@@ -12,6 +12,10 @@
 4. 抽出結果を `{name, stage, nextAction, nextDate, industry}` の配列JSONとして `pipeline/sheet-import-loop.json` に書き出す(gitignore済み)。対象メールが無ければ「新しい選考情報はありませんでした」と出力して終了。
 5. `cd pipeline; npx tsx scripts/sheet-sync.ts sheet-import-loop.json` で dry-run 実行し、差分を確認する。
 6. 差分が妥当(既存の合格/不合格を壊さない・件数が異常に多くない)なら `--apply` を付けて書き込む。妥当でなければ書き込まず理由を出力する。
-7. 最後に結果サマリ(更新した企業名・選考日・追記件数)を簡潔に出力する。
+7. 受信トレイの整理: 就活サービス媒体(宣伝・スカウトメルマガ)からの未読メールを既読にする。
+   - 対象の送信ドメイン: slogan.jp / br-campus.jp / typeshukatsu.jp / en-courage.com / labbase.jp / openwork.jp / gaishishukatsu.com / gakujo.ne.jp / ibeck.co.jp / offerbox.jp / mynavi.jp / rikunabi.com
+   - `is:unread newer_than:2d {from:...}` で検索し、各スレッドから unlabel_thread で UNREAD ラベルを外す(アーカイブや削除はしない)
+   - 企業ドメインからの選考・募集メールは絶対に既読にしないこと
+8. 最後に結果サマリ(更新した企業名・選考日・追記件数・既読にした宣伝メール件数)を簡潔に出力する。
 
 注意: シートの書き込みルール(合格/不合格/辞退は上書きしない、メモ・数式列に触れない)はスクリプト側で保証されているが、dry-run の差分は必ず目視確認すること。
