@@ -28,7 +28,7 @@ function Copy-Prompt([string] $file, [string] $label) {
   Get-Content $path -Raw -Encoding UTF8 | Set-Clipboard
   "$label のプロンプトをクリップボードにコピーしました。"
   "Chromeで対象ページを開き、Claude in Chrome に貼り付けてください。"
-  "(_profile.local.md の個人情報も忘れずに)"
+  "(個人マスタは submit.local.md の§4〜§11)"
 }
 
 switch ($Command) {

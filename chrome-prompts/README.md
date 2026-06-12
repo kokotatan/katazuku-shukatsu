@@ -4,10 +4,10 @@
 
 ## 使い方
 
-1. `_profile.md` をコピーして `_profile.local.md` を作り、自分の情報を埋める(localはgitignore済み)
+1. **個人マスタは `submit.local.md` の§4〜§11**(gitignore済み)。氏名・学歴・職歴・資格・受賞・ES素材まで全部ここで管理する(旧 `_profile.local.md` は廃止)
 2. Chromeで対象のマイページ・フォームを開く
-3. Claude in Chrome を開き、目的のプロンプトの「ここから貼り付け」以降をコピペ
-4. `{{ }}` の部分を埋めて送信
+3. `katazuku submit` / `katazuku test` でプロンプトをコピーするか、目的のプロンプトを手でコピペ
+4. 01〜04のプロンプトで個人情報が要る場合も `submit.local.md` の該当節を貼る
 
 ## プロンプト一覧
 
