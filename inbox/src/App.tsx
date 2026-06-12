@@ -199,6 +199,8 @@ export default function App() {
       .then((data) => {
         if (data === null) return
         const added = importRaws(toRaws(data))
+        // 実データが入ったらデモデータは引っ込める
+        setEmails((prev) => prev.filter((e) => e.source !== 'demo'))
         if (added > 0) setToast(`メールデータから新着${added}件を自動取込しました`)
       })
       .catch(() => {
