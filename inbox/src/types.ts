@@ -1,6 +1,6 @@
 import type { SelectionKind } from './lib/selection'
 
-export type Category = 'interview' | 'result' | 'task' | 'event' | 'other'
+export type Category = 'interview' | 'result' | 'task' | 'test' | 'event' | 'other'
 
 export type Status = 'inbox' | 'done' | 'snoozed'
 
@@ -49,6 +49,7 @@ export const CATEGORY_META: Record<Category, { label: string }> = {
   interview: { label: '面接・日程調整' },
   result: { label: '選考結果' },
   task: { label: 'ES・提出タスク' },
+  test: { label: '適性検査' },
   event: { label: '説明会・イベント' },
   other: { label: 'その他' },
 }

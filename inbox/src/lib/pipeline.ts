@@ -21,6 +21,7 @@ const STORAGE_KEY = 'katazuku-pipeline/companies'
 const STAGE_FOR: Record<Category, Stage> = {
   interview: 'interview',
   task: 'task',
+  test: 'task',
   result: 'entried',
   event: 'scouted',
   other: 'scouted',

@@ -49,6 +49,10 @@ npm install
 npm run dev   # → http://localhost:5173 (初回はデモデータで動きます)
 ```
 
+返信ボタンからの文章生成は、ログイン済みの Claude Code CLI を `claude -p` で呼び出すため、
+`npm run dev` または `npm run preview` でローカル起動した場合に利用できます。
+静的配信された Vercel 版からは、Claude サブスクリプションのローカル認証を利用できません。
+
 **技術スタック**: Vite + React 19 + TypeScript + Tailwind CSS v4 / バックエンド不要(localStorage永続化)
 
 ### 📊 Katazuku Pipeline (`pipeline/`)

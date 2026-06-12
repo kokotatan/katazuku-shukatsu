@@ -7,6 +7,7 @@ import { addEmailToPipeline } from './lib/pipeline'
 import { useLocalStorage } from './lib/storage'
 import { EmailCard } from './components/EmailCard'
 import { Header } from './components/Header'
+import { ReplyModal } from './components/ReplyModal'
 import { Sidebar, type Filter } from './components/Sidebar'
 import { SettingsModal } from './components/SettingsModal'
 
@@ -47,6 +48,7 @@ export default function App() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [replyTarget, setReplyTarget] = useState<Email | null>(null)
   const [connecting, setConnecting] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
   const [now, setNow] = useState(() => new Date())
@@ -64,7 +66,7 @@ export default function App() {
 
   const counts = useMemo(() => {
     const c: Record<Filter, number> = {
-      action: 0, selection: 0, all: 0, interview: 0, result: 0, task: 0, event: 0, other: 0,
+      action: 0, selection: 0, all: 0, interview: 0, result: 0, task: 0, test: 0, event: 0, other: 0,
       snoozed: 0, done: 0,
     }
     for (const e of emails) {
@@ -316,12 +318,21 @@ export default function App() {
                   onSnooze={() => snooze(email.id)}
                   onRestore={() => restore(email.id)}
                   onAddToPipeline={() => addToPipeline(email)}
+                  onReply={() => setReplyTarget(email)}
                 />
               ))}
             </div>
           )}
         </section>
       </main>
+
+      {replyTarget && (
+        <ReplyModal
+          email={replyTarget}
+          onClose={() => setReplyTarget(null)}
+          onCopied={() => setToast('本文をコピーしました')}
+        />
+      )}
 
       {settingsOpen && (
         <SettingsModal

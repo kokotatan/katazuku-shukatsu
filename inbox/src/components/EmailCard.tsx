@@ -12,6 +12,7 @@ interface Props {
   onSnooze: () => void
   onRestore: () => void
   onAddToPipeline: () => void
+  onReply: () => void
 }
 
 const URGENCY_BAR: Record<Urgency, string> = {
@@ -58,6 +59,7 @@ export function EmailCard({
   onSnooze,
   onRestore,
   onAddToPipeline,
+  onReply,
 }: Props) {
   const deadline = email.deadline ? new Date(email.deadline) : null
   const urgency = email.status === 'done' ? 'normal' : urgencyOf(deadline, now)
@@ -150,6 +152,9 @@ export function EmailCard({
                 className="rounded-lg bg-slate-900 px-2.5 py-1 text-xs font-semibold text-white shadow-sm transition hover:bg-slate-700"
               >
                 片付けた
+              </button>
+              <button onClick={onReply} className={ghostBtn} title="テンプレート付きで返信を作成します">
+                返信
               </button>
               {email.actionUrl && (
                 <a href={email.actionUrl} target="_blank" rel="noreferrer" className={ghostBtn} title={email.actionUrl}>

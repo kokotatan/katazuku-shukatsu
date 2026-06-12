@@ -20,6 +20,7 @@
    - 就活サービス媒体(slogan.jp / br-campus.jp / typeshukatsu.jp / en-courage.com / labbase.jp / openwork.jp / gaishishukatsu.com / gakujo.ne.jp / ibeck.co.jp / offerbox.jp / mynavi.jp / rikunabi.com)の `is:unread older_than:7d` は label_thread で TRASH へ
    - それ以外の `is:unread older_than:1d` は unlabel_thread で UNREAD を外す(既読化・削除はしない)。手順7でアプリに取り込み済みなので見逃しは起きない
    - 当日(1日以内)の未読はそのまま残す(緊急対応の目印のため)
+   - **最重要の例外**: 件名・本文に「人事面談・面談調整・Slack招待/ワークスペース・インターン事前準備(事前アンケート/セットアップ/持ち物/宿泊/交通費/キックオフ)」が含まれ、かつ未対応に見えるメールは**既読化せず未読のまま残し**、サマリの冒頭で個別に報告する。この種の見逃しは選考辞退扱いに直結するため最優先
 9. 最後に結果サマリ(更新した企業名・選考日・追記件数・既読化/ゴミ箱の件数)を簡潔に出力する。
 
 注意: シートの書き込みルール(合格/不合格/辞退は上書きしない、メモ・数式列に触れない)はスクリプト側で保証されているが、dry-run の差分は必ず目視確認すること。

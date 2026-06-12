@@ -1,6 +1,15 @@
 # katazuku 開発進捗
 
 最終更新: 2026-06-12
+
+## 引き継ぎ(2026-06-12〜)
+
+開発はClaude Fable以外のAI(Opus / Codex / GitHub Copilot)へ引き継ぎ。
+- 共通規約: `CLAUDE.md`(Claude Code系) / `AGENTS.md`(Codex) / `.github/copilot-instructions.md`(Copilot)
+- 次の実装は `docs/specs/01〜04` の順(01: 返信生成API → 02: Today → 03: Notes → 04: Prep)
+- 注意: `inbox/src/lib/reply.ts` は `/api/generate-reply` 前提に変更済みだが**サーバー未実装**。
+  Spec 01 を最初にやらないと返信モーダルはエラーになる
+- 未読メール掃除の途中状態: 古い宣伝900件+α処理済み、残りは継続要(手順は scripts/daily-sync-prompt.md と同様)
 **ユーザー向けの進捗一覧はGoogleスプレッドシートで管理**: https://docs.google.com/spreadsheets/d/1dzwnLLRtMJDHcKemJzcGHSqsvkKbeKFC9uXfuM9rqXg
 (careerアカウントのドライブ。このmdはリポジトリ内の開発者向け詳細メモ)
 
