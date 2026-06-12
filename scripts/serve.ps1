@@ -1,4 +1,4 @@
-# katazuku をローカル配信する(常時起動用)
+﻿# katazuku をローカル配信する(常時起動用)
 # - Inbox はAI返信生成API付きの本番ビルド配信(vite preview)
 # - コードを更新したら先に `npm run build` を実行すること
 #

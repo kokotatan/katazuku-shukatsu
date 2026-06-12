@@ -6,6 +6,25 @@
 開発規約は `CLAUDE.md`(Claude Code) / `AGENTS.md`(Codex) / `.github/copilot-instructions.md`(Copilot)。
 次の実装は `docs/specs/` を番号順に。進捗の一次情報は `docs/PROGRESS.md`。
 
+## コマンド一覧(当初構想と実装状況)
+
+統一入口は `katazuku <command>`(`scripts/katazuku.ps1`)。
+セットアップ: PowerShellプロファイルに `function katazuku { & "<このリポジトリ>\scripts\katazuku.ps1" @args }` を1行追加。
+
+| コマンド | 日本語名 | 概要 | 実体 | 状況 |
+|---|---|---|---|---|
+| `katazuku submit` | 書類提出 | ESをフォームへ転記・提出(プロンプトをコピーしてClaude in Chromeへ) | chrome-prompts/05 | 提供中 |
+| `katazuku test` | 適性検査 | 受検の予約・環境準備(受検代行は不正のためしない) | chrome-prompts/02 | 提供中 |
+| `katazuku inbox` | 連絡管理 | メール仕分け・AI返信下書き+毎時の見張り・毎朝の同期 | inbox/ + ルーチン | 提供中 |
+| `katazuku profile` | 個人マスタ | 氏名・学歴・署名の一元管理 | _profile.local.md | 暫定(specs/05) |
+| `katazuku company` | 企業マスタ | 企業情報・選考ステータス(Googleシート+Pipeline双方向) | 選考管理シート | 提供中 |
+| `katazuku prep [社名]` | 直前対策 | 振り返り・想定問答・面接直前モード | prep/ | 提供中 |
+| `katazuku insight` | インテリジェンス | 当日のサマリーと次アクション(毎朝自動・手動も可) | daily-sync + today/ | 提供中 |
+| `katazuku ask <質問>` | ヘルプデスク | 自分の就活データ(シート・メール)にチャットで質問 | Claude Code + MCP | 提供中 |
+| `katazuku status` | 進捗管理 | 全社の選考状況ダッシュボード | pipeline/ | 提供中 |
+| `katazuku interview` | 面接ログ | 面接録音から構造化メモを生成しPrepへ | specs/06 | 未実装 |
+| `katazuku people` | 人脈整理 | 出会った社員・OBの記録(Prepに統合) | specs/07 | 未実装 |
+
 ## 構成
 
 ```

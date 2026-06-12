@@ -1,4 +1,4 @@
-# katazuku 毎日のシート同期 (Windowsタスクスケジューラから起動する)
+﻿# katazuku 毎日のシート同期 (Windowsタスクスケジューラから起動する)
 # 登録方法は docs/MINIPC-SETUP.md を参照
 $ErrorActionPreference = 'Continue'
 $repo = Split-Path $PSScriptRoot -Parent
