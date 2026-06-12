@@ -13,6 +13,8 @@ notify-items-*.json
 # 選考管理シート等から変換した取込データ(個人情報)
 sheet-import-*.json
 gmail-import-*.json
+notes-export-*.json
+prep/seed-example.json
 
 # Googleサービスアカウントの鍵(秘密情報)
 service-account.json

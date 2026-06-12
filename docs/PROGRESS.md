@@ -17,9 +17,15 @@
 
 ```
 katazuku.kotalab.com          → landing/ (プロダクト一覧トップ)
-katazuku.kotalab.com/inbox/   → inbox/   (メール見逃しゼロ) ✅ 完成
-katazuku.kotalab.com/pipeline/→ pipeline/(選考管理ボード)   🚧 実装中
+katazuku.kotalab.com/inbox/   → inbox/   (メール見逃しゼロ・AI返信生成つき) 完成
+katazuku.kotalab.com/pipeline/→ pipeline/(選考管理ボード)                  完成
+katazuku.kotalab.com/today/   → today/   (今日やること横断ダッシュボード)   完成 (2026-06-12, spec02)
+katazuku.kotalab.com/notes/   → notes/   (ES部品庫・文字数カウンタ)        完成 (2026-06-12, spec03)
+katazuku.kotalab.com/prep/    → prep/    (面接振り返り・直前モード)        完成 (2026-06-12, spec04)
 ```
+
+新3アプリの検証: `cd today && npx tsx scripts/check-aggregate.ts` / `cd notes && npx tsx scripts/check-count.ts` /
+`cd prep && npx tsx scripts/check-prep.ts`。ローカル常時配信は `scripts/serve.ps1`(5アプリ、AI返信生成はinboxのpreviewに同梱)。
 
 ビルド: ルートで `npm run build` → `dist/` を組み立て(`scripts/assemble.mjs`)
 デプロイ: ルートから `vercel --prod`(`vercel.json` 設定済み)→ 未実施(vercel CLI未インストール・未ログイン)

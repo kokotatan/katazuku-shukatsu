@@ -111,6 +111,14 @@ export function CompanyModal({ initial, onSave, onDelete, onClose }: Props) {
           <button onClick={onClose} className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50">
             キャンセル
           </button>
+          {initial.name && (
+            <a
+              href={`/prep/?company=${encodeURIComponent(initial.name)}`}
+              className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"
+            >
+              対策ノート
+            </a>
+          )}
           {onDelete && (
             <button
               onClick={() => { if (window.confirm(`「${initial.name}」を削除しますか?`)) onDelete() }}

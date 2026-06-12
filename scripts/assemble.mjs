@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url'
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)))
 const dist = join(root, 'dist')
-const apps = ['inbox', 'pipeline']
+const apps = ['inbox', 'pipeline', 'today', 'notes', 'prep']
 
 for (const app of apps) {
   if (!existsSync(join(root, app, 'dist'))) {
