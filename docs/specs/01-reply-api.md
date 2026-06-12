@@ -1,10 +1,15 @@
-# Spec 01: 返信文生成API (/api/generate-reply)
+# Spec 01: 返信文生成API (/api/generate-reply) ※デプロイ版のみ未実装
 
 ## 背景
 
-Inboxの返信モーダル(`inbox/src/components/ReplyModal.tsx`)は既に
-`POST /api/generate-reply` を呼ぶ実装になっているが、**サーバー側が存在しない**。
-これを実装して、メールカードの「返信」ボタンからClaude生成の返信文が出るようにする。
+Inboxの返信モーダル(`inbox/src/components/ReplyModal.tsx`)は `POST /api/generate-reply` を呼ぶ。
+
+**ローカル(dev/preview)は実装済み・動作確認済み**: `inbox/vite.claude-reply.ts` がViteミドルウェアとして
+`claude -p --model haiku` を起動して生成する。これは **Claude CLIのログイン=サブスクリプション扱い**で、
+APIキー不要・追加課金なし(ただしプランの利用上限は消費する)。claude CLIが入っているPC/miniPCでのみ動く。
+
+本スペックは **Vercelにデプロイした本番でも動かす場合のみ** 必要(クラウドにはclaude CLIが無いため)。
+当面ローカル運用なら着手不要。
 
 ## 要件
 

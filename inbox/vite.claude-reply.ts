@@ -55,9 +55,10 @@ ${String(data.body ?? '')}`
 
 function runClaude(prompt: string): Promise<string> {
   return new Promise((resolve, reject) => {
+    // テキスト生成のみ(ツール不要)。--tools というフラグは存在しないので注意
     const child = spawn(
       'claude',
-      ['-p', '--model', 'haiku', '--tools', '', '--no-session-persistence'],
+      ['-p', '--model', 'haiku', '--no-session-persistence'],
       {
         cwd: process.cwd(),
         windowsHide: true,
