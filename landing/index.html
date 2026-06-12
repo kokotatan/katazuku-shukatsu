@@ -5,80 +5,115 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="description" content="katazuku — 就活、ぜんぶ片付く。日本の大学生のための就活プロダクト群" />
   <title>katazuku — 就活、ぜんぶ片付く。</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;600;700&display=swap" rel="stylesheet" />
   <style>
     :root {
-      --ink: #1e293b;
-      --sub: #64748b;
-      --bg: #f1f5f9;
-      --card: #ffffff;
-      --accent: #0f172a;
+      --paper: #f4f2ec;
+      --card: #faf9f6;
+      --ink: #1b1a16;
+      --sub: #7f7a6e;
+      --rule: #d3cec1;
+      --aka: #b13a14;
+      --mincho: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "MS PMincho", serif;
+      --gothic: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Yu Gothic", "Meiryo", system-ui, sans-serif;
     }
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Yu Gothic", "Meiryo", system-ui, sans-serif;
-      background: var(--bg);
+      font-family: var(--gothic);
+      background: var(--paper);
       color: var(--ink);
       -webkit-font-smoothing: antialiased;
       font-feature-settings: "palt";
     }
-    .wrap { max-width: 880px; margin: 0 auto; padding: 0 24px; }
-    header { padding: 88px 0 56px; text-align: center; }
-    .logo { font-size: 15px; font-weight: 700; letter-spacing: 0.08em; color: var(--accent); }
-    h1 { font-size: clamp(32px, 6vw, 52px); font-weight: 800; letter-spacing: -0.02em; margin-top: 16px; line-height: 1.25; }
-    .tagline { margin-top: 16px; font-size: 16px; color: var(--sub); line-height: 1.8; }
-    .products { display: grid; gap: 16px; padding-bottom: 96px; }
-    .card {
-      display: block; background: var(--card); border: 1px solid #e2e8f0; border-radius: 18px;
-      padding: 28px 30px; text-decoration: none; color: inherit;
-      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    .wrap { max-width: 820px; margin: 0 auto; padding: 0 24px; }
+
+    header { padding: 96px 0 64px; }
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .mark {
+      width: 34px; height: 34px; background: var(--ink); color: #fff;
+      font-family: var(--mincho); font-weight: 600; font-size: 18px;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 4px; padding-top: 2px;
     }
-    a.card:hover { transform: translateY(-2px); box-shadow: 0 10px 28px rgba(15, 23, 42, 0.08); }
-    .card-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-    .card h2 { font-size: 21px; font-weight: 800; }
-    .badge { font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 999px; }
-    .badge.live { background: #0f172a; color: #ffffff; }
-    .badge.soon { background: #e2e8f0; color: #64748b; }
-    .card p { margin-top: 10px; font-size: 14px; color: var(--sub); line-height: 1.9; }
-    .cta { margin-top: 14px; font-size: 14px; font-weight: 700; color: var(--accent); }
-    .muted { opacity: 0.65; }
-    footer { padding: 32px 0 48px; text-align: center; font-size: 12px; color: #94a3b8; }
+    .logo { font-family: var(--mincho); font-size: 18px; font-weight: 600; letter-spacing: 0.02em; }
+    h1 {
+      font-family: var(--mincho);
+      font-size: clamp(34px, 6.5vw, 58px);
+      font-weight: 600; letter-spacing: 0.04em; line-height: 1.4;
+      margin-top: 36px;
+    }
+    h1 .period { color: var(--aka); }
+    .tagline { margin-top: 20px; font-size: 14px; color: var(--sub); line-height: 2.1; }
+    .rule { border: 0; border-top: 1px solid var(--rule); margin: 0; }
+
+    .products { padding: 16px 0 96px; }
+    .card {
+      display: grid; grid-template-columns: 56px 1fr auto; gap: 20px; align-items: baseline;
+      background: transparent; border-bottom: 1px solid var(--rule);
+      padding: 34px 4px; text-decoration: none; color: inherit;
+      transition: background 0.15s ease;
+    }
+    .card:first-child { border-top: 1px solid var(--rule); }
+    a.card:hover { background: var(--card); }
+    .num { font-family: var(--mincho); font-size: 13px; color: var(--sub); letter-spacing: 0.15em; }
+    .card h2 { font-family: var(--mincho); font-size: 22px; font-weight: 600; letter-spacing: 0.02em; }
+    .card h2 small {
+      margin-left: 10px; font-family: var(--gothic); font-size: 11px; font-weight: 600;
+      letter-spacing: 0.25em; color: var(--sub); text-transform: uppercase;
+    }
+    .card p { margin-top: 12px; font-size: 13.5px; color: var(--sub); line-height: 2; max-width: 56ch; }
+    .status { font-size: 11px; font-weight: 600; letter-spacing: 0.1em; white-space: nowrap; }
+    .status.live { color: var(--ink); border: 1px solid var(--ink); padding: 4px 12px; border-radius: 3px; }
+    .status.soon { color: var(--sub); border: 1px solid var(--rule); padding: 4px 12px; border-radius: 3px; }
+    .muted h2, .muted .num { color: var(--sub); }
+
+    footer { padding: 28px 0 56px; display: flex; justify-content: space-between; font-size: 11.5px; color: var(--sub); letter-spacing: 0.05em; }
   </style>
 </head>
 <body>
   <header class="wrap">
-    <div class="logo">katazuku</div>
-    <h1>就活、ぜんぶ片付く。</h1>
+    <div class="brand">
+      <div class="mark">片</div>
+      <div class="logo">katazuku</div>
+    </div>
+    <h1>就活、ぜんぶ<br />片付く<span class="period">。</span></h1>
     <p class="tagline">日本の大学生のための就活プロダクト群。<br />散らかった就活のタスクを、ひとつずつ気持ちよく片付けていく。</p>
   </header>
 
   <main class="wrap products">
     <a class="card" href="/inbox/">
-      <div class="card-head">
-        <h2>Katazuku Inbox</h2>
-        <span class="badge live">公開中</span>
+      <span class="num">〇一</span>
+      <div>
+        <h2>Inbox<small>メール</small></h2>
+        <p>就活メール、ぜんぶ片付く。企業からのメールを自動仕分けし、本文から締切を抽出して「あと何日」で可視化。返信・提出が必要なメールだけを締切順に並べる、見逃しゼロの受信箱。</p>
       </div>
-      <p>就活メール、ぜんぶ片付く。企業からのメールを自動仕分けし、本文から締切を抽出して「あと◯日」で可視化。返信・提出が必要なメールだけを締切順に並べる、見逃しゼロのインボックス。</p>
-      <div class="cta">使ってみる →</div>
+      <span class="status live">公開中</span>
     </a>
 
     <a class="card" href="/pipeline/">
-      <div class="card-head">
-        <h2>Katazuku Pipeline</h2>
-        <span class="badge live">公開中</span>
+      <span class="num">〇二</span>
+      <div>
+        <h2>Pipeline<small>選考管理</small></h2>
+        <p>選考状況、ぜんぶ見える。気になる、エントリー、ES・テスト、面接、内定。企業ごとの選考ステージをドラッグで動かすカンバンボード。「次にやること」と期限つきで、今日動くべき一社がすぐわかる。</p>
       </div>
-      <p>選考状況、ぜんぶ見える。気になる→エントリー→ES・テスト→面接→内定。企業ごとの選考ステージをドラッグで動かすカンバンボード。「次にやること」と期限つきで、今日動くべき1社がすぐわかる。</p>
-      <div class="cta">使ってみる →</div>
+      <span class="status live">公開中</span>
     </a>
 
     <div class="card muted">
-      <div class="card-head">
+      <span class="num">〇三</span>
+      <div>
         <h2>Coming soon</h2>
-        <span class="badge soon">準備中</span>
+        <p>次の「片付く」を準備中です。</p>
       </div>
-      <p>次の「片付く」を準備中です。</p>
+      <span class="status soon">準備中</span>
     </div>
   </main>
 
-  <footer>© 2026 katazuku</footer>
+  <footer class="wrap">
+    <span>katazuku</span>
+    <span>© 2026</span>
+  </footer>
 </body>
 </html>

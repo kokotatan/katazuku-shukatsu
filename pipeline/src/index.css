@@ -1,8 +1,41 @@
+@import url("https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;600;700&display=swap");
 @import "tailwindcss";
 
+/*
+ * katazuku デザイントークン — 「帳簿的ミニマリズム」
+ * 紙色の地にインクの黒、罫線はうすい砂色。警告だけ朱(しゅ)。
+ * slate/red のトークン自体を温かい色に差し替えることで全UIに適用する。
+ */
 @theme {
   --font-sans: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI",
     "Yu Gothic", "Meiryo", system-ui, sans-serif;
+  --font-display: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho",
+    "MS PMincho", serif;
+
+  /* 紙とインク (warm gray) */
+  --color-slate-50: #faf9f6;
+  --color-slate-100: #f4f2ec;
+  --color-slate-200: #e8e4da;
+  --color-slate-300: #d3cec1;
+  --color-slate-400: #a29d90;
+  --color-slate-500: #7f7a6e;
+  --color-slate-600: #5b574d;
+  --color-slate-700: #433f37;
+  --color-slate-800: #2a2823;
+  --color-slate-900: #1b1a16;
+
+  /* 朱 — 締切・要対応の警告専用 */
+  --color-red-50: #faeee8;
+  --color-red-100: #f5ddd1;
+  --color-red-200: #ecc4b1;
+  --color-red-500: #c24a20;
+  --color-red-600: #b13a14;
+  --color-red-700: #92300e;
+
+  /* 角丸はきりっと控えめに */
+  --radius-lg: 0.375rem;
+  --radius-xl: 0.5rem;
+  --radius-2xl: 0.625rem;
 }
 
 html {

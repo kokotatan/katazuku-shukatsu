@@ -288,7 +288,9 @@ export default function App() {
             <div className="flex flex-col items-center gap-3 rounded-2xl border-2 border-dashed border-slate-200 bg-white/60 py-20 text-center">
               {filter === 'action' && counts.action === 0 && !query ? (
                 <>
-                  <p className="text-lg font-bold text-slate-700">要対応はゼロ。ぜんぶ片付いています</p>
+                  <p className="font-display text-2xl font-semibold tracking-wide text-slate-800">
+                    全部、片付いた。
+                  </p>
                   <p className="text-sm text-slate-400">この調子で見逃しゼロをキープしましょう</p>
                 </>
               ) : (

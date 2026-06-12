@@ -134,19 +134,29 @@ export default function App() {
     <div className="flex min-h-screen flex-col">
       <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-screen-2xl items-center gap-4 px-4 py-3">
-          <h1 className="flex items-baseline gap-2.5 tracking-tight">
-            <span className="text-[15px] font-semibold tracking-widest text-slate-400 uppercase">
-              katazuku
+          <h1 className="flex items-center gap-2.5">
+            <span
+              aria-hidden
+              className="flex h-7 w-7 items-center justify-center rounded-[4px] bg-slate-900 pt-0.5 font-display text-[15px] font-semibold leading-none text-white"
+            >
+              片
             </span>
-            <span className="text-lg font-bold text-slate-900">Pipeline</span>
-            <span className="hidden text-xs font-normal text-slate-400 sm:inline">
+            <span className="flex items-baseline gap-2">
+              <span className="font-display text-lg font-semibold tracking-tight text-slate-900">
+                katazuku
+              </span>
+              <span className="text-[11px] font-semibold tracking-[0.25em] text-slate-400 uppercase">
+                Pipeline
+              </span>
+            </span>
+            <span className="hidden border-l border-slate-200 pl-2.5 text-xs font-normal text-slate-400 sm:inline">
               選考状況、ぜんぶ見える。
             </span>
           </h1>
           <div className="ml-auto flex items-center gap-4 text-xs text-slate-500">
-            <span>進行中 <b className="text-base text-slate-900">{active}</b> 社</span>
-            <span>面接 <b className="text-base text-slate-900">{interviews}</b></span>
-            <span>内定 <b className="text-base text-slate-900">{offers}</b></span>
+            <span>進行中 <b className="font-display text-base text-slate-900">{active}</b> 社</span>
+            <span>面接 <b className="font-display text-base text-slate-900">{interviews}</b></span>
+            <span>内定 <b className="font-display text-base text-slate-900">{offers}</b></span>
             <button
               onClick={() => fileInput.current?.click()}
               className="rounded-lg border border-slate-300 px-3 py-1.5 font-medium text-slate-600 transition hover:bg-slate-50"
@@ -205,7 +215,7 @@ export default function App() {
                 }`}
               >
                 <div className="flex items-center gap-1.5 px-3 pt-3 pb-2">
-                  <h2 className="text-sm font-bold text-slate-600">{stage.label}</h2>
+                  <h2 className="font-display text-sm font-semibold text-slate-700">{stage.label}</h2>
                   <span className="ml-auto rounded-full bg-white px-2 py-0.5 text-xs font-bold text-slate-500">
                     {list.length}
                   </span>
