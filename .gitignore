@@ -1,0 +1,21 @@
+node_modules
+dist
+.vercel
+
+# Discord通知の設定・状態(Webhook URLは秘密情報)
+notify-config.json
+notify-state.json
+notify-items-*.json
+
+# 個人情報入りのローカルプロフィール
+*.local.md
+
+# 選考管理シート等から変換した取込データ(個人情報)
+sheet-import-*.json
+gmail-import-*.json
+
+# Googleサービスアカウントの鍵(秘密情報)
+service-account.json
+
+# 自動同期の実行ログ
+logs/

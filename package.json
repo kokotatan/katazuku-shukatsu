@@ -1,0 +1,8 @@
+{
+  "name": "katazuku-shukatsu",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "build": "npm --prefix inbox install && npm --prefix inbox run build && npm --prefix pipeline install && npm --prefix pipeline run build && node scripts/assemble.mjs"
+  }
+}

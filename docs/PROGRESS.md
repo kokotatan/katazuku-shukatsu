@@ -1,0 +1,90 @@
+# katazuku 開発進捗
+
+最終更新: 2026-06-12
+**ユーザー向けの進捗一覧はGoogleスプレッドシートで管理**: https://docs.google.com/spreadsheets/d/1dzwnLLRtMJDHcKemJzcGHSqsvkKbeKFC9uXfuM9rqXg
+(careerアカウントのドライブ。このmdはリポジトリ内の開発者向け詳細メモ)
+
+## 全体構成
+
+```
+katazuku.kotalab.com          → landing/ (プロダクト一覧トップ)
+katazuku.kotalab.com/inbox/   → inbox/   (メール見逃しゼロ) ✅ 完成
+katazuku.kotalab.com/pipeline/→ pipeline/(選考管理ボード)   🚧 実装中
+```
+
+ビルド: ルートで `npm run build` → `dist/` を組み立て(`scripts/assemble.mjs`)
+デプロイ: ルートから `vercel --prod`(`vercel.json` 設定済み)→ 未実施(vercel CLI未インストール・未ログイン)
+ドメイン: katazuku.kotalab.com 予定(DNS設定未実施: CNAME `katazuku` → `cname.vercel-dns.com`)
+
+## ✅ Katazuku Inbox(完成・ローカル動作確認済み)
+
+就活メールの自動仕分け+締切抽出+要対応キュー。Vite + React 19 + TS + Tailwind v4、バックエンドなし(localStorage)。
+
+- 自動分類: 面接/選考結果/ES・提出タスク/説明会/その他(`inbox/src/lib/classify.ts`)
+- 日本語日付・締切抽出: 「6月15日(月) 17:00まで」「2026/6/11」等(`inbox/src/lib/dates.ts`)
+- 要対応キュー(締切順)、片付け/スヌーズ/カレンダー登録、J/K/E/Sショートカット、検索、片付け率
+- Gmail直接続(クライアントサイドOAuth、要クライアントID)+ JSONインポート/エクスポート
+- 実メール検証済み: 直近50件で分類テスト→誤分類5件を修正(検証: `cd inbox && npx tsx scripts/check-classify.ts`)
+- **Pipeline連携(2026-06-12追加)**: メールカードの「📌 選考ボードへ」でPipelineに企業を追加・更新(`inbox/src/lib/pipeline.ts`)。同一オリジンのlocalStorage(`katazuku-pipeline/companies`)経由。表記ゆれ(株式会社の有無等)を吸収して既存企業は更新、ステージは前進方向のみ(内定/終了は不変)。検証: `cd inbox && npx tsx scripts/check-pipeline.ts`(9ケース通過)。※devでは両アプリのポートが違うため連携は本番ビルド(同一オリジン)でのみ動作
+- 実メールデータ: `inbox/gmail-import-2026-06-11.json`(gitignore済・個人情報)→ アプリの設定→インポートで取込
+
+### 未対応(Inbox)
+- デザインパス: codex product design プラグインに任せる予定(未インストール)
+- 本番でGmail直接続を使う場合: OAuthクライアントIDの承認済みオリジンに https://katazuku.kotalab.com を追加
+- コミット未実施(ベースライン未固定)
+
+## ✅ メール見張りクラウドルーチン(稼働開始)
+
+毎時0分にクラウドでGmailをチェックし、重要メール(面接・締切・選考結果等)だけ通知。
+
+- ルーチンID: `trig_01LE26rJ6RL3FuzU8TBDiNib`(claude.ai/code/routines で管理・削除)
+- モデル: claude-haiku-4-5 / cron: `0 * * * *`(UTC) / Gmail MCPコネクタ接続済み
+- 通知済み管理: Gmailラベル `katazuku-notified` で二重通知防止
+- 2026-06-11T11:00Z以前のメールは移行措置で通知対象外
+- 注意: クラウド環境にPushNotificationが無い場合は実行結果の冒頭に通知文を書く設計。初回実行の結果要確認
+- ローカル版の遺産: `scripts/notify-discord.mjs`(Discord Webhook送信、未使用)、`notify-state.json`(ローカルループ用、クラウド版では不使用)
+
+## ✅ Katazuku Pipeline(選考管理ボード)— 完成・ビルド検証済み
+
+企業ごとの選考ステータスをカンバンで管理(`pipeline/`、/pipeline/ で配信)。
+
+- 6ステージ: 気になる/エントリー済み/ES・テスト/面接・面談/内定/終了
+- HTML5ドラッグ&ドロップでステージ移動、カードクリックで編集モーダル(企業名・職種・次のアクション・期限・メモ)
+- 期限バッジ(期限切れ/今日/あと◯日)、列内は締切が近い順に自動ソート
+- 初期データは実メールから判明した選考状況9社(PKSHA面接再調整・LayerX課題6/29・タイミー面談・ネクストビート6/12締切・博報堂6/25・農林中金6/15・JT・SMBC・ソニー)
+- localStorage永続化(`katazuku-pipeline/companies`)
+- **Inbox連携(2026-06-12完了)**: Inboxの「選考ボードへ」ボタンから企業を受け取る。`katazuku-pipeline/seeded` フラグでInboxが先に書き込んでも初期9社が消えない。storageイベント購読で別タブからの追加が開いたまま反映される
+- **選考管理シート取込(2026-06-12完了)**: Googleスプレッドシート「選考管理シート_奥山彪太郎」(Drive MCPで読込)をGUI化。
+  - ステージに「🎫 インターン合格」を新設(サマー合格は内定と別扱い)、カードに業界・志望度バッジ、編集モーダルにマイページURL(開くボタン付き)を追加
+  - ヘッダーに JSONインポート/エクスポート。インポートは既存カードを壊さないマージ(stage/nextAction/nextDate は維持、空欄のみ補完、メモは追記)。名寄せは表記ゆれ吸収+短名は完全一致(`pipeline/src/lib/importer.ts`)
+  - シート変換済みデータ: `pipeline/sheet-import-2026-06-12.json`(gitignore済。**ID/パスワード列は意図的に除外**)→ アプリの「⬆ インポート」で取込むと初期9社+新規107社=116社
+  - 検証: `cd pipeline && npx tsx scripts/check-import.ts`(12ケース、実データの名寄せ衝突チェック込み)
+- **シート書き戻し(2026-06-12完了)**: ヘッダーの「📤 シートに反映」でボード→選考管理シートへ同期(`pipeline/src/lib/sheet.ts` + `SheetSyncModal`)。
+  - 方式: クライアントサイドOAuth(GIS、Inboxと同方式)+ Google Sheets API values:batchUpdate。**要: ユーザーのOAuthクライアントID + Sheets API有効化**(クライアントIDとシートIDはlocalStorageに保存、デフォルトIDは実シート)
+  - 書く列: 出願状況/次回アクション/〆切。業界・志望度は空欄のみ補完。**合格/不合格/辞退は上書きしない**(合格の自動集計数式を守る)。メモ欄・選考①〜④・提出済・残り日数(数式)は不可侵。シートに無い企業は表の空き行に追記
+  - 書き込み前に差分プレビュー(更新/追記の企業一覧)を出して確認してから実行
+  - 検証: `cd pipeline && npx tsx scripts/check-sheet.ts`(23ケース: 2段ヘッダ検出・全角カッコ名寄せ・別表不可侵など)
+  - 名寄せはNFKC正規化を追加(全角カッコ対応)。Inbox側 `lib/pipeline.ts` も同一ロジックに更新
+
+- **シート書き戻し(サービスアカウント版CLI)**: `pipeline/scripts/sheet-sync.ts`。Claude Code/ターミナルから直接書き込める(ブラウザOAuth不要)。Pipelineの「⬇ エクスポート」JSONを渡す。デフォルトdry-run、`--apply`で書込。鍵は `pipeline/service-account.json`(gitignore済、環境変数 `GOOGLE_SA_KEY` で変更可)。書込ルールは `lib/sheet.ts` をアプリと共用
+  - 準備: GCPでSheets API有効化→サービスアカウント作成→JSONキー保存→シートをSAメールに編集者で共有
+  - 背景: claude.aiのDrive MCPコネクタにはセル更新ツールがなく、MCPだけでは書き戻し不可
+
+### 未対応(Pipeline)
+- デザインパスはInboxと同様プラグイン待ち
+- シート書き戻しの実機テスト(サービスアカウント鍵 or OAuthクライアントID作成後)
+
+## 🕗 毎日のシート自動同期(miniPC運用予定)
+
+メール→選考管理シートの無人同期。実装済み・**鍵未作成のため未稼働**。
+
+- `scripts/daily-sync.ps1`(タスクスケジューラから起動)→ `claude -p` + `scripts/daily-sync-prompt.md` → Gmail分析 → `pipeline/scripts/sheet-sync.ts` で書込
+- 移行手順は `docs/MINIPC-SETUP.md` に一本化(クローン→秘密ファイルコピー→鍵作成→schtasks登録→動作確認)
+- 運用はminiPC予定。ノートPCでも同じschtasksコマンドで登録可
+- 注意: リポジトリにGitHubリモート未設定(miniPCへは `gh repo create --private --source . --push` か直接コピー)
+
+## ユーザー情報・経緯メモ
+
+- 奥山彪太郎さん、東北大学大学院・28卒。就活用Gmail: okuyama.kotaro.career@gmail.com(MCP接続済み)
+- 直近14日で201通。PKSHA面接遅刻→再調整待ち、ネクストビート/トヨタコニック6/12締切等は把握済み
+- 方針: 同一ドメイン配下にプロダクトを並べる / 通知はDiscordより内蔵プッシュ優先 / AI処理はHaikuで十分(現状アプリはルールベースでLLM不使用)

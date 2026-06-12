@@ -1,0 +1,14 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI",
+    "Yu Gothic", "Meiryo", system-ui, sans-serif;
+}
+
+html {
+  font-feature-settings: "palt";
+}
+
+body {
+  @apply bg-slate-100 text-slate-800 antialiased;
+}
