@@ -1,3 +1,5 @@
+import type { SelectionKind } from './lib/selection'
+
 export type Category = 'interview' | 'result' | 'task' | 'event' | 'other'
 
 export type Status = 'inbox' | 'done' | 'snoozed'
@@ -12,6 +14,8 @@ export interface Email {
   body: string
   receivedAt: string
   category: Category
+  /** 進行中の選考か、募集案内か、サービスの宣伝か */
+  selectionKind: SelectionKind
   /** 抽出された締切・予定日時 (ISO)。なければ null */
   deadline: string | null
   /** deadline が「〆切」なのか「開催日時」なのか */

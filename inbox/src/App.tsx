@@ -64,7 +64,7 @@ export default function App() {
 
   const counts = useMemo(() => {
     const c: Record<Filter, number> = {
-      action: 0, all: 0, interview: 0, result: 0, task: 0, event: 0, other: 0,
+      action: 0, selection: 0, all: 0, interview: 0, result: 0, task: 0, event: 0, other: 0,
       snoozed: 0, done: 0,
     }
     for (const e of emails) {
@@ -73,6 +73,7 @@ export default function App() {
         c.all++
         c[e.category]++
         if (e.needsAction) c.action++
+        if (e.selectionKind === 'selection') c.selection++
       } else {
         c[status]++
       }
@@ -86,6 +87,11 @@ export default function App() {
       case 'action':
         list = emails
           .filter((e) => effectiveStatus(e, now) === 'inbox' && e.needsAction)
+          .sort(DEADLINE_ASC)
+        break
+      case 'selection':
+        list = emails
+          .filter((e) => effectiveStatus(e, now) === 'inbox' && e.selectionKind === 'selection')
           .sort(DEADLINE_ASC)
         break
       case 'all':

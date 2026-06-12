@@ -1,6 +1,7 @@
 import type { Category, Email, RawEmail } from '../types'
 import { extractActionPlan } from './actions'
 import { extractDates, formatDateShort, pickDeadline } from './dates'
+import { detectSelectionKind } from './selection'
 
 // 上から順に評価。「選考結果」は「面接」より語が重なるため先に置く
 const CATEGORY_RULES: { category: Category; re: RegExp }[] = [
@@ -92,6 +93,7 @@ export function classifyEmail(raw: RawEmail, now: Date = new Date()): Email {
     ...raw,
     company: extractCompany(raw.from, raw.fromAddress, raw.body),
     category,
+    selectionKind: detectSelectionKind(raw.fromAddress, raw.subject, raw.body, category),
     deadline: picked ? picked.date.toISOString() : null,
     deadlineKind: picked?.kind ?? null,
     needsAction,

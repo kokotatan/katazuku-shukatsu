@@ -1,6 +1,6 @@
 import { CATEGORY_META, type Category } from '../types'
 
-export type Filter = 'action' | 'all' | Category | 'snoozed' | 'done'
+export type Filter = 'action' | 'selection' | 'all' | Category | 'snoozed' | 'done'
 
 interface Props {
   filter: Filter
@@ -61,6 +61,13 @@ export function Sidebar({ filter, counts, onSelect }: Props) {
         count={counts.action}
         highlight
         onClick={() => onSelect('action')}
+      />
+      <Item
+        active={filter === 'selection'}
+        icon="🎯"
+        label="選考のみ"
+        count={counts.selection}
+        onClick={() => onSelect('selection')}
       />
       <Item
         active={filter === 'all'}

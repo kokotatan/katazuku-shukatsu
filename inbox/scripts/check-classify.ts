@@ -13,14 +13,19 @@ const now = new Date('2026-06-11T07:00:00Z')
 const emails = raws.map((r) => classifyEmail({ ...r, source: 'import' }, now))
 
 const needAction = emails.filter((e) => e.needsAction)
-console.log(`総数: ${emails.length} / 要対応: ${needAction.length}\n`)
+const kinds = { selection: 0, recruiting: 0, promo: 0, other: 0 }
+for (const e of emails) kinds[e.selectionKind]++
+console.log(
+  `総数: ${emails.length} / 要対応: ${needAction.length} / 🎯選考: ${kinds.selection} 📣募集案内: ${kinds.recruiting} 📰宣伝: ${kinds.promo} ・対象外: ${kinds.other}\n`,
+)
 
+const KIND_ICON = { selection: '🎯', recruiting: '📣', promo: '📰', other: '・' }
 for (const e of emails) {
   const dl = e.deadline
     ? `${formatDateShort(new Date(e.deadline))} (${formatRemaining(new Date(e.deadline), now)}) [${e.deadlineKind}]`
     : '-'
   console.log(
-    `${e.needsAction ? '🔥' : '  '} [${e.category.padEnd(9)}] ${e.company} | ${e.subject.slice(0, 30)}`,
+    `${e.needsAction ? '🔥' : '  '}${KIND_ICON[e.selectionKind]} [${e.category.padEnd(9)}] ${e.company} | ${e.subject.slice(0, 30)}`,
   )
   console.log(`     締切: ${dl} / ヒント: ${e.actionHint ?? '-'}`)
   if (e.actionSteps.length || e.actionUrl) {

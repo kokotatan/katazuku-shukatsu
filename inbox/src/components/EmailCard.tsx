@@ -1,5 +1,6 @@
 import { CATEGORY_META, type Email } from '../types'
 import { formatDateShort, formatRemaining, urgencyOf, type Urgency } from '../lib/dates'
+import { SELECTION_META } from '../lib/selection'
 
 interface Props {
   email: Email
@@ -76,6 +77,13 @@ export function EmailCard({
         <button onClick={onToggle} className="block w-full text-left">
           <div className="flex flex-wrap items-center gap-2 text-xs">
             <span className="font-semibold text-slate-700">{email.company}</span>
+            {email.selectionKind && email.selectionKind !== 'other' && (
+              <span
+                className={`rounded-full px-2 py-0.5 font-semibold ${SELECTION_META[email.selectionKind].color}`}
+              >
+                {SELECTION_META[email.selectionKind].icon} {SELECTION_META[email.selectionKind].label}
+              </span>
+            )}
             <span className={`rounded-full px-2 py-0.5 font-medium ${meta.color}`}>
               {meta.icon} {meta.label}
             </span>
