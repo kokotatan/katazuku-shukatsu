@@ -100,7 +100,7 @@ export default function App() {
     try {
       const result = mergeImport(companies, JSON.parse(await file.text()))
       setCompanies(result.companies)
-      setToast(`⬆ ${result.added}社を追加、${result.enriched}社の情報を補完しました`)
+      setToast(`${result.added}社を追加、${result.enriched}社の情報を補完しました`)
     } catch (err) {
       setToast(`インポート失敗: ${err instanceof Error ? err.message : String(err)}`)
     }
@@ -134,39 +134,41 @@ export default function App() {
     <div className="flex min-h-screen flex-col">
       <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-screen-2xl items-center gap-4 px-4 py-3">
-          <h1 className="flex items-center gap-2 text-lg font-bold tracking-tight">
-            <span aria-hidden>🧹</span>
-            Katazuku Pipeline
+          <h1 className="flex items-baseline gap-2.5 tracking-tight">
+            <span className="text-[15px] font-semibold tracking-widest text-slate-400 uppercase">
+              katazuku
+            </span>
+            <span className="text-lg font-bold text-slate-900">Pipeline</span>
             <span className="hidden text-xs font-normal text-slate-400 sm:inline">
               選考状況、ぜんぶ見える。
             </span>
           </h1>
           <div className="ml-auto flex items-center gap-4 text-xs text-slate-500">
-            <span>進行中 <b className="text-base text-slate-700">{active}</b> 社</span>
-            <span>面接 <b className="text-base text-violet-600">{interviews}</b></span>
-            <span>内定 <b className="text-base text-emerald-600">{offers}</b></span>
+            <span>進行中 <b className="text-base text-slate-900">{active}</b> 社</span>
+            <span>面接 <b className="text-base text-slate-900">{interviews}</b></span>
+            <span>内定 <b className="text-base text-slate-900">{offers}</b></span>
             <button
               onClick={() => fileInput.current?.click()}
               className="rounded-lg border border-slate-300 px-3 py-1.5 font-medium text-slate-600 transition hover:bg-slate-50"
               title="JSONファイルから企業を取り込みます(既存カードは壊さずマージ)"
             >
-              ⬆ インポート
+              インポート
             </button>
             <button
               onClick={exportJson}
               className="rounded-lg border border-slate-300 px-3 py-1.5 font-medium text-slate-600 transition hover:bg-slate-50"
             >
-              ⬇ エクスポート
+              エクスポート
             </button>
             <button
               onClick={() => setSheetSyncOpen(true)}
               className="rounded-lg border border-slate-300 px-3 py-1.5 font-medium text-slate-600 transition hover:bg-slate-50"
               title="ボードの内容を選考管理シート(Googleスプレッドシート)に書き戻します"
             >
-              📤 シートに反映
+              シートに反映
             </button>
             <a href="/" className="rounded-lg border border-slate-300 px-3 py-1.5 font-medium text-slate-600 transition hover:bg-slate-50">
-              🏠 katazuku
+              katazuku
             </a>
             <input
               ref={fileInput}
@@ -203,7 +205,6 @@ export default function App() {
                 }`}
               >
                 <div className="flex items-center gap-1.5 px-3 pt-3 pb-2">
-                  <span aria-hidden>{stage.icon}</span>
                   <h2 className="text-sm font-bold text-slate-600">{stage.label}</h2>
                   <span className="ml-auto rounded-full bg-white px-2 py-0.5 text-xs font-bold text-slate-500">
                     {list.length}
@@ -222,7 +223,7 @@ export default function App() {
                     onClick={() => setModal({ mode: 'new', stage: stage.key })}
                     className="rounded-xl border-2 border-dashed border-slate-300 py-2 text-xs font-medium text-slate-400 transition hover:border-slate-400 hover:text-slate-600"
                   >
-                    ＋ 追加
+                    + 追加
                   </button>
                 </div>
               </section>

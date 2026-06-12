@@ -23,4 +23,6 @@ cpSync(join(root, 'landing'), dist, { recursive: true })
 for (const app of apps) {
   cpSync(join(root, app, 'dist'), join(dist, app), { recursive: true })
 }
+// 個人メールデータ(ローカル自動取込用)は配信物に絶対に含めない
+rmSync(join(dist, 'inbox', 'gmail-import-auto.json'), { force: true })
 console.log(`✓ dist/ を組み立てました (landing + ${apps.map((a) => `/${a}`).join(' + ')})`)

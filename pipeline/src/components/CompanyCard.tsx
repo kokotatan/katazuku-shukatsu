@@ -15,9 +15,9 @@ function dateBadge(nextDate: string | null): { text: string; cls: string } | nul
   today.setHours(0, 0, 0, 0)
   const days = Math.round((d.getTime() - today.getTime() - 86399e3) / 86400e3)
   const label = `${d.getMonth() + 1}/${d.getDate()}(${WEEKDAYS[d.getDay()]})`
-  if (days < 0) return { text: `${label} 期限切れ`, cls: 'bg-rose-600 text-white' }
-  if (days === 0) return { text: `${label} 今日`, cls: 'bg-rose-100 text-rose-700' }
-  if (days <= 3) return { text: `${label} あと${days}日`, cls: 'bg-amber-100 text-amber-700' }
+  if (days < 0) return { text: `${label} 期限切れ`, cls: 'bg-red-600 text-white' }
+  if (days === 0) return { text: `${label} 今日`, cls: 'bg-red-50 text-red-700 ring-1 ring-red-200' }
+  if (days <= 3) return { text: `${label} あと${days}日`, cls: 'bg-slate-200 text-slate-700' }
   return { text: `${label} あと${days}日`, cls: 'bg-slate-100 text-slate-500' }
 }
 
@@ -38,26 +38,26 @@ export function CompanyCard({ company, onClick, onDragStart }: Props) {
             <span
               className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${
                 company.priority.includes('１') || company.priority.includes('1')
-                  ? 'bg-rose-100 text-rose-700'
-                  : 'bg-slate-100 text-slate-500'
+                  ? 'bg-slate-900 text-white'
+                  : 'text-slate-500 ring-1 ring-slate-200'
               }`}
             >
               {company.priority}
             </span>
           )}
           {company.industry && (
-            <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500">
+            <span className="rounded px-1.5 py-0.5 text-[10px] text-slate-400 ring-1 ring-slate-200">
               {company.industry}
             </span>
           )}
         </p>
       )}
       {company.nextAction && (
-        <p className="mt-2 text-xs leading-relaxed text-slate-600">👉 {company.nextAction}</p>
+        <p className="mt-2 text-xs leading-relaxed text-slate-600">{company.nextAction}</p>
       )}
       {badge && (
-        <span className={`mt-2 inline-block rounded px-1.5 py-0.5 text-xs font-bold ${badge.cls}`}>
-          ⏰ {badge.text}
+        <span className={`mt-2 inline-block rounded px-1.5 py-0.5 text-xs font-bold tabular-nums ${badge.cls}`}>
+          {badge.text}
         </span>
       )}
       {company.mypageUrl && (
@@ -68,9 +68,9 @@ export function CompanyCard({ company, onClick, onDragStart }: Props) {
             e.stopPropagation()
             window.open(company.mypageUrl, '_blank', 'noreferrer')
           }}
-          className="mt-2 ml-1 inline-block rounded px-1.5 py-0.5 text-xs font-medium text-indigo-600 underline-offset-2 hover:underline"
+          className="mt-2 ml-1 inline-block rounded px-1.5 py-0.5 text-xs font-medium text-slate-500 underline decoration-slate-300 underline-offset-2 hover:text-slate-800"
         >
-          🔗 マイページ
+          マイページ ↗
         </span>
       )}
     </button>

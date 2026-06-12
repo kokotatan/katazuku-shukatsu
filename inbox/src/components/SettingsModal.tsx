@@ -34,12 +34,12 @@ export function SettingsModal({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-bold">⚙ 設定・連携</h2>
+          <h2 className="text-lg font-bold">設定・連携</h2>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600">✕</button>
         </div>
 
         <section className="mb-6">
-          <h3 className="mb-2 text-sm font-bold text-slate-700">📧 Gmail と直接連携</h3>
+          <h3 className="mb-2 text-sm font-bold text-slate-700">Gmail と直接連携</h3>
           <p className="mb-2 text-xs leading-relaxed text-slate-500">
             Google Cloud Console で OAuth クライアントID(ウェブアプリ /
             承認済みオリジンに <code className="rounded bg-slate-100 px-1">http://localhost:5173</code>)
@@ -66,7 +66,7 @@ export function SettingsModal({
         </section>
 
         <section className="mb-6">
-          <h3 className="mb-2 text-sm font-bold text-slate-700">📂 JSONインポート / エクスポート</h3>
+          <h3 className="mb-2 text-sm font-bold text-slate-700">JSONインポート / エクスポート</h3>
           <p className="mb-2 text-xs leading-relaxed text-slate-500">
             Claude(Gmail MCP連携)などで書き出したメールJSONを取り込めます。形式:
             <code className="rounded bg-slate-100 px-1">
@@ -78,13 +78,13 @@ export function SettingsModal({
               onClick={() => fileRef.current?.click()}
               className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
             >
-              ⬆ インポート
+              インポート
             </button>
             <button
               onClick={onExportJson}
               className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
             >
-              ⬇ エクスポート
+              エクスポート
             </button>
             <input
               ref={fileRef}
@@ -101,10 +101,10 @@ export function SettingsModal({
         </section>
 
         <section>
-          <h3 className="mb-2 text-sm font-bold text-slate-700">🧪 データ</h3>
+          <h3 className="mb-2 text-sm font-bold text-slate-700">データ</h3>
           <button
             onClick={onResetDemo}
-            className="rounded-lg border border-rose-200 px-3 py-2 text-sm font-medium text-rose-600 hover:bg-rose-50"
+            className="rounded-lg border border-red-200 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
           >
             デモデータにリセット
           </button>

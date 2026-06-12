@@ -122,11 +122,11 @@ export default function App() {
 
   const markDone = (id: string) => {
     patch(id, { status: 'done', doneAt: new Date().toISOString(), snoozeUntil: null })
-    setToast('✓ 片付けました')
+    setToast('片付けました')
   }
   const snooze = (id: string) => {
     patch(id, { status: 'snoozed', snoozeUntil: nextMorning(new Date()).toISOString() })
-    setToast('⏰ 明日の朝8時に戻ってきます')
+    setToast('明日の朝8時に戻ってきます')
   }
   const restore = (id: string) =>
     patch(id, { status: 'inbox', doneAt: null, snoozeUntil: null })
@@ -135,8 +135,8 @@ export default function App() {
     const result = addEmailToPipeline(email)
     setToast(
       result.created
-        ? `📌 ${result.name} を選考ボードに追加しました`
-        : `📌 ${result.name} の次のアクションを選考ボードに反映しました`,
+        ? `${result.name} を選考ボードに追加しました`
+        : `${result.name} の次のアクションを選考ボードに反映しました`,
     )
   }
 
@@ -158,7 +158,7 @@ export default function App() {
       const token = await requestAccessToken(clientId.trim())
       const raws = await fetchRecentEmails(token)
       const added = importRaws(raws)
-      setToast(`📧 Gmailから${raws.length}件取得、新着${added}件を取り込みました`)
+      setToast(`Gmailから${raws.length}件取得、新着${added}件を取り込みました`)
       setSettingsOpen(false)
       setFilter('action')
     } catch (err) {
@@ -168,26 +168,44 @@ export default function App() {
     }
   }
 
+  const toRaws = (data: unknown): RawEmail[] => {
+    if (!Array.isArray(data)) throw new Error('配列ではありません')
+    return data.map((d, i) => ({
+      id: String(d.id ?? `import-${Date.now()}-${i}`),
+      from: String(d.from ?? ''),
+      fromAddress: String(d.fromAddress ?? d.from_address ?? ''),
+      subject: String(d.subject ?? '(件名なし)'),
+      body: String(d.body ?? ''),
+      receivedAt: String(d.receivedAt ?? d.received_at ?? new Date().toISOString()),
+      source: 'import',
+    }))
+  }
+
   const importJson = (text: string) => {
     try {
-      const data: unknown = JSON.parse(text)
-      if (!Array.isArray(data)) throw new Error('配列ではありません')
-      const raws: RawEmail[] = data.map((d, i) => ({
-        id: String(d.id ?? `import-${Date.now()}-${i}`),
-        from: String(d.from ?? ''),
-        fromAddress: String(d.fromAddress ?? d.from_address ?? ''),
-        subject: String(d.subject ?? '(件名なし)'),
-        body: String(d.body ?? ''),
-        receivedAt: String(d.receivedAt ?? d.received_at ?? new Date().toISOString()),
-        source: 'import',
-      }))
+      const raws = toRaws(JSON.parse(text))
       const added = importRaws(raws)
-      setToast(`⬆ ${raws.length}件中、新着${added}件を取り込みました`)
+      setToast(`${raws.length}件中、新着${added}件を取り込みました`)
       setSettingsOpen(false)
     } catch (err) {
       setToast(`インポート失敗: ${err instanceof Error ? err.message : String(err)}`)
     }
   }
+
+  // public/gmail-import-auto.json があれば起動時に自動取込(ローカル運用向け・gitignore済み)
+  useEffect(() => {
+    fetch(`${import.meta.env.BASE_URL}gmail-import-auto.json`, { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data === null) return
+        const added = importRaws(toRaws(data))
+        if (added > 0) setToast(`メールデータから新着${added}件を自動取込しました`)
+      })
+      .catch(() => {
+        // ファイルが無い・壊れている場合は何もしない
+      })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const exportJson = () => {
     const blob = new Blob([JSON.stringify(emails, null, 2)], { type: 'application/json' })
@@ -201,7 +219,7 @@ export default function App() {
   const resetDemo = () => {
     if (window.confirm('現在のデータを消してデモデータに戻します。よろしいですか?')) {
       setEmails(freshDemo())
-      setToast('🧪 デモデータをリセットしました')
+      setToast('デモデータをリセットしました')
       setSettingsOpen(false)
     }
   }
@@ -260,7 +278,7 @@ export default function App() {
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="🔍 企業名・件名・本文で検索"
+            placeholder="企業名・件名・本文で検索"
             className="mb-4 w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm shadow-sm focus:border-slate-400 focus:outline-none"
           />
 
@@ -268,17 +286,13 @@ export default function App() {
             <div className="flex flex-col items-center gap-3 rounded-2xl border-2 border-dashed border-slate-200 bg-white/60 py-20 text-center">
               {filter === 'action' && counts.action === 0 && !query ? (
                 <>
-                  <span className="text-5xl">🎉</span>
-                  <p className="text-lg font-bold text-slate-700">要対応はゼロ。ぜんぶ片付いています!</p>
+                  <p className="text-lg font-bold text-slate-700">要対応はゼロ。ぜんぶ片付いています</p>
                   <p className="text-sm text-slate-400">この調子で見逃しゼロをキープしましょう</p>
                 </>
               ) : (
-                <>
-                  <span className="text-4xl">🍃</span>
-                  <p className="text-sm text-slate-400">
-                    {query ? '検索に一致するメールはありません' : 'ここにはメールがありません'}
-                  </p>
-                </>
+                <p className="text-sm text-slate-400">
+                  {query ? '検索に一致するメールはありません' : 'ここにはメールがありません'}
+                </p>
               )}
             </div>
           ) : (

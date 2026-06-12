@@ -50,12 +50,9 @@ export function detectSelectionKind(
   }
 }
 
-export const SELECTION_META: Record<
-  SelectionKind,
-  { label: string; icon: string; color: string }
-> = {
-  selection: { label: '選考', icon: '🎯', color: 'bg-violet-600 text-white' },
-  recruiting: { label: '募集案内', icon: '📣', color: 'bg-sky-100 text-sky-700' },
-  promo: { label: '宣伝', icon: '📰', color: 'bg-slate-200 text-slate-500' },
-  other: { label: '対象外', icon: '・', color: 'bg-slate-100 text-slate-400' },
+export const SELECTION_META: Record<SelectionKind, { label: string; color: string }> = {
+  selection: { label: '選考', color: 'bg-slate-900 text-white' },
+  recruiting: { label: '募集案内', color: 'text-slate-500 ring-1 ring-slate-200' },
+  promo: { label: '宣伝', color: 'text-slate-400 ring-1 ring-slate-200' },
+  other: { label: '対象外', color: 'text-slate-400 ring-1 ring-slate-200' },
 }

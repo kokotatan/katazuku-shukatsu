@@ -33,7 +33,7 @@ export function CompanyModal({ initial, onSave, onDelete, onClose }: Props) {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-bold">{initial.name ? '✏️ 編集' : '➕ 企業を追加'}</h2>
+          <h2 className="text-lg font-bold">{initial.name ? '編集' : '企業を追加'}</h2>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600">✕</button>
         </div>
 
@@ -50,7 +50,7 @@ export function CompanyModal({ initial, onSave, onDelete, onClose }: Props) {
             ステージ
             <select value={stage} onChange={(e) => setStage(e.target.value as Stage)} className={`mt-1 ${inputCls}`}>
               {STAGES.map((s) => (
-                <option key={s.key} value={s.key}>{s.icon} {s.label}</option>
+                <option key={s.key} value={s.key}>{s.label}</option>
               ))}
             </select>
           </label>
@@ -114,9 +114,9 @@ export function CompanyModal({ initial, onSave, onDelete, onClose }: Props) {
           {onDelete && (
             <button
               onClick={() => { if (window.confirm(`「${initial.name}」を削除しますか?`)) onDelete() }}
-              className="ml-auto rounded-lg border border-rose-200 px-3 py-2 text-sm text-rose-600 hover:bg-rose-50"
+              className="ml-auto rounded-lg border border-red-200 px-3 py-2 text-sm text-red-600 hover:bg-red-50"
             >
-              🗑 削除
+              削除
             </button>
           )}
         </div>

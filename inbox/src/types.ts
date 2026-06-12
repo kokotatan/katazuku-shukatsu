@@ -45,13 +45,10 @@ export interface RawEmail {
   source: Email['source']
 }
 
-export const CATEGORY_META: Record<
-  Category,
-  { label: string; icon: string; color: string }
-> = {
-  interview: { label: '面接・日程調整', icon: '🗓️', color: 'bg-violet-100 text-violet-700' },
-  result: { label: '選考結果', icon: '📩', color: 'bg-rose-100 text-rose-700' },
-  task: { label: 'ES・提出タスク', icon: '✍️', color: 'bg-amber-100 text-amber-700' },
-  event: { label: '説明会・イベント', icon: '🏢', color: 'bg-sky-100 text-sky-700' },
-  other: { label: 'その他', icon: '📨', color: 'bg-slate-100 text-slate-600' },
+export const CATEGORY_META: Record<Category, { label: string }> = {
+  interview: { label: '面接・日程調整' },
+  result: { label: '選考結果' },
+  task: { label: 'ES・提出タスク' },
+  event: { label: '説明会・イベント' },
+  other: { label: 'その他' },
 }
