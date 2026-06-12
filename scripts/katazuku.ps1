@@ -41,7 +41,10 @@ switch ($Command) {
     Open-App 'prep' 4177 $q
   }
   'company' { Start-Process $sheetUrl }               # 企業マスタ: 選考管理シート
-  'submit'  { Copy-Prompt '05-es-submit.md' '書類提出(ES転記・提出)' }
+  'submit'  {                                          # 個人データ入りの実戦版があればそちらを使う
+    $f = if (Test-Path (Join-Path $root 'chrome-prompts\submit.local.md')) { 'submit.local.md' } else { '05-es-submit.md' }
+    Copy-Prompt $f '書類提出(ES転記・提出)'
+  }
   'test'    { Copy-Prompt '02-webtest-setup.md' '適性検査の予約・受検準備' }
   'sync'    {                                          # メール分析→シート更新→Inboxデータ更新→整理
     & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $root 'scripts\daily-sync.ps1')
