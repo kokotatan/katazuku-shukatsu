@@ -53,12 +53,25 @@ okuyama.kotaro.career@gmail.com
 ${String(data.body ?? '')}`
 }
 
-function runClaude(prompt: string): Promise<string> {
+/**
+ * モデルの自動振り分け:
+ * 内容を考える必要がある返信(日程調整・選考結果への返答・先方からの質問あり)は sonnet、
+ * 定型の確認返信は haiku(軽い)。どちらもClaude CLI経由なのでサブスク範囲内。
+ */
+function modelFor(data: Record<string, unknown>): 'sonnet' | 'haiku' {
+  const category = String(data.category ?? '')
+  if (category === 'interview' || category === 'result') return 'sonnet'
+  const body = String(data.body ?? '')
+  if (/[?？]|いかがでしょうか|ご教示|ご回答|お聞かせ|ご都合/.test(body)) return 'sonnet'
+  return 'haiku'
+}
+
+function runClaude(prompt: string, model: 'sonnet' | 'haiku'): Promise<string> {
   return new Promise((resolve, reject) => {
     // テキスト生成のみ(ツール不要)。--tools というフラグは存在しないので注意
     const child = spawn(
       'claude',
-      ['-p', '--model', 'haiku', '--no-session-persistence'],
+      ['-p', '--model', model, '--no-session-persistence'],
       {
         cwd: process.cwd(),
         windowsHide: true,
@@ -110,7 +123,8 @@ async function handleReply(req: IncomingMessage, res: ServerResponse) {
     if (!data || typeof data !== 'object' || Array.isArray(data)) {
       throw new Error('メールデータが不正です')
     }
-    const body = await runClaude(promptFor(data as Record<string, unknown>))
+    const email = data as Record<string, unknown>
+    const body = await runClaude(promptFor(email), modelFor(email))
     res.end(JSON.stringify({ body }))
   } catch (error) {
     res.statusCode = 500
