@@ -101,6 +101,19 @@ export function EmailCard({
               <span className="truncate">👉 {email.actionHint}</span>
             </p>
           )}
+
+          {(email.actionSteps ?? []).length > 0 && !isDone && (
+            <p className="mt-1.5 flex flex-wrap gap-1">
+              {(email.actionSteps ?? []).map((step) => (
+                <span
+                  key={step}
+                  className="rounded-md bg-indigo-50 px-1.5 py-0.5 text-[11px] font-medium text-indigo-700 ring-1 ring-indigo-100"
+                >
+                  ☐ {step}
+                </span>
+              ))}
+            </p>
+          )}
         </button>
 
         {expanded && (
@@ -124,6 +137,17 @@ export function EmailCard({
             </button>
           ) : (
             <>
+              {email.actionUrl && (
+                <a
+                  href={email.actionUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="rounded-lg bg-indigo-600 px-2.5 py-1 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-500"
+                  title={email.actionUrl}
+                >
+                  🔗 フォームを開く
+                </a>
+              )}
               <button
                 onClick={onDone}
                 className="rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-500"

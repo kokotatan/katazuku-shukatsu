@@ -60,6 +60,19 @@ export function CompanyCard({ company, onClick, onDragStart }: Props) {
           ⏰ {badge.text}
         </span>
       )}
+      {company.mypageUrl && (
+        <span
+          role="link"
+          tabIndex={0}
+          onClick={(e) => {
+            e.stopPropagation()
+            window.open(company.mypageUrl, '_blank', 'noreferrer')
+          }}
+          className="mt-2 ml-1 inline-block rounded px-1.5 py-0.5 text-xs font-medium text-indigo-600 underline-offset-2 hover:underline"
+        >
+          🔗 マイページ
+        </span>
+      )}
     </button>
   )
 }

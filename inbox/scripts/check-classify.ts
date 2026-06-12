@@ -23,4 +23,9 @@ for (const e of emails) {
     `${e.needsAction ? '🔥' : '  '} [${e.category.padEnd(9)}] ${e.company} | ${e.subject.slice(0, 30)}`,
   )
   console.log(`     締切: ${dl} / ヒント: ${e.actionHint ?? '-'}`)
+  if (e.actionSteps.length || e.actionUrl) {
+    console.log(
+      `     やること: ${e.actionSteps.join('・') || '-'}${e.actionUrl ? ` / 🔗 ${e.actionUrl.slice(0, 60)}` : ''}`,
+    )
+  }
 }

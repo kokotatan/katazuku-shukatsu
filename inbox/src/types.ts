@@ -20,6 +20,10 @@ export interface Email {
   needsAction: boolean
   /** 「6/15(月) 17:00 までに回答」のような一言ヒント */
   actionHint: string | null
+  /** 「日程を選んで回答」「ESを提出」のような具体的なやること */
+  actionSteps: string[]
+  /** アクションを実行するフォーム・マイページ等のURL */
+  actionUrl: string | null
   status: Status
   snoozeUntil: string | null
   doneAt: string | null

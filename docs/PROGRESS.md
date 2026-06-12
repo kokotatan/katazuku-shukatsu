@@ -25,6 +25,7 @@ katazuku.kotalab.com/pipeline/→ pipeline/(選考管理ボード)   🚧 実装
 - 要対応キュー(締切順)、片付け/スヌーズ/カレンダー登録、J/K/E/Sショートカット、検索、片付け率
 - Gmail直接続(クライアントサイドOAuth、要クライアントID)+ JSONインポート/エクスポート
 - 実メール検証済み: 直近50件で分類テスト→誤分類5件を修正(検証: `cd inbox && npx tsx scripts/check-classify.ts`)
+- **具体アクション抽出(2026-06-12追加)**: 「要対応」だけでなく何をすべきか(`inbox/src/lib/actions.ts`)。やることリスト(日程回答/ES提出/課題提出/適性検査受検/イベント予約 等)をカードにチップ表示し、実行先URL(フォーム・マイページ)を「🔗 フォームを開く」ボタンに。URL選定は直前文脈のアクション語を重視し配信停止系を除外。検証: `cd inbox && npx tsx scripts/check-actions.ts`(10ケース)。Pipeline連携のnextActionにもやることリストが流れる
 - **Pipeline連携(2026-06-12追加)**: メールカードの「📌 選考ボードへ」でPipelineに企業を追加・更新(`inbox/src/lib/pipeline.ts`)。同一オリジンのlocalStorage(`katazuku-pipeline/companies`)経由。表記ゆれ(株式会社の有無等)を吸収して既存企業は更新、ステージは前進方向のみ(内定/終了は不変)。検証: `cd inbox && npx tsx scripts/check-pipeline.ts`(9ケース通過)。※devでは両アプリのポートが違うため連携は本番ビルド(同一オリジン)でのみ動作
 - 実メールデータ: `inbox/gmail-import-2026-06-11.json`(gitignore済・個人情報)→ アプリの設定→インポートで取込
 

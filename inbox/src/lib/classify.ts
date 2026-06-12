@@ -1,4 +1,5 @@
 import type { Category, Email, RawEmail } from '../types'
+import { extractActionPlan } from './actions'
 import { extractDates, formatDateShort, pickDeadline } from './dates'
 
 // 上から順に評価。「選考結果」は「面接」より語が重なるため先に置く
@@ -85,6 +86,8 @@ export function classifyEmail(raw: RawEmail, now: Date = new Date()): Email {
     actionHint = `${ACTION_VERB[category]}が必要`
   }
 
+  const plan = needsAction ? extractActionPlan(raw.body) : { steps: [], url: null }
+
   return {
     ...raw,
     company: extractCompany(raw.from, raw.fromAddress, raw.body),
@@ -93,6 +96,8 @@ export function classifyEmail(raw: RawEmail, now: Date = new Date()): Email {
     deadlineKind: picked?.kind ?? null,
     needsAction,
     actionHint,
+    actionSteps: plan.steps,
+    actionUrl: plan.url,
     status: 'inbox',
     snoozeUntil: null,
     doneAt: null,

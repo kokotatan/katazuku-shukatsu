@@ -69,7 +69,11 @@ export interface AddResult {
 export function addEmailToPipeline(email: Email): AddResult {
   const companies = load()
   const nextDate = email.deadline ? email.deadline.slice(0, 10) : null
-  const nextAction = email.actionHint ?? `メール「${email.subject}」に対応`
+  const steps = email.actionSteps ?? []
+  const nextAction =
+    steps.length > 0
+      ? steps.join(' / ')
+      : (email.actionHint ?? `メール「${email.subject}」に対応`)
   const stage = STAGE_FOR[email.category]
   const now = new Date().toISOString()
 
