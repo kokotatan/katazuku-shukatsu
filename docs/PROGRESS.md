@@ -2,6 +2,12 @@
 
 最終更新: 2026-06-12
 
+## 命名統一(2026-06-13)
+
+READMEの当初構想に合わせてフォルダ・URLを改名: pipeline→status / today→insight / notes→profile。
+localStorageキー(katazuku-pipeline/companies, katazuku-notes/snippets)とinbox/src/lib/pipeline.tsの
+ファイル名は既存データ互換のため旧称のまま。統一コマンドは scripts/katazuku.ps1 (katazuku <動詞>)。
+
 ## 引き継ぎ(2026-06-12〜)
 
 開発はClaude Fable以外のAI(Opus / Codex / GitHub Copilot)へ引き継ぎ。
@@ -18,9 +24,9 @@
 ```
 katazuku.kotalab.com          → landing/ (プロダクト一覧トップ)
 katazuku.kotalab.com/inbox/   → inbox/   (メール見逃しゼロ・AI返信生成つき) 完成
-katazuku.kotalab.com/pipeline/→ pipeline/(選考管理ボード)                  完成
-katazuku.kotalab.com/today/   → today/   (今日やること横断ダッシュボード)   完成 (2026-06-12, spec02)
-katazuku.kotalab.com/notes/   → notes/   (ES部品庫・文字数カウンタ)        完成 (2026-06-12, spec03)
+katazuku.kotalab.com/status/  → status/  (選考管理ボード=旧pipeline)        完成
+katazuku.kotalab.com/insight/ → insight/ (今日やること横断=旧today)         完成 (2026-06-12, spec02)
+katazuku.kotalab.com/profile/ → profile/ (ES部品庫=旧notes)                完成 (2026-06-12, spec03)
 katazuku.kotalab.com/prep/    → prep/    (面接振り返り・直前モード)        完成 (2026-06-12, spec04)
 ```
 

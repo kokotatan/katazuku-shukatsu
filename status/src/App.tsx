@@ -146,7 +146,7 @@ export default function App() {
                 katazuku
               </span>
               <span className="text-[11px] font-semibold tracking-[0.25em] text-slate-400 uppercase">
-                Pipeline
+                Status
               </span>
             </span>
             <span className="hidden border-l border-slate-200 pl-2.5 text-xs font-normal text-slate-400 sm:inline">

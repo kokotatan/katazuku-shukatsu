@@ -9,9 +9,9 @@ $root = Split-Path $PSScriptRoot -Parent
 
 $apps = @(
   @{ name = 'inbox';    port = 4173 },
-  @{ name = 'pipeline'; port = 4174 },
-  @{ name = 'today';    port = 4175 },
-  @{ name = 'notes';    port = 4176 },
+  @{ name = 'status'  ; port = 4174 },
+  @{ name = 'insight';    port = 4175 },
+  @{ name = 'profile';    port = 4176 },
   @{ name = 'prep';     port = 4177 }
 )
 foreach ($app in $apps) {

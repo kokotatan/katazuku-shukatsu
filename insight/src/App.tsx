@@ -58,7 +58,7 @@ function Section({
               </button>
             )}
             <a
-              href={item.source === 'inbox' ? '/inbox/' : '/pipeline/'}
+              href={item.source === 'inbox' ? '/inbox/' : '/status/'}
               className="shrink-0 text-xs text-slate-400 underline decoration-slate-300 underline-offset-2 hover:text-slate-700"
             >
               開く
@@ -124,7 +124,7 @@ export default function App() {
           </span>
           <span className="flex items-baseline gap-2">
             <span className="font-display text-lg font-semibold tracking-tight text-slate-900">katazuku</span>
-            <span className="text-[11px] font-semibold tracking-[0.25em] text-slate-400 uppercase">Today</span>
+            <span className="text-[11px] font-semibold tracking-[0.25em] text-slate-400 uppercase">Insight</span>
           </span>
           <span className="ml-auto font-display text-sm font-semibold text-slate-700">{dateLabel}</span>
           <a href="/" className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50">

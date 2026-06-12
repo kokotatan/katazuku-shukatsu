@@ -1,116 +1,130 @@
-# katazuku — 就活、ぜんぶ片付く。
+# katazuku-shukatsu
 
-日本の大学生(作者ひとり)のための就活プロダクト群。
-本番ドメイン: **https://katazuku.kotalab.com** (トップ = プロダクト一覧 / 各プロダクトはパス配下)
+就活の実行フェーズを自動化するAIエージェント群のモノレポ。
 
-開発規約は `CLAUDE.md`(Claude Code) / `AGENTS.md`(Codex) / `.github/copilot-instructions.md`(Copilot)。
-次の実装は `docs/specs/` を番号順に。進捗の一次情報は `docs/PROGRESS.md`。
+## なぜ作るか
 
-## コマンド一覧(当初構想と実装状況)
+自己分析もES内容の生成も、すでにカスタムAIで解決できる。残る摩擦は、生成済みの内容をフォームへ入力し、文字数を調整し、コピペするという機械的な実行作業に集約される。katazuku はこの実行フェーズの摩擦をエージェントで消すことだけに焦点を絞る。開発者自身を最初の利用者として設計している。
 
-統一入口は `katazuku <command>`(`scripts/katazuku.ps1`)。
-セットアップ: PowerShellプロファイルに `function katazuku { & "<このリポジトリ>\scripts\katazuku.ps1" @args }` を1行追加。
+命名は「片付く」に由来し、各プロダクトは `katazuku <動詞>` 形式で揃える。業務名を後置する構造により、増えても一貫した使用感を保つ。
 
-| コマンド | 日本語名 | 概要 | 実体 | 状況 |
+## プロダクト一覧
+
+| コマンド | 日本語名 | 概要 | インターフェース | 優先度 |
 |---|---|---|---|---|
-| `katazuku submit` | 書類提出 | ESをフォームへ転記・提出(プロンプトをコピーしてClaude in Chromeへ) | chrome-prompts/05 | 提供中 |
-| `katazuku test` | 適性検査 | 受検の予約・環境準備(受検代行は不正のためしない) | chrome-prompts/02 | 提供中 |
-| `katazuku inbox` | 連絡管理 | メール仕分け・AI返信下書き+毎時の見張り・毎朝の同期 | inbox/ + ルーチン | 提供中 |
-| `katazuku profile` | 個人マスタ | 氏名・学歴・署名の一元管理 | _profile.local.md | 暫定(specs/05) |
-| `katazuku company` | 企業マスタ | 企業情報・選考ステータス(Googleシート+Pipeline双方向) | 選考管理シート | 提供中 |
-| `katazuku prep [社名]` | 直前対策 | 振り返り・想定問答・面接直前モード | prep/ | 提供中 |
-| `katazuku insight` | インテリジェンス | 当日のサマリーと次アクション(毎朝自動・手動も可) | daily-sync + today/ | 提供中 |
-| `katazuku ask <質問>` | ヘルプデスク | 自分の就活データ(シート・メール)にチャットで質問 | Claude Code + MCP | 提供中 |
-| `katazuku status` | 進捗管理 | 全社の選考状況ダッシュボード | pipeline/ | 提供中 |
-| `katazuku interview` | 面接ログ | 面接録音から構造化メモを生成しPrepへ | specs/06 | 未実装 |
-| `katazuku people` | 人脈整理 | 出会った社員・OBの記録(Prepに統合) | specs/07 | 未実装 |
+| `katazuku submit` | 書類提出 | ES・書類をフォームへ自動入力して提出 | Claude in Chrome | 第一波 |
+| `katazuku test` | 適性検査 | WEB適性検査を受検する、既にプロンプトは用意済み | Claude in Chrome | 第一波 |
+| `katazuku inbox` | 連絡管理 | 採用メールの仕分けと返信下書き | バックグラウンド常駐 | 第一波 |
+| `katazuku profile` | 個人マスタ | 氏名・学歴・ESデータの一元管理 | スプレッドシート | 土台 |
+| `katazuku company` | 企業マスタ | 企業情報・選考ステータスの一元管理 | スプレッドシート | 土台 |
+| `katazuku prep` | 直前対策 | 面接前日の準備パックを自動生成 | Claude in Chrome / CLI | 第二波 |
+| `katazuku insight` | インテリジェンス | 当日のサマリーと次アクションの提案 | Claude in Chrome / cron | 第二波 |
+| `katazuku ask` | ヘルプデスク | 自分のデータへチャットで質問 | チャットUI | 第二波 |
+| `katazuku status` | 進捗管理 | 全社の選考状況ダッシュボード | Web UI | 第二波 |
+| `katazuku interview` | 面接ログ | 面接録音から構造化メモを生成 | スマホ / CLI | 第三波 |
+| `katazuku people` | 人脈整理 | 出会った社員・OBの情報管理 | スマホ / CLI | 第三波 |
 
-## 構成
+実装は優先度順に進める。第一波の submit・test・inbox は、土台である profile・company の2マスタが揃えば動作する。
+
+## プロダクトの分類
+
+インターフェースは業務の性質から決まる。
+
+- **純粋CLI型** — submit・test・prep・insight。コマンド起動でエージェントが裏で動き、結果を返す。追加実装が最も軽い。
+- **バックグラウンド常駐型** — inbox。Gmail等と常時接続し、受信を監視する。
+- **物理入力型** — interview（録音）と people（手書き入力）。スマホUIを必須とする。
+- **共通データ基盤** — profile と company。全プロダクトがこの2マスタを参照する。
+
+## アーキテクチャ
 
 ```
-landing/   トップページ(静的)
-inbox/     Katazuku Inbox    → /inbox/    メール見逃しゼロ + AI返信生成
-pipeline/  Katazuku Pipeline → /pipeline/ 選考管理カンバン + シート連携
-today/     Katazuku Today    → /today/    今日やること横断ダッシュボード
-notes/     Katazuku Notes    → /notes/    ES部品庫・文字数カウンタ
-prep/      Katazuku Prep     → /prep/     面接振り返り・直前モード
-scripts/   dist組立 / ローカル配信(serve.ps1) / 毎朝の自動同期(daily-sync)
-docs/      PROGRESS.md(進捗) / specs/(実装仕様) / MINIPC-SETUP.md(移行手順)
+Google スプレッドシート（Profile・Company マスタ）
+        │  katazuku sync
+        ▼
+~/.katazuku/data/（ローカルJSONキャッシュ）
+        │
+        ├─→ Claude in Chrome ショートカット   … submit / test / prep / insight
+        └─→ バックグラウンドスクリプト         … inbox / insight
 ```
 
-共通スタック: Vite + React 19 + TypeScript + Tailwind v4。バックエンドなし・localStorage永続化。
-デザインは「帳簿的ミニマリズム」(紙とインクのウォームグレー、朱は警告専用、見出しはしっぽり明朝、絵文字なし)。
+| 層 | 実装 |
+|---|---|
+| データ層 | Google スプレッドシート（人間が編集するマスタ） |
+| ランタイムキャッシュ | ローカルJSON（`~/.katazuku/data/`） |
+| オーケストレーション層 | Python CLIスクリプト |
+| ブラウザ実行層 | Claude in Chrome（Claude Code の `--chrome` 経由で駆動。マルチタブ操作・DOM/ネットワークアクセス・スクリーンショットに対応） |
 
-## ビルド・起動・テスト
+ブラウザ操作を伴うタスクは Claude in Chrome のショートカット（`/`コマンド、スケジュール実行対応）として、常時監視を要するタスクは常駐スクリプト（n8n / cron）として実装する。
 
-```powershell
-npm run build                      # 5アプリのビルド + dist/ 組立(個人データは除外される)
-powershell -File scripts\serve.ps1 # ローカル常時配信(5アプリ、スマホからもアクセス可)
-npm --prefix inbox run dev         # 単体の開発サーバー(他アプリも同様)
+技術スタック: Python, JavaScript/React, n8n, Tailscale, Claude Code, Claude in Chrome。
 
-# 検証スクリプト(全8スイート)
-cd inbox;    npx tsx scripts/check-classify.ts; npx tsx scripts/check-actions.ts
-cd inbox;    npx tsx scripts/check-selection.ts; npx tsx scripts/check-pipeline.ts
-cd pipeline; npx tsx scripts/check-import.ts;   npx tsx scripts/check-sheet.ts
-cd today;    npx tsx scripts/check-aggregate.ts
-cd notes;    npx tsx scripts/check-count.ts
-cd prep;     npx tsx scripts/check-prep.ts
+## リポジトリ構成
+
+以下は想定構成であり、実装の進行に応じて調整する。
+
+```
+katazuku-shukatsu/
+├── packages/
+│   ├── submit/ test/ inbox/ prep/ insight/ ask/ status/ interview/ people/
+│   └── core/            # 共通ライブラリ（Profile・Company参照、認証）
+├── agents/              # Claude Code / Codex 向けエージェント定義
+│   └── submit-agent/ test-agent/ inbox-agent/
+├── data/.katazuku/      # ローカルキャッシュ（JSON）
+├── scripts/sync.sh      # スプレッドシート → ローカルJSON同期
+├── CLAUDE.md            # Claude Code 向けコンテキスト
+└── README.md
 ```
 
-デプロイ(任意): `vercel --prod`(vercel.json 設定済み)。公開版ではAI返信生成のみ動かない(下記)。
+## セットアップ
 
-## Products
+必要な環境は Node.js 20+、Python 3.11+、Claude Code、Claude in Chrome 拡張機能、Google スプレッドシート（マスタ用）。
 
-### Katazuku Inbox (`inbox/`)
+```bash
+git clone https://github.com/kokotatan/katazuku-shukatsu
+cd katazuku-shukatsu
+npm install
+pip install -r requirements.txt --break-system-packages
+```
 
-就活メール、ぜんぶ片付く。見逃しゼロの受信箱。
+初期設定では、まず個人マスタをスプレッドシートで作成・入力し、ローカルへ同期したうえで、Claude in Chrome にショートカットを登録する。
 
-- 要対応キュー: 返信・回答・提出が必要なメールだけを締切順に。J/K/Enter/E/S のキーボード操作
-- 自動分類: 面接・日程調整 / 選考結果 / ES・提出タスク / 適性検査 / 説明会 / その他
-- 判定レイヤー: 「選考」「募集案内」「課外活動(ハッカソン・長期インターン等)」「宣伝」を送信元と本文から判定。
-  サイドバーの「選考のみ」タブで進行中の選考だけを見られる
-- やることリスト抽出: 「日程を選んで回答」「ESを提出」等のチップと「フォームを開く」直リンク
-- 締切の日本語パース(「6月15日(月) 17:00まで」)、カレンダー登録リンク、スヌーズ
-- 選考ボードへ: ワンタップでPipelineに企業を追加(表記ゆれ名寄せ・ステージは前進のみ)
-- AI返信生成: カードの「返信」からClaudeが返信文を作成(下記の仕組み)
-- データ取込: 起動時に `public/gmail-import-auto.json` を自動読込(gitignore済)。JSONインポート/エクスポート、
-  Gmail直接続(クライアントサイドOAuth)も可
+```bash
+bash scripts/sync.sh                 # マスタをローカルへ同期
+# Claude in Chrome に以下を登録
+#   /submit → packages/submit/shortcut.md
+#   /test   → packages/test/shortcut.md
+#   /prep   → packages/prep/shortcut.md
+```
 
-**AI返信生成の仕組み**: devサーバー/`vite preview` が、ログイン済みの Claude Code CLI を `claude -p` で呼ぶ
-(`inbox/vite.claude-reply.ts`)。**Claudeサブスクリプションの範囲内で動き、APIキー不要**。
-内容を考える返信(日程調整・選考結果・質問あり)はSonnet、定型確認はHaikuに自動振り分け。
-claude CLIが居ないクラウド(Vercel公開版)では使えない — 必要になったら `docs/specs/01-reply-api.md`。
+## 使い方
 
-### Katazuku Pipeline (`pipeline/`)
+```bash
+# 書類提出（採用フォームを開いた状態で起動）
+/submit
 
-選考状況、ぜんぶ見える。カンバンボード。
+# 適性検査（検査ページを開いた状態で起動）
+/test
 
-- 7ステージ: 気になる / エントリー済み / ES・テスト / 面接・面談 / インターン合格 / 内定 / 終了
-- カードに業界・志望度バッジ、期限バッジ(あと何日)、マイページ直リンク、対策ノート(Prep)への導線
-- 選考管理シート(Google Sheets)連携: 取込(JSONインポート)と書き戻し(「シートに反映」)。
-  書き戻しは差分プレビュー付きで、合格/不合格/辞退・メモ・数式列には触れない設計
-- CLI同期 `pipeline/scripts/sheet-sync.ts`(サービスアカウント・dry-run既定)
+# 連絡管理（常駐起動）
+python packages/inbox/daemon.py
+```
 
-### Katazuku Today (`today/`)
+submit はフォームを解析し、個人マスタ・企業マスタ・ES素材を参照して入力する。test は適性検査を自動で行い、就活生の時間を捻出する。inbox は採用メールを仕分けし、返信を要するものは下書きを生成して通知する。
 
-今日やること、ぜんぶここに。Inboxの締切とPipelineの予定を横断して
-「期限切れ / 今日 / 今週」だけを一枚に。朝いちばんに開くページ。
+## 開発
 
-### Katazuku Notes (`notes/`)
+```bash
+cd packages/submit && npm run dev   # 特定パッケージの開発
+npm run test                        # テスト
+claude                              # Claude Code（CLAUDE.md を自動参照）
+```
 
-ESの部品、ぜんぶ揃う。ガクチカ・研究概要・自己PR・志望動機を部品として保存し、
-常時表示の文字数カウンタ(改行除外・全角換算)と目標文字数(「あと52字」「12字オーバー」)で
-400字版・600字版を量産。使った企業も記録(選考ボードから補完)。
+実装には Claude Code および Codex を用いる。各パッケージの詳細は `packages/<name>/README.md` を参照。
 
-### Katazuku Prep (`prep/`)
+## ライセンス
 
-面接の前に、5分。企業ごとの振り返り・想定問答と全社共通の「就活の軸」を貯める。
-直前モードでは設問が明朝の大きな文字で一問ずつ流れる(クリック/Enterで答え表示、J/Kで前後)。
-振り返りの横断ビューで「同じ失敗の繰り返し」にも気づける。
+All rights reserved. 本リポジトリのコードは個人利用を目的として開発されており、許可のない複製・配布・商用利用を禁じる。将来の有料化に際しては、コアエンジンとユーティリティを分割してライセンスを再設計する。
 
-## 自動化
+## 作者
 
-- **毎時のメール見張り**: claude.aiクラウドのルーチン(Haiku)が重要メールだけ通知。管理: https://claude.ai/code/routines
-- **毎朝のシート同期**: タスクスケジューラ → `scripts/daily-sync.ps1` → `claude -p`。
-  メール分析 → 選考管理シート更新 → Inbox用データ書き出し → 受信トレイのフラット化(重要メールは保護)。
-  セットアップは `docs/MINIPC-SETUP.md`
+[kokotatan](https://github.com/kokotatan)

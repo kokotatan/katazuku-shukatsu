@@ -11,7 +11,7 @@
 - **個人情報をコミットしない**: `gmail-import-*.json`, `sheet-import-*.json`,
   `service-account.json`, `logs/`, `*.local.md` はgitignore対象。新しい個人データファイルを
   追加するときは `.gitignore` と `scripts/assemble.mjs` の除外処理の両方を更新する
-- 完了条件: `npm run build` 通過 + `inbox/scripts/` `pipeline/scripts/` の `check-*.ts` 全通過。
+- 完了条件: `npm run build` 通過 + 各アプリ `scripts/` の `check-*.ts` 全通過。
   新機能には同形式(tsx実行・自前assert)の検証スクリプトを追加する
-- 実装順は `docs/specs/01〜04`。企業名の名寄せは `pipeline/src/lib/importer.ts` の
-  `sameCompany` を再利用。選考管理シートへの書き込みは `pipeline/src/lib/sheet.ts` 経由のみ
+- 実装順は `docs/specs/01〜04`。企業名の名寄せは `status/src/lib/importer.ts` の
+  `sameCompany` を再利用。選考管理シートへの書き込みは `status/src/lib/sheet.ts` 経由のみ

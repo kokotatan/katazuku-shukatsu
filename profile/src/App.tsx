@@ -95,7 +95,7 @@ export default function App() {
     const blob = new Blob([JSON.stringify(snippets, null, 2)], { type: 'application/json' })
     const a = document.createElement('a')
     a.href = URL.createObjectURL(blob)
-    a.download = `notes-export-${new Date().toISOString().slice(0, 10)}.json`
+    a.download = `profile-export-${new Date().toISOString().slice(0, 10)}.json`
     a.click()
     URL.revokeObjectURL(a.href)
   }
@@ -125,7 +125,7 @@ export default function App() {
           </span>
           <span className="flex items-baseline gap-2">
             <span className="font-display text-lg font-semibold tracking-tight text-slate-900">katazuku</span>
-            <span className="text-[11px] font-semibold tracking-[0.25em] text-slate-400 uppercase">Notes</span>
+            <span className="text-[11px] font-semibold tracking-[0.25em] text-slate-400 uppercase">Profile</span>
           </span>
           <div className="ml-auto flex items-center gap-2 text-sm">
             <button onClick={() => fileInput.current?.click()} className={ghostBtn}>インポート</button>

@@ -16,11 +16,11 @@
 5. 実装するのは `docs/specs/` の番号順(01: 返信API → 02: Today → 03: Notes → 04: Prep)。
    仕様にないプロダクトを勝手に増やさない
 6. アプリはバックエンドなし・localStorage永続化(`katazuku-<app>/...` キー)。例外は `api/` のみ。
-   他アプリのデータへ書くときは既存を壊さないマージ(`inbox/src/lib/pipeline.ts` 参照)
+   他アプリのデータへ書くときは既存を壊さないマージ(`inbox/src/lib/pipeline.ts(旧称)` 参照)
 
 ## 環境
 
 - Windows 11 / PowerShell。Node 20+。`npm run build` がルートの一括ビルド
 - 開発サーバー: `npm --prefix inbox run dev`(他アプリも同様)
-- 選考管理シートへの書き込みは `pipeline/src/lib/sheet.ts` の安全ルールを必ず経由
+- 選考管理シートへの書き込みは `status/src/lib/sheet.ts` の安全ルールを必ず経由
   (合格/不合格/辞退・メモ・数式列は不可侵)

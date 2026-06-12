@@ -14,6 +14,7 @@ notify-items-*.json
 sheet-import-*.json
 gmail-import-*.json
 notes-export-*.json
+profile-export-*.json
 prep/seed-example.json
 
 # Googleサービスアカウントの鍵(秘密情報)

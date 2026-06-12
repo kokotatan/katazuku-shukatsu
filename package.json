@@ -3,6 +3,6 @@
   "private": true,
   "version": "0.1.0",
   "scripts": {
-    "build": "npm --prefix inbox install && npm --prefix inbox run build && npm --prefix pipeline install && npm --prefix pipeline run build && npm --prefix today install && npm --prefix today run build && npm --prefix notes install && npm --prefix notes run build && npm --prefix prep install && npm --prefix prep run build && node scripts/assemble.mjs"
+    "build": "npm --prefix inbox install && npm --prefix inbox run build && npm --prefix status install && npm --prefix status run build && npm --prefix insight install && npm --prefix insight run build && npm --prefix profile install && npm --prefix profile run build && npm --prefix prep install && npm --prefix prep run build && node scripts/assemble.mjs"
   }
 }

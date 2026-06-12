@@ -10,8 +10,8 @@
   → scripts/daily-sync.ps1
     → claude -p (scripts/daily-sync-prompt.md)
       → Gmail MCP で直近1日のメールを分析
-      → pipeline/sheet-import-loop.json に企業・選考日を書き出し
-      → pipeline/scripts/sheet-sync.ts で選考管理シートに書き込み(dry-run→apply)
+      → status/sheet-import-loop.json に企業・選考日を書き出し
+      → status/scripts/sheet-sync.ts で選考管理シートに書き込み(dry-run→apply)
     → logs/sync-*.log に実行ログ
 ```
 
@@ -42,7 +42,7 @@ npm run build   # 依存インストール+ビルドが通ることを確認
 
 | ファイル | 用途 | 必須? |
 |---|---|---|
-| `pipeline\service-account.json` | シート書き込みの鍵 | **必須** |
+| `status\service-account.json` | シート書き込みの鍵 | **必須** |
 | `inbox\gmail-import-*.json` | Inboxアプリの実メールデータ | 任意 |
 | `chrome-prompts\_profile.local.md` | ブラウザ操作プロンプト用プロフィール | 任意 |
 
@@ -52,14 +52,14 @@ npm run build   # 依存インストール+ビルドが通ることを確認
 2. 「APIとサービス」→ ライブラリ → **Google Sheets API を有効化**
 3. 「IAMと管理」→「サービスアカウント」→ 作成(名前は `katazuku-sync` など)
 4. 作成したサービスアカウント →「キー」タブ → 鍵を追加 → **JSON** → ダウンロード
-5. ダウンロードしたファイルを `pipeline\service-account.json` という名前で保存
+5. ダウンロードしたファイルを `status\service-account.json` という名前で保存
 6. **選考管理シート**(「選考管理シート_奥山彪太郎」)の共有に、サービスアカウントのメールアドレス
    (`xxx@xxx.iam.gserviceaccount.com`)を**編集者**で追加
 
 確認:
 
 ```powershell
-cd C:\katazuku-shukatsu\pipeline
+cd C:\katazuku-shukatsu\status
 npx tsx scripts/sheet-sync.ts sheet-import-loop.json   # dry-run。「シートにアクセスできません」が出なければOK
 ```
 
@@ -108,12 +108,12 @@ Get-Content C:\katazuku-shukatsu\logs\sync-*.log -Tail 30   # 結果サマリを
   → `claude` を一度対話で起動してログインし直す。
 - **書き込み内容がおかしい**
   → `logs/` のdry-run差分を確認。シート側の 合格/不合格/辞退・メモ・数式列はスクリプトが触らない設計
-  (`pipeline/src/lib/sheet.ts`)。ロジックの検証は `cd pipeline && npx tsx scripts/check-sheet.ts`。
+  (`status/src/lib/sheet.ts`)。ロジックの検証は `cd status && npx tsx scripts/check-sheet.ts`。
 
 ## このリポジトリの全体像(参考)
 
 - `inbox/` — メール自動仕分けSPA(katazuku.kotalab.com/inbox/ 予定)
-- `pipeline/` — 選考管理カンバン(同 /pipeline/)。「⬆ インポート」「📤 シートに反映」あり
+- `status/` — 選考管理カンバン(同 /status/)。「⬆ インポート」「📤 シートに反映」あり
 - `landing/` — トップページ
 - `chrome-prompts/` — Claude in Chrome用のマイページ操作プロンプト集
 - `scripts/` — ビルド組立・毎日同期

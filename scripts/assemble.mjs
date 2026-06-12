@@ -1,14 +1,14 @@
 // 配信用 dist/ を組み立てる:
 //   dist/           ← landing/ (katazuku.kotalab.com のトップ)
 //   dist/inbox/     ← inbox/dist (Katazuku Inbox)
-//   dist/pipeline/  ← pipeline/dist (Katazuku Pipeline)
+//   dist/status/    ← status/dist (Katazuku Status) ほか各アプリ
 import { cpSync, mkdirSync, rmSync, existsSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)))
 const dist = join(root, 'dist')
-const apps = ['inbox', 'pipeline', 'today', 'notes', 'prep']
+const apps = ['inbox', 'status', 'insight', 'profile', 'prep']
 
 for (const app of apps) {
   if (!existsSync(join(root, app, 'dist'))) {

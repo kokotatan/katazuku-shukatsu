@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
-  // katazuku.kotalab.com/today 配下で配信する
-  base: '/today/',
+  // katazuku.kotalab.com/notes 配下で配信する
+  base: '/profile/',
   plugins: [react(), tailwindcss()],
 })
