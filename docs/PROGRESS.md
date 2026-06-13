@@ -79,10 +79,10 @@ katazuku.kotalab.com/prep/    → prep/    (面接振り返り・直前モード
 
 ## ✅ メール見張りクラウドルーチン(稼働開始)
 
-毎時0分にクラウドでGmailをチェックし、重要メール(面接・締切・選考結果等)だけ通知。
+12時間ごと(JST 09:07 / 21:07)にクラウドでGmailをチェックし、重要メール(面接・締切・選考結果等)だけ通知。
 
 - ルーチンID: `trig_01LE26rJ6RL3FuzU8TBDiNib`(claude.ai/code/routines で管理・削除)
-- モデル: claude-haiku-4-5 / cron: `0 * * * *`(UTC) / Gmail MCPコネクタ接続済み
+- モデル: claude-haiku-4-5 / cron: `7 0,12 * * *`(UTC = JST 09:07/21:07) / Gmail MCPコネクタ接続済み
 - 通知済み管理: Gmailラベル `katazuku-notified` で二重通知防止
 - 2026-06-11T11:00Z以前のメールは移行措置で通知対象外
 - 注意: クラウド環境にPushNotificationが無い場合は実行結果の冒頭に通知文を書く設計。初回実行の結果要確認
