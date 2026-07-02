@@ -17,7 +17,21 @@
 - 起動: `katazuku asa`(`katazuku inbox` も同じルーチン)。対話セッションなので決裁の返事で続きが進む
 - 自動起動: タスクスケジューラ `katazuku-asa`(毎朝9:00、PCが寝ていれば次に使える時。登録スクリプト `scripts/register-asa.ps1`、解除は `Unregister-ScheduledTask -TaskName 'katazuku-asa'`)
 - 注意: `.ps1` はBOM付きUTF-8必須(PowerShell 5.1がBOM無しをShift-JIS誤読する)
-- 残タスク: 初回実行(2026-07-03朝)の結果確認 / クラウド見張りルーチン(12時間ごと)を「24時間以内の緊急のみ通知」に縮小(claude.ai/code/routines で編集) / `status/service-account.json` 配置(シート書き戻し活性化)
+
+### 同日追記(2026-07-02 環境整備)
+
+- PowerShellプロファイルに `katazuku` 関数を登録(未登録で `katazuku asa` が動かなかった)
+- **daily-syncをタスクスケジューラに登録**(`katazuku-daily-sync`、毎朝8:23。登録スクリプト `scripts/register-daily-sync.ps1`)。
+  未登録のまま「毎朝自動実行」と書かれていたので実は一度も回っていなかった
+- **重要な発見: ユーザー環境変数に無効な `ANTHROPIC_API_KEY` が残っていて、claude.aiコネクタ(Gmail/カレンダー/Drive)を
+  全セッションで無効化していた** → 削除済み(キーは無効だったため退避なし。他ツールで使っていた場合はコンソールから再発行)
+- headless(`claude -p`)ではキー削除後もclaude.aiコネクタは載らない(実測。MINIPC-SETUPのトラブルシュート記載どおり)。
+  よって daily-sync のGmail処理はheadlessでは動かず、gracefulにスキップされる。対策として**受信トレイ整理(旧daily-sync手順8)を
+  asa-prompt の手順8に吸収**(対話セッションはコネクタが使える前提)
+- GitHub: gh認証は実は済んでいた。未pushだった21コミットをpush済み(リポジトリはprivate確認済み)
+- 残タスク: 対話セッションで `/mcp` を開きGmail/カレンダー/Driveコネクタの接続を目視確認(カレンダーコネクタが
+  未追加なら claude.ai 側で追加) / asa初回実行(2026-07-03朝9:00)の結果確認 / クラウド見張りルーチンを
+  「24時間以内の緊急のみ通知」に縮小(claude.ai/code/routines で編集) / `status/service-account.json` 配置(シート書き戻し活性化)
 
 ## 次回再開メモ(2026-06-13セッション終了時点)
 

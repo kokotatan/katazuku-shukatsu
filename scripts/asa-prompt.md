@@ -62,6 +62,19 @@
 - 締切が48時間以内なのに未着手に見えるタスク(ES・課題など)は、督促で終わらせず**成果物のドラフト**を作って出す
   (ESなら個人マスタ§8の部品から設問に合わせて下書き)。決裁を「やるかどうか」ではなく「これで出すか、直すか」にする。
 
+### 8. 受信トレイの整理(katazuku Inboxが受信箱、Gmailはフラット化する運用)
+
+- 就活サービス媒体(slogan.jp / br-campus.jp / typeshukatsu.jp / en-courage.com / labbase.jp / openwork.jp /
+  gaishishukatsu.com / gakujo.ne.jp / ibeck.co.jp / offerbox.jp / mynavi.jp / rikunabi.com)の
+  `is:unread older_than:7d` は label_thread で TRASH へ。
+- それ以外の `is:unread older_than:1d` は unlabel_thread で UNREAD を外す(既読化のみ。削除はしない)。
+  手順1で対応要否を判定済みなので見逃しは起きない。
+- 当日(1日以内)の未読はそのまま残す。
+- **最重要の例外**: 人事面談・面談調整・Slack招待/ワークスペース・インターン事前準備(事前アンケート/
+  セットアップ/持ち物/宿泊/交通費/キックオフ)系で未対応に見えるメールは**既読化せず未読のまま残し**、
+  決裁または要返信の先頭で個別に扱う。この種の見逃しは選考辞退扱いに直結するため最優先。
+- 整理した件数(ゴミ箱・既読化)は「自動で済ませたこと」に1行で載せる。
+
 ## 出力フォーマット
 
 ```
