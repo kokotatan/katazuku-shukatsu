@@ -32,9 +32,14 @@
 - **asa実行結果(2026-07-02)**: このセッションでもGmail/カレンダー/Driveコネクタは未接続(ToolSearchでも見つからず)。
   さらにChrome拡張も「OAuthトークンが別のclaude.aiアカウント」エラーで接続不可 —
   `CLAUDE_CODE_OAUTH_TOKEN` が環境変数に残っている可能性(要確認)。メール取得手段ゼロのため全手順スキップ
-- 残タスク: 対話セッションで `/mcp` を開きGmail/カレンダー/Driveコネクタの接続を目視確認(カレンダーコネクタが
-  未追加なら claude.ai 側で追加) / asa初回実行(2026-07-03朝9:00)の結果確認 / クラウド見張りルーチンを
-  「24時間以内の緊急のみ通知」に縮小(claude.ai/code/routines で編集) / `status/service-account.json` 配置(シート書き戻し活性化)
+- **方針転換(2026-07-03)**: claude.aiコネクタは追わず、**Google直結MCP(workspace-mcp)に乗り換える**。
+  手順書: `docs/GOOGLE-MCP-SETUP.md`。これで対話/headless両対応になり、daily-syncのGmail処理も復活する。
+  ブロッカー: Chrome拡張が別のclaude.aiアカウントでログインしていてブラウザ代行操作が不可
+  (本人が拡張を laboauto12 に切り替えたらGCP設定を代行実施)
+- 用語修正: 本人向け出力の「決裁」「Yes/No」をやめ「きょうやること(最大3件)」に統一
+- 残タスク: Chrome拡張のアカウント切替(本人)→ GCPでOAuthクライアント作成+API有効化(代行可)→
+  `claude mcp add google-workspace` → daily-sync.ps1のallowedTools差し替え / SA鍵配置(シート書き戻し) /
+  クラウド見張りルーチンを「24時間以内の緊急のみ通知」に縮小(claude.ai/code/routines)
 
 ## 次回再開メモ(2026-06-13セッション終了時点)
 
