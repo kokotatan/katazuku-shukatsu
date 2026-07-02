@@ -32,7 +32,7 @@ function Copy-Prompt([string] $file, [string] $label) {
 }
 
 switch ($Command) {
-  'asa'     {                                         # 朝の決裁: メール分類→返信下書き→カレンダー→シート突合→prep。決裁は最大3件
+  'asa'     {                                         # 朝のYes/No: メール分類→返信下書き→カレンダー→シート突合→prep。返事は最大3件
     Set-Location $root
     $prompt = Get-Content (Join-Path $root 'scripts\asa-prompt.md') -Raw -Encoding UTF8
     claude $prompt
@@ -77,7 +77,7 @@ katazuku <command>
   第一波
   submit     書類提出     ES転記プロンプトをコピー(Claude in Chromeへ)
   test       適性検査     受検準備プロンプトをコピー(受検代行はしない)
-  asa        朝の決裁     返信下書き・カレンダー・シート突合まで自動、決裁は最大3件(毎朝9時に自動起動)
+  asa        朝のYes/No   返信下書き・カレンダー・シート突合まで自動、あなたはYes/Noを返すだけ(毎朝9時)
   inbox      連絡管理     asa と同じルーチンを手動で実行
   inbox-web  連絡管理     取込メールの仕分けSPA (Web)
 

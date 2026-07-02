@@ -29,6 +29,9 @@
   よって daily-sync のGmail処理はheadlessでは動かず、gracefulにスキップされる。対策として**受信トレイ整理(旧daily-sync手順8)を
   asa-prompt の手順8に吸収**(対話セッションはコネクタが使える前提)
 - GitHub: gh認証は実は済んでいた。未pushだった21コミットをpush済み(リポジトリはprivate確認済み)
+- **asa実行結果(2026-07-02)**: このセッションでもGmail/カレンダー/Driveコネクタは未接続(ToolSearchでも見つからず)。
+  さらにChrome拡張も「OAuthトークンが別のclaude.aiアカウント」エラーで接続不可 —
+  `CLAUDE_CODE_OAUTH_TOKEN` が環境変数に残っている可能性(要確認)。メール取得手段ゼロのため全手順スキップ
 - 残タスク: 対話セッションで `/mcp` を開きGmail/カレンダー/Driveコネクタの接続を目視確認(カレンダーコネクタが
   未追加なら claude.ai 側で追加) / asa初回実行(2026-07-03朝9:00)の結果確認 / クラウド見張りルーチンを
   「24時間以内の緊急のみ通知」に縮小(claude.ai/code/routines で編集) / `status/service-account.json` 配置(シート書き戻し活性化)
