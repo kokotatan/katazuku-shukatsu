@@ -32,7 +32,17 @@ function Copy-Prompt([string] $file, [string] $label) {
 }
 
 switch ($Command) {
-  'inbox'   { Open-App 'inbox' 4173 }                 # 連絡管理: 仕分け・返信下書き
+  'asa'     {                                         # 朝の決裁: メール分類→返信下書き→カレンダー→シート突合→prep。決裁は最大3件
+    Set-Location $root
+    $prompt = Get-Content (Join-Path $root 'scripts\asa-prompt.md') -Raw -Encoding UTF8
+    claude $prompt
+  }
+  'inbox'   {                                         # 連絡管理: asa と同じルーチン(旧inbox-triageを吸収)
+    Set-Location $root
+    $prompt = Get-Content (Join-Path $root 'scripts\asa-prompt.md') -Raw -Encoding UTF8
+    claude $prompt
+  }
+  'inbox-web' { Open-App 'inbox' 4173 }               # 旧inbox: 取込メールの仕分けSPA(Web)
   'status'  { Open-App 'status' 4174 }                # 進捗管理: 全社の選考状況ボード
   'insight' { Open-App 'insight' 4175 }               # インテリジェンス: 当日サマリーと次アクション
   'profile' { Open-App 'profile' 4176 }               # 個人マスタ: ESデータの一元管理
@@ -67,7 +77,9 @@ katazuku <command>
   第一波
   submit     書類提出     ES転記プロンプトをコピー(Claude in Chromeへ)
   test       適性検査     受検準備プロンプトをコピー(受検代行はしない)
-  inbox      連絡管理     メール仕分け・AI返信下書き (Web)
+  asa        朝の決裁     返信下書き・カレンダー・シート突合まで自動、決裁は最大3件(毎朝9時に自動起動)
+  inbox      連絡管理     asa と同じルーチンを手動で実行
+  inbox-web  連絡管理     取込メールの仕分けSPA (Web)
 
   土台
   profile    個人マスタ   ESデータの一元管理 (Web)
