@@ -1,6 +1,25 @@
 # katazuku 開発進捗
 
-最終更新: 2026-07-02
+最終更新: 2026-07-03
+
+## Google直結MCP(workspace-mcp)乗り換え完了(2026-07-03)
+
+`docs/GOOGLE-MCP-SETUP.md` の全手順を完了。Gmail/カレンダー/Drive/Sheets が対話・headless両方で使えるようになった。
+
+- GCP: プロジェクト作成・API 4つ有効化・OAuth同意画面・デスクトップアプリのOAuthクライアント作成
+  (Claude in Chrome 代行。プロンプトは `chrome-prompts/06-gcp-oauth-setup.md` に恒久化)
+- `claude mcp add google-workspace --scope user`(uvx workspace-mcp、gmail/calendar/drive/sheets)登録済み・Connected確認済み
+- 初回OAuth認証は難航(4回失敗)ののち成功。原因と教訓:
+  - headless `claude -p` 経由だと承認前にプロセスが終了しコールバックサーバーが消える
+  - ツール連打でリトライすると毎回新しい認証フローが発行され、開いていた承認ページが無効化される
+  - 解決: MCPサーバーを1プロセスだけ起動し、認証フローを1回だけ発行して承認まで待つ専用スクリプト
+    (scratchpadの一時スクリプト。再認証が必要になったら同じ方式で)+ 承認URLをクリップボード渡し
+  - トークン保存先: `~/.google_workspace_mcp/credentials/`。クライアントIDシークレットの控えは `~/credientials/`(綴りはtypoだが本人の置き場)
+- 追従修正済み: `scripts/daily-sync.ps1` の allowedTools と `daily-sync-prompt.md` / `asa-prompt.md` のツール名を
+  `mcp__google-workspace__*` の実名(search_gmail_messages / get_gmail_thread_content / batch_modify_gmail_message_labels /
+  get_events / draft_gmail_message 等)に差し替え。これで受信トレイ整理がheadlessのdaily-syncでも動く
+- 残タスク: OAuth同意画面の「本番公開」確認(未公開だとトークン7日失効→週1再認証)、SA鍵配置(シート書き戻し)、
+  クラウド見張りルーチンの縮小
 
 ## ✅ 朝の決裁ルーチン「katazuku asa」(2026-07-02稼働開始)
 

@@ -18,6 +18,7 @@
 | `03-event-reserve.md` | 説明会・座談会・オープンカンパニーの予約 |
 | `04-schedule-reply.md` | 面接・面談の日程調整フォーム回答 |
 | `05-es-submit.md` | 書き上げたESのマイページ転記・提出 |
+| `06-gcp-oauth-setup.md` | GCPコンソールでのOAuthクライアント作成(google-workspace MCP用) |
 
 ## ⚠️ 全プロンプト共通のルール(各プロンプトに組み込み済み)
 

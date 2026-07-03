@@ -13,7 +13,9 @@ $prompt = Get-Content -Raw (Join-Path $PSScriptRoot 'daily-sync-prompt.md')
 # headless実行。ツールは同期に必要な最小限だけ許可する
 claude -p $prompt `
   --allowedTools 'PowerShell' 'Bash' 'Read' 'Write' 'Glob' 'Grep' `
-    'mcp__claude_ai_Gmail__search_threads' 'mcp__claude_ai_Gmail__get_thread' `
+    'mcp__google-workspace__search_gmail_messages' 'mcp__google-workspace__get_gmail_message_content' `
+    'mcp__google-workspace__get_gmail_messages_content_batch' 'mcp__google-workspace__get_gmail_thread_content' `
+    'mcp__google-workspace__modify_gmail_message_labels' 'mcp__google-workspace__batch_modify_gmail_message_labels' `
   *> $logFile
 
 # 30日より古いログは消す

@@ -14,7 +14,7 @@
 ### 1. メールの取得と分類
 
 - Gmail MCP で受信トレイの未読を取得する。クエリ例: `in:inbox is:unread newer_than:7d`(必要なら日付を調整)。最大40〜50件。
-- スレッド一覧のスニペット/件名/差出人で一次判定。中身が要るものだけ get_thread で本文を読む。
+- スレッド一覧のスニペット/件名/差出人で一次判定。中身が要るものだけ get_gmail_thread_content で本文を読む。
 - 3群に分類する:
   - **確定済みの予定**: 面接・来訪・インターン本体など日時が確定したもの。Zoom/会場/QR等の参加情報を拾う。
   - **要返信・要判断**: 面談の日程調整(候補から選ぶ/空きを返す)、ES・課題・適性検査の締切、予約が要るイベント。締切日を必ず特定する。
@@ -26,11 +26,11 @@
 - description に参加手順・URL・ID・持ち物(QRコード等)・服装・合否連絡時期などをまとめる。
 - 前日(1440分)+直前(対面120分/オンライン60分)の popup リマインダーを付ける。
 - 複数日のインターンは allDay の複数日イベントにする。
-- **重複登録を避ける**: 登録前に list_events で同日同件名が無いか確認する。既にあればスキップして「登録済み」と報告。
+- **重複登録を避ける**: 登録前に get_events で同日同件名が無いか確認する。既にあればスキップして「登録済み」と報告。
 
 ### 3. 要返信は下書きまで作る(自動送信は絶対にしない)
 
-- Gmail MCP に下書き作成ツール(create_draft 等)があれば、該当スレッドへの返信下書きを作成する。
+- Gmail MCP の下書き作成ツール(draft_gmail_message)で、該当スレッドへの返信下書きを作成する。
   無ければ、そのまま送れる完成度の返信文を出力に含める(本人はコピーして送るだけ)。
 - 日程調整は、先に Google Calendar で該当期間の空きを確認し、既存予定と重ならない候補を2〜3個選んで下書きに入れる。対面は前後60分の移動時間も空けておく。
 - 文面は就活標準の敬語+署名。氏名・連絡先は個人マスタ§4を参照する。
@@ -68,8 +68,8 @@
 
 - 就活サービス媒体(slogan.jp / br-campus.jp / typeshukatsu.jp / en-courage.com / labbase.jp / openwork.jp /
   gaishishukatsu.com / gakujo.ne.jp / ibeck.co.jp / offerbox.jp / mynavi.jp / rikunabi.com)の
-  `is:unread older_than:7d` は label_thread で TRASH へ。
-- それ以外の `is:unread older_than:1d` は unlabel_thread で UNREAD を外す(既読化のみ。削除はしない)。
+  `is:unread older_than:7d` は batch_modify_gmail_message_labels で TRASH ラベルを付けてゴミ箱へ。
+- それ以外の `is:unread older_than:1d` は batch_modify_gmail_message_labels で UNREAD ラベルを外す(既読化のみ。削除はしない)。
   手順1で対応要否を判定済みなので見逃しは起きない。
 - 当日(1日以内)の未読はそのまま残す。
 - **最重要の例外**: 人事面談・面談調整・Slack招待/ワークスペース・インターン事前準備(事前アンケート/
