@@ -22,3 +22,13 @@ service-account.json
 
 # 自動同期の実行ログ
 logs/
+
+# ブラウザ操作MCP(Playwright)のスクリーンショット等(顔写真・ES内容など個人情報が写る)
+.playwright-mcp/
+mitsui-*.png
+sec-*.png
+es-*.md
+tl-snap-*.md
+
+# ブラウザMCPからアップロードする一時ファイル(顔写真など個人情報)
+tmp/
