@@ -20,6 +20,11 @@ prep/seed-example.json
 # Googleサービスアカウントの鍵(秘密情報)
 service-account.json
 
+# APIキー等の環境変数(ANTHROPIC_API_KEY など。秘密情報)
+.env
+.env.local
+.env.*.local
+
 # 自動同期の実行ログ
 logs/
 
