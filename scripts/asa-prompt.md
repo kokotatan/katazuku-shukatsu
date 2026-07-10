@@ -9,7 +9,20 @@
 参照: 選考管理シート(Google Drive)・docs/PROGRESS.md・個人マスタ(chrome-prompts/submit.local.md §4〜§11)。
 デザイン規約「帳簿的ミニマリズム」に従い、**絵文字は一切使わない**(カレンダー本文・返信下書きも含む)。出力は日本語。
 
+MCPツールは環境により mcp__google-workspace__ 系または mcp__claude_ai_* 系(claude_ai_Gmail /
+claude_ai_Google_Calendar / claude_ai_Google_Drive)のどちらかが使える。**使える方を使う**こと。
+以下の手順でツール名を挙げている箇所は例であり、同等の機能を持つ方のツールに読み替える
+(例: get_gmail_thread_content ↔ get_thread、draft_gmail_message ↔ create_draft、
+get_events ↔ list_events、batch_modify_gmail_message_labels ↔ label/unlabel 系)。
+
 ## 手順
+
+### 00. 自動化の故障チェック【最初に】
+
+- `logs/alert-*.txt`(例: alert-daily-sync.txt / alert-meeting-opener.txt)が存在するか確認する。
+- 存在すれば、その内容を出力の「きょうやること」の冒頭で**【自動化の故障】**として報告する
+  (どのジョブが・いつから・何の理由で失敗しているかを1〜2行で)。
+- 報告したらファイルを削除する(報告済みの故障を翌日また出さないため)。1件も無ければ何も出力しない。
 
 ### 0. 送り忘れ(未送信の下書き)の検出【最優先】
 

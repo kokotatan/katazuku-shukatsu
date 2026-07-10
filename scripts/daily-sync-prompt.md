@@ -3,7 +3,11 @@
 手順:
 
 1. `status/service-account.json` の存在を確認。無ければ「サービスアカウント鍵がありません。docs/MINIPC-SETUP.md の手順4を参照」とだけ出力して終了。
-2. Gmail MCP (mcp__google-workspace__search_gmail_messages / get_gmail_thread_content) で直近1日(`newer_than:1d`)の就活関連メールを検索する。Gmail MCPツールが利用できない環境なら「Gmail MCP が使えないため同期をスキップ」と出力して終了。
+2. Gmail MCP で直近1日(`newer_than:1d`)の就活関連メールを検索する。Gmail MCP ツールは環境により
+   mcp__google-workspace__ 系(search_gmail_messages / get_gmail_thread_content)または
+   mcp__claude_ai_Gmail__ 系(search_threads / get_thread / get_message)のどちらかが使えるので、使える方を使う
+   (以降の手順でツール名を挙げている箇所も同様に読み替える)。どちらも利用できない環境なら
+   「Gmail MCP が使えないため同期をスキップ」と出力して終了。
 3. メールから企業ごとに以下を抽出する:
    - 選考ステータス: 出願済 / 合格 / 不合格 / 辞退 など → stage にマッピング(出願予定=scouted, 出願済=entried, ES・テスト中=task, 面接中=interview, インターン合格=intern, 内定=offer, 不合格・辞退=closed)
    - 〆切・選考日(面接日程を含む) → nextDate (YYYY-MM-DD)
@@ -17,8 +21,8 @@
    `inbox/gmail-import-daily.json` に上書きWriteする(gitignore済み)。
    ※ from は本文署名から企業名を推定して入れる。アプリ側がIDで重複排除するので過去分と重なってよい。
 8. 受信トレイの整理(katazuku Inboxが受信箱、Gmailはフラット化する運用):
-   - 就活サービス媒体(slogan.jp / br-campus.jp / typeshukatsu.jp / en-courage.com / labbase.jp / openwork.jp / gaishishukatsu.com / gakujo.ne.jp / ibeck.co.jp / offerbox.jp / mynavi.jp / rikunabi.com)の `is:unread older_than:7d` は batch_modify_gmail_message_labels で TRASH ラベルを付けてゴミ箱へ
-   - それ以外の `is:unread older_than:1d` は batch_modify_gmail_message_labels で UNREAD ラベルを外す(既読化のみ・削除はしない)。手順7でアプリに取り込み済みなので見逃しは起きない
+   - 就活サービス媒体(slogan.jp / br-campus.jp / typeshukatsu.jp / en-courage.com / labbase.jp / openwork.jp / gaishishukatsu.com / gakujo.ne.jp / ibeck.co.jp / offerbox.jp / mynavi.jp / rikunabi.com)の `is:unread older_than:7d` は batch_modify_gmail_message_labels(claude_ai 系なら label_thread / label_message)で TRASH ラベルを付けてゴミ箱へ
+   - それ以外の `is:unread older_than:1d` は batch_modify_gmail_message_labels(claude_ai 系なら unlabel_thread / unlabel_message)で UNREAD ラベルを外す(既読化のみ・削除はしない)。手順7でアプリに取り込み済みなので見逃しは起きない
    - 当日(1日以内)の未読はそのまま残す(緊急対応の目印のため)
    - **最重要の例外**: 件名・本文に「人事面談・面談調整・Slack招待/ワークスペース・インターン事前準備(事前アンケート/セットアップ/持ち物/宿泊/交通費/キックオフ)」が含まれ、かつ未対応に見えるメールは**既読化せず未読のまま残し**、サマリの冒頭で個別に報告する。この種の見逃しは選考辞退扱いに直結するため最優先
 9. 最後に結果サマリ(更新した企業名・選考日・追記件数・既読化/ゴミ箱の件数)を簡潔に出力する。
