@@ -1,6 +1,27 @@
 # katazuku 開発進捗
 
-最終更新: 2026-07-03
+最終更新: 2026-07-10
+
+## 自動運転の故障修理と土台強化(2026-07-10)
+
+棚卸し(3エージェント並列)で判明した実害と修理:
+
+- **【故障】headless自動化がほぼ全滅していた**: `daily-sync.ps1` / `open-meeting-urls.ps1` の
+  allowedTools が旧 `mcp__google-workspace__*` のみで、実働コネクタ `mcp__claude_ai_Gmail__*` /
+  `mcp__claude_ai_Google_Calendar__*` が許可されておらず、会議URL自動オープンは認証エラーで常時失敗、
+  daily-syncも早期終了が頻発(logs/ の実ログで確認)。→ ツール名を両対応化して修理
+- **【故障】失敗が誰にも通知されない**: 失敗検知を追加。異常時に `logs/alert-*.txt` を書き、
+  asa(朝ルーチン)の冒頭で【自動化の故障】として本人に報告する仕組みに
+- シート書き込みに決定的ブレーキ追加: 無人applyで15件超の差分は中止(`--force`で解除)。
+  LLMの「妥当なら書く」自己判断に頼らない安全弁
+- check-pipeline.ts の型追随、meeting-opener.log のローテーション追加
+- エントリー代行の実戦知見を `chrome-prompts/08-browser-entry-knowhow.md` に恒久化(e2r/HRMOS突破法)。
+  当日実績: 任天堂イベント用マイページ(パスワード入力のみ本人待ち)、日本トレカセンターRAID応募完了
+- ID/パスワードの正本は企業マスタ(選考管理シート)に統合する運用へ(submit.local.md §0.1)
+- 個人情報混入防止: `tl-snap-*.md` をgitignoreに追加、既存スナップショットを `tmp/` へ退避
+
+既知の残課題(次の一手): OAuth同意画面の本番公開確認、SA鍵配置(A3)、Vercel本番デプロイ(C1)、
+specs旧フォルダ名(today/notes)の改名追従、MINIPC-SETUP.md の旧コネクタ前提の書き直し。
 
 ## Google直結MCP(workspace-mcp)乗り換え完了(2026-07-03)
 

@@ -67,6 +67,11 @@ npx tsx scripts/sheet-sync.ts sheet-import-loop.json   # dry-run。「シート�
 
 ## 5. Gmail MCP(claude.aiコネクタ)の確認
 
+> 【2026-07-10 注記】現在の一次手段は claude.ai 直結コネクタ(`mcp__claude_ai_Gmail__*` 等)。
+> 自前 workspace-mcp(`mcp__google-workspace__*`)は登録済みだが認証が不安定で、スクリプトの
+> allowedTools は両対応にしてある(scripts/daily-sync.ps1 / open-meeting-urls.ps1)。
+> 本節と後述トラブルシュートの「/loop 24h に切替(週1再設定)」は最終手段の旧手順として残す。
+
 Gmailコネクタは **claude.aiアカウントに紐づく**ので、同じアカウントでログインすれば追加設定なしで使えるはず。
 
 ```powershell
