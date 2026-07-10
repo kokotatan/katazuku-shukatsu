@@ -20,8 +20,17 @@
 - ID/パスワードの正本は企業マスタ(選考管理シート)に統合する運用へ(submit.local.md §0.1)
 - 個人情報混入防止: `tl-snap-*.md` をgitignoreに追加、既存スナップショットを `tmp/` へ退避
 
-既知の残課題(次の一手): OAuth同意画面の本番公開確認、SA鍵配置(A3)、Vercel本番デプロイ(C1)、
-specs旧フォルダ名(today/notes)の改名追従、MINIPC-SETUP.md の旧コネクタ前提の書き直し。
+同日追記(夕):
+- **spec01完了**: 返信文生成API `api/generate-reply.ts`(Vercel Functions版)を実装。
+  claude-haiku-4-5 をfetch直叩き、APIキー未設定/障害時はルールベーステンプレートへフォールバック。
+  検証 `inbox/scripts/check-reply-api.ts`(20件)。残りはVercelデプロイ+環境変数設定のみ(C1)
+- 締切抽出の単体検証 `inbox/scripts/check-dates.ts` を追加(44件)。24時間猶予・年補正境界・
+  改行跨ぎ時刻非紐付け等の壊れやすい挙動を固定
+- vercel CLI をグローバルインストール済み(ログインは本人作業)
+- specs 02/03 に旧フォルダ名(today/notes→insight/profile)の注記を追加
+
+既知の残課題(次の一手): OAuth同意画面の本番公開確認、SA鍵配置(A3)、Vercel本番デプロイ(C1・
+ログインは本人)、MINIPC-SETUP.md の旧コネクタ前提の全面書き直し。
 
 ## Google直結MCP(workspace-mcp)乗り換え完了(2026-07-03)
 
