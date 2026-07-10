@@ -26,7 +26,7 @@ export function makeDemoEmails(now: Date = new Date()): RawEmail[] {
       fromAddress: 'recruit@techfrontier.example.jp',
       subject: '【重要/要返信】一次面接の日程調整のお願い',
       receivedAt: at(now, -1, 14, 32).toISOString(),
-      body: `大久保 様
+      body: `山田 太郎 様
 
 株式会社テックフロンティア 新卒採用担当の佐藤です。
 このたびは書類選考にご応募いただき、誠にありがとうございました。
@@ -50,7 +50,7 @@ https://techfrontier.example.jp/schedule
       fromAddress: 'saiyo@mirai-shoji.example.co.jp',
       subject: '【リマインド】エントリーシートご提出期限のお知らせ',
       receivedAt: at(now, 0, 9, 5).toISOString(),
-      body: `大久保 様
+      body: `山田 太郎 様
 
 ミライ総合商社 人事部です。
 総合職エントリーにあたり、エントリーシートのご提出期限が近づいておりますのでご案内いたします。
@@ -67,7 +67,7 @@ https://techfrontier.example.jp/schedule
       fromAddress: 'newgrads@connect-hr.example.com',
       subject: 'Webテスト受検のお願い(書類選考通過のご連絡)',
       receivedAt: at(now, -1, 19, 48).toISOString(),
-      body: `大久保 様
+      body: `山田 太郎 様
 
 株式会社コネクトHR 採用チームです。
 書類選考の結果、次のステップへお進みいただくことになりました。
@@ -87,7 +87,7 @@ https://techfrontier.example.jp/schedule
       fromAddress: 'recruit@northlight.example.jp',
       subject: '最終面接のご案内(日時確定)',
       receivedAt: at(now, -2, 11, 20).toISOString(),
-      body: `大久保 様
+      body: `山田 太郎 様
 
 株式会社ノースライト 採用事務局です。
 最終面接の日時が確定いたしましたのでご案内いたします。
@@ -122,7 +122,7 @@ https://techfrontier.example.jp/schedule
       fromAddress: 'jinji@hikari-foods.example.co.jp',
       subject: '二次選考結果のご連絡',
       receivedAt: at(now, 0, 10, 41).toISOString(),
-      body: `大久保 様
+      body: `山田 太郎 様
 
 ヒカリ食品株式会社 人事部です。
 先日は二次面接にお越しいただき、誠にありがとうございました。
@@ -155,7 +155,7 @@ https://techfrontier.example.jp/schedule
       fromAddress: 'tanaka@kaisei.example.com',
       subject: 'カジュアル面談のご都合はいかがでしょうか',
       receivedAt: at(now, -4, 18, 27).toISOString(),
-      body: `大久保 様
+      body: `山田 太郎 様
 
 株式会社カイセイ 採用担当の田中です。
 プロフィールを拝見し、ぜひ一度カジュアル面談でお話しできればと思いご連絡いたしました。
@@ -190,7 +190,7 @@ https://shukatsu-navi.example.com/picks
       fromAddress: 'saiyou@tsubasa-logi.example.co.jp',
       subject: '【要対応】内々定に伴う承諾書のご提出について',
       receivedAt: at(now, -1, 9, 55).toISOString(),
-      body: `大久保 様
+      body: `山田 太郎 様
 
 ツバサ物流株式会社 採用グループです。
 このたびは内々定おめでとうございます。
@@ -208,7 +208,7 @@ https://shukatsu-navi.example.com/picks
       fromAddress: 'seminar@minato-sec.example.co.jp',
       subject: '会社説明会(オンライン)のご予約確認',
       receivedAt: at(now, -5, 12, 30).toISOString(),
-      body: `大久保 様
+      body: `山田 太郎 様
 
 ミナト証券 新卒採用セミナー事務局です。
 下記の会社説明会のご予約を承りました。
