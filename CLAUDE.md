@@ -9,7 +9,7 @@
 landing/          トップページ (katazuku.kotalab.com 予定)
 inbox/            メール自動仕分けSPA      → /inbox/
 status/           選考管理カンバン(進捗管理) → /status/
-api/              Vercel Functions (これから。specs/01参照)
+api/              Vercel Functions (spec01実装済み。デプロイ待ち)
 scripts/          dist組立・毎日同期 (daily-sync.ps1 + daily-sync-prompt.md)
 chrome-prompts/   Claude in Chrome 用ブラウザ操作プロンプト集
 docs/PROGRESS.md  開発進捗の詳細 (一次情報)
@@ -33,6 +33,8 @@ cd inbox;    npx tsx scripts/check-classify.ts    # 実メール50件の分類�
 cd inbox;    npx tsx scripts/check-actions.ts     # アクション抽出
 cd inbox;    npx tsx scripts/check-selection.ts   # 選考/募集/課外/宣伝の判定
 cd inbox;    npx tsx scripts/check-pipeline.ts    # Inbox→Pipeline連携
+cd inbox;    npx tsx scripts/check-dates.ts       # 締切抽出(日付・時刻・緊急度)
+cd inbox;    npx tsx scripts/check-reply-api.ts   # 返信APIのフォールバックテンプレート
 cd status;   npx tsx scripts/check-import.ts      # シート取込マージ
 cd status;   npx tsx scripts/check-sheet.ts       # シート書き戻し
 ```
