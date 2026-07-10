@@ -4,6 +4,7 @@
  * 実行: cd pipeline && npx tsx scripts/check-sheet.ts
  */
 import { desiredStatus, locateTable, planUpdates, type CellUpdate } from '../src/lib/sheet'
+import { countPlannedChanges, MAX_APPLY_CHANGES } from './sheet-sync'
 import type { Company, Stage } from '../src/types'
 
 let failed = 0
@@ -81,6 +82,19 @@ check('空き行が尽きたらskippedに回す', plan.skipped.length === 1 && p
 check('別表(endRow以降)には書かない', plan.updates.every((u) => u.row < 11))
 check('数式・チェック列(残り日数/提出済)に触れない', plan.updates.every((u) => u.col !== 11 && u.col !== 12))
 check('メモ欄に触れない', plan.updates.every((u) => u.col !== 17))
+
+// --- countPlannedChanges (--apply の書き込み上限ガード) ---
+const fakePlan = (updated: number, added: number) => ({
+  updatedNames: Array.from({ length: updated }, (_, i) => `更新社${i + 1}`),
+  addedNames: Array.from({ length: added }, (_, i) => `追記社${i + 1}`),
+})
+check('上限ガード: 更新+追記の合計を数える', countPlannedChanges(fakePlan(9, 6)) === 15)
+check('上限ガード: 実プランの件数と一致', countPlannedChanges(plan) === plan.updatedNames.length + plan.addedNames.length)
+check('上限ガード: 上限ちょうど(15社)は超過しない', countPlannedChanges(fakePlan(10, 5)) <= MAX_APPLY_CHANGES)
+check('上限ガード: 16社は超過と判定', countPlannedChanges(fakePlan(10, 6)) > MAX_APPLY_CHANGES)
+check('上限ガード: 追記だけでも超過を検出', countPlannedChanges(fakePlan(0, 16)) > MAX_APPLY_CHANGES)
+const planWithSkipped = { updatedNames: ['更新社'], addedNames: ['追記社'], skipped: ['空き行不足社A', '空き行不足社B'] }
+check('上限ガード: skipped は件数に含めない', countPlannedChanges(planWithSkipped) === 2)
 
 if (failed) {
   console.error(`\n${failed}件失敗`)

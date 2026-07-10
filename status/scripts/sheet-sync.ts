@@ -12,6 +12,10 @@
  *   npx tsx scripts/sheet-sync.ts <ボードのJSON>           # 差分表示のみ(dry-run)
  *   npx tsx scripts/sheet-sync.ts <ボードのJSON> --apply   # 実際に書き込む
  *
+ * 暴走ブレーキ: --apply 時に更新+追記の合計が MAX_APPLY_CHANGES 社を超える場合は
+ * 書き込みを中止してエラー終了する(無人実行での誤書き込み対策)。
+ * 意図した大量変更のときだけ --force を併用して上限を無視できる。
+ *
  * ボードのJSONは Pipeline アプリの「⬇ エクスポート」で書き出したファイル。
  * 書き込みルールはアプリの「📤 シートに反映」と同一(lib/sheet.ts を共用):
  * 合格/不合格/辞退は上書きしない・メモや数式列に触れない・無い企業は空き行に追記。
@@ -19,9 +23,17 @@
 import { createSign } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { dirname, join } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { DEFAULT_SHEET_ID, locateTable, planUpdates, type CellUpdate } from '../src/lib/sheet'
 import type { Company } from '../src/types'
+
+/** --apply で一度に書き込める上限(更新+追記の合計社数)。超えたら --force が必要 */
+export const MAX_APPLY_CHANGES = 15
+
+/** 更新+追記の合計社数を数える(暴走ブレーキの判定材料。純粋関数でテスト可能) */
+export function countPlannedChanges(plan: { updatedNames: string[]; addedNames: string[] }): number {
+  return plan.updatedNames.length + plan.addedNames.length
+}
 
 const KEY_PATH = process.env.GOOGLE_SA_KEY ?? join(dirname(fileURLToPath(import.meta.url)), '..', 'service-account.json')
 const SHEET_ID = process.env.SHEET_ID ?? DEFAULT_SHEET_ID
@@ -72,9 +84,10 @@ async function getToken(): Promise<string> {
 async function main() {
   const args = process.argv.slice(2)
   const apply = args.includes('--apply')
+  const force = args.includes('--force')
   const boardPath = args.find((a) => !a.startsWith('--'))
   if (!boardPath) {
-    console.error('使い方: npx tsx scripts/sheet-sync.ts <ボードのJSON> [--apply]')
+    console.error('使い方: npx tsx scripts/sheet-sync.ts <ボードのJSON> [--apply] [--force]')
     process.exit(1)
   }
 
@@ -116,6 +129,14 @@ async function main() {
       return
     }
 
+    // 暴走ブレーキ: 無人実行での誤書き込みを防ぐ。上限超過は --force のみ許可
+    const changeCount = countPlannedChanges(plan)
+    if (changeCount > MAX_APPLY_CHANGES && !force) {
+      console.error(`変更が ${changeCount} 社(更新 ${plan.updatedNames.length} + 追記 ${plan.addedNames.length})あり、上限 ${MAX_APPLY_CHANGES} 社を超えています。書き込みを中止しました。`)
+      console.error('意図した大量変更であれば --force を付けて再実行してください。')
+      process.exit(1)
+    }
+
     const colLetter = (i: number) => {
       let s = ''
       let n = i + 1
@@ -143,7 +164,13 @@ async function main() {
   throw new Error('「企業名」「出願状況」列を持つ表が見つかりませんでした')
 }
 
-main().catch((err) => {
-  console.error(`❌ ${err instanceof Error ? err.message : err}`)
-  process.exit(1)
-})
+// 直接実行されたときだけ main を動かす(check-sheet.ts が純粋関数をimportできるように)
+const invokedDirectly =
+  process.argv[1] != null &&
+  resolve(process.argv[1]).toLowerCase() === fileURLToPath(import.meta.url).toLowerCase()
+if (invokedDirectly) {
+  main().catch((err) => {
+    console.error(`❌ ${err instanceof Error ? err.message : err}`)
+    process.exit(1)
+  })
+}
