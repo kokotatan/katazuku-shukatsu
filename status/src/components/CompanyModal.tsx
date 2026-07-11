@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { AnchorButton, Button, ControlledFormDialog, Input, Select, Textarea } from 'smarthr-ui'
 import { STAGES, type Company, type Stage } from '../types'
 
 interface Props {
@@ -8,6 +9,8 @@ interface Props {
   onDelete?: () => void
   onClose: () => void
 }
+
+const PRIORITIES = ['第１志望群', '第２志望群', '第３志望群', 'それ以下']
 
 export function CompanyModal({ initial, onSave, onDelete, onClose }: Props) {
   const [name, setName] = useState(initial.name ?? '')
@@ -20,115 +23,162 @@ export function CompanyModal({ initial, onSave, onDelete, onClose }: Props) {
   const [priority, setPriority] = useState(initial.priority ?? '')
   const [mypageUrl, setMypageUrl] = useState(initial.mypageUrl ?? '')
 
-  const inputCls =
-    'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none'
+  // ラベル(見出し)は Tailwind のまま、入力コントロールだけ smarthr-ui に載せ替える
+  const labelCls = 'flex flex-col gap-1 text-xs font-semibold text-slate-500'
+
+  const submit = () => {
+    onSave({
+      name: name.trim(),
+      role: role.trim(),
+      stage,
+      nextAction: nextAction.trim(),
+      nextDate: nextDate || null,
+      memo: memo.trim(),
+      industry: industry.trim() || undefined,
+      priority: priority || undefined,
+      mypageUrl: mypageUrl.trim() || undefined,
+    })
+  }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4"
-      onClick={onClose}
-    >
-      <div
-        className="max-h-[85vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-bold">{initial.name ? '編集' : '企業を追加'}</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">✕</button>
-        </div>
-
-        <div className="flex flex-col gap-3">
-          <label className="text-xs font-semibold text-slate-500">
-            企業名 *
-            <input value={name} onChange={(e) => setName(e.target.value)} className={`mt-1 ${inputCls}`} placeholder="株式会社○○" />
-          </label>
-          <label className="text-xs font-semibold text-slate-500">
-            職種・コース
-            <input value={role} onChange={(e) => setRole(e.target.value)} className={`mt-1 ${inputCls}`} placeholder="夏インターン / 総合職 など" />
-          </label>
-          <label className="text-xs font-semibold text-slate-500">
-            ステージ
-            <select value={stage} onChange={(e) => setStage(e.target.value as Stage)} className={`mt-1 ${inputCls}`}>
-              {STAGES.map((s) => (
-                <option key={s.key} value={s.key}>{s.label}</option>
-              ))}
-            </select>
-          </label>
-          <div className="flex gap-3">
-            <label className="flex-1 text-xs font-semibold text-slate-500">
-              業界
-              <input value={industry} onChange={(e) => setIndustry(e.target.value)} className={`mt-1 ${inputCls}`} placeholder="IT・通信 など" />
-            </label>
-            <label className="flex-1 text-xs font-semibold text-slate-500">
-              志望度
-              <select value={priority} onChange={(e) => setPriority(e.target.value)} className={`mt-1 ${inputCls}`}>
-                <option value="">未設定</option>
-                <option value="第１志望群">第１志望群</option>
-                <option value="第２志望群">第２志望群</option>
-                <option value="第３志望群">第３志望群</option>
-                <option value="それ以下">それ以下</option>
-              </select>
-            </label>
-          </div>
-          <label className="text-xs font-semibold text-slate-500">
-            マイページURL
-            <span className="flex items-center gap-2">
-              <input value={mypageUrl} onChange={(e) => setMypageUrl(e.target.value)} className={`mt-1 ${inputCls}`} placeholder="https://mypage.example.com" />
-              {mypageUrl.trim().startsWith('http') && (
-                <a
-                  href={mypageUrl.trim()}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="mt-1 shrink-0 rounded-lg border border-slate-300 px-3 py-2 text-slate-600 hover:bg-slate-50"
-                >
-                  開く ↗
-                </a>
-              )}
-            </span>
-          </label>
-          <label className="text-xs font-semibold text-slate-500">
-            次にやること
-            <input value={nextAction} onChange={(e) => setNextAction(e.target.value)} className={`mt-1 ${inputCls}`} placeholder="ESを提出 / 日程を回答 など" />
-          </label>
-          <label className="text-xs font-semibold text-slate-500">
-            期限・予定日
-            <input type="date" value={nextDate} onChange={(e) => setNextDate(e.target.value)} className={`mt-1 ${inputCls}`} />
-          </label>
-          <label className="text-xs font-semibold text-slate-500">
-            メモ
-            <textarea value={memo} onChange={(e) => setMemo(e.target.value)} rows={3} className={`mt-1 ${inputCls}`} placeholder="選考の経緯、対策メモなど" />
-          </label>
-        </div>
-
-        <div className="mt-5 flex items-center gap-2">
-          <button
-            onClick={() => onSave({ name: name.trim(), role: role.trim(), stage, nextAction: nextAction.trim(), nextDate: nextDate || null, memo: memo.trim(), industry: industry.trim() || undefined, priority: priority || undefined, mypageUrl: mypageUrl.trim() || undefined })}
-            disabled={!name.trim()}
-            className="rounded-lg bg-slate-800 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:opacity-40"
-          >
-            保存
-          </button>
-          <button onClick={onClose} className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50">
-            キャンセル
-          </button>
+    <ControlledFormDialog
+      isOpen
+      heading={initial.name ? '編集' : '企業を追加'}
+      actionButton={{ text: '保存', theme: 'primary', disabled: !name.trim() }}
+      closeButton={{ text: 'キャンセル' }}
+      onSubmit={(_e, helpers) => {
+        submit()
+        helpers.close()
+      }}
+      onClickClose={onClose}
+      onClickOverlay={onClose}
+      onPressEscape={onClose}
+      subActionArea={
+        <div className="flex items-center gap-2">
           {initial.name && (
-            <a
+            <AnchorButton
+              size="S"
+              variant="secondary"
               href={`/prep/?company=${encodeURIComponent(initial.name)}`}
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"
             >
               対策ノート
-            </a>
+            </AnchorButton>
           )}
           {onDelete && (
-            <button
-              onClick={() => { if (window.confirm(`「${initial.name}」を削除しますか?`)) onDelete() }}
-              className="ml-auto rounded-lg border border-red-200 px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+            <Button
+              size="S"
+              variant="danger"
+              onClick={() => {
+                if (window.confirm(`「${initial.name}」を削除しますか?`)) onDelete()
+              }}
             >
               削除
-            </button>
+            </Button>
           )}
         </div>
+      }
+    >
+      <div className="flex flex-col gap-3">
+        <label className={labelCls}>
+          企業名 *
+          <Input
+            width="100%"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="株式会社○○"
+          />
+        </label>
+        <label className={labelCls}>
+          職種・コース
+          <Input
+            width="100%"
+            value={role}
+            onChange={(e) => setRole(e.target.value)}
+            placeholder="夏インターン / 総合職 など"
+          />
+        </label>
+        <label className={labelCls}>
+          ステージ
+          <Select
+            width="100%"
+            value={stage}
+            options={STAGES.map((s) => ({ value: s.key, label: s.label }))}
+            onChangeValue={(v) => setStage(v as Stage)}
+          />
+        </label>
+        <div className="flex gap-3">
+          <label className={`flex-1 ${labelCls}`}>
+            業界
+            <Input
+              width="100%"
+              value={industry}
+              onChange={(e) => setIndustry(e.target.value)}
+              placeholder="IT・通信 など"
+            />
+          </label>
+          <label className={`flex-1 ${labelCls}`}>
+            志望度
+            <Select
+              width="100%"
+              value={priority}
+              hasBlank
+              blankLabel="未設定"
+              options={PRIORITIES.map((p) => ({ value: p, label: p }))}
+              onChangeValue={(v) => setPriority(v)}
+            />
+          </label>
+        </div>
+        <label className={labelCls}>
+          マイページURL
+          <span className="flex items-center gap-2">
+            <Input
+              width="100%"
+              value={mypageUrl}
+              onChange={(e) => setMypageUrl(e.target.value)}
+              placeholder="https://mypage.example.com"
+            />
+            {mypageUrl.trim().startsWith('http') && (
+              <AnchorButton
+                size="S"
+                variant="secondary"
+                href={mypageUrl.trim()}
+                target="_blank"
+                rel="noreferrer"
+              >
+                開く
+              </AnchorButton>
+            )}
+          </span>
+        </label>
+        <label className={labelCls}>
+          次にやること
+          <Input
+            width="100%"
+            value={nextAction}
+            onChange={(e) => setNextAction(e.target.value)}
+            placeholder="ESを提出 / 日程を回答 など"
+          />
+        </label>
+        <label className={labelCls}>
+          期限・予定日
+          <Input
+            width="100%"
+            type="date"
+            value={nextDate}
+            onChange={(e) => setNextDate(e.target.value)}
+          />
+        </label>
+        <label className={labelCls}>
+          メモ
+          <Textarea
+            width="100%"
+            value={memo}
+            onChange={(e) => setMemo(e.target.value)}
+            rows={3}
+            placeholder="選考の経緯、対策メモなど"
+          />
+        </label>
       </div>
-    </div>
+    </ControlledFormDialog>
   )
 }

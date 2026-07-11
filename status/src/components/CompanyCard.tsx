@@ -1,3 +1,4 @@
+import { StatusLabel } from 'smarthr-ui'
 import type { Company } from '../types'
 
 interface Props {
@@ -8,21 +9,26 @@ interface Props {
 
 const WEEKDAYS = '日月火水木金土'
 
-function dateBadge(nextDate: string | null): { text: string; cls: string } | null {
+type LabelType = 'grey' | 'blue' | 'red' | 'warning' | 'error'
+
+// 期限までの残り日数で StatusLabel の種類とラベル文言を決める
+function dateBadge(nextDate: string | null): { text: string; type: LabelType } | null {
   if (!nextDate) return null
   const d = new Date(`${nextDate}T23:59:59`)
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   const days = Math.round((d.getTime() - today.getTime() - 86399e3) / 86400e3)
   const label = `${d.getMonth() + 1}/${d.getDate()}(${WEEKDAYS[d.getDay()]})`
-  if (days < 0) return { text: `${label} 期限切れ`, cls: 'bg-red-600 text-white' }
-  if (days === 0) return { text: `${label} 今日`, cls: 'bg-red-50 text-red-700 ring-1 ring-red-200' }
-  if (days <= 3) return { text: `${label} あと${days}日`, cls: 'bg-slate-200 text-slate-700' }
-  return { text: `${label} あと${days}日`, cls: 'bg-slate-100 text-slate-500' }
+  if (days < 0) return { text: `${label} 期限切れ`, type: 'error' }
+  if (days === 0) return { text: `${label} 今日`, type: 'warning' }
+  if (days <= 3) return { text: `${label} あと${days}日`, type: 'red' }
+  return { text: `${label} あと${days}日`, type: 'grey' }
 }
 
 export function CompanyCard({ company, onClick, onDragStart }: Props) {
   const badge = dateBadge(company.nextDate)
+  const isTopChoice =
+    !!company.priority && (company.priority.includes('１') || company.priority.includes('1'))
   return (
     <button
       draggable
@@ -35,29 +41,21 @@ export function CompanyCard({ company, onClick, onDragStart }: Props) {
       {(company.priority || company.industry) && (
         <p className="mt-1 flex flex-wrap gap-1">
           {company.priority && (
-            <span
-              className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${
-                company.priority.includes('１') || company.priority.includes('1')
-                  ? 'bg-slate-900 text-white'
-                  : 'text-slate-500 ring-1 ring-slate-200'
-              }`}
-            >
+            <StatusLabel type={isTopChoice ? 'blue' : 'grey'} bold={isTopChoice}>
               {company.priority}
-            </span>
+            </StatusLabel>
           )}
-          {company.industry && (
-            <span className="rounded px-1.5 py-0.5 text-[10px] text-slate-400 ring-1 ring-slate-200">
-              {company.industry}
-            </span>
-          )}
+          {company.industry && <StatusLabel type="grey">{company.industry}</StatusLabel>}
         </p>
       )}
       {company.nextAction && (
         <p className="mt-2 text-xs leading-relaxed text-slate-600">{company.nextAction}</p>
       )}
       {badge && (
-        <span className={`mt-2 inline-block rounded px-1.5 py-0.5 text-xs font-bold tabular-nums ${badge.cls}`}>
-          {badge.text}
+        <span className="mt-2 inline-block">
+          <StatusLabel type={badge.type} bold={badge.type === 'error'}>
+            {badge.text}
+          </StatusLabel>
         </span>
       )}
       {company.mypageUrl && (

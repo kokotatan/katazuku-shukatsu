@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Button, Dialog, Input } from 'smarthr-ui'
 import type { Company } from '../types'
 import { requestAccessToken } from '../lib/google'
 import { applyPlan, fetchGrid, planUpdates, type SheetGrid, type SyncPlan } from '../lib/sheet'
@@ -22,9 +23,6 @@ export function SheetSyncModal({ companies, clientId, sheetId, onSaveSettings, o
   const [cid, setCid] = useState(clientId)
   const [sid, setSid] = useState(sheetId)
   const [phase, setPhase] = useState<Phase>({ step: 'setup' })
-
-  const inputCls =
-    'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none'
 
   const makePlan = async () => {
     onSaveSettings(cid.trim(), sid.trim())
@@ -55,14 +53,13 @@ export function SheetSyncModal({ companies, clientId, sheetId, onSaveSettings, o
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4" onClick={onClose}>
-      <div
-        className="max-h-[85vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <Dialog isOpen width="28rem" onClickOverlay={onClose} onPressEscape={onClose}>
+      <div className="max-h-[85vh] overflow-y-auto p-6">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-bold">選考管理シートに反映</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">✕</button>
+          <Button size="S" variant="text" onClick={onClose}>
+            閉じる
+          </Button>
         </div>
 
         {phase.step === 'setup' && (
@@ -71,21 +68,24 @@ export function SheetSyncModal({ companies, clientId, sheetId, onSaveSettings, o
               ボードを正として、シートの「出願状況・次回アクション・〆切」を更新し、シートに無い企業を空き行に追記します。
               合格/不合格などの確定済みの状況・メモ欄・選考フロー列には触れません。書き込み前に差分を確認できます。
             </p>
-            <label className="text-xs font-semibold text-slate-500">
+            <label className="flex flex-col gap-1 text-xs font-semibold text-slate-500">
               Google OAuth クライアントID *
-              <input value={cid} onChange={(e) => setCid(e.target.value)} className={`mt-1 ${inputCls}`} placeholder="xxxx.apps.googleusercontent.com" />
+              <Input
+                width="100%"
+                value={cid}
+                onChange={(e) => setCid(e.target.value)}
+                placeholder="xxxx.apps.googleusercontent.com"
+              />
             </label>
-            <label className="text-xs font-semibold text-slate-500">
+            <label className="flex flex-col gap-1 text-xs font-semibold text-slate-500">
               スプレッドシートID
-              <input value={sid} onChange={(e) => setSid(e.target.value)} className={`mt-1 ${inputCls}`} />
+              <Input width="100%" value={sid} onChange={(e) => setSid(e.target.value)} />
             </label>
-            <button
-              onClick={makePlan}
-              disabled={!cid.trim() || !sid.trim()}
-              className="rounded-lg bg-slate-800 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:opacity-40"
-            >
-              サインインして差分を確認
-            </button>
+            <div>
+              <Button variant="primary" onClick={makePlan} disabled={!cid.trim() || !sid.trim()}>
+                サインインして差分を確認
+              </Button>
+            </div>
           </div>
         )}
 
@@ -122,12 +122,11 @@ export function SheetSyncModal({ companies, clientId, sheetId, onSaveSettings, o
                 差分はありません。シートは最新です
               </p>
             ) : (
-              <button
-                onClick={apply}
-                className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
-              >
-                この内容でシートに書き込む
-              </button>
+              <div>
+                <Button variant="primary" onClick={apply}>
+                  この内容でシートに書き込む
+                </Button>
+              </div>
             )}
           </div>
         )}
@@ -135,15 +134,14 @@ export function SheetSyncModal({ companies, clientId, sheetId, onSaveSettings, o
         {phase.step === 'error' && (
           <div className="flex flex-col gap-3">
             <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{phase.message}</p>
-            <button
-              onClick={() => setPhase({ step: 'setup' })}
-              className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50"
-            >
-              戻る
-            </button>
+            <div>
+              <Button variant="secondary" onClick={() => setPhase({ step: 'setup' })}>
+                戻る
+              </Button>
+            </div>
           </div>
         )}
       </div>
-    </div>
+    </Dialog>
   )
 }

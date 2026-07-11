@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { Button } from 'smarthr-ui'
 import { STAGES, type Company, type Stage } from './types'
 import { makeInitialCompanies } from './lib/demo'
 import { mergeImport } from './lib/importer'
@@ -157,26 +158,25 @@ export default function App() {
             <span>進行中 <b className="font-display text-base text-slate-900">{active}</b> 社</span>
             <span>面接 <b className="font-display text-base text-slate-900">{interviews}</b></span>
             <span>内定 <b className="font-display text-base text-slate-900">{offers}</b></span>
-            <button
+            <Button
+              size="S"
+              variant="secondary"
               onClick={() => fileInput.current?.click()}
-              className="rounded-lg border border-slate-300 px-3 py-1.5 font-medium text-slate-600 transition hover:bg-slate-50"
               title="JSONファイルから企業を取り込みます(既存カードは壊さずマージ)"
             >
               インポート
-            </button>
-            <button
-              onClick={exportJson}
-              className="rounded-lg border border-slate-300 px-3 py-1.5 font-medium text-slate-600 transition hover:bg-slate-50"
-            >
+            </Button>
+            <Button size="S" variant="secondary" onClick={exportJson}>
               エクスポート
-            </button>
-            <button
+            </Button>
+            <Button
+              size="S"
+              variant="primary"
               onClick={() => setSheetSyncOpen(true)}
-              className="rounded-lg border border-slate-300 px-3 py-1.5 font-medium text-slate-600 transition hover:bg-slate-50"
               title="ボードの内容を選考管理シート(Googleスプレッドシート)に書き戻します"
             >
               シートに反映
-            </button>
+            </Button>
             <a href="/" className="rounded-lg border border-slate-300 px-3 py-1.5 font-medium text-slate-600 transition hover:bg-slate-50">
               katazuku
             </a>
