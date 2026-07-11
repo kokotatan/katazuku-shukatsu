@@ -183,7 +183,7 @@ export default function App() {
       </header>
 
       <main className="flex-1 overflow-x-auto px-4 py-5">
-        <div className="mx-auto flex min-w-fit max-w-screen-2xl gap-3">
+        <div className="flex min-w-fit gap-3">
           {STAGES.map((stage) => {
             const list = sorted(stage.key)
             return (

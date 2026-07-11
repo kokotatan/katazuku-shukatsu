@@ -39,7 +39,7 @@ function Section({
       <ul>
         {items.map((item) => (
           <li key={item.key} className="flex items-center gap-3 border-b border-slate-100 py-2.5">
-            <span className="w-24 shrink-0 text-center">
+            <span className="w-32 shrink-0">
               <StatusLabel type={urgent ? 'error' : 'grey'} bold={urgent}>
                 {dueLabel(item, now)}
               </StatusLabel>
@@ -120,7 +120,7 @@ export default function App() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-3xl px-6 py-8">
+      <main className="max-w-3xl px-6 py-8">
         {empty ? (
           <div className="rounded-lg border border-slate-300 bg-white py-20 text-center">
             <p className="text-2xl font-semibold tracking-wide text-slate-800">

@@ -217,7 +217,7 @@ function Home({
   const options = useMemo(pipelineNames, [])
 
   return (
-    <main className="mx-auto max-w-3xl px-6 py-6">
+    <main className="max-w-3xl px-6 py-6">
       <form
         onSubmit={(e) => {
           e.preventDefault()
@@ -322,7 +322,7 @@ function Company({
 }) {
   const mine = entries.filter((e) => e.company && sameCompany(e.company, company))
   return (
-    <main className="mx-auto max-w-3xl px-6 py-6">
+    <main className="max-w-3xl px-6 py-6">
       <div className="mb-4 flex items-baseline gap-3">
         <h1 className="text-2xl font-semibold text-slate-900">{company}</h1>
         <Button className="ml-auto" variant="primary" onClick={onFocus}>

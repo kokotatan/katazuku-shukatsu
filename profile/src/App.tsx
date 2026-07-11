@@ -146,7 +146,7 @@ export default function App() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-3xl px-6 py-6">
+      <main className="max-w-3xl px-6 py-6">
         {editing === null ? (
           <>
             <nav className="mb-4 flex gap-1 border-b border-slate-200">

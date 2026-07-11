@@ -279,7 +279,7 @@ export default function App() {
         onOpenSettings={() => setSettingsOpen(true)}
       />
 
-      <main className="mx-auto flex max-w-6xl gap-6 px-6 py-6">
+      <main className="flex max-w-6xl gap-6 px-6 py-6">
         <Sidebar filter={filter} counts={counts} onSelect={(f) => { setFilter(f); setSelectedId(null) }} />
 
         <section className="min-w-0 flex-1">
