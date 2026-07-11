@@ -39,7 +39,7 @@
 
 ## 優先度C: 「どこでも・見逃さない」
 - **C1. 本番デプロイ(spec01 api + Vercel + DNS)** — 規模:中
-  `api/generate-reply` 新設 → Vercelデプロイ → katazuku.kotalab.com 公開。
+  `api/generate-reply` 新設 → Vercelデプロイ → katazuku.kotalabo.com 公開。
   PCが寝ていても・スマホからも使える状態に。`dist/` はビルド済みで即デプロイ可。
 - **C2. push通知** — 保留(2026-07-08 本人判断: Claudeアプリの通知で当面十分)
   必要になったら朝の「きょうやること」をスマホ/LINE/Discordへ(notify-discord.mjs 再利用可)。

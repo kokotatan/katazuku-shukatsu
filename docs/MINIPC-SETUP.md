@@ -117,7 +117,7 @@ Get-Content C:\katazuku-shukatsu\logs\sync-*.log -Tail 30   # 結果サマリを
 
 ## このリポジトリの全体像(参考)
 
-- `inbox/` — メール自動仕分けSPA(katazuku.kotalab.com/inbox/ 予定)
+- `inbox/` — メール自動仕分けSPA(katazuku.kotalabo.com/inbox/ 予定)
 - `status/` — 選考管理カンバン(同 /status/)。「⬆ インポート」「📤 シートに反映」あり
 - `landing/` — トップページ
 - `chrome-prompts/` — Claude in Chrome用のマイページ操作プロンプト集

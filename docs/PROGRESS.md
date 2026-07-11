@@ -132,12 +132,12 @@ localStorageキー(katazuku-pipeline/companies, katazuku-notes/snippets)とinbox
 ## 全体構成
 
 ```
-katazuku.kotalab.com          → landing/ (プロダクト一覧トップ)
-katazuku.kotalab.com/inbox/   → inbox/   (メール見逃しゼロ・AI返信生成つき) 完成
-katazuku.kotalab.com/status/  → status/  (選考管理ボード=旧pipeline)        完成
-katazuku.kotalab.com/insight/ → insight/ (今日やること横断=旧today)         完成 (2026-06-12, spec02)
-katazuku.kotalab.com/profile/ → profile/ (ES部品庫=旧notes)                完成 (2026-06-12, spec03)
-katazuku.kotalab.com/prep/    → prep/    (面接振り返り・直前モード)        完成 (2026-06-12, spec04)
+katazuku.kotalabo.com          → landing/ (プロダクト一覧トップ)
+katazuku.kotalabo.com/inbox/   → inbox/   (メール見逃しゼロ・AI返信生成つき) 完成
+katazuku.kotalabo.com/status/  → status/  (選考管理ボード=旧pipeline)        完成
+katazuku.kotalabo.com/insight/ → insight/ (今日やること横断=旧today)         完成 (2026-06-12, spec02)
+katazuku.kotalabo.com/profile/ → profile/ (ES部品庫=旧notes)                完成 (2026-06-12, spec03)
+katazuku.kotalabo.com/prep/    → prep/    (面接振り返り・直前モード)        完成 (2026-06-12, spec04)
 ```
 
 新3アプリの検証: `cd today && npx tsx scripts/check-aggregate.ts` / `cd notes && npx tsx scripts/check-count.ts` /
@@ -145,7 +145,7 @@ katazuku.kotalab.com/prep/    → prep/    (面接振り返り・直前モード
 
 ビルド: ルートで `npm run build` → `dist/` を組み立て(`scripts/assemble.mjs`)
 デプロイ: ルートから `vercel --prod`(`vercel.json` 設定済み)→ 未実施(vercel CLI未インストール・未ログイン)
-ドメイン: katazuku.kotalab.com 予定(DNS設定未実施: CNAME `katazuku` → `cname.vercel-dns.com`)
+ドメイン: katazuku.kotalabo.com 予定(DNS設定未実施: CNAME `katazuku` → `cname.vercel-dns.com`)
 
 ## ✅ Katazuku Inbox(完成・ローカル動作確認済み)
 
@@ -162,7 +162,7 @@ katazuku.kotalab.com/prep/    → prep/    (面接振り返り・直前モード
 
 ### 未対応(Inbox)
 - デザインパス: codex product design プラグインに任せる予定(未インストール)
-- 本番でGmail直接続を使う場合: OAuthクライアントIDの承認済みオリジンに https://katazuku.kotalab.com を追加
+- 本番でGmail直接続を使う場合: OAuthクライアントIDの承認済みオリジンに https://katazuku.kotalabo.com を追加
 - コミット未実施(ベースライン未固定)
 
 ## ✅ メール見張りクラウドルーチン(稼働開始)

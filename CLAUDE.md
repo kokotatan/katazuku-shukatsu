@@ -6,7 +6,7 @@
 ## 構成
 
 ```
-landing/          トップページ (katazuku.kotalab.com 予定)
+landing/          トップページ (katazuku.kotalabo.com 予定)
 inbox/            メール自動仕分けSPA      → /inbox/
 status/           選考管理カンバン(進捗管理) → /status/
 api/              Vercel Functions (spec01実装済み。デプロイ待ち)
@@ -65,7 +65,7 @@ public/ に置く場合は assemble.mjs の除外処理にも必ず追加する�
 
 ## アプリ間連携の決まり
 
-- 同一オリジン前提のlocalStorage共有で連携する(本番は katazuku.kotalab.com 配下のパス分け)
+- 同一オリジン前提のlocalStorage共有で連携する(本番は katazuku.kotalabo.com 配下のパス分け)
 - キー: `katazuku-inbox/emails`、`katazuku-pipeline/companies`、`katazuku-pipeline/seeded`
 - 新アプリも `katazuku-<app>/...` の命名で。別アプリのキーを読むのは可、**書く場合は既存データを
   壊さないマージにする**(inbox/src/lib/pipeline.ts(ファイル名は旧称)の「ステージは前進のみ」方式を踏襲)

@@ -1,5 +1,5 @@
 // 配信用 dist/ を組み立てる:
-//   dist/           ← landing/ (katazuku.kotalab.com のトップ)
+//   dist/           ← landing/ (katazuku.kotalabo.com のトップ)
 //   dist/inbox/     ← inbox/dist (Katazuku Inbox)
 //   dist/status/    ← status/dist (Katazuku Status) ほか各アプリ
 import { cpSync, mkdirSync, rmSync, existsSync } from 'node:fs'
