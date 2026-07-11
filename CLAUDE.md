@@ -39,18 +39,26 @@ cd status;   npx tsx scripts/check-import.ts      # シート取込マージ
 cd status;   npx tsx scripts/check-sheet.ts       # シート書き戻し
 ```
 
-## デザインシステム「帳簿的ミニマリズム」(厳守)
+## デザインシステム「SmartHR Design System 準拠」(厳守)
 
-- **絵文字は全面禁止**(UI・コード・コミットメッセージとも)。アイコンが要るならテキストか字形で
-- 配色はトークンで管理 (`inbox/src/index.css` と `pipeline/src/index.css` は同一内容を保つ):
-  - `slate-*` = 紙とインクのウォームグレー(青みグレー禁止)
-  - `red-*` = 朱。**締切・要対応・エラーの警告専用**。装飾に使わない
-  - アクセントは `slate-900`(墨色)の塗りのみ。紫・緑・青・黄などの追加色は禁止
-- 見出し・大きい数字・ブランドは `font-display`(しっぽり明朝)。本文はゴシック(可読性優先)
-- ブランドマークは「片」一字の黒角印(Header実装を参照してコピーする)
-- 角丸は控えめ(トークンで上書き済み)。影よりも罫線(hairline border)で区切る
-- 中央寄せヒーロー・3等分カード・グラデーションなどの「AIっぽい定型」を避ける。
-  参考スキル: `~/.agents/skills/design-taste-frontend/SKILL.md`(TasteSkill。ランディング系のみ適用)
+2026-07-11に旧「帳簿的ミニマリズム」(墨色+朱+明朝)から全面移行した。
+
+- **絵文字は全面禁止**(UI・コード・コミットメッセージとも)。アイコンは smarthr-ui の Fa*Icon を使う
+- コンポーネントは **smarthr-ui を第一候補**にする(Button/Dialog/Input/StatusLabel/Fa*Icon 等)。
+  テーマは `createTheme()` のデフォルト(SmartHRブルー)のまま。独自色で上書きしない
+- 配色は Tailwind トークンで管理し、**値は smarthr-ui の defaultColor と同一に保つ**
+  (`<app>/src/index.css` は5アプリで同一内容を保つ):
+  - `slate-*` = SmartHRグレースケール(GREY_5〜GREY_100。50/100/200/300/400/500/900が公式値)
+  - `blue-*` = プロダクトブルー(MAIN #0077c7 / TEXT_LINK #0071c1)。操作・リンク・選択状態
+  - `red-*` = DANGER(#e01e5a)。**締切・要対応・エラーの警告専用**。装飾に使わない
+  - `teal-500` = SMARTHR_BLUE(#00c4cc)。**ブランドマーク専用**。UIには使わない
+- フォントはシステムゴシック(Hiragino Sans / Yu Gothic系)。**明朝・Webフォントは使わない**。
+  `font-display` は互換エイリアスとして残っているがゴシックを指す(新規コードでは使わない)
+- ブランドマークは「片」一字のティール角印(角丸8px)。AppNav実装を参照
+- **共通左サイドナビ `src/components/AppNav.tsx`** を全アプリに配置(コピー同期で同一内容を保つ)。
+  ランディング(`landing/index.html`)にも同デザインのサイドナビを静的HTMLで実装済み。
+  アプリを増やす/名前を変えるときは AppNav(5アプリ)+ landing の両方を更新すること
+- 角丸は SmartHR の s/m/l(4/6/8px)相当。影よりも罫線(`border-slate-300`)で区切る
 
 ## データとセキュリティ(最重要)
 

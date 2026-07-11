@@ -4,6 +4,7 @@ import { STAGES, type Company, type Stage } from './types'
 import { makeInitialCompanies } from './lib/demo'
 import { mergeImport } from './lib/importer'
 import { DEFAULT_SHEET_ID } from './lib/sheet'
+import { AppNav } from './components/AppNav'
 import { CompanyCard } from './components/CompanyCard'
 import { CompanyModal } from './components/CompanyModal'
 import { SheetSyncModal } from './components/SheetSyncModal'
@@ -132,32 +133,21 @@ export default function App() {
       })
 
   return (
-    <div className="flex min-h-screen flex-col">
-      <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/90 backdrop-blur">
-        <div className="mx-auto flex max-w-screen-2xl items-center gap-4 px-4 py-3">
-          <h1 className="flex items-center gap-2.5">
-            <span
-              aria-hidden
-              className="flex h-7 w-7 items-center justify-center rounded-[4px] bg-slate-900 pt-0.5 font-display text-[15px] font-semibold leading-none text-white"
-            >
-              片
-            </span>
-            <span className="flex items-baseline gap-2">
-              <span className="font-display text-lg font-semibold tracking-tight text-slate-900">
-                katazuku
-              </span>
-              <span className="text-[11px] font-semibold tracking-[0.25em] text-slate-400 uppercase">
-                Status
-              </span>
-            </span>
-            <span className="hidden border-l border-slate-200 pl-2.5 text-xs font-normal text-slate-400 sm:inline">
+    <div className="flex min-h-screen">
+      <AppNav current="status" />
+      <div className="flex min-h-screen min-w-0 flex-1 flex-col pb-14 md:pb-0">
+      <header className="sticky top-0 z-10 border-b border-slate-300 bg-white">
+        <div className="flex items-center gap-4 px-6 py-3">
+          <h1 className="flex items-baseline gap-2.5">
+            <span className="whitespace-nowrap text-lg font-bold tracking-tight text-slate-900">選考管理</span>
+            <span className="hidden whitespace-nowrap text-xs font-normal text-slate-500 lg:inline">
               選考状況、ぜんぶ見える。
             </span>
           </h1>
-          <div className="ml-auto flex items-center gap-4 text-xs text-slate-500">
-            <span>進行中 <b className="font-display text-base text-slate-900">{active}</b> 社</span>
-            <span>面接 <b className="font-display text-base text-slate-900">{interviews}</b></span>
-            <span>内定 <b className="font-display text-base text-slate-900">{offers}</b></span>
+          <div className="ml-auto flex items-center gap-4 text-xs whitespace-nowrap text-slate-500">
+            <span>進行中 <b className="text-base text-slate-900">{active}</b> 社</span>
+            <span>面接 <b className="text-base text-slate-900">{interviews}</b></span>
+            <span>内定 <b className="text-base text-slate-900">{offers}</b></span>
             <Button
               size="S"
               variant="secondary"
@@ -177,9 +167,6 @@ export default function App() {
             >
               シートに反映
             </Button>
-            <a href="/" className="rounded-lg border border-slate-300 px-3 py-1.5 font-medium text-slate-600 transition hover:bg-slate-50">
-              katazuku
-            </a>
             <input
               ref={fileInput}
               type="file"
@@ -210,12 +197,12 @@ export default function App() {
                   const id = e.dataTransfer.getData('text/company-id')
                   if (id) moveTo(id, stage.key)
                 }}
-                className={`flex w-60 shrink-0 flex-col rounded-2xl border-t-4 bg-slate-200/50 ${stage.accent} ${
-                  dragOverStage === stage.key ? 'bg-slate-300/60 ring-2 ring-slate-400/40' : ''
+                className={`flex w-60 shrink-0 flex-col rounded-2xl border-t-4 bg-slate-100 ${stage.accent} ${
+                  dragOverStage === stage.key ? 'bg-blue-50 ring-2 ring-blue-200' : ''
                 }`}
               >
                 <div className="flex items-center gap-1.5 px-3 pt-3 pb-2">
-                  <h2 className="font-display text-sm font-semibold text-slate-700">{stage.label}</h2>
+                  <h2 className="text-sm font-bold text-slate-700">{stage.label}</h2>
                   <span className="ml-auto rounded-full bg-white px-2 py-0.5 text-xs font-bold text-slate-500">
                     {list.length}
                   </span>
@@ -279,6 +266,7 @@ export default function App() {
           {toast}
         </div>
       )}
+      </div>
     </div>
   )
 }

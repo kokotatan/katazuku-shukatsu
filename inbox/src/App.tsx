@@ -6,6 +6,7 @@ import { makeDemoEmails } from './lib/demo'
 import { fetchRecentEmails, requestAccessToken } from './lib/gmail'
 import { addEmailToPipeline } from './lib/pipeline'
 import { useLocalStorage } from './lib/storage'
+import { AppNav } from './components/AppNav'
 import { EmailCard } from './components/EmailCard'
 import { Header } from './components/Header'
 import { ReplyModal } from './components/ReplyModal'
@@ -268,7 +269,9 @@ export default function App() {
   ).length
 
   return (
-    <div className="min-h-screen">
+    <div className="flex min-h-screen">
+      <AppNav current="inbox" />
+      <div className="min-h-screen min-w-0 flex-1 pb-14 md:pb-0">
       <Header
         doneToday={doneToday}
         doneTotal={counts.done}
@@ -276,7 +279,7 @@ export default function App() {
         onOpenSettings={() => setSettingsOpen(true)}
       />
 
-      <main className="mx-auto flex max-w-6xl gap-6 px-4 py-6">
+      <main className="mx-auto flex max-w-6xl gap-6 px-6 py-6">
         <Sidebar filter={filter} counts={counts} onSelect={(f) => { setFilter(f); setSelectedId(null) }} />
 
         <section className="min-w-0 flex-1">
@@ -354,6 +357,7 @@ export default function App() {
           {toast}
         </div>
       )}
+      </div>
     </div>
   )
 }

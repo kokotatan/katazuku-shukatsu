@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
-import { AnchorButton, Button, Input, StatusLabel, Textarea } from 'smarthr-ui'
+﻿import { useEffect, useMemo, useState } from 'react'
+import { Button, Input, StatusLabel, Textarea } from 'smarthr-ui'
 import { KIND_META, type PrepEntry, type PrepKind } from './types'
 import { companySummary, focusDeck, retrospectives } from './lib/select'
 import { sameCompany } from './lib/names'
+import { AppNav } from './components/AppNav'
 
 const STORAGE_KEY = 'katazuku-prep/entries'
 const PIPELINE_KEY = 'katazuku-pipeline/companies'
@@ -54,28 +55,23 @@ export default function App() {
   const remove = (id: string) => setEntries((prev) => prev.filter((e) => e.id !== id))
 
   return (
-    <div className="min-h-screen">
-      <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/90 backdrop-blur">
-        <div className="mx-auto flex max-w-3xl items-center gap-2.5 px-4 py-3">
-          <span
-            aria-hidden
-            className="flex h-7 w-7 items-center justify-center rounded-[4px] bg-slate-900 pt-0.5 font-display text-[15px] font-semibold leading-none text-white"
-          >
-            片
-          </span>
-          <span className="flex items-baseline gap-2">
-            <span className="font-display text-lg font-semibold tracking-tight text-slate-900">katazuku</span>
-            <span className="text-[11px] font-semibold tracking-[0.25em] text-slate-400 uppercase">Prep</span>
-          </span>
+    <div className="flex min-h-screen">
+      <AppNav current="prep" />
+      <div className="min-h-screen min-w-0 flex-1 pb-14 md:pb-0">
+      <header className="sticky top-0 z-10 border-b border-slate-300 bg-white">
+        <div className="flex items-center gap-2.5 px-6 py-3">
+          <h1 className="flex items-baseline gap-2.5">
+            <span className="text-lg font-bold tracking-tight text-slate-900">面接準備</span>
+            <span className="hidden text-xs font-normal text-slate-500 sm:inline">
+              振り返りと想定問答を企業ごとに。
+            </span>
+          </h1>
           <div className="ml-auto flex items-center gap-2">
             {view.mode !== 'home' && (
               <Button size="S" variant="secondary" onClick={() => setView({ mode: 'home' })}>
                 一覧へ
               </Button>
             )}
-            <AnchorButton size="S" variant="secondary" href="/">
-              katazuku
-            </AnchorButton>
           </div>
         </div>
       </header>
@@ -100,6 +96,7 @@ export default function App() {
           onExit={() => setView({ mode: 'company', company: view.company })}
         />
       )}
+      </div>
     </div>
   )
 }
@@ -220,7 +217,7 @@ function Home({
   const options = useMemo(pipelineNames, [])
 
   return (
-    <main className="mx-auto max-w-3xl px-4 py-6">
+    <main className="mx-auto max-w-3xl px-6 py-6">
       <form
         onSubmit={(e) => {
           e.preventDefault()
@@ -325,7 +322,7 @@ function Company({
 }) {
   const mine = entries.filter((e) => e.company && sameCompany(e.company, company))
   return (
-    <main className="mx-auto max-w-3xl px-4 py-6">
+    <main className="mx-auto max-w-3xl px-6 py-6">
       <div className="mb-4 flex items-baseline gap-3">
         <h1 className="font-display text-2xl font-semibold text-slate-900">{company}</h1>
         <Button className="ml-auto" variant="primary" onClick={onFocus}>

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { AnchorButton, Button, Input, Select, StatusLabel, Textarea } from 'smarthr-ui'
+import { Button, Input, Select, StatusLabel, Textarea } from 'smarthr-ui'
 import { KINDS, type Kind, type Snippet } from './types'
 import { countChars, targetLabel } from './lib/count'
+import { AppNav } from './components/AppNav'
 
 const STORAGE_KEY = 'katazuku-notes/snippets'
 const PIPELINE_KEY = 'katazuku-pipeline/companies'
@@ -112,19 +113,17 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen">
-      <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/90 backdrop-blur">
-        <div className="mx-auto flex max-w-3xl items-center gap-2.5 px-4 py-3">
-          <span
-            aria-hidden
-            className="flex h-7 w-7 items-center justify-center rounded-[4px] bg-slate-900 pt-0.5 font-display text-[15px] font-semibold leading-none text-white"
-          >
-            片
-          </span>
-          <span className="flex items-baseline gap-2">
-            <span className="font-display text-lg font-semibold tracking-tight text-slate-900">katazuku</span>
-            <span className="text-[11px] font-semibold tracking-[0.25em] text-slate-400 uppercase">Profile</span>
-          </span>
+    <div className="flex min-h-screen">
+      <AppNav current="profile" />
+      <div className="min-h-screen min-w-0 flex-1 pb-14 md:pb-0">
+      <header className="sticky top-0 z-10 border-b border-slate-300 bg-white">
+        <div className="flex items-center gap-2.5 px-6 py-3">
+          <h1 className="flex items-baseline gap-2.5">
+            <span className="text-lg font-bold tracking-tight text-slate-900">個人マスタ</span>
+            <span className="hidden text-xs font-normal text-slate-500 sm:inline">
+              ガクチカ・自己PRを部品として使い回す。
+            </span>
+          </h1>
           <div className="ml-auto flex items-center gap-2 text-sm">
             <Button size="S" variant="secondary" onClick={() => fileInput.current?.click()}>
               インポート
@@ -132,9 +131,6 @@ export default function App() {
             <Button size="S" variant="secondary" onClick={exportJson}>
               エクスポート
             </Button>
-            <AnchorButton size="S" variant="secondary" href="/">
-              katazuku
-            </AnchorButton>
             <input
               ref={fileInput}
               type="file"
@@ -150,7 +146,7 @@ export default function App() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-3xl px-4 py-6">
+      <main className="mx-auto max-w-3xl px-6 py-6">
         {editing === null ? (
           <>
             <nav className="mb-4 flex gap-1 border-b border-slate-200">
@@ -160,8 +156,8 @@ export default function App() {
                   onClick={() => setKind(k.key)}
                   className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium transition ${
                     kind === k.key
-                      ? 'border-slate-900 font-semibold text-slate-900'
-                      : 'border-transparent text-slate-400 hover:text-slate-600'
+                      ? 'border-blue-500 font-bold text-blue-600'
+                      : 'border-transparent text-slate-500 hover:text-slate-700'
                   }`}
                 >
                   {k.label}
@@ -223,6 +219,7 @@ export default function App() {
           {toast}
         </div>
       )}
+      </div>
     </div>
   )
 }

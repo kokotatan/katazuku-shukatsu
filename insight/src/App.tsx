@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { AnchorButton, Button, StatusLabel } from 'smarthr-ui'
 import type { InboxEmail, PipelineCompany, TodayItem } from './types'
 import { aggregate, INBOX_KEY, loadJson, PIPELINE_KEY } from './lib/aggregate'
+import { AppNav } from './components/AppNav'
 
 const WEEKDAYS = '日月火水木金土'
 
@@ -104,27 +105,22 @@ export default function App() {
   const empty = buckets.overdue.length + buckets.today.length + buckets.week.length === 0
 
   return (
-    <div className="min-h-screen">
-      <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/90 backdrop-blur">
-        <div className="mx-auto flex max-w-3xl items-center gap-2.5 px-4 py-3">
-          <span
-            aria-hidden
-            className="flex h-7 w-7 items-center justify-center rounded-[4px] bg-slate-900 pt-0.5 font-display text-[15px] font-semibold leading-none text-white"
-          >
-            片
-          </span>
-          <span className="flex items-baseline gap-2">
-            <span className="font-display text-lg font-semibold tracking-tight text-slate-900">katazuku</span>
-            <span className="text-[11px] font-semibold tracking-[0.25em] text-slate-400 uppercase">Insight</span>
-          </span>
-          <span className="ml-auto font-display text-sm font-semibold text-slate-700">{dateLabel}</span>
-          <a href="/" className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50">
-            katazuku
-          </a>
+    <div className="flex min-h-screen">
+      <AppNav current="insight" />
+      <div className="min-h-screen min-w-0 flex-1 pb-14 md:pb-0">
+      <header className="sticky top-0 z-10 border-b border-slate-300 bg-white">
+        <div className="flex items-center gap-2.5 px-6 py-3">
+          <h1 className="flex items-baseline gap-2.5">
+            <span className="text-lg font-bold tracking-tight text-slate-900">今日やること</span>
+            <span className="hidden text-xs font-normal text-slate-500 sm:inline">
+              朝いちばんに開くページ。
+            </span>
+          </h1>
+          <span className="ml-auto text-sm font-bold text-slate-700">{dateLabel}</span>
         </div>
       </header>
 
-      <main className="mx-auto max-w-3xl px-4 py-8">
+      <main className="mx-auto max-w-3xl px-6 py-8">
         {empty ? (
           <div className="rounded-2xl border-2 border-dashed border-slate-200 bg-white/60 py-20 text-center">
             <p className="font-display text-2xl font-semibold tracking-wide text-slate-800">
@@ -156,6 +152,7 @@ export default function App() {
           {toast}
         </div>
       )}
+      </div>
     </div>
   )
 }
