@@ -20,7 +20,7 @@
       --bg: #f8f7f6;
       --surface: #ffffff;
       --text: #23221e;
-      --text-sub: #5c5a54;      /* AA を満たす読みやすいサブ文字色 */
+      --text-sub: #706d65;      /* TEXT_GREY(公式値) */
       --text-grey: #706d65;     /* TEXT_GREY */
       --text-disabled: #c1bdb7; /* TEXT_DISABLED */
       --border: #d6d3d0;
@@ -31,10 +31,8 @@
       --link: #0071c1;          /* TEXT_LINK */
       --link-bg: #e9f4fb;       /* 選択中ナビの背景 */
       --brand: #00c4cc;         /* ブランドティール(マーク専用) */
-      --success-bg: #e6f7f8;
-      --success-text: #0a7b80;
-      --font: "AdjustedYuGothic", "Yu Gothic Medium", "Yu Gothic", YuGothic,
-              "Hiragino Sans", "Hiragino Kaku Gothic ProN", Meiryo, system-ui, sans-serif;
+      /* smarthr-ui 本体・各アプリと完全に同じフォントスタック(混在させない) */
+      --font: system-ui, sans-serif;
       --radius: 8px;
     }
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -73,7 +71,7 @@
     .nav-item {
       display: flex; align-items: center; gap: 10px;
       padding: 8px 12px; border-radius: 6px;
-      font-size: 14px; color: #3e3b36; text-decoration: none;
+      font-size: 14px; color: #23221e; text-decoration: none;
       transition: background-color 0.15s ease;
     }
     .nav-item svg { width: 16px; height: 16px; flex: none; fill: var(--text-grey); }
@@ -132,7 +130,7 @@
     }
     .badge {
       flex: none; font-size: 12px; font-weight: 700; letter-spacing: 0.02em;
-      color: var(--success-text); background: var(--success-bg);
+      color: var(--link); background: var(--link-bg);
       padding: 3px 10px; border-radius: 6px;
     }
     .card-desc { font-size: 14px; color: var(--text-sub); line-height: 1.8; }

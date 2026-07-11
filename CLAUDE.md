@@ -50,12 +50,14 @@ cd insight;  npx tsx scripts/check-aggregate.ts   # 今日やること集計(宣
   テーマは `createTheme()` のデフォルト(SmartHRブルー)のまま。独自色で上書きしない
 - 配色は Tailwind トークンで管理し、**値は smarthr-ui の defaultColor と同一に保つ**
   (`<app>/src/index.css` は5アプリで同一内容を保つ):
-  - `slate-*` = SmartHRグレースケール(GREY_5〜GREY_100。50/100/200/300/400/500/900が公式値)
+  - `slate-*` = SmartHRグレースケール(全段公式値。文字色は600→TEXT_GREY、700/800/900→TEXT_BLACK に集約済み。
+    中間グレーの文字色を勝手に発明しない)
   - `blue-*` = プロダクトブルー(MAIN #0077c7 / TEXT_LINK #0071c1)。操作・リンク・選択状態
   - `red-*` = DANGER(#e01e5a)。**締切・要対応・エラーの警告専用**。装飾に使わない
   - `teal-500` = SMARTHR_BLUE(#00c4cc)。**ブランドマーク専用**。UIには使わない
-- フォントはシステムゴシック(Hiragino Sans / Yu Gothic系)。**明朝・Webフォントは使わない**。
-  `font-display` は互換エイリアスとして残っているがゴシックを指す(新規コードでは使わない)
+- フォントは **`system-ui, sans-serif`(smarthr-ui本体と完全に同一のスタック)**。独自のフォント指定・
+  明朝・Webフォントは使わない(landing含む。混在するとコンポーネントと地の文でフォントが割れる)。
+  `font-display` は互換エイリアスとして残っているが同じ値を指す(新規コードでは使わない)
 - ブランドマークは「片」一字のティール角印(角丸8px)。AppNav実装を参照
 - **共通左サイドナビ `src/components/AppNav.tsx`** を全アプリに配置(コピー同期で同一内容を保つ)。
   ランディング(`landing/index.html`)にも同デザインのサイドナビを静的HTMLで実装済み。
