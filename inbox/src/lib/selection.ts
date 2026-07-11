@@ -13,7 +13,7 @@ export type SelectionKind = 'selection' | 'recruiting' | 'activity' | 'promo' | 
 
 // 就活プラットフォーム・スカウト媒体のドメイン(企業の採用ATSは含めない)
 const PLATFORM_DOMAIN_RE =
-  /goodfind|slogan\.jp|typeshukatsu|bizreach|br-campus|en-?courage|labbase|openwork|gaishishukatsu|gakujo|re-katsu|offerbox|mynavi|rikunabi|onecareer|unistyle|careerpark|kimisuka|wantedly|athletics|irodas|abuild|ibeck/i
+  /goodfind|slogan\.jp|typeshukatsu|bizreach|br-campus|en-?courage|labbase|openwork|gaishishukatsu|gakujo|re-katsu|offerbox|mynavi|rikunabi|onecareer|unistyle|careerpark|kimisuka|wantedly|athletics|irodas|abuild|ibeck|nikki\.ne\.jp/i
 
 // 宣伝・メルマガらしさ
 const PROMO_RE =

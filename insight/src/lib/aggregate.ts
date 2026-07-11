@@ -26,13 +26,16 @@ export function aggregate(
   const items: TodayItem[] = []
   let datelessCount = 0
 
+  const mailItems: TodayItem[] = []
   for (const e of emails) {
     if (!isActive(e, now) || !e.needsAction) continue
+    // 宣伝(ナビ媒体)・就活外のメールは「今日やること」に載せない(精度優先)
+    if (e.selectionKind === 'promo' || e.selectionKind === 'other') continue
     if (!e.deadline) {
       datelessCount++
       continue
     }
-    items.push({
+    mailItems.push({
       key: `inbox-${e.id}`,
       source: 'inbox',
       company: e.company,
@@ -40,6 +43,19 @@ export function aggregate(
       due: e.deadline,
       hasTime: true,
     })
+  }
+
+  // 同じ会社×同じ日のメールは1行にまとめる(一番早い期限を残し、残りは件数表示)
+  mailItems.sort((a, b) => a.due.localeCompare(b.due))
+  const grouped = new Map<string, { item: TodayItem; extra: number }>()
+  for (const item of mailItems) {
+    const key = `${item.company}|${item.due.slice(0, 10)}`
+    const hit = grouped.get(key)
+    if (hit) hit.extra++
+    else grouped.set(key, { item, extra: 0 })
+  }
+  for (const { item, extra } of grouped.values()) {
+    items.push(extra > 0 ? { ...item, title: `${item.title}(他${extra}件)` } : item)
   }
 
   for (const c of companies) {

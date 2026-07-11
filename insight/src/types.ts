@@ -9,6 +9,8 @@ export interface InboxEmail {
   snoozeUntil?: string | null
   actionSteps?: string[]
   actionHint?: string | null
+  /** 選考/募集案内/課外/宣伝/対象外(古いデータには無いことがある) */
+  selectionKind?: string
 }
 
 /** Pipeline(katazuku-pipeline/companies)から読む最小限の形 */

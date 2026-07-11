@@ -78,8 +78,11 @@ export function classifyEmail(raw: RawEmail, now: Date = new Date()): Email {
   const category = isNoise ? 'other' : detectCategory(raw.subject, raw.body)
 
   const picked = pickDeadline(extractDates(raw.body, new Date(raw.receivedAt)), now)
-  // 〆切が生きているメールは、アクション語がなくても要対応として浮かせる
-  const needsAction = !isNoise && (ACTION_RE.test(text) || picked?.kind === 'deadline')
+  const selectionKind = detectSelectionKind(raw.fromAddress, raw.subject, raw.body, category)
+  // 〆切が生きているメールは、アクション語がなくても要対応として浮かせる。
+  // ただしナビ媒体等の宣伝(promo)と就活外(other)は、締切があっても要対応に積まない(精度優先)
+  const relevant = selectionKind !== 'promo' && selectionKind !== 'other'
+  const needsAction = !isNoise && relevant && (ACTION_RE.test(text) || picked?.kind === 'deadline')
 
   let actionHint: string | null = null
   if (picked) {
@@ -98,7 +101,7 @@ export function classifyEmail(raw: RawEmail, now: Date = new Date()): Email {
     ...raw,
     company: extractCompany(raw.from, raw.fromAddress, raw.body),
     category,
-    selectionKind: detectSelectionKind(raw.fromAddress, raw.subject, raw.body, category),
+    selectionKind,
     deadline: picked ? picked.date.toISOString() : null,
     deadlineKind: picked?.kind ?? null,
     needsAction,

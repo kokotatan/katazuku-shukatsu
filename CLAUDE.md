@@ -35,8 +35,10 @@ cd inbox;    npx tsx scripts/check-selection.ts   # 選考/募集/課外/宣伝�
 cd inbox;    npx tsx scripts/check-pipeline.ts    # Inbox→Pipeline連携
 cd inbox;    npx tsx scripts/check-dates.ts       # 締切抽出(日付・時刻・緊急度)
 cd inbox;    npx tsx scripts/check-reply-api.ts   # 返信APIのフォールバックテンプレート
+cd inbox;    npx tsx scripts/check-needs-action.ts # 要対応判定(宣伝・就活外は積まない)
 cd status;   npx tsx scripts/check-import.ts      # シート取込マージ
 cd status;   npx tsx scripts/check-sheet.ts       # シート書き戻し
+cd insight;  npx tsx scripts/check-aggregate.ts   # 今日やること集計(宣伝除外・同社同日の1行化)
 ```
 
 ## デザインシステム「SmartHR Design System 準拠」(厳守)
