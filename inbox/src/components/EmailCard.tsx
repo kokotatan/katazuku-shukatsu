@@ -74,8 +74,8 @@ export function EmailCard({
   return (
     <article
       data-email-card={email.id}
-      className={`group relative flex overflow-hidden rounded-xl border bg-white shadow-sm transition ${
-        selected ? 'border-slate-900 ring-2 ring-slate-900/10' : 'border-slate-200 hover:border-slate-300'
+      className={`group relative flex overflow-hidden rounded-lg border bg-white shadow-sm transition ${
+        selected ? 'border-blue-500 ring-2 ring-blue-500/20' : 'border-slate-300 hover:border-blue-500'
       } ${isDone ? 'opacity-60' : ''}`}
     >
       <div className={`w-1 shrink-0 ${URGENCY_BAR[urgency]}`} aria-hidden />

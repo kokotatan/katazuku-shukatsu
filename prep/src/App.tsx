@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Button, Input, StatusLabel, Textarea } from 'smarthr-ui'
 import { KIND_META, type PrepEntry, type PrepKind } from './types'
 import { companySummary, focusDeck, retrospectives } from './lib/select'
@@ -119,7 +119,7 @@ function EntryForm({ company, onAdd }: { company: string; onAdd: (e: Omit<PrepEn
         setQuestion('')
         setAnswer('')
       }}
-      className="mb-6 rounded-xl border border-slate-200 bg-white p-4"
+      className="mb-6 rounded-lg border border-slate-300 bg-white p-4"
     >
       <div className="mb-2 flex gap-1">
         {(Object.keys(KIND_META) as PrepKind[]).map((k) => (
@@ -246,7 +246,7 @@ function Home({
 
       {summary.length > 0 && (
         <section className="mb-8">
-          <h2 className="mb-2 border-b border-slate-200 pb-1.5 font-display text-base font-semibold text-slate-800">
+          <h2 className="mb-2 border-b border-slate-200 pb-1.5 text-base font-semibold text-slate-800">
             企業別ノート
           </h2>
           <ul className="flex flex-wrap gap-2 pt-2">
@@ -267,7 +267,7 @@ function Home({
       )}
 
       <section className="mb-8">
-        <h2 className="mb-2 border-b border-slate-200 pb-1.5 font-display text-base font-semibold text-slate-800">
+        <h2 className="mb-2 border-b border-slate-200 pb-1.5 text-base font-semibold text-slate-800">
           就活の軸(全社共通)
         </h2>
         <EntryForm company="" onAdd={onAdd} />
@@ -286,7 +286,7 @@ function Home({
 
       {retros.length > 0 && (
         <section>
-          <h2 className="mb-2 border-b border-slate-200 pb-1.5 font-display text-base font-semibold text-slate-800">
+          <h2 className="mb-2 border-b border-slate-200 pb-1.5 text-base font-semibold text-slate-800">
             振り返りの横断ビュー
             <span className="ml-2 text-xs font-normal text-slate-400">同じ失敗を繰り返していないか</span>
           </h2>
@@ -324,7 +324,7 @@ function Company({
   return (
     <main className="mx-auto max-w-3xl px-6 py-6">
       <div className="mb-4 flex items-baseline gap-3">
-        <h1 className="font-display text-2xl font-semibold text-slate-900">{company}</h1>
+        <h1 className="text-2xl font-semibold text-slate-900">{company}</h1>
         <Button className="ml-auto" variant="primary" onClick={onFocus}>
           直前モードを開始
         </Button>
@@ -375,7 +375,7 @@ function Focus({ deck, company, onExit }: { deck: PrepEntry[]; company: string; 
   if (deck.length === 0) {
     return (
       <main className="mx-auto max-w-2xl px-4 py-24 text-center">
-        <p className="font-display text-xl text-slate-700">読むものがまだありません</p>
+        <p className="text-xl text-slate-700">読むものがまだありません</p>
         <p className="mt-2 text-sm text-slate-400">軸と想定問答を追加してから直前モードを使ってください</p>
         <div className="mt-6">
           <Button variant="secondary" onClick={onExit}>
@@ -402,7 +402,7 @@ function Focus({ deck, company, onExit }: { deck: PrepEntry[]; company: string; 
         {company} 直前モード {index + 1} / {deck.length}
         <span className="ml-3">{KIND_META[entry.kind].label}</span>
       </p>
-      <h1 className="font-display text-3xl font-semibold leading-relaxed tracking-wide text-slate-900">
+      <h1 className="text-3xl font-semibold leading-relaxed tracking-wide text-slate-900">
         {entry.question || '(無題)'}
       </h1>
       {showAnswer ? (

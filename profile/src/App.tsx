@@ -161,7 +161,7 @@ export default function App() {
                   }`}
                 >
                   {k.label}
-                  <span className="ml-1.5 font-display text-xs text-slate-400">
+                  <span className="ml-1.5 text-xs text-slate-400">
                     {snippets.filter((s) => s.kind === k.key).length}
                   </span>
                 </button>
@@ -170,7 +170,7 @@ export default function App() {
 
             <button
               onClick={create}
-              className="mb-4 w-full rounded-xl border-2 border-dashed border-slate-300 py-2.5 text-sm font-medium text-slate-400 transition hover:border-slate-400 hover:text-slate-600"
+              className="mb-4 w-full rounded-lg border border-slate-300 bg-white py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50 hover:text-blue-600"
             >
               + 新しい部品を書く
             </button>
@@ -192,7 +192,7 @@ export default function App() {
                         <span className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-800">
                           {s.title || '無題'}
                         </span>
-                        <span className="shrink-0 font-display text-sm tabular-nums text-slate-500">{c.chars}字</span>
+                        <span className="shrink-0 text-sm tabular-nums text-slate-500">{c.chars}字</span>
                         {s.usedAt.length > 0 && (
                           <span className="shrink-0 text-[11px] text-slate-400">{s.usedAt.length}社で使用</span>
                         )}
@@ -215,7 +215,7 @@ export default function App() {
       </main>
 
       {toast && (
-        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full bg-slate-800 px-5 py-2.5 text-sm font-medium text-white shadow-lg">
+        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-lg bg-slate-800 px-5 py-2.5 text-sm font-medium text-white shadow-lg">
           {toast}
         </div>
       )}
@@ -265,7 +265,7 @@ function Editor({
       />
 
       <div className="mb-2 flex items-baseline gap-3 text-sm">
-        <span className="font-display text-2xl font-semibold tabular-nums text-slate-900">{c.chars}</span>
+        <span className="text-2xl font-semibold tabular-nums text-slate-900">{c.chars}</span>
         <span className="text-xs text-slate-400">字(改行除く) / 全角換算 {c.zenkaku}字</span>
         <label className="ml-auto flex items-center gap-1.5 text-xs text-slate-500">
           目標

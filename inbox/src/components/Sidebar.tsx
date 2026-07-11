@@ -96,7 +96,7 @@ export function Sidebar({ filter, counts, onSelect }: Props) {
         />
       </div>
 
-      <div className="mt-6 rounded-lg bg-slate-200/60 p-3 text-[11px] leading-relaxed text-slate-500">
+      <div className="mt-6 rounded-lg border border-slate-200 bg-slate-100 p-3 text-[11px] leading-relaxed text-slate-500">
         <p className="mb-1 font-semibold text-slate-600">キーボード操作</p>
         <p>J / K : 上下移動</p>
         <p>Enter : 本文を開く</p>

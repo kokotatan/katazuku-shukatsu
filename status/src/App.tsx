@@ -197,8 +197,8 @@ export default function App() {
                   const id = e.dataTransfer.getData('text/company-id')
                   if (id) moveTo(id, stage.key)
                 }}
-                className={`flex w-60 shrink-0 flex-col rounded-2xl border-t-4 bg-slate-100 ${stage.accent} ${
-                  dragOverStage === stage.key ? 'bg-blue-50 ring-2 ring-blue-200' : ''
+                className={`flex w-60 shrink-0 flex-col rounded-lg border border-slate-300 bg-slate-100 ${
+                  dragOverStage === stage.key ? 'border-blue-500 bg-blue-50' : ''
                 }`}
               >
                 <div className="flex items-center gap-1.5 px-3 pt-3 pb-2">
@@ -218,7 +218,7 @@ export default function App() {
                   ))}
                   <button
                     onClick={() => setModal({ mode: 'new', stage: stage.key })}
-                    className="rounded-xl border-2 border-dashed border-slate-300 py-2 text-xs font-medium text-slate-400 transition hover:border-slate-400 hover:text-slate-600"
+                    className="rounded-lg border border-slate-300 bg-white py-2 text-xs font-medium text-slate-600 transition hover:bg-slate-50 hover:text-blue-600"
                   >
                     + 追加
                   </button>
@@ -262,7 +262,7 @@ export default function App() {
       )}
 
       {toast && (
-        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full bg-slate-800 px-5 py-2.5 text-sm font-medium text-white shadow-lg">
+        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-lg bg-slate-800 px-5 py-2.5 text-sm font-medium text-white shadow-lg">
           {toast}
         </div>
       )}

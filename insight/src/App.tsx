@@ -31,10 +31,10 @@ function Section({
   return (
     <section className="mb-8">
       <h2 className="mb-2 flex items-baseline gap-2 border-b border-slate-200 pb-1.5">
-        <span className={`font-display text-base font-semibold ${urgent ? 'text-red-600' : 'text-slate-800'}`}>
+        <span className={`text-base font-semibold ${urgent ? 'text-red-600' : 'text-slate-800'}`}>
           {title}
         </span>
-        <span className="font-display text-sm text-slate-400">{items.length}</span>
+        <span className="text-sm text-slate-400">{items.length}</span>
       </h2>
       <ul>
         {items.map((item) => (
@@ -122,8 +122,8 @@ export default function App() {
 
       <main className="mx-auto max-w-3xl px-6 py-8">
         {empty ? (
-          <div className="rounded-2xl border-2 border-dashed border-slate-200 bg-white/60 py-20 text-center">
-            <p className="font-display text-2xl font-semibold tracking-wide text-slate-800">
+          <div className="rounded-lg border border-slate-300 bg-white py-20 text-center">
+            <p className="text-2xl font-semibold tracking-wide text-slate-800">
               今日は、もう何もない。
             </p>
             <p className="mt-2 text-sm text-slate-400">期限つきのタスクはすべて先の日付です</p>
@@ -148,7 +148,7 @@ export default function App() {
       </main>
 
       {toast && (
-        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full bg-slate-800 px-5 py-2.5 text-sm font-medium text-white shadow-lg">
+        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-lg bg-slate-800 px-5 py-2.5 text-sm font-medium text-white shadow-lg">
           {toast}
         </div>
       )}

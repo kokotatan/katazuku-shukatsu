@@ -292,10 +292,10 @@ export default function App() {
           />
 
           {visible.length === 0 ? (
-            <div className="flex flex-col items-center gap-3 rounded-2xl border-2 border-dashed border-slate-200 bg-white/60 py-20 text-center">
+            <div className="flex flex-col items-center gap-3 rounded-lg border border-slate-300 bg-white py-20 text-center">
               {filter === 'action' && counts.action === 0 && !query ? (
                 <>
-                  <p className="font-display text-2xl font-semibold tracking-wide text-slate-800">
+                  <p className="text-2xl font-semibold tracking-wide text-slate-800">
                     全部、片付いた。
                   </p>
                   <p className="text-sm text-slate-400">この調子で見逃しゼロをキープしましょう</p>
@@ -353,7 +353,7 @@ export default function App() {
       )}
 
       {toast && (
-        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full bg-slate-800 px-5 py-2.5 text-sm font-medium text-white shadow-lg">
+        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-lg bg-slate-800 px-5 py-2.5 text-sm font-medium text-white shadow-lg">
           {toast}
         </div>
       )}
