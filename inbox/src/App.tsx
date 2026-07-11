@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Input } from 'smarthr-ui'
 import type { Email, RawEmail, Status } from './types'
 import { classifyEmail } from './lib/classify'
 import { makeDemoEmails } from './lib/demo'
@@ -279,11 +280,12 @@ export default function App() {
         <Sidebar filter={filter} counts={counts} onSelect={(f) => { setFilter(f); setSelectedId(null) }} />
 
         <section className="min-w-0 flex-1">
-          <input
+          <Input
+            width="100%"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="企業名・件名・本文で検索"
-            className="mb-4 w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm shadow-sm focus:border-slate-400 focus:outline-none"
+            className="mb-4"
           />
 
           {visible.length === 0 ? (

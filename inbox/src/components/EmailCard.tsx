@@ -1,3 +1,4 @@
+import { AnchorButton, Button, StatusLabel } from 'smarthr-ui'
 import { CATEGORY_META, type Email } from '../types'
 import { formatDateShort, formatRemaining, urgencyOf, type Urgency } from '../lib/dates'
 import { SELECTION_META } from '../lib/selection'
@@ -15,6 +16,8 @@ interface Props {
   onReply: () => void
 }
 
+type LabelType = 'grey' | 'blue' | 'red' | 'warning' | 'error'
+
 const URGENCY_BAR: Record<Urgency, string> = {
   overdue: 'bg-red-600',
   critical: 'bg-red-500',
@@ -22,11 +25,12 @@ const URGENCY_BAR: Record<Urgency, string> = {
   normal: 'bg-slate-200',
 }
 
-const URGENCY_BADGE: Record<Urgency, string> = {
-  overdue: 'bg-red-600 text-white',
-  critical: 'bg-red-50 text-red-700 ring-1 ring-red-200',
-  soon: 'bg-slate-100 text-slate-600',
-  normal: 'bg-slate-100 text-slate-500',
+// 締切の切迫度を StatusLabel の種類に対応づける
+const URGENCY_LABEL: Record<Urgency, LabelType> = {
+  overdue: 'error',
+  critical: 'warning',
+  soon: 'grey',
+  normal: 'grey',
 }
 
 function gcalUrl(email: Email): string {
@@ -65,9 +69,7 @@ export function EmailCard({
   const urgency = email.status === 'done' ? 'normal' : urgencyOf(deadline, now)
   const meta = CATEGORY_META[email.category]
   const isDone = email.status === 'done'
-
-  const ghostBtn =
-    'rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-500 transition hover:bg-slate-50'
+  const isSelection = email.selectionKind === 'selection'
 
   return (
     <article
@@ -83,19 +85,15 @@ export function EmailCard({
           <div className="flex flex-wrap items-center gap-2 text-xs">
             <span className="font-semibold text-slate-700">{email.company}</span>
             {email.selectionKind && email.selectionKind !== 'other' && (
-              <span
-                className={`rounded px-1.5 py-0.5 text-[11px] font-medium ${SELECTION_META[email.selectionKind].color}`}
-              >
+              <StatusLabel type={isSelection ? 'blue' : 'grey'} bold={isSelection}>
                 {SELECTION_META[email.selectionKind].label}
-              </span>
+              </StatusLabel>
             )}
-            <span className="rounded px-1.5 py-0.5 text-[11px] font-medium text-slate-500 ring-1 ring-slate-200">
-              {meta.label}
-            </span>
+            <StatusLabel type="grey">{meta.label}</StatusLabel>
             {email.needsAction && !isDone && (
-              <span className="rounded px-1.5 py-0.5 text-[11px] font-semibold text-red-600 ring-1 ring-red-200">
+              <StatusLabel type="error" bold>
                 要対応
-              </span>
+              </StatusLabel>
             )}
             <span className="ml-auto tabular-nums text-slate-400">{receivedLabel(email.receivedAt, now)}</span>
           </div>
@@ -107,9 +105,9 @@ export function EmailCard({
           {email.actionHint && (
             <p className="mt-1 flex items-center gap-2 text-xs text-slate-500">
               {deadline && !isDone && (
-                <span className={`rounded px-1.5 py-0.5 font-bold tabular-nums ${URGENCY_BADGE[urgency]}`}>
+                <StatusLabel type={URGENCY_LABEL[urgency]} bold={urgency === 'overdue'}>
                   {formatRemaining(deadline, now)}
-                </span>
+                </StatusLabel>
               )}
               <span className="truncate">{email.actionHint}</span>
             </p>
@@ -140,38 +138,47 @@ export function EmailCard({
           </div>
         )}
 
-        <div className="mt-2.5 flex items-center gap-2">
+        <div className="mt-2.5 flex flex-wrap items-center gap-2">
           {isDone ? (
-            <button onClick={onRestore} className={ghostBtn}>
+            <Button size="S" variant="secondary" onClick={onRestore}>
               受信トレイに戻す
-            </button>
+            </Button>
           ) : (
             <>
-              <button
-                onClick={onDone}
-                className="rounded-lg bg-slate-900 px-2.5 py-1 text-xs font-semibold text-white shadow-sm transition hover:bg-slate-700"
-              >
+              <Button size="S" variant="primary" onClick={onDone}>
                 片付けた
-              </button>
-              <button onClick={onReply} className={ghostBtn} title="テンプレート付きで返信を作成します">
+              </Button>
+              <Button size="S" variant="secondary" onClick={onReply} title="テンプレート付きで返信を作成します">
                 返信
-              </button>
+              </Button>
               {email.actionUrl && (
-                <a href={email.actionUrl} target="_blank" rel="noreferrer" className={ghostBtn} title={email.actionUrl}>
-                  フォームを開く ↗
-                </a>
+                <AnchorButton
+                  size="S"
+                  variant="secondary"
+                  href={email.actionUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  title={email.actionUrl}
+                >
+                  フォームを開く
+                </AnchorButton>
               )}
-              <button onClick={onSnooze} className={ghostBtn} title="明日の朝8時に受信トレイへ戻ります">
+              <Button size="S" variant="secondary" onClick={onSnooze} title="明日の朝8時に受信トレイへ戻ります">
                 明日の朝へ
-              </button>
+              </Button>
               {deadline && (
-                <a href={gcalUrl(email)} target="_blank" rel="noreferrer" className={ghostBtn}>
+                <AnchorButton size="S" variant="secondary" href={gcalUrl(email)} target="_blank" rel="noreferrer">
                   カレンダー
-                </a>
+                </AnchorButton>
               )}
-              <button onClick={onAddToPipeline} className={ghostBtn} title="選考管理ボード(Pipeline)にこの企業を追加します">
+              <Button
+                size="S"
+                variant="secondary"
+                onClick={onAddToPipeline}
+                title="選考管理ボード(Pipeline)にこの企業を追加します"
+              >
                 選考ボードへ
-              </button>
+              </Button>
             </>
           )}
         </div>

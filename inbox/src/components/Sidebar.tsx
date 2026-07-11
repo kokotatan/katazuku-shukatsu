@@ -1,3 +1,4 @@
+import { Button, StatusLabel } from 'smarthr-ui'
 import { CATEGORY_META, type Category } from '../types'
 
 export type Filter = 'action' | 'selection' | 'all' | Category | 'snoozed' | 'done'
@@ -23,28 +24,24 @@ function Item({
   highlight?: boolean
   onClick: () => void
 }) {
+  // フィルタは smarthr-ui の Button に載せ替える。選択中は primary、未選択は text。
+  // 件数バッジは StatusLabel(要対応など緊急のものは red)で表す。
   return (
-    <button
+    <Button
+      wide
+      size="S"
+      variant={active ? 'primary' : 'text'}
       onClick={onClick}
-      className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition ${
-        active ? 'bg-slate-900 font-semibold text-white' : 'text-slate-600 hover:bg-slate-200'
-      }`}
+      suffix={
+        count > 0 ? (
+          <StatusLabel type={highlight ? 'red' : 'grey'} bold={highlight}>
+            {count}
+          </StatusLabel>
+        ) : undefined
+      }
     >
-      <span className="flex-1">{label}</span>
-      {count > 0 && (
-        <span
-          className={`rounded-full px-2 py-0.5 text-xs font-bold ${
-            highlight && !active
-              ? 'bg-red-600 text-white'
-              : active
-                ? 'bg-white/20 text-white'
-                : 'bg-slate-300 text-slate-600'
-          }`}
-        >
-          {count}
-        </span>
-      )}
-    </button>
+      {label}
+    </Button>
   )
 }
 

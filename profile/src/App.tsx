@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { AnchorButton, Button, Input, Select, StatusLabel, Textarea } from 'smarthr-ui'
 import { KINDS, type Kind, type Snippet } from './types'
 import { countChars, targetLabel } from './lib/count'
 
@@ -26,9 +27,6 @@ function pipelineCompanyNames(): string[] {
   }
   return []
 }
-
-const ghostBtn =
-  'rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50'
 
 export default function App() {
   const [snippets, setSnippets] = useState<Snippet[]>(load)
@@ -128,9 +126,15 @@ export default function App() {
             <span className="text-[11px] font-semibold tracking-[0.25em] text-slate-400 uppercase">Profile</span>
           </span>
           <div className="ml-auto flex items-center gap-2 text-sm">
-            <button onClick={() => fileInput.current?.click()} className={ghostBtn}>インポート</button>
-            <button onClick={exportJson} className={ghostBtn}>エクスポート</button>
-            <a href="/" className={ghostBtn}>katazuku</a>
+            <Button size="S" variant="secondary" onClick={() => fileInput.current?.click()}>
+              インポート
+            </Button>
+            <Button size="S" variant="secondary" onClick={exportJson}>
+              エクスポート
+            </Button>
+            <AnchorButton size="S" variant="secondary" href="/">
+              katazuku
+            </AnchorButton>
             <input
               ref={fileInput}
               type="file"
@@ -244,21 +248,23 @@ function Editor({
   return (
     <div>
       <div className="mb-4 flex items-center gap-2">
-        <button onClick={onBack} className={ghostBtn}>一覧へ戻る</button>
-        <button onClick={onDuplicate} className={ghostBtn}>複製</button>
-        <button
-          onClick={onRemove}
-          className="ml-auto rounded-lg border border-red-200 px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50"
-        >
+        <Button size="S" variant="secondary" onClick={onBack}>
+          一覧へ戻る
+        </Button>
+        <Button size="S" variant="secondary" onClick={onDuplicate}>
+          複製
+        </Button>
+        <Button className="ml-auto" size="S" variant="danger" onClick={onRemove}>
           削除
-        </button>
+        </Button>
       </div>
 
-      <input
+      <Input
+        width="100%"
         value={snippet.title}
         onChange={(e) => onPatch({ title: e.target.value })}
         placeholder="タイトル(例: LayerXハッカソンの話・600字版)"
-        className="mb-3 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold focus:border-slate-500 focus:outline-none"
+        className="mb-3 font-semibold"
       />
 
       <div className="mb-2 flex items-baseline gap-3 text-sm">
@@ -266,32 +272,32 @@ function Editor({
         <span className="text-xs text-slate-400">字(改行除く) / 全角換算 {c.zenkaku}字</span>
         <label className="ml-auto flex items-center gap-1.5 text-xs text-slate-500">
           目標
-          <select
-            value={snippet.targetChars ?? ''}
-            onChange={(e) => onPatch({ targetChars: e.target.value ? Number(e.target.value) : null })}
-            className="rounded border border-slate-300 px-1.5 py-0.5 text-xs focus:outline-none"
-          >
-            <option value="">なし</option>
-            {[200, 300, 400, 500, 600, 800, 1000].map((n) => (
-              <option key={n} value={n}>{n}字</option>
-            ))}
-          </select>
+          <Select
+            size="S"
+            value={snippet.targetChars?.toString() ?? ''}
+            hasBlank
+            blankLabel="なし"
+            options={[200, 300, 400, 500, 600, 800, 1000].map((n) => ({
+              value: n.toString(),
+              label: `${n}字`,
+            }))}
+            onChangeValue={(v) => onPatch({ targetChars: v ? Number(v) : null })}
+          />
         </label>
         {target && (
-          <span className={`rounded px-1.5 py-0.5 text-xs font-bold tabular-nums ${
-            target.over ? 'bg-red-600 text-white' : 'bg-slate-100 text-slate-600'
-          }`}>
+          <StatusLabel type={target.over ? 'error' : 'grey'} bold={target.over}>
             {target.text}
-          </span>
+          </StatusLabel>
         )}
       </div>
 
-      <textarea
+      <Textarea
+        width="100%"
         value={snippet.body}
         onChange={(e) => onPatch({ body: e.target.value })}
         rows={16}
         placeholder="ここに本文。改行は文字数に数えません"
-        className="mb-4 w-full max-w-[65ch] resize-y rounded-lg border border-slate-300 px-4 py-3 text-sm leading-loose focus:border-slate-500 focus:outline-none"
+        className="mb-4 max-w-[65ch] leading-loose"
       />
 
       <div className="border-t border-slate-200 pt-3">
@@ -319,19 +325,21 @@ function Editor({
           }}
           className="flex gap-2"
         >
-          <input
+          <Input
+            width="16rem"
             value={companyDraft}
             onChange={(e) => setCompanyDraft(e.target.value)}
             list="company-options"
             placeholder="企業名(選考ボードから補完)"
-            className="w-64 rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-slate-500 focus:outline-none"
           />
           <datalist id="company-options">
             {companyOptions.map((name) => (
               <option key={name} value={name} />
             ))}
           </datalist>
-          <button type="submit" className={ghostBtn}>追加</button>
+          <Button type="submit" size="S" variant="secondary">
+            追加
+          </Button>
         </form>
       </div>
     </div>

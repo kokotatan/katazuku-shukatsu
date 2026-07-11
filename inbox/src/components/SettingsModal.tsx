@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { Button, Dialog, Input } from 'smarthr-ui'
 
 interface Props {
   clientId: string
@@ -25,17 +26,13 @@ export function SettingsModal({
   const fileRef = useRef<HTMLInputElement>(null)
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4"
-      onClick={onClose}
-    >
-      <div
-        className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <Dialog isOpen width="32rem" onClickOverlay={onClose} onPressEscape={onClose}>
+      <div className="max-h-[85vh] overflow-y-auto p-6">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-bold">設定・連携</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">✕</button>
+          <Button size="S" variant="text" onClick={onClose}>
+            閉じる
+          </Button>
         </div>
 
         <section className="mb-6">
@@ -46,22 +43,22 @@ export function SettingsModal({
             を作成し、貼り付けてください。メールは読み取り専用で、データはこの端末にのみ保存されます。
           </p>
           <div className="flex gap-2">
-            <input
+            <Input
+              width="100%"
               value={idDraft}
               onChange={(e) => setIdDraft(e.target.value)}
               placeholder="xxxx.apps.googleusercontent.com"
-              className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
             />
-            <button
+            <Button
+              variant="primary"
               onClick={() => {
                 onSaveClientId(idDraft.trim())
                 onConnectGmail()
               }}
               disabled={!idDraft.trim() || connecting}
-              className="rounded-lg bg-slate-800 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:opacity-40"
             >
               {connecting ? '取得中…' : '接続'}
-            </button>
+            </Button>
           </div>
         </section>
 
@@ -74,18 +71,12 @@ export function SettingsModal({
             </code>
           </p>
           <div className="flex gap-2">
-            <button
-              onClick={() => fileRef.current?.click()}
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
-            >
+            <Button size="S" variant="secondary" onClick={() => fileRef.current?.click()}>
               インポート
-            </button>
-            <button
-              onClick={onExportJson}
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
-            >
+            </Button>
+            <Button size="S" variant="secondary" onClick={onExportJson}>
               エクスポート
-            </button>
+            </Button>
             <input
               ref={fileRef}
               type="file"
@@ -102,14 +93,11 @@ export function SettingsModal({
 
         <section>
           <h3 className="mb-2 text-sm font-bold text-slate-700">データ</h3>
-          <button
-            onClick={onResetDemo}
-            className="rounded-lg border border-red-200 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
-          >
+          <Button size="S" variant="danger" onClick={onResetDemo}>
             デモデータにリセット
-          </button>
+          </Button>
         </section>
       </div>
-    </div>
+    </Dialog>
   )
 }

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { AnchorButton, Button, Input, StatusLabel, Textarea } from 'smarthr-ui'
 import { KIND_META, type PrepEntry, type PrepKind } from './types'
 import { companySummary, focusDeck, retrospectives } from './lib/select'
 import { sameCompany } from './lib/names'
@@ -27,9 +28,6 @@ function pipelineNames(): string[] {
   }
   return []
 }
-
-const ghostBtn =
-  'rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50'
 
 type View = { mode: 'home' } | { mode: 'company'; company: string } | { mode: 'focus'; company: string }
 
@@ -71,9 +69,13 @@ export default function App() {
           </span>
           <div className="ml-auto flex items-center gap-2">
             {view.mode !== 'home' && (
-              <button onClick={() => setView({ mode: 'home' })} className={ghostBtn}>一覧へ</button>
+              <Button size="S" variant="secondary" onClick={() => setView({ mode: 'home' })}>
+                一覧へ
+              </Button>
             )}
-            <a href="/" className={ghostBtn}>katazuku</a>
+            <AnchorButton size="S" variant="secondary" href="/">
+              katazuku
+            </AnchorButton>
           </div>
         </div>
       </header>
@@ -124,34 +126,35 @@ function EntryForm({ company, onAdd }: { company: string; onAdd: (e: Omit<PrepEn
     >
       <div className="mb-2 flex gap-1">
         {(Object.keys(KIND_META) as PrepKind[]).map((k) => (
-          <button
+          <Button
             key={k}
             type="button"
+            size="S"
+            variant={kind === k ? 'primary' : 'secondary'}
             onClick={() => setKind(k)}
-            className={`rounded px-2.5 py-1 text-xs font-medium transition ${
-              kind === k ? 'bg-slate-900 text-white' : 'text-slate-500 ring-1 ring-slate-200 hover:text-slate-700'
-            }`}
           >
             {KIND_META[k].label}
-          </button>
+          </Button>
         ))}
       </div>
-      <input
+      <Input
+        width="100%"
         value={question}
         onChange={(e) => setQuestion(e.target.value)}
         placeholder={placeholder[kind][0]}
-        className="mb-2 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold focus:border-slate-500 focus:outline-none"
+        className="mb-2 font-semibold"
       />
-      <textarea
+      <Textarea
+        width="100%"
         value={answer}
         onChange={(e) => setAnswer(e.target.value)}
         rows={3}
         placeholder={placeholder[kind][1]}
-        className="mb-2 w-full resize-y rounded-lg border border-slate-300 px-3 py-2 text-sm leading-relaxed focus:border-slate-500 focus:outline-none"
+        className="mb-2"
       />
-      <button type="submit" className="rounded-lg bg-slate-900 px-4 py-1.5 text-sm font-semibold text-white transition hover:bg-slate-700">
+      <Button type="submit" variant="primary">
         追加
-      </button>
+      </Button>
     </form>
   )
 }
@@ -161,26 +164,30 @@ function EntryRow({ entry, onPatch, onRemove }: { entry: PrepEntry; onPatch: (p:
   if (editing) {
     return (
       <li className="border-b border-slate-100 py-3">
-        <input
+        <Input
+          width="100%"
           value={entry.question}
           onChange={(e) => onPatch({ question: e.target.value })}
-          className="mb-1.5 w-full rounded border border-slate-300 px-2 py-1 text-sm font-semibold focus:outline-none"
+          className="mb-1.5 font-semibold"
         />
-        <textarea
+        <Textarea
+          width="100%"
           value={entry.answer}
           onChange={(e) => onPatch({ answer: e.target.value })}
           rows={3}
-          className="mb-1.5 w-full resize-y rounded border border-slate-300 px-2 py-1 text-sm focus:outline-none"
+          className="mb-1.5"
         />
-        <button onClick={() => setEditing(false)} className="text-xs text-slate-500 underline underline-offset-2">閉じる</button>
+        <Button size="S" variant="text" onClick={() => setEditing(false)}>
+          閉じる
+        </Button>
       </li>
     )
   }
   return (
     <li className="group border-b border-slate-100 py-3">
       <div className="flex items-baseline gap-2">
-        <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium text-slate-500 ring-1 ring-slate-200">
-          {KIND_META[entry.kind].label}
+        <span className="shrink-0">
+          <StatusLabel type="grey">{KIND_META[entry.kind].label}</StatusLabel>
         </span>
         <button onClick={() => setEditing(true)} className="min-w-0 flex-1 text-left">
           <p className="text-sm font-semibold text-slate-800">{entry.question || '(無題)'}</p>
@@ -221,21 +228,23 @@ function Home({
         }}
         className="mb-6 flex gap-2"
       >
-        <input
-          value={companyDraft}
-          onChange={(e) => setCompanyDraft(e.target.value)}
-          list="company-options"
-          placeholder="企業名を入れて対策ノートを開く(選考ボードから補完)"
-          className="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm shadow-sm focus:border-slate-400 focus:outline-none"
-        />
+        <div className="flex-1">
+          <Input
+            width="100%"
+            value={companyDraft}
+            onChange={(e) => setCompanyDraft(e.target.value)}
+            list="company-options"
+            placeholder="企業名を入れて対策ノートを開く(選考ボードから補完)"
+          />
+        </div>
         <datalist id="company-options">
           {options.map((name) => (
             <option key={name} value={name} />
           ))}
         </datalist>
-        <button type="submit" className="rounded-xl bg-slate-900 px-4 text-sm font-semibold text-white transition hover:bg-slate-700">
+        <Button type="submit" variant="primary">
           開く
-        </button>
+        </Button>
       </form>
 
       {summary.length > 0 && (
@@ -246,10 +255,14 @@ function Home({
           <ul className="flex flex-wrap gap-2 pt-2">
             {summary.map((g) => (
               <li key={g.company}>
-                <button onClick={() => onOpen(g.company)} className={ghostBtn}>
+                <Button
+                  size="S"
+                  variant="secondary"
+                  onClick={() => onOpen(g.company)}
+                  suffix={<StatusLabel type="grey">{g.count}</StatusLabel>}
+                >
                   {g.company}
-                  <span className="ml-1.5 font-display text-xs text-slate-400">{g.count}</span>
-                </button>
+                </Button>
               </li>
             ))}
           </ul>
@@ -315,12 +328,9 @@ function Company({
     <main className="mx-auto max-w-3xl px-4 py-6">
       <div className="mb-4 flex items-baseline gap-3">
         <h1 className="font-display text-2xl font-semibold text-slate-900">{company}</h1>
-        <button
-          onClick={onFocus}
-          className="ml-auto rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
-        >
+        <Button className="ml-auto" variant="primary" onClick={onFocus}>
           直前モードを開始
-        </button>
+        </Button>
       </div>
       <EntryForm company={company} onAdd={onAdd} />
       {mine.length === 0 ? (
@@ -370,7 +380,11 @@ function Focus({ deck, company, onExit }: { deck: PrepEntry[]; company: string; 
       <main className="mx-auto max-w-2xl px-4 py-24 text-center">
         <p className="font-display text-xl text-slate-700">読むものがまだありません</p>
         <p className="mt-2 text-sm text-slate-400">軸と想定問答を追加してから直前モードを使ってください</p>
-        <button onClick={onExit} className={`mt-6 ${ghostBtn}`}>戻る</button>
+        <div className="mt-6">
+          <Button variant="secondary" onClick={onExit}>
+            戻る
+          </Button>
+        </div>
       </main>
     )
   }

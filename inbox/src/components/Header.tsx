@@ -1,3 +1,5 @@
+import { Button } from 'smarthr-ui'
+
 interface Props {
   doneToday: number
   doneTotal: number
@@ -43,12 +45,9 @@ export function Header({ doneToday, doneTotal, total, onOpenSettings }: Props) {
           <span className="text-xs text-slate-500">
             今日 <span className="font-display text-base font-semibold text-slate-900">{doneToday}</span> 件片付けた
           </span>
-          <button
-            onClick={onOpenSettings}
-            className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50"
-          >
+          <Button size="S" variant="secondary" onClick={onOpenSettings}>
             設定・連携
-          </button>
+          </Button>
         </div>
       </div>
     </header>

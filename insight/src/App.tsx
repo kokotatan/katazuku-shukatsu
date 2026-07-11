@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { AnchorButton, Button, StatusLabel } from 'smarthr-ui'
 import type { InboxEmail, PipelineCompany, TodayItem } from './types'
 import { aggregate, INBOX_KEY, loadJson, PIPELINE_KEY } from './lib/aggregate'
 
@@ -36,33 +37,23 @@ function Section({
       </h2>
       <ul>
         {items.map((item) => (
-          <li key={item.key} className="flex items-baseline gap-3 border-b border-slate-100 py-2.5">
-            <span
-              className={`w-24 shrink-0 rounded px-1.5 py-0.5 text-center text-xs font-bold tabular-nums ${
-                urgent ? 'bg-red-600 text-white' : 'bg-slate-100 text-slate-600'
-              }`}
-            >
-              {dueLabel(item, now)}
+          <li key={item.key} className="flex items-center gap-3 border-b border-slate-100 py-2.5">
+            <span className="w-24 shrink-0 text-center">
+              <StatusLabel type={urgent ? 'error' : 'grey'} bold={urgent}>
+                {dueLabel(item, now)}
+              </StatusLabel>
             </span>
             <span className="shrink-0 text-sm font-semibold text-slate-800">{item.company}</span>
             <span className="min-w-0 flex-1 truncate text-sm text-slate-500">{item.title}</span>
-            <span className="shrink-0 text-[11px] text-slate-400">
-              {item.source === 'inbox' ? 'メール' : 'ボード'}
-            </span>
+            <StatusLabel type="grey">{item.source === 'inbox' ? 'メール' : 'ボード'}</StatusLabel>
             {item.source === 'inbox' && (
-              <button
-                onClick={() => onDone(item)}
-                className="shrink-0 rounded-lg border border-slate-300 px-2 py-0.5 text-xs font-medium text-slate-500 transition hover:bg-slate-50"
-              >
+              <Button size="S" variant="secondary" onClick={() => onDone(item)}>
                 片付けた
-              </button>
+              </Button>
             )}
-            <a
-              href={item.source === 'inbox' ? '/inbox/' : '/status/'}
-              className="shrink-0 text-xs text-slate-400 underline decoration-slate-300 underline-offset-2 hover:text-slate-700"
-            >
+            <AnchorButton size="S" variant="text" href={item.source === 'inbox' ? '/inbox/' : '/status/'}>
               開く
-            </a>
+            </AnchorButton>
           </li>
         ))}
       </ul>
