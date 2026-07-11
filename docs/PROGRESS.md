@@ -1,6 +1,16 @@
 # katazuku 開発進捗
 
-最終更新: 2026-07-10
+最終更新: 2026-07-11
+
+## 本番ドメイン公開完了 katazuku.kotalabo.com(2026-07-11)
+
+C1(本番公開)が完了。https://katazuku.kotalabo.com でランディング+5アプリが公開中。
+
+- Vercel プロジェクト `katazuku-shukatsu`(kokotatanアカウント)に `katazuku.kotalabo.com` を追加(Production)
+- Cloudflare の kotalabo.com に CNAME レコード追加: `katazuku` → `27257dcb575f0d91.vercel-dns-017.com`(プロキシオフ=DNSのみ、他サブドメインと同方式)
+- Vercel側の検証・SSL証明書発行を確認。実機で `/` と `/status/` の表示確認済み(demoシードは匿名化済みサンプルが表示される)
+- 注意: 前セッションで別Vercelアカウント(okuyama.k@tsubamelab.com)に誤ログインして404になった。katazukuのデプロイ先は **GitHub連携の kokotatan アカウント**
+- 残課題: api/generate-reply.ts の環境変数(ANTHROPIC_API_KEY)をVercelに未設定。設定するまでAI返信下書きはルールベーステンプレートにフォールバック
 
 ## 自動運転の故障修理と土台強化(2026-07-10)
 
