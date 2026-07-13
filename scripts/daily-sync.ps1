@@ -21,16 +21,16 @@ claude -p $prompt `
   *> $logFile
 
 # 実行結果を検査し、失敗の疑いがあれば alert ファイルに残す(asa が翌朝【自動化の故障】として報告する)
+# 正常判定は完了センチネル方式: プロンプトが最後に出力する『=== daily-sync 完了 ===』の有無だけで判定する。
+# 鍵不在によるシート同期スキップは「正常完了(部分)」であり、完了行が出るので故障扱いしない。
 $alertFile = Join-Path $logDir 'alert-daily-sync.txt'
 $failReason = $null
 if (-not (Test-Path $logFile) -or (Get-Item $logFile).Length -lt 200) {
   $failReason = 'ログが空か極小(claude実行自体が失敗した可能性)'
 } else {
   $logText = Get-Content -Raw $logFile
-  if ($logText -match 'スキップ|service-account\.json がありません|サービスアカウント鍵がありません') {
-    $failReason = '早期終了の痕跡(スキップ/サービスアカウント鍵なし)'
-  } elseif ($logText -match '認証|ログイン|permission') {
-    $failReason = '認証・許可エラーの痕跡'
+  if ($logText -notmatch '===\s*daily-sync\s*完了\s*===') {
+    $failReason = '完了行なし(Gmail不通・認証エラー・途中終了などで最後まで到達しなかった可能性)'
   }
 }
 if ($failReason) {
