@@ -85,7 +85,11 @@ public/ に置く場合は assemble.mjs の除外処理にも必ず追加する�
 
 ## 外部連携
 
-- 選考管理シート(Google Sheets, ID `1X6z04LUU5IHvzJLoKQiHpdc_ml21Dor3XDDdz9rWLx0`):
+- **既存リソース台帳 `docs/INFRA.md` を必ず先に見る**。GCPプロジェクト・サービスアカウント・
+  スプレッドシート・タスクスケジューラ・デプロイ等の"既にあるもの"を列挙してある。
+  **新しいクラウドリソースや定常運用を作る前にここを確認し、既存を再利用する**
+  (過去に既存GCPプロジェクト `katazuku` を見落として重複作成した)。新設・変更したら台帳も更新する。
+- 選考管理シート(Google Sheets, ID `1jf6kSy7tZqakw8QocOmMzU6WToncQVQCeIuQ1VfRjMM`):
   読み書きルールは `status/src/lib/sheet.ts` に集約。**合格/不合格/辞退は上書きしない・
   メモ/数式列に触れない**が絶対条件
 - 毎日同期: `scripts/daily-sync-prompt.md` が仕様(タスクスケジューラ→claude -p)。

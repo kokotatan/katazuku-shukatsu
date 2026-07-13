@@ -12,7 +12,7 @@ import { sameCompany } from './importer'
  * - 業界・志望度はシート側が空欄のときだけ補完する
  */
 
-export const DEFAULT_SHEET_ID = '1X6z04LUU5IHvzJLoKQiHpdc_ml21Dor3XDDdz9rWLx0'
+export const DEFAULT_SHEET_ID = '1jf6kSy7tZqakw8QocOmMzU6WToncQVQCeIuQ1VfRjMM'
 
 export interface SheetTable {
   /** 「企業名」ヘッダ行 (0-based) */

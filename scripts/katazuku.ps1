@@ -6,7 +6,7 @@ param(
   [Parameter(Position = 1, ValueFromRemainingArguments = $true)] [string[]] $Rest
 )
 $root = Split-Path $PSScriptRoot -Parent
-$sheetUrl = 'https://docs.google.com/spreadsheets/d/1X6z04LUU5IHvzJLoKQiHpdc_ml21Dor3XDDdz9rWLx0'
+$sheetUrl = 'https://docs.google.com/spreadsheets/d/1jf6kSy7tZqakw8QocOmMzU6WToncQVQCeIuQ1VfRjMM'
 
 function Ensure-Serve {
   try {
