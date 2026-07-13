@@ -18,7 +18,7 @@ $trigger.Repetition = $rep
 $logonTrigger = New-ScheduledTaskTrigger -AtLogOn
 $logonTrigger.Delay = 'PT2M'
 
-$settings = New-ScheduledTaskSettingsSet -StartWhenAvailable `
+$settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -WakeToRun `
   -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Minutes 20)
 
 Register-ScheduledTask -TaskName 'katazuku-mail-watch' `
