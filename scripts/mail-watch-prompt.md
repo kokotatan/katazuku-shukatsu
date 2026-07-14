@@ -21,7 +21,7 @@ user_google_email は okuyama.kotaro.career@gmail.com。
    - 提出依頼・適性検査・事前準備(アンケート/セットアップ/持ち物/宿泊/交通費)・Slack招待
    - 24時間以内の締切が本文にあるもの
    ナビ媒体(goodfind/slogan/bizreach/br-campus/gaishishukatsu/mynavi/rikunabi/offerbox/openwork/
-   minshu.co.jp 等)からの宣伝・スカウトは緊急ではない。判定に迷う程度のものは asa(朝の決裁)に任せて手を出さない。
+   minshu.co.jp 等)からの宣伝・スカウトは緊急ではない。判定に迷う程度のものは asa(朝のまとめ)に任せて手を出さない。
 
 4. **緊急メールだけ本文を読んで対応する**:
    - **返信が必要**(日程調整・出欠・確認依頼) → draft_gmail_message で**そのスレッドへの返信下書き**を作る。

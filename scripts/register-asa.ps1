@@ -1,5 +1,5 @@
-﻿# katazuku asa — 朝の決裁ルーチンをタスクスケジューラに登録する(1回実行すればよい)
-# 毎朝9:00にPowerShellウィンドウを開き、claude対話セッションで決裁を提示する。
+﻿# katazuku asa — 朝のまとめルーチンをタスクスケジューラに登録する(1回実行すればよい)
+# 毎朝9:00にPowerShellウィンドウを開き、claude対話セッションできょうやることを提示する。
 # 9:00にPCが起きていなければ、次に使える時点で実行する(StartWhenAvailable)。
 # 解除: Unregister-ScheduledTask -TaskName 'katazuku-asa' -Confirm:$false
 $ErrorActionPreference = 'Stop'
@@ -10,13 +10,13 @@ $action = New-ScheduledTaskAction -Execute 'powershell.exe' `
 
 $trigger = New-ScheduledTaskTrigger -Daily -At '09:00'
 
-# 実行時間の上限なし(決裁ウィンドウを開いたままにしてもタスク側から殺さない)
+# 実行時間の上限なし(ウィンドウを開いたままにしてもタスク側から殺さない)
 $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable `
   -MultipleInstances IgnoreNew -ExecutionTimeLimit ([TimeSpan]::Zero)
 
 Register-ScheduledTask -TaskName 'katazuku-asa' `
   -Action $action -Trigger $trigger -Settings $settings `
-  -Description 'katazuku 朝の決裁ルーチン: メール分類・返信下書き・カレンダー登録・シート突合を自動で済ませ、決裁だけを提示する' `
+  -Description 'katazuku 朝のまとめルーチン: メール分類・返信下書き・カレンダー登録・シート突合を自動で済ませ、きょうやることだけを提示する' `
   -Force | Out-Null
 
 "タスク 'katazuku-asa' を登録しました(毎朝9:00、ログオン中のみウィンドウ表示)。"

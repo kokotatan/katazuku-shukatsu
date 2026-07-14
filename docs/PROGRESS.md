@@ -39,7 +39,7 @@
 ## 自律メール対応ループ「mail-watch」運用開始(2026-07-13)
 
 本人の指示「メール対応、AIが自律的に動く仕組みを構築して運用開始」に対応。
-これで自動運転は「毎時の見張り(mail-watch)→毎朝のバッチ(daily-sync 8:23)→朝の決裁(asa 9:00)→
+これで自動運転は「毎時の見張り(mail-watch)→毎朝のバッチ(daily-sync 8:23)→朝のまとめ(asa 9:00)→
 会議URL自動オープン(meeting-opener)→クラウド毎時見張り(claude.ai routine)」の5層になった。
 
 - **新設: `scripts/mail-watch.ps1` + `mail-watch-prompt.md` + `register-mail-watch.ps1`**
@@ -143,11 +143,11 @@ C1(本番公開)が完了。https://katazuku.kotalabo.com でランディング+
 - 残タスク: OAuth同意画面の「本番公開」確認(未公開だとトークン7日失効→週1再認証)、SA鍵配置(シート書き戻し)、
   クラウド見張りルーチンの縮小
 
-## ✅ 朝の決裁ルーチン「katazuku asa」(2026-07-02稼働開始)
+## ✅ 朝のまとめルーチン「katazuku asa」(2026-07-02稼働開始)
 
-背景: 通知は心理的に無視されるため、「気づかせる」設計から「決裁」設計へ反転。
+背景: 通知は心理的に無視されるため、「気づかせる」設計から「まとめて渡す」設計へ反転。
 システムが先に作業(返信下書き・カレンダー登録・シート突合・面接prep)を終わらせ、
-本人にはYes/Noの決裁を最大3件だけ提示する。無視しても翌朝また出る(自己修復)。
+本人にはきょうやることを最大3件だけ提示する。無視しても翌朝また出る(自己修復)。
 
 - 本体: `scripts/asa-prompt.md`(旧 inbox-triage-prompt.md を吸収・拡張)。主な追加:
   - 要返信メールはGmail下書きまで自動作成(下書きツールが無い環境ではコピー可能な返信文を提示。自動送信は絶対にしない)
@@ -155,7 +155,7 @@ C1(本番公開)が完了。https://katazuku.kotalabo.com でランディング+
   - 選考管理シートと突合し「締切7日以内なのに未出願」の企業を検出(エントリーし忘れ対策)
   - 48時間以内に面接があればprepパック(想定質問・回答素材・逆質問)を生成しイベント説明欄に追記
   - 締切48時間以内の未着手タスクは督促でなく成果物ドラフト(個人マスタ§8の部品から)を出す
-- 起動: `katazuku asa`(`katazuku inbox` も同じルーチン)。対話セッションなので決裁の返事で続きが進む
+- 起動: `katazuku asa`(`katazuku inbox` も同じルーチン)。対話セッションなので返事で続きが進む
 - 自動起動: タスクスケジューラ `katazuku-asa`(毎朝9:00、PCが寝ていれば次に使える時。登録スクリプト `scripts/register-asa.ps1`、解除は `Unregister-ScheduledTask -TaskName 'katazuku-asa'`)
 - 注意: `.ps1` はBOM付きUTF-8必須(PowerShell 5.1がBOM無しをShift-JIS誤読する)
 
@@ -177,7 +177,7 @@ C1(本番公開)が完了。https://katazuku.kotalabo.com でランディング+
   手順書: `docs/GOOGLE-MCP-SETUP.md`。これで対話/headless両対応になり、daily-syncのGmail処理も復活する。
   ブロッカー: Chrome拡張が別のclaude.aiアカウントでログインしていてブラウザ代行操作が不可
   (本人が拡張を laboauto12 に切り替えたらGCP設定を代行実施)
-- 用語修正: 本人向け出力の「決裁」「Yes/No」をやめ「きょうやること(最大3件)」に統一
+- 用語修正: 本人向け出力の固い言葉(「Yes/No」等)をやめ「きょうやること(最大3件)」に統一
 - 残タスク: Chrome拡張のアカウント切替(本人)→ GCPでOAuthクライアント作成+API有効化(代行可)→
   `claude mcp add google-workspace` → daily-sync.ps1のallowedTools差し替え / SA鍵配置(シート書き戻し) /
   クラウド見張りルーチンを「24時間以内の緊急のみ通知」に縮小(claude.ai/code/routines)
