@@ -4,7 +4,7 @@
 
 手順:
 
-1. **文字起こし**: `mcp__voicebox__voicebox_transcribe` に `audio_path=<対象音声の絶対パス>`、`language="ja"` を渡して全文を文字起こしする。失敗したら理由を出力して終了。
+1. **文字起こし**: `mcp__voicebox__voicebox_transcribe` に `audio_path=<対象音声の絶対パス>`、`language="ja"`、`model="turbo"` を渡して全文を文字起こしする(Voiceboxで既定の'base'は未DLのことがあるため、DL済みの'turbo'を明示指定する。'turbo'も未DLなら、その旨=「VoiceboxのSettings→キャプチャでモデルをダウンロードしてください」と出力して終了)。
 2. **メタ情報の推定**: 文字起こしから、企業名・面談者名(分かれば)・日付を推定する。日付は音声ファイル名に含まれていればそれを優先。曜日を書くときは必ずJSTで検算する。
 3. **文字起こし全文の保存**: `logs/interviews/<企業>-<YYYY-MM-DD>.txt` に全文を Write で保存(gitignore済み想定。無ければ logs/interviews/ を作成)。
 4. **構造化ノートの作成**: `chrome-prompts/interview-notes.local.md` の既存形式に厳密に合わせた1社分の節を組み立てる。見出しは `## <企業名>(<面談者/種別>)<YYYY-MM-DD>`。中に以下を含める(該当があるものだけ):
