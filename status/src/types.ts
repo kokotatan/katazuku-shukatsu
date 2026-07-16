@@ -18,6 +18,8 @@ export interface Company {
   priority?: string
   /** マイページURL */
   mypageUrl?: string
+  /** 企業ロゴ(dataURL または http URL) */
+  logo?: string
   updatedAt: string
 }
 
