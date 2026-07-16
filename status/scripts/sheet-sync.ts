@@ -24,7 +24,7 @@ import { createSign } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join, resolve } from 'node:path'
-import { DEFAULT_SHEET_ID, locateTable, planUpdates, type CellUpdate } from '../src/lib/sheet'
+import { DEFAULT_SHEET_ID, locateTable, planUpdates, tabPref, type CellUpdate } from '../src/lib/sheet'
 import type { Company } from '../src/types'
 
 /** --apply で一度に書き込める上限(更新+追記の合計社数)。超えたら --force が必要 */
@@ -103,7 +103,11 @@ async function main() {
   if (!metaRes.ok) throw new Error(`シートにアクセスできません (${metaRes.status})。サービスアカウントに共有されているか確認してください。`)
   const meta = (await metaRes.json()) as { sheets?: { properties: { title: string } }[] }
 
-  for (const s of meta.sheets ?? []) {
+  // 「選考管理」タブを最優先で試す(旧タブが残っていても新タブに書き込む)
+  const sheets = [...(meta.sheets ?? [])].sort(
+    (a, b) => tabPref(b.properties.title) - tabPref(a.properties.title),
+  )
+  for (const s of sheets) {
     const title = s.properties.title
     const range = encodeURIComponent(`'${title}'!A1:T500`)
     const dataRes = await fetch(`${API}/${SHEET_ID}/values/${range}`, {

@@ -83,6 +83,38 @@ check('別表(endRow以降)には書かない', plan.updates.every((u) => u.row 
 check('数式・チェック列(残り日数/提出済)に触れない', plan.updates.every((u) => u.col !== 11 && u.col !== 12))
 check('メモ欄に触れない', plan.updates.every((u) => u.col !== 17))
 
+// --- 新スキーマ(選考管理タブ・自由記述ステータス。空欄補完のみで手入力を潰さない) ---
+const HEADER2 = ['企業名', '時期', 'ポジション', '志望度', 'ステータス', '次アクション', '締切・選考日', '残り日数', '提出済', 'ES・資料URL', '選考メモ']
+const row2 = (name: string, status = '', nextAction = '', nextDate = '', priority = '') =>
+  [name, '', '', priority, status, nextAction, nextDate, '', 'FALSE', '', '']
+const rows2: string[][] = [
+  HEADER2,
+  row2('PKSHA', '人事面接済(7/16)', '3days/1dayの案内待ち'),
+  row2('P&G', '選考中', 'SDS提出', '2026/07/16'),
+  row2('空ステ社', '', '', ''),
+  row2(''),
+  row2(''),
+]
+const table2 = locateTable(rows2)!
+check('新スキーマ: ステータス/次アクション/締切列を検出', table2.cols.status === 4 && table2.cols.nextAction === 5 && table2.cols.nextDate === 6)
+check('新スキーマ: freeform=true', table2.freeform === true)
+check('旧スキーマ: freeform=false', table.freeform === false)
+
+const board2: Company[] = [
+  co('PKSHA', 'interview', { nextAction: '上書きされてはいけない', nextDate: '2026-08-01' }),
+  co('空ステ社', 'entried'), // ステータス空欄 → 補完される
+  co('新規ソフト社', 'task', { nextAction: 'ES提出', nextDate: '2026-07-20' }), // 無い企業 → 追記
+]
+const plan2 = planUpdates(board2, rows2, table2)
+const at2 = (r: number, c: number): CellUpdate | undefined =>
+  plan2.updates.find((u) => u.row === r && u.col === c)
+
+check('新: 手入力ステータスは上書きしない', !at2(1, 4))
+check('新: 手入力の次アクションは上書きしない', !at2(1, 5))
+check('新: 空欄ステータスは補完する', at2(3, 4)?.value === '出願済')
+check('新: 無い企業を空き行に追記', at2(4, 0)?.value === '新規ソフト社' && at2(4, 4)?.value === '出願済')
+check('新: 残り日数・提出済(数式/チェック)に触れない', plan2.updates.every((u) => u.col !== 7 && u.col !== 8))
+
 // --- countPlannedChanges (--apply の書き込み上限ガード) ---
 const fakePlan = (updated: number, added: number) => ({
   updatedNames: Array.from({ length: updated }, (_, i) => `更新社${i + 1}`),

@@ -27,6 +27,8 @@ export interface SheetTable {
     nextAction: number
     nextDate: number
   }
+  /** ステータス列が自由記述(新・選考管理タブ)か。true のとき既存の手入力は上書きしない */
+  freeform: boolean
 }
 
 export interface CellUpdate {
@@ -45,19 +47,29 @@ export interface SyncPlan {
   skipped: string[]
 }
 
+/** 「選考管理」タブを優先して選ぶための重み(fetchGrid / sheet-sync で使用) */
+export function tabPref(title: string): number {
+  return title.includes('選考管理') ? 1 : 0
+}
+
 export function locateTable(rows: string[][]): SheetTable | null {
   const headerRow = rows.findIndex((r) => r.some((c) => c === '企業名'))
   if (headerRow === -1) return null
   const header = rows[headerRow]
+  // 旧タブは「出願状況」、新・選考管理タブは「ステータス」(自由記述)
+  const status = header.findIndex((c) => c === '出願状況' || c === 'ステータス')
   const cols = {
     name: header.findIndex((c) => c === '企業名'),
     industry: header.findIndex((c) => c === '業界'),
     priority: header.findIndex((c) => c === '志望度'),
-    status: header.findIndex((c) => c === '出願状況'),
-    nextAction: header.findIndex((c) => c.includes('次回アクション')),
-    nextDate: header.findIndex((c) => c.includes('〆切')),
+    status,
+    // 「次回アクション」(旧)も「次アクション」(新)も拾う
+    nextAction: header.findIndex((c) => c.includes('アクション')),
+    // 「〆切」(旧)も「締切」(新)も拾う
+    nextDate: header.findIndex((c) => c.includes('締切') || c.includes('〆切')),
   }
   if (cols.status === -1) return null
+  const freeform = header[status] === 'ステータス'
   let endRow = rows.length
   for (let i = headerRow + 1; i < rows.length; i++) {
     if (rows[i].some((c) => c === '企業名')) {
@@ -65,7 +77,7 @@ export function locateTable(rows: string[][]): SheetTable | null {
       break
     }
   }
-  return { headerRow, endRow, cols }
+  return { headerRow, endRow, cols, freeform }
 }
 
 const STATUS_FOR: Record<Stage, string> = {
@@ -129,12 +141,22 @@ export function planUpdates(companies: Company[], rows: string[][], table: Sheet
 
     if (row >= 0) {
       const before = plan.updates.length
-      const status = desiredStatus(co.stage, cell(row, cols.status))
-      if (status) plan.updates.push({ row, col: cols.status, value: status })
-      if (cols.nextAction >= 0 && co.nextAction && cell(row, cols.nextAction) !== co.nextAction)
-        plan.updates.push({ row, col: cols.nextAction, value: co.nextAction })
-      if (cols.nextDate >= 0 && co.nextDate && !sameDate(cell(row, cols.nextDate), co.nextDate))
-        plan.updates.push({ row, col: cols.nextDate, value: co.nextDate.replace(/-/g, '/') })
+      if (table.freeform) {
+        // 自由記述ステータスのタブ(新・選考管理): 手入力を潰さないため空欄補完のみ。既存値は上書きしない
+        if (co.stage && !cell(row, cols.status))
+          plan.updates.push({ row, col: cols.status, value: STATUS_FOR[co.stage] })
+        if (cols.nextAction >= 0 && co.nextAction && !cell(row, cols.nextAction))
+          plan.updates.push({ row, col: cols.nextAction, value: co.nextAction })
+        if (cols.nextDate >= 0 && co.nextDate && !cell(row, cols.nextDate))
+          plan.updates.push({ row, col: cols.nextDate, value: co.nextDate.replace(/-/g, '/') })
+      } else {
+        const status = desiredStatus(co.stage, cell(row, cols.status))
+        if (status) plan.updates.push({ row, col: cols.status, value: status })
+        if (cols.nextAction >= 0 && co.nextAction && cell(row, cols.nextAction) !== co.nextAction)
+          plan.updates.push({ row, col: cols.nextAction, value: co.nextAction })
+        if (cols.nextDate >= 0 && co.nextDate && !sameDate(cell(row, cols.nextDate), co.nextDate))
+          plan.updates.push({ row, col: cols.nextDate, value: co.nextDate.replace(/-/g, '/') })
+      }
       if (cols.industry >= 0 && co.industry && !cell(row, cols.industry))
         plan.updates.push({ row, col: cols.industry, value: co.industry })
       if (cols.priority >= 0 && co.priority && !cell(row, cols.priority))
@@ -182,7 +204,10 @@ export async function fetchGrid(token: string, spreadsheetId: string): Promise<S
     token,
   )) as { sheets?: { properties: { title: string } }[] }
 
-  for (const s of meta.sheets ?? []) {
+  const sheets = [...(meta.sheets ?? [])].sort(
+    (a, b) => tabPref(b.properties.title) - tabPref(a.properties.title),
+  )
+  for (const s of sheets) {
     const title = s.properties.title
     const range = encodeURIComponent(`'${title}'!A1:T500`)
     const data = (await getJson(`${API}/${spreadsheetId}/values/${range}`, token)) as {
