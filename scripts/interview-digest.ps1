@@ -1,4 +1,4 @@
-# interview-digest: turn an interview recording into structured notes + forward-looking insights.
+﻿# interview-digest: turn an interview recording into structured notes + forward-looking insights.
 #
 # Pipeline: (video/audio file) -> [ffmpeg extract audio if needed] -> voicebox local Whisper
 #           -> claude -p structures into chrome-prompts/interview-notes.local.md + writes insights.
@@ -14,7 +14,10 @@
 param(
   [Parameter(Mandatory = $true)]
   [Alias('AudioPath')]
-  [string]$InputPath
+  [string]$InputPath,
+  # 既定では議事録が取れたら中間ファイル(チャンク)と巨大な元録画を消してディスクを節約する。
+  # 元動画を残したいときだけ -KeepSource を付ける。聞き直し用の16kHz wavと文字起こしtxtは常に残る。
+  [switch]$KeepSource
 )
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path $PSScriptRoot -Parent
@@ -37,6 +40,24 @@ if (-not $ffmpeg) {
   $ffmpeg = $cand | Where-Object { Test-Path $_ } | Select-Object -First 1
 }
 if (-not $ffmpeg) { Write-Error "need ffmpeg. Install: winget install Gyan.FFmpeg"; exit 1 }
+
+# voicebox must already be listening BEFORE claude starts: a claude session binds its MCP servers at
+# launch, so starting voicebox afterwards does not give that session the transcribe tool. Without this
+# check the run fails silently in its worst form -- chunking "succeeds", every transcribe call is a
+# no-op, and no transcript is ever written (hit 2026-07-15 and again 2026-07-16; see PROGRESS.md).
+$voiceboxPort = 17493
+function Test-Voicebox { try { (New-Object Net.Sockets.TcpClient).Connect('127.0.0.1', $voiceboxPort); return $true } catch { return $false } }
+if (-not (Test-Voicebox)) {
+  $vb = @("$env:ProgramFiles\Voicebox\voicebox.exe", "${env:ProgramFiles(x86)}\Voicebox\voicebox.exe") |
+    Where-Object { Test-Path $_ } | Select-Object -First 1
+  if (-not $vb) { Write-Error "voicebox is not running and voicebox.exe was not found. Start Voicebox, then re-run."; exit 1 }
+  "voicebox is down. starting $vb ..."
+  Start-Process $vb -WindowStyle Minimized
+  $deadline = (Get-Date).AddSeconds(60)
+  while (-not (Test-Voicebox) -and (Get-Date) -lt $deadline) { Start-Sleep -Seconds 2 }
+  if (-not (Test-Voicebox)) { Write-Error "voicebox did not open port $voiceboxPort within 60s. Start it manually, then re-run."; exit 1 }
+  "voicebox is up (port $voiceboxPort)"
+}
 
 # voicebox accepts these audio formats directly; anything else (mp4/mkv/mov...) is extracted first.
 $audioExts = @('.wav', '.mp3', '.m4a', '.webm', '.opus', '.flac')
@@ -81,6 +102,26 @@ $ErrorActionPreference = $prevEAP
 $ok = (Test-Path $logFile) -and ((Get-Content -Raw $logFile) -match '===\s*interview-digest\s*完了\s*===')
 if ($ok) {
   "interview-digest OK. notes appended to chrome-prompts/interview-notes.local.md (log: logs/$(Split-Path $logFile -Leaf))"
+
+  # --- 掃除(本人方針 2026-07-16): 議事録が取れたら中間ファイルとデカい元録画を消す。 ------------
+  # 「議事録取れたら消していい」。ただし議事録は不明瞭箇所を [mm:ss] で聞き直す設計なので、
+  # 聞き直し用の 16kHz mono wav($audioPath)と文字起こし txt は必ず残す。消すのは:
+  #   ・30秒チャンク($chunkDir、純粋な中間・数百MB)
+  #   ・元動画($InputPath が mp4 等で、そこから wav を抽出した場合のみ。数GB)。-KeepSource で残せる。
+  # 入力が最初から wav(record-audio.ps1 の出力)なら、それ自体が聞き直し用なので消さない。
+  if (Test-Path $chunkDir) {
+    Remove-Item $chunkDir -Recurse -Force -ErrorAction SilentlyContinue
+    "  cleanup: 中間チャンクを削除 ($chunkDir)"
+  }
+  $extractedFromVideo = ($audioPath -ne $InputPath)   # 動画等から wav を別途抽出した場合に true
+  if ($extractedFromVideo -and -not $KeepSource -and (Test-Path $InputPath)) {
+    $mb = [math]::Round((Get-Item $InputPath).Length / 1MB, 0)
+    Remove-Item $InputPath -Force -ErrorAction SilentlyContinue
+    "  cleanup: 元録画を削除 (${mb}MB, 聞き直し用wavは保持 -> $audioPath)"
+  }
 } else {
-  Write-Warning "interview-digest may have failed (no completion marker). See log: logs/$(Split-Path $logFile -Leaf)"
+  # Exit non-zero so a background/scheduled caller sees the failure. Returning 0 here made a failed run
+  # look like a completed one (2026-07-16).
+  Write-Warning "interview-digest FAILED (no completion marker). See log: logs/$(Split-Path $logFile -Leaf)"
+  exit 1
 }
