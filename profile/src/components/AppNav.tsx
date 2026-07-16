@@ -1,6 +1,7 @@
 import type { ComponentType } from 'react'
 import {
   FaCalendarCheckIcon,
+  FaChartLineIcon,
   FaCommentsIcon,
   FaHouseIcon,
   FaIdCardIcon,
@@ -10,13 +11,13 @@ import {
 
 /*
  * katazuku 共通サイドナビ。
- * このファイルは inbox/status/insight/profile/prep の
+ * このファイルは inbox/status/insight/profile/prep/impact の
  * src/components/AppNav.tsx で同一内容を保つこと(コピー同期)。
  * リンクは同一オリジンのパス前提(本番 katazuku.kotalabo.com)。
  * 開発サーバー(ポート別)ではアプリ間リンクは飛べないが仕様どおり。
  */
 
-export type AppKey = 'home' | 'inbox' | 'status' | 'insight' | 'profile' | 'prep'
+export type AppKey = 'home' | 'inbox' | 'status' | 'insight' | 'profile' | 'prep' | 'impact'
 
 type Item = {
   key: AppKey
@@ -33,6 +34,7 @@ const ITEMS: Item[] = [
   { key: 'insight', href: '/insight/', label: '今日やること', caption: 'Insight', icon: FaCalendarCheckIcon },
   { key: 'profile', href: '/profile/', label: '個人マスタ', caption: 'Profile', icon: FaIdCardIcon },
   { key: 'prep', href: '/prep/', label: '面接準備', caption: 'Prep', icon: FaCommentsIcon },
+  { key: 'impact', href: '/impact/', label: '効果', caption: 'Impact', icon: FaChartLineIcon },
 ]
 
 function Brand() {
