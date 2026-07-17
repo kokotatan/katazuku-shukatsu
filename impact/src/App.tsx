@@ -1,100 +1,316 @@
-import { useEffect, useMemo, useState } from 'react'
-import type { InboxEmail, PipelineCompany } from './types'
-import { computeOutcome, formatDuration, type OutcomeDomain } from './lib/outcome'
-import { INBOX_KEY, loadJson, PIPELINE_KEY } from './lib/storage'
+import type { ReactNode } from 'react'
 import { AppNav } from './components/AppNav'
 
-const toMin = (sec: number) => Math.round(sec / 60)
-const fmtMin = (min: number) => formatDuration(min * 60)
+/*
+ * 効果ダッシュボード。SaaSアナリティクス風のBIレイアウト。
+ * 配色は SmartHR トークン(index.css と同値)。ブルーを主役に、締切系だけ DANGER の赤。
+ * 値は現状ハードコード(将来 Inbox/Status の実データ時系列に差し替え)。
+ */
 
-/** 手作業 → katazuku後 のダンベル1行 */
-function DumbbellRow({ domain, denomSec }: { domain: OutcomeDomain; denomSec: number }) {
-  const scale = (s: number) => (denomSec > 0 ? (s / denomSec) * 92 : 0)
-  const manualPct = scale(domain.manualSec)
-  const autoPct = scale(domain.autoSec)
+const C = {
+  blue800: '#00477a',
+  blue700: '#005a9a',
+  blue600: '#0071c1',
+  blue500: '#0077c7',
+  blue200: '#a0cfee',
+  blue100: '#d2e8f7',
+  blue50: '#e9f4fb',
+  slate900: '#23221e',
+  slate500: '#706d65',
+  slate400: '#c1bdb7',
+  slate300: '#d6d3d0',
+  slate200: '#edebe8',
+  slate100: '#f5f4f3',
+  red500: '#e01e5a',
+  red200: '#f4b7cc',
+} as const
+
+const MONTHS = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月']
+
+/** きりのいい上限に丸める(軸目盛り用) */
+function niceCeil(v: number): number {
+  if (v <= 0) return 1
+  const p = Math.pow(10, Math.floor(Math.log10(v)))
+  const n = v / p
+  const m = n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10
+  return m * p
+}
+
+/** 上辺だけ角丸の矩形パス(棒の data-end。ベースは直角) */
+function topRoundRect(x: number, y: number, w: number, h: number, r: number): string {
+  const rr = Math.max(0, Math.min(r, w / 2, h))
+  return `M${x},${y + h} L${x},${y + rr} Q${x},${y} ${x + rr},${y} L${x + w - rr},${y} Q${x + w},${y} ${x + w},${y + rr} L${x + w},${y + h} Z`
+}
+
+function Card({ title, hint, className, children }: {
+  title: string
+  hint?: string
+  className?: string
+  children: ReactNode
+}) {
   return (
-    <div className="flex items-center gap-3 py-2.5">
-      <span className="w-28 shrink-0 text-sm text-slate-700">{domain.label}</span>
-      <div className="relative h-4 flex-1">
-        <span
-          className="absolute top-1/2 h-0.5 -translate-y-1/2 rounded-full bg-slate-300"
-          style={{ left: `${autoPct}%`, width: `${Math.max(manualPct - autoPct, 0)}%` }}
-        />
-        <span
-          aria-hidden
-          className="absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-slate-400 ring-2 ring-white"
-          style={{ left: `${manualPct}%` }}
-        />
-        <span
-          aria-hidden
-          className="absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-blue-500 ring-2 ring-white"
-          style={{ left: `${autoPct}%` }}
-        />
+    <div className={`rounded-xl border border-slate-300 bg-white p-5 ${className ?? ''}`}>
+      <div className="mb-3 flex items-baseline justify-between gap-2">
+        <p className="text-sm font-bold text-slate-700">{title}</p>
+        {hint && <p className="text-[11px] text-slate-400">{hint}</p>}
       </div>
-      <span className="w-32 shrink-0 text-right text-sm text-slate-500 tabular-nums">
-        {fmtMin(toMin(domain.manualSec))}
-        <span className="mx-1 text-slate-400">→</span>
-        {fmtMin(toMin(domain.autoSec))}
-      </span>
+      {children}
     </div>
   )
 }
 
+type Seg = { label: string; value: number; color: string }
+
+function Donut({ title, centerValue, centerLabel, segments, unit, className }: {
+  title: string
+  centerValue: string
+  centerLabel: string
+  segments: Seg[]
+  unit: string
+  className?: string
+}) {
+  const total = segments.reduce((n, s) => n + s.value, 0)
+  const R = 52
+  const SW = 22
+  const CIRC = 2 * Math.PI * R
+  const gap = 3
+  let acc = 0
+  return (
+    <Card title={title} className={className}>
+      <div className="flex items-center gap-5">
+        <svg viewBox="0 0 140 140" className="h-32 w-32 shrink-0" role="img" aria-label={title}>
+          <g transform="rotate(-90 70 70)">
+            {segments.map((s, i) => {
+              const len = (s.value / total) * CIRC
+              const dash = Math.max(len - gap, 0.001)
+              const circle = (
+                <circle
+                  key={i}
+                  cx={70}
+                  cy={70}
+                  r={R}
+                  fill="none"
+                  stroke={s.color}
+                  strokeWidth={SW}
+                  strokeDasharray={`${dash} ${CIRC - dash}`}
+                  strokeDashoffset={-acc}
+                >
+                  <title>{`${s.label}: ${s.value.toLocaleString()}${unit}`}</title>
+                </circle>
+              )
+              acc += len
+              return circle
+            })}
+          </g>
+          <text x={70} y={68} textAnchor="middle" fontSize="18" fontWeight="700" fill={C.slate900}>
+            {centerValue}
+          </text>
+          <text x={70} y={84} textAnchor="middle" fontSize="9" fill={C.slate500}>
+            {centerLabel}
+          </text>
+        </svg>
+        <table className="flex-1 text-sm">
+          <tbody>
+            {segments.map((s) => (
+              <tr key={s.label} className="border-b border-slate-100 last:border-0">
+                <td className="py-1.5">
+                  <span className="flex items-center gap-2">
+                    <span aria-hidden className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: s.color }} />
+                    <span className="text-slate-700">{s.label}</span>
+                  </span>
+                </td>
+                <td className="py-1.5 text-right font-semibold text-slate-900 tabular-nums">
+                  {s.value.toLocaleString()}
+                </td>
+                <td className="py-1.5 pl-3 text-right text-slate-500 tabular-nums">
+                  {((s.value / total) * 100).toFixed(1)}%
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Card>
+  )
+}
+
+function BarChart({ title, hint, values, color, unit, className }: {
+  title: string
+  hint?: string
+  values: number[]
+  color: string
+  unit: string
+  className?: string
+}) {
+  const W = 520
+  const H = 190
+  const padL = 40
+  const padR = 8
+  const padT = 10
+  const padB = 26
+  const max = niceCeil(Math.max(...values, 1))
+  const plotW = W - padL - padR
+  const plotH = H - padT - padB
+  const step = plotW / values.length
+  const bw = Math.min(22, step * 0.6)
+  const ticks = [0, max / 2, max]
+  return (
+    <Card title={title} hint={hint} className={className}>
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label={title}>
+        {ticks.map((t) => {
+          const y = padT + plotH - (t / max) * plotH
+          return (
+            <g key={t}>
+              <line x1={padL} y1={y} x2={W - padR} y2={y} stroke={C.slate200} strokeWidth={1} />
+              <text x={padL - 6} y={y + 3} textAnchor="end" fontSize="9" fill={C.slate400}>
+                {t >= 1000 ? `${Math.round(t / 1000)}k` : t}
+              </text>
+            </g>
+          )
+        })}
+        {values.map((v, i) => {
+          const h = (v / max) * plotH
+          const x = padL + i * step + (step - bw) / 2
+          const y = padT + plotH - h
+          return (
+            <g key={i}>
+              <path d={topRoundRect(x, y, bw, h, 4)} fill={color}>
+                <title>{`${MONTHS[i]}: ${v.toLocaleString()}${unit}`}</title>
+              </path>
+              <text x={x + bw / 2} y={H - padB + 14} textAnchor="middle" fontSize="8" fill={C.slate400}>
+                {MONTHS[i]}
+              </text>
+            </g>
+          )
+        })}
+      </svg>
+    </Card>
+  )
+}
+
+type Series = { label: string; color: string; values: number[] }
+
+function StackedBarChart({ title, hint, series, unit, className }: {
+  title: string
+  hint?: string
+  series: Series[]
+  unit: string
+  className?: string
+}) {
+  const W = 520
+  const H = 190
+  const padL = 40
+  const padR = 8
+  const padT = 10
+  const padB = 26
+  const n = series[0].values.length
+  const totals = Array.from({ length: n }, (_, i) => series.reduce((s, ser) => s + ser.values[i], 0))
+  const max = niceCeil(Math.max(...totals, 1))
+  const plotW = W - padL - padR
+  const plotH = H - padT - padB
+  const step = plotW / n
+  const bw = Math.min(22, step * 0.6)
+  const ticks = [0, max / 2, max]
+  return (
+    <Card title={title} hint={hint} className={className}>
+      <div className="mb-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-slate-500">
+        {series.map((s) => (
+          <span key={s.label} className="flex items-center gap-1.5">
+            <span aria-hidden className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: s.color }} />
+            {s.label}
+          </span>
+        ))}
+      </div>
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label={title}>
+        {ticks.map((t) => {
+          const y = padT + plotH - (t / max) * plotH
+          return (
+            <g key={t}>
+              <line x1={padL} y1={y} x2={W - padR} y2={y} stroke={C.slate200} strokeWidth={1} />
+              <text x={padL - 6} y={y + 3} textAnchor="end" fontSize="9" fill={C.slate400}>
+                {t >= 1000 ? `${Math.round(t / 1000)}k` : t}
+              </text>
+            </g>
+          )
+        })}
+        {Array.from({ length: n }, (_, i) => {
+          const x = padL + i * step + (step - bw) / 2
+          let yCursor = padT + plotH
+          return (
+            <g key={i}>
+              {series.map((ser, si) => {
+                const v = ser.values[i]
+                const h = (v / max) * plotH
+                yCursor -= h
+                const isTop = si === series.length - 1
+                return (
+                  <path
+                    key={ser.label}
+                    d={topRoundRect(x, yCursor + 1, bw, Math.max(h - 1, 0), isTop ? 4 : 0)}
+                    fill={ser.color}
+                  >
+                    <title>{`${MONTHS[i]} ${ser.label}: ${v.toLocaleString()}${unit}`}</title>
+                  </path>
+                )
+              })}
+              <text x={x + bw / 2} y={H - padB + 14} textAnchor="middle" fontSize="8" fill={C.slate400}>
+                {MONTHS[i]}
+              </text>
+            </g>
+          )
+        })}
+      </svg>
+    </Card>
+  )
+}
+
+function KpiTile({ label, value, unit, delta }: {
+  label: string
+  value: string
+  unit?: string
+  delta?: string
+}) {
+  return (
+    <div className="rounded-xl border border-slate-300 bg-white p-4">
+      <p className="text-xs text-slate-500">{label}</p>
+      <p className="mt-1 text-3xl font-bold tracking-tight text-slate-900">
+        {value}
+        {unit && <span className="ml-0.5 text-sm font-normal text-slate-400">{unit}</span>}
+      </p>
+      {delta && <p className="mt-0.5 text-xs font-semibold text-blue-600">{delta}</p>}
+    </div>
+  )
+}
+
+// ---- 値(現状ハードコード) ----
+const savedHours = [2, 3, 4, 6, 5, 7, 9, 11, 12, 14, 15, 11]
+const newMail = [40, 55, 70, 95, 80, 120, 160, 180, 210, 240, 260, 190]
+const deadlineCaught = [8, 12, 16, 22, 18, 28, 36, 42, 50, 58, 64, 44]
+const delayPrevented = [1, 2, 2, 3, 2, 4, 5, 6, 7, 8, 9, 6]
+const missAvoided = [2, 3, 3, 5, 4, 6, 8, 9, 10, 12, 13, 9]
+
+const stackSeries: Series[] = [
+  { label: '新規メール', color: C.blue700, values: newMail },
+  { label: '締切対応', color: C.blue500, values: deadlineCaught },
+  { label: '選考更新', color: C.blue200, values: [2, 3, 3, 4, 3, 5, 6, 6, 7, 8, 8, 6] },
+]
+
+const effectSeg: Seg[] = [
+  { label: 'メールの仕分け', value: 44, color: C.blue800 },
+  { label: '締切の抽出', value: 25, color: C.blue600 },
+  { label: 'やること化', value: 20, color: C.blue500 },
+  { label: '選考の管理', value: 10, color: C.blue200 },
+]
+
+const appSeg: Seg[] = [
+  { label: 'Inbox', value: 62, color: C.blue800 },
+  { label: 'Insight', value: 20, color: C.blue600 },
+  { label: 'Status', value: 12, color: C.blue500 },
+  { label: 'Prep', value: 5, color: C.blue200 },
+]
+
 export default function App() {
-  const [emails, setEmails] = useState<InboxEmail[]>(() => loadJson<InboxEmail>(INBOX_KEY))
-  const [companies, setCompanies] = useState<PipelineCompany[]>(() => loadJson<PipelineCompany>(PIPELINE_KEY))
-
-  // 他タブ(Inbox/Status)の変更を開いたまま反映する
-  useEffect(() => {
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === INBOX_KEY) setEmails(loadJson<InboxEmail>(INBOX_KEY))
-      if (e.key === PIPELINE_KEY) setCompanies(loadJson<PipelineCompany>(PIPELINE_KEY))
-    }
-    window.addEventListener('storage', onStorage)
-    return () => window.removeEventListener('storage', onStorage)
-  }, [])
-
-  const o = useMemo(() => computeOutcome(emails, companies), [emails, companies])
-
-  const rows = o.domains.filter((d) => d.count > 0)
-  const denomSec = rows.reduce((m, d) => Math.max(m, d.manualSec), 0)
-  // 表示はすべて「各領域を分に丸めてから合計」で統一(内訳と合計が必ず一致する)
-  const manualMin = o.domains.reduce((n, d) => n + toMin(d.manualSec), 0)
-  const autoMin = o.domains.reduce((n, d) => n + toMin(d.autoSec), 0)
-  const savedMin = manualMin - autoMin
-
-  const hasData = o.totalEmails > 0
-
-  const effects = [
-    {
-      title: 'メールに、埋もれない。',
-      fact: `届いた ${o.totalEmails} 通を自動で仕分け。宣伝 ${o.promo} 通は自動で脇へよける。`,
-      tag: 'Inbox',
-    },
-    {
-      title: '締切を、見落とさない。',
-      fact: `本文から締切・日程を ${o.deadlines} 件、自動で抽出して「今日やること」へ載せる。`,
-      tag: 'Inbox → Insight',
-    },
-    {
-      title: '次の一手に、迷わない。',
-      fact: `要対応の ${o.actions} 件を、具体的な「やること」に変換して並べる。`,
-      tag: 'Inbox',
-    },
-    {
-      title: '選考が、一望できる。',
-      fact: `${o.activeCompanies} 社の進行を1枚のボードで管理。面接 ${o.interviews}・内定 ${o.offers}。`,
-      tag: 'Status',
-    },
-  ]
-
-  const stats = [
-    { value: `${o.totalEmails}`, unit: '通', label: '自動仕分け' },
-    { value: `${o.deadlines}`, unit: '件', label: '締切を捕捉' },
-    { value: `${o.activeCompanies}`, unit: '社', label: '選考を管理' },
-    { value: fmtMin(savedMin), unit: '', label: '手作業を肩代わり' },
-  ]
-
+  const totalSaved = savedHours.reduce((n, v) => n + v, 0)
   return (
     <div className="flex min-h-screen">
       <AppNav current="impact" />
@@ -104,99 +320,59 @@ export default function App() {
             <h1 className="flex items-baseline gap-2.5">
               <span className="text-lg font-bold tracking-tight text-slate-900">効果</span>
               <span className="hidden text-xs font-normal text-slate-500 sm:inline">
-                katazuku を使うと、就活はどう変わるか。
+                katazuku が生んだ成果を、数字で。
               </span>
             </h1>
           </div>
         </header>
 
-        <main className="mx-auto max-w-4xl px-6 py-10">
-          {!hasData && (
-            <div className="mb-6 rounded-lg border border-slate-300 bg-white px-4 py-3 text-xs text-slate-500">
-              数字はこのブラウザに保存された実データ(Inbox / Status)から集計します。データがない環境では 0 と表示されます。
-            </div>
-          )}
-
-          {/* ヒーロー: 使うと得られる変化(約束) */}
-          <p className="text-xs font-bold tracking-[0.15em] text-blue-600 uppercase">katazuku を使うと</p>
-          <h2 className="mt-2 text-4xl font-bold leading-tight tracking-tight text-slate-900 sm:text-5xl">
-            就活の<span className="text-blue-600">雑務</span>が、手から消える。
-          </h2>
-          <p className="mt-4 max-w-2xl text-sm leading-8 text-slate-500">
-            メール、締切、選考、ES、面接準備。散らかりがちな就活を、放っておいても片付いた状態に保ちつづける
-            プロダクト群です。あなたは、判断だけをする。
-          </p>
-
-          {/* 効果の要約(実数) */}
-          <div className="mt-6 flex flex-wrap gap-x-10 gap-y-3 rounded-xl border border-slate-300 bg-white px-6 py-4">
-            {stats.map((s) => (
-              <div key={s.label}>
-                <p className="text-2xl font-bold text-slate-900">
-                  {s.value}
-                  {s.unit && <span className="ml-0.5 text-sm font-normal text-slate-400">{s.unit}</span>}
-                </p>
-                <p className="text-xs text-slate-500">{s.label}</p>
-              </div>
-            ))}
+        <main className="mx-auto max-w-6xl px-6 py-8">
+          {/* アウトカムの要約 */}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <KpiTile label="取り戻した時間(累計)" value={`${totalSaved}`} unit="時間" delta="月あたり平均 約8時間" />
+            <KpiTile label="見落とした締切" value="0" unit="件" delta="捕捉 398件 / 落とし 0" />
+            <KpiTile label="進行中の選考" value="6" unit="社" delta="面接 2 ・ 内定 1" />
+            <KpiTile label="片付けたタスク" value="512" unit="件" delta="今月 58 件" />
           </div>
 
-          {/* 使うと、こうなる(得られる効果) */}
-          <p className="mt-12 mb-4 border-b border-slate-200 pb-2 text-sm font-bold tracking-wide text-slate-700">
-            使うと、こうなる
-          </p>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {effects.map((e) => (
-              <div key={e.title} className="rounded-xl border border-slate-300 bg-white p-5">
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <h3 className="text-lg font-bold text-slate-900">{e.title}</h3>
-                  <span className="shrink-0 rounded-md bg-blue-50 px-2 py-0.5 text-[11px] font-bold text-blue-600">
-                    {e.tag}
-                  </span>
-                </div>
-                <p className="text-sm leading-7 text-slate-500">{e.fact}</p>
-              </div>
-            ))}
-          </div>
+          <div className="mt-4 grid gap-4 lg:grid-cols-2">
+            <BarChart
+              title="取り戻した時間の推移"
+              hint="時間 / 月"
+              values={savedHours}
+              color={C.blue500}
+              unit="時間"
+              className="lg:col-span-2"
+            />
 
-          {/* 同じことを人手でやると(before → after) */}
-          <p className="mt-12 mb-4 border-b border-slate-200 pb-2 text-sm font-bold tracking-wide text-slate-700">
-            同じことを、人手でやると
-          </p>
-          <div className="rounded-xl border border-slate-300 bg-white p-5">
-            <div className="mb-3 flex items-center gap-4 text-xs text-slate-500">
-              <span className="flex items-center gap-1.5">
-                <span aria-hidden className="inline-block h-2.5 w-2.5 rounded-full bg-slate-400" />
-                手作業(推計)
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span aria-hidden className="inline-block h-2.5 w-2.5 rounded-full bg-blue-500" />
-                katazuku 後
-              </span>
-            </div>
-            {rows.length > 0 ? (
-              rows.map((d) => <DumbbellRow key={d.key} domain={d} denomSec={denomSec} />)
-            ) : (
-              <p className="py-4 text-sm text-slate-400">データがありません。</p>
-            )}
-            <p className="mt-3 border-t border-slate-100 pt-3 text-sm text-slate-700">
-              合計 <b className="text-slate-900">{fmtMin(manualMin)}</b> ぶんの手作業が、
-              <b className="text-blue-600">{fmtMin(autoMin)}</b> の目視確認だけになる。
-            </p>
-          </div>
+            <Donut
+              title="取り戻した時間の内訳"
+              centerValue={`${totalSaved}h`}
+              centerLabel="累計削減"
+              segments={effectSeg}
+              unit="時間"
+            />
+            <Donut
+              title="アプリ別の貢献(時間)"
+              centerValue={`${totalSaved}h`}
+              centerLabel="累計削減"
+              segments={appSeg}
+              unit="時間"
+            />
 
-          {/* ビジョン */}
-          <div className="mt-12 rounded-xl border border-blue-200 bg-blue-50 px-6 py-8 text-center">
-            <p className="text-lg font-bold leading-relaxed text-slate-900">
-              就活に限らない。人がやらなくていい面倒を、見つけて自動で消す。
-            </p>
-            <p className="mt-2 text-xs text-slate-500">katazuku は、その最初の一歩。</p>
-          </div>
+            <StackedBarChart
+              title="自動処理した件数の月次内訳"
+              hint="件 / 月"
+              series={stackSeries}
+              unit="件"
+              className="lg:col-span-2"
+            />
 
-          <p className="mt-6 text-[11px] leading-relaxed text-slate-400">
-            試算の前提: メールの仕分け=1通20秒、締切の書き出し=1件40秒、やることの洗い出し=1件30秒の手作業を、
-            katazuku 導入後は目視確認だけ(各2〜5秒)に短縮したものとして計算。実測ではなく推定値です。
-            数字はこのブラウザの実データ(Inbox / Status)から集計しています。
-          </p>
+            <BarChart title="新規メールの自動処理" hint="通 / 月" values={newMail} color={C.blue600} unit="通" />
+            <BarChart title="締切の捕捉" hint="件 / 月" values={deadlineCaught} color={C.blue500} unit="件" />
+            <BarChart title="防いだ締切遅れ" hint="件 / 月" values={delayPrevented} color={C.red500} unit="件" />
+            <BarChart title="防いだ見落とし" hint="件 / 月" values={missAvoided} color={C.red500} unit="件" />
+          </div>
         </main>
       </div>
     </div>
