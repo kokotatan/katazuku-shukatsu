@@ -29,6 +29,10 @@ service-account.json
 # 自動同期の実行ログ
 logs/
 
+# 正本DB(SQLite。選考・企業の個人データ)とミラー出力
+data/
+mirror-out.json
+
 # ブラウザ操作MCP(Playwright)のスクリーンショット等(顔写真・ES内容など個人情報が写る)
 .playwright-mcp/
 mitsui-*.png
