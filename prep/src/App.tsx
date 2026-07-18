@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Button, Input, StatusLabel, Textarea } from 'smarthr-ui'
+import { Button, FaUsersIcon, Input, StatusLabel, Textarea } from 'smarthr-ui'
 import { KIND_META, type PrepEntry, type PrepKind } from './types'
 import { companySummary, focusDeck, retrospectives } from './lib/select'
 import { sameCompany } from './lib/names'
 import { AppNav } from './components/AppNav'
+import { PeopleView } from './components/PeopleView'
 
 const STORAGE_KEY = 'katazuku-prep/entries'
 const PIPELINE_KEY = 'katazuku-pipeline/companies'
@@ -30,7 +31,11 @@ function pipelineNames(): string[] {
   return []
 }
 
-type View = { mode: 'home' } | { mode: 'company'; company: string } | { mode: 'focus'; company: string }
+type View =
+  | { mode: 'home' }
+  | { mode: 'company'; company: string }
+  | { mode: 'focus'; company: string }
+  | { mode: 'people' }
 
 export default function App() {
   const [entries, setEntries] = useState<PrepEntry[]>(load)
@@ -67,6 +72,16 @@ export default function App() {
             </span>
           </h1>
           <div className="ml-auto flex items-center gap-2">
+            {view.mode !== 'people' && (
+              <Button
+                size="S"
+                variant="secondary"
+                prefix={<FaUsersIcon />}
+                onClick={() => setView({ mode: 'people' })}
+              >
+                人
+              </Button>
+            )}
             {view.mode !== 'home' && (
               <Button size="S" variant="secondary" onClick={() => setView({ mode: 'home' })}>
                 一覧へ
@@ -96,6 +111,7 @@ export default function App() {
           onExit={() => setView({ mode: 'company', company: view.company })}
         />
       )}
+      {view.mode === 'people' && <PeopleView />}
       </div>
     </div>
   )
