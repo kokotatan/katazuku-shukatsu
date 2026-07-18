@@ -1,14 +1,18 @@
 import { useEffect, useRef, useState } from 'react'
-import { Button } from 'smarthr-ui'
+import { Button, FaPlusIcon } from 'smarthr-ui'
 import type { Person } from './types'
-import { loadPeople, newPersonId, savePeople } from './lib/people'
+import { loadPeople, mergePeople, newPersonId, savePeople } from './lib/people'
 import { AppNav } from './components/AppNav'
 import { PeopleView } from './components/PeopleView'
+import { PersonDialog, type PersonInput } from './components/PersonDialog'
 
-type FormValue = Omit<Person, 'id' | 'updatedAt'>
+/** モーダルの状態: 閉/新規追加/既存編集 */
+type DialogState = { mode: 'closed' } | { mode: 'add' } | { mode: 'edit'; person: Person }
 
 export default function App() {
+  // 初期値は localStorage から読む。以降の変更は useEffect で必ず保存する
   const [people, setPeople] = useState<Person[]>(loadPeople)
+  const [dialog, setDialog] = useState<DialogState>({ mode: 'closed' })
   const [toast, setToast] = useState<string | null>(null)
   const fileInput = useRef<HTMLInputElement>(null)
 
@@ -22,13 +26,23 @@ export default function App() {
     return () => clearTimeout(t)
   }, [toast])
 
-  const add = (v: FormValue) =>
-    setPeople((prev) => [{ ...v, id: newPersonId(), updatedAt: new Date().toISOString() }, ...prev])
-  const update = (id: string, v: FormValue) =>
+  const add = (v: PersonInput) => {
+    setPeople((prev) => [
+      { ...v, id: newPersonId(), updatedAt: new Date().toISOString() },
+      ...prev,
+    ])
+    setDialog({ mode: 'closed' })
+  }
+  const update = (id: string, v: PersonInput) => {
     setPeople((prev) =>
       prev.map((p) => (p.id === id ? { ...p, ...v, updatedAt: new Date().toISOString() } : p)),
     )
-  const remove = (id: string) => setPeople((prev) => prev.filter((p) => p.id !== id))
+    setDialog({ mode: 'closed' })
+  }
+  const remove = (id: string) => {
+    setPeople((prev) => prev.filter((p) => p.id !== id))
+    setDialog({ mode: 'closed' })
+  }
 
   const exportJson = () => {
     const blob = new Blob([JSON.stringify(people, null, 2)], { type: 'application/json' })
@@ -41,12 +55,11 @@ export default function App() {
 
   const importJson = async (file: File) => {
     try {
-      const data = JSON.parse(await file.text()) as Person[]
+      const data = JSON.parse(await file.text())
       if (!Array.isArray(data)) throw new Error('配列ではありません')
-      const known = new Set(people.map((p) => p.id))
-      const fresh = data.filter((p) => p.id && !known.has(p.id))
-      setPeople((prev) => [...fresh, ...prev])
-      setToast(`${fresh.length}件を取り込みました`)
+      const { merged, added } = mergePeople(people, data as Partial<Person>[])
+      setPeople(merged)
+      setToast(added > 0 ? `${added}件を取り込みました` : '新しく追加できるものはありませんでした')
     } catch (err) {
       setToast(`インポート失敗: ${err instanceof Error ? err.message : String(err)}`)
     }
@@ -71,6 +84,14 @@ export default function App() {
               <Button size="S" variant="secondary" onClick={exportJson}>
                 エクスポート
               </Button>
+              <Button
+                size="S"
+                variant="primary"
+                prefix={<FaPlusIcon />}
+                onClick={() => setDialog({ mode: 'add' })}
+              >
+                登録
+              </Button>
               <input
                 ref={fileInput}
                 type="file"
@@ -86,7 +107,22 @@ export default function App() {
           </div>
         </header>
 
-        <PeopleView people={people} onAdd={add} onUpdate={update} onRemove={remove} />
+        <PeopleView
+          people={people}
+          onSelectPerson={(person) => setDialog({ mode: 'edit', person })}
+        />
+
+        {dialog.mode !== 'closed' && (
+          <PersonDialog
+            initial={dialog.mode === 'edit' ? dialog.person : null}
+            people={people}
+            onSave={(v) =>
+              dialog.mode === 'edit' ? update(dialog.person.id, v) : add(v)
+            }
+            onDelete={dialog.mode === 'edit' ? () => remove(dialog.person.id) : undefined}
+            onClose={() => setDialog({ mode: 'closed' })}
+          />
+        )}
 
         {toast && (
           <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-lg bg-slate-800 px-5 py-2.5 text-sm font-medium text-white shadow-lg">

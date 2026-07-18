@@ -4,6 +4,7 @@ export interface Person {
   name: string
   company: string
   role: string // 部署・肩書き
+  category: string // 種別(面接官/学生/社員/OB・OG/その他)。未設定は「面接官」扱い
   metAt: string // 出会った場面(例「7/16 二次面接」)
   howMet: string // どこでどう会ったか一言
   notes: string // 話した内容・人柄・刺さった言葉(=前回この人と話したこと)
