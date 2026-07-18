@@ -37,6 +37,15 @@ npm run build                              # board(管理画面)ビルド + sync
 3. **board/の実機確認**: katazuku.kotalabo.com にデプロイ後、スマホでOAuth→表示確認
 4. **次の構想**: 企業研究・面接対策パイプライン(deep research・IR・ブログ/動画・OBOG・業務/顧客/技術理解を
    企業ごとのdossierに集約し、DBと面接準備に接続する)。着手前に本人と設計を確認する
+5. **【DB完成後・本人事前承認済み(2026-07-18)・指示不要で実施】人脈/基本情報/顔をDBへ載せ、面接から自動更新**:
+   - people(面接官)・個人マスタの基本情報・面接官の顔写真を DB に投入し、`board/` から見えるようにする(spec07/08/10)。
+   - 面接録音→議事録(interview-digest)から、面接官→people と、自己PR系(strengths/weaknesses/careerAxis/
+     desiredRole/desiredIndustry)を **DBへ自動更新**。氏名・住所等の確定情報は上書きしない(候補追加のみ)。
+   - **シード(移行の種)**: 面接官11名・基本情報一式・顔3枚(川島=JAFCO/関根=LayerX/富士元=リンク・アイ)は
+     `Downloads/katazuku-people-import.json`・`katazuku-profile-basic.json` と、`logs/interviews/`・
+     `chrome-prompts/submit.local.md` から再生成可能。証明写真は Bash `cp` で `katazuku-files` から取得可。
+   - 顔取得ロジック: 公開情報(公式チームページ/Wantedly本人)から `curl`+`ffmpeg`で256px化→本人確認(名前+会社+経歴一致)。
+   - 今後の面接で顔を自動取得したいなら、会議ウィンドウのスクショsamplerを `record-audio` 系に追加。
 
 ## 禁止・注意
 
