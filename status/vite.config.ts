@@ -2,8 +2,8 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
-// katazuku.kotalabo.com/board 配下で配信する(アプリ群の一員=管理画面)
 export default defineConfig({
-  base: '/board/',
+  // katazuku.kotalab.com/status 配下で配信する
+  base: '/status/',
   plugins: [react(), tailwindcss()],
 })

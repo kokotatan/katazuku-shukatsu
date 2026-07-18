@@ -1,0 +1,6 @@
+node_modules
+dist
+*.local
+
+# 実メールデータ(個人情報)はコミットしない
+gmail-import-*.json

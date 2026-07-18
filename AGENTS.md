@@ -30,9 +30,11 @@ npm run build                              # board(管理画面)ビルド + sync
 
 ## 進行中のタスク(2026-07-18時点)
 
-1. **旧アプリ削除(承認済み・未完)**: inbox/ status/ insight/ profile/ people/ prep/ impact/ landing/ api/ を
-   git rm し、README.md と CLAUDE.md を新構成に書き直す。個人データJSON(inbox/gmail-import-*.json,
-   status/sheet-import-*.json)は先に logs/archive-imports/ へ退避。タグ apps-archive-20260718 に全履歴あり
+1. **【方針確定 2026-07-18 18:48 本人】アプリ群は残す(復活済み)**: シートは見えにくいので人間用UIはアプリ群。
+   廃止は「各アプリがlocalStorageを正として持つこと」だけ。次の改修=各アプリを「ミラーのシートを読む窓」化
+   (board/src/lib/data.ts の読み取り方式を共通ライブラリ化して各アプリへ)。
+   **見た目はSmartHR Design Systemのまま維持**(本人が気に入っている。刷新はしない。細部改善のみ可)。
+   api/ のみ廃止のまま(履歴はタグ apps-archive-20260718)
 2. **daily-syncの実走確認**: scripts/daily-sync-prompt.md の新フロー(抽出→db-apply→db-mirror→MCP書込)を初回実行で確認
 3. **board/の実機確認**: katazuku.kotalabo.com にデプロイ後、スマホでOAuth→表示確認
 4. **次の構想**: 企業研究・面接対策パイプライン(deep research・IR・ブログ/動画・OBOG・業務/顧客/技術理解を

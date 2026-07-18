@@ -7,10 +7,14 @@
 ## アーキテクチャ(2026-07-18 DB中心化。詳細は docs/specs/08-data.md と AGENTS.md)
 
 ```
-data/katazuku.db(正本・SQLite・gitignore) ──→ Googleシート(一方向ミラー。スマホ/PCでの俯瞰用)
-        ↑                                 ──→ board/(管理画面。ミラーのシートを読むだけのSPA)
+data/katazuku.db(正本・SQLite・gitignore) ──→ Googleシート(一方向ミラー=アプリへの配管+スマホ俯瞰)
+        ↑                                 ──→ アプリ群(人間用UI。ミラーを読む窓。localStorageを正にしない)
   agent(唯一の書き手): メール→ sync/scripts/db-apply.ts / DB→ db-mirror.ts → MCPでシートへ書込
 ```
+
+**方針確定(2026-07-18 本人)**: アプリ群は残す(シートは見えにくいので人間用UIはアプリ)。
+廃止されたのは「各アプリが個別にlocalStorageを正として持つこと」だけ。
+各アプリは順次「ミラーのシートを読む窓」に改修する(board/src/lib/data.ts の方式を共通化)。
 
 - **書き手はagentのみ**。人はシートを直接編集しない(次のミラーで消える)。修正依頼は会話で受けてDBに書く
 - ステータス更新規則は `sync/src/db.ts` の `transition()` に集約。終了系(不合格/辞退)は根拠があれば確定・
@@ -21,7 +25,8 @@ data/katazuku.db(正本・SQLite・gitignore) ──→ Googleシート(一方�
 ## 構成
 
 ```
-board/            管理画面SPA(katazuku.kotalabo.comのトップ。読み取り専用・Vite+React19+TS+Tailwind v4+smarthr-ui)
+landing/          トップページ / inbox/ status/ insight/ profile/ people/ prep/ impact/  アプリ群(人間用UI)
+board/            管理画面SPA(/board/。ミラーを読む窓の参照実装。読み取り専用)
 sync/             正本DBと同期エンジン(node:sqlite・依存ゼロ)。db.ts/db-apply/db-mirror/db-import + check-*
 scripts/          自動運転ランナー(mail-watch / daily-sync / interview-digest / record-audio / log-activity 等)
 chrome-prompts/   Claude in Chrome 用プロンプト台帳(submit.local.md が個人データの正)
@@ -29,8 +34,8 @@ docs/             INFRA.md(既存リソース台帳・必読) / specs/ / PROGRES
 data/ logs/       正本DBと実行ログ・活動ログ(gitignore。個人データ)
 ```
 
-旧アプリ群(inbox/status/insight/profile/people/prep/impact/landing/api)は2026-07-18に廃止方針決定。
-全履歴はタグ `apps-archive-20260718`。
+アプリはVite+React19+TS+Tailwind v4+smarthr-ui。**localStorageを正本にしない**(DB中心化以前の
+一時的な姿。順次ミラー読みへ改修)。api/ は廃止(タグ apps-archive-20260718 に履歴)。
 
 ## コマンド
 

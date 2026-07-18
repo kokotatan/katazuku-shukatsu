@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.2.0",
   "scripts": {
-    "build": "npm --prefix board install && npm --prefix board run build && npm --prefix sync install && npm --prefix sync run check && npm --prefix sync run check:db",
-    "check": "npm --prefix sync run check && npm --prefix sync run check:db"
+    "build": "npm --prefix inbox install && npm --prefix inbox run build && npm --prefix status install && npm --prefix status run build && npm --prefix insight install && npm --prefix insight run build && npm --prefix profile install && npm --prefix profile run build && npm --prefix people install && npm --prefix people run build && npm --prefix prep install && npm --prefix prep run build && npm --prefix impact install && npm --prefix impact run build && npm --prefix board install && npm --prefix board run build && node scripts/assemble.mjs && npm run check",
+    "check": "npm --prefix sync install && npm --prefix sync run check && npm --prefix sync run check:db"
   }
 }
