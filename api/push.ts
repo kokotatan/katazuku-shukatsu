@@ -1,7 +1,7 @@
 /**
  * スナップショットの受け口(agentのPCからのPUTのみ)。
  * 認証: Authorization: Bearer <KATAZUKU_WRITE_SECRET> (Vercel環境変数)。
- * 保存: Vercel Blob の snapshot.json (上書き)。
+ * 保存: Vercel Blob(Privateストア) の snapshot.json (上書き)。
  */
 import { put } from '@vercel/blob'
 
@@ -22,11 +22,12 @@ export default async function handler(req: { method?: string; headers: Record<st
     return
   }
   const body = typeof req.body === 'string' ? req.body : JSON.stringify(req.body ?? {})
+  // Privateストア: URL直アクセス不可。読み出しは必ず /api/data (合言葉) 経由
   const blob = await put('snapshot.json', body, {
-    access: 'public', // URLは推測不能ハッシュ付きだが、参照は必ず /api/data (合言葉つき) 経由にする
+    access: 'private',
     contentType: 'application/json',
     addRandomSuffix: false,
     allowOverwrite: true,
-  })
-  res.status(200).json({ ok: true, url: blob.url, bytes: body.length })
+  } as Parameters<typeof put>[2])
+  res.status(200).json({ ok: true, pathname: blob.pathname, bytes: body.length })
 }

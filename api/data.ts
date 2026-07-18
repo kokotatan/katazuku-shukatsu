@@ -1,9 +1,8 @@
 /**
  * アプリ向けの読み取り口。合言葉(KATAZUKU_READ_SECRET)が合えばスナップショットを返す。
  * サインイン不要 — 初回に合言葉を1回入れるだけ(アプリ側がlocalStorageに記憶)。
+ * BlobはPrivateストアなので、SDK経由でのみ読める(URL直アクセス不可)。
  */
-import { list } from '@vercel/blob'
-
 export const config = { maxDuration: 10 }
 
 export default async function handler(req: { method?: string; query?: Record<string, string | string[]>; url?: string }, res: {
@@ -18,12 +17,30 @@ export default async function handler(req: { method?: string; query?: Record<str
     res.status(401).json({ error: 'unauthorized' })
     return
   }
-  const blobs = await list({ prefix: 'snapshot.json', limit: 1 })
-  const target = blobs.blobs[0]
-  if (!target) {
+
+  // SDKのバージョン差(get / head+downloadUrl)に両対応で読む
+  const blobMod = (await import('@vercel/blob')) as unknown as {
+    get?: (p: string) => Promise<{ blob: { text: () => Promise<string> } } | null>
+    head?: (p: string) => Promise<{ url?: string; downloadUrl?: string } | null>
+  }
+  let text: string | null = null
+  try {
+    if (blobMod.get) {
+      const r = await blobMod.get('snapshot.json')
+      if (r?.blob) text = await r.blob.text()
+    }
+    if (text === null && blobMod.head) {
+      const h = await blobMod.head('snapshot.json')
+      const u = h?.downloadUrl ?? h?.url
+      if (u) text = await (await fetch(u)).text()
+    }
+  } catch {
+    text = null
+  }
+  if (text === null) {
     res.status(404).json({ error: 'snapshot not found (まだ一度もプッシュされていません)' })
     return
   }
-  const data = await fetch(target.url)
-  res.status(200).send(await data.text())
+  res.setHeader('Content-Type', 'application/json')
+  res.status(200).send(text)
 }
