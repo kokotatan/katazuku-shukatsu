@@ -34,6 +34,12 @@
 - 本番: **katazuku.kotalabo.com**(Vercel アカウント=kokotatan + Cloudflare CNAME)
 - Vercel Functions: `api/generate-reply`(※ Vercelに ANTHROPIC_API_KEY 未設定=AI返信はテンプレfallback)
 
+## データDB(spec08 / DB中心・**未プロビジョニング**)
+- 正データDBを新設予定(spec08)。**まだ作っていない**。作るときは **kokotatan の Vercel Marketplace(Neon Postgres 想定)** に1つだけ。重複作成しないこと。
+- スキーマは `db/schema.sql`(company/selection/interview_note/person/es_snippet)。DB作成後 `psql "$DATABASE_URL" -f db/schema.sql` で適用。
+- 接続情報は Vercel の env(`DATABASE_URL` 等)+ ローカルは gitignore 済み `.env`。設定ファイルへ平文直書き禁止。
+- 認証読取API(`api/`)・初期移行(Sheet→DB)・DB→Sheetミラーは、DB作成後に実装+実地検証する。
+
 ## クラウドルーチン(claude.ai/code/routines・リポジトリ外)
 - 見張りルーチン(cron `7 0,12 * * *` JST 09:07/21:07、Haiku、Gmailラベル `katazuku-notified` で重複防止)
 
