@@ -70,6 +70,31 @@ export function openDb(path: string): DatabaseSync {
       updated_at TEXT NOT NULL,
       updated_by TEXT NOT NULL DEFAULT 'agent'
     );
+    -- 名寄せの学習台帳: 別名(正規化キー) -> 正式名称の企業。本人確認を経てここに増えていく
+    CREATE TABLE IF NOT EXISTS company_alias (
+      alias_norm TEXT PRIMARY KEY,
+      alias TEXT NOT NULL,
+      company_id INTEGER NOT NULL REFERENCES company(id),
+      created_at TEXT NOT NULL
+    );
+    -- 名寄せが怪しかった入力の待ち行列。本人に確認してから alias 登録 or 新企業として解決する
+    CREATE TABLE IF NOT EXISTS pending_review (
+      id INTEGER PRIMARY KEY,
+      name TEXT NOT NULL,
+      context TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL,
+      resolved INTEGER NOT NULL DEFAULT 0
+    );
+    -- イベント台帳(本人方針 2026-07-18「イベント起点」): 状態が変わる出来事を必ず記録し、
+    -- selection.status はその結果のキャッシュとして扱う。「なぜ今この状態か」を後から追える
+    CREATE TABLE IF NOT EXISTS event (
+      id INTEGER PRIMARY KEY,
+      selection_id INTEGER NOT NULL REFERENCES selection(id),
+      at TEXT NOT NULL,
+      kind TEXT NOT NULL,
+      summary TEXT NOT NULL,
+      source TEXT NOT NULL DEFAULT ''
+    );
   `)
   return db
 }
@@ -149,12 +174,84 @@ export function transition(current: string, stage: Stage): string | null {
   return rank(cur) < rank(want) ? want : null
 }
 
+// ---- 名寄せ(正式名称ベース + 学習) ----
+
+export type Resolution =
+  | { kind: 'hit'; companyId: number }
+  | { kind: 'suspicious'; suggestId: number; suggestName: string }
+  | { kind: 'new' }
+
+/**
+ * 企業名の解決(本人方針 2026-07-18「基本は正式名称。怪しいものは確認して学習」):
+ * 1. 正式名称と正規化一致(株式会社・全半角・カッコの揺れは吸収) → 確定
+ * 2. 学習済みエイリアス → 確定
+ * 3. 部分一致で似た企業がある → 「怪しい」。勝手にマージせず suspicious を返す(呼び手が要確認に積む)
+ * 4. どれにも当たらない → 新企業
+ */
+export function resolveCompany(db: DatabaseSync, name: string): Resolution {
+  const n = normalize(name)
+  const all = db.prepare('SELECT id, name FROM company').all() as { id: number; name: string }[]
+  const exact = all.find((r) => normalize(r.name) === n)
+  if (exact) return { kind: 'hit', companyId: exact.id }
+  const alias = db.prepare('SELECT company_id FROM company_alias WHERE alias_norm = ?').get(n) as
+    | { company_id: number }
+    | undefined
+  if (alias) return { kind: 'hit', companyId: alias.company_id }
+  const fuzzy = all.find((r) => sameCompany(r.name, name))
+  if (fuzzy) return { kind: 'suspicious', suggestId: fuzzy.id, suggestName: fuzzy.name }
+  return { kind: 'new' }
+}
+
+/** 本人確認済みの別名を学習する。canonical は既存の正式名称(正規化一致)であること */
+export function addAlias(db: DatabaseSync, alias: string, canonical: string): number {
+  const r = resolveCompany(db, canonical)
+  if (r.kind !== 'hit') throw new Error(`正式名称が見つかりません: ${canonical}`)
+  db.prepare('INSERT OR REPLACE INTO company_alias (alias_norm, alias, company_id, created_at) VALUES (?, ?, ?, ?)')
+    .run(normalize(alias), alias, r.companyId, new Date().toISOString())
+  db.prepare('UPDATE pending_review SET resolved = 1 WHERE name = ?').run(alias)
+  return r.companyId
+}
+
+export function addPending(db: DatabaseSync, name: string, context: string): void {
+  const dup = db.prepare('SELECT id FROM pending_review WHERE name = ? AND resolved = 0').get(name)
+  if (!dup) db.prepare('INSERT INTO pending_review (name, context, created_at) VALUES (?, ?, ?)').run(name, context, new Date().toISOString())
+}
+
+export function listPending(db: DatabaseSync): { name: string; context: string; created_at: string }[] {
+  return db.prepare('SELECT name, context, created_at FROM pending_review WHERE resolved = 0 ORDER BY id').all() as {
+    name: string
+    context: string
+    created_at: string
+  }[]
+}
+
+// ---- イベント(状態変化の一次記録) ----
+
+export function addEvent(db: DatabaseSync, selectionId: number, kind: string, summary: string, source = '', at?: string): void {
+  db.prepare('INSERT INTO event (selection_id, at, kind, summary, source) VALUES (?, ?, ?, ?, ?)')
+    .run(selectionId, at ?? new Date().toISOString(), kind, summary, source)
+}
+
+export interface EventRow {
+  selection_id: number
+  at: string
+  kind: string
+  summary: string
+  source: string
+}
+
+export function listEvents(db: DatabaseSync, selectionId?: number): EventRow[] {
+  const sql = 'SELECT selection_id, at, kind, summary, source FROM event' + (selectionId ? ' WHERE selection_id = ?' : '') + ' ORDER BY id'
+  return db.prepare(sql).all(...(selectionId ? [selectionId] : [])) as unknown as EventRow[]
+}
+
 // ---- 読み書きヘルパー ----
 
 export function upsertCompany(db: DatabaseSync, info: Partial<CompanyInfo> & { name: string }): number {
   const now = new Date().toISOString()
-  const all = db.prepare('SELECT id, name FROM company').all() as { id: number; name: string }[]
-  const hit = all.find((r) => sameCompany(r.name, info.name))
+  // 自動マージは正規化一致とエイリアスのみ(部分一致の推測マージはしない。怪しいものは呼び手が確認に回す)
+  const reso = resolveCompany(db, info.name)
+  const hit = reso.kind === 'hit' ? { id: reso.companyId } : undefined
   if (hit) {
     // 空欄だけ補完(会社情報は安定情報。名寄せ済みの別表記で上書きしない)
     const cur = db.prepare('SELECT * FROM company WHERE id = ?').get(hit.id) as Record<string, unknown>

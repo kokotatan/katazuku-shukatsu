@@ -19,6 +19,8 @@ DB→シートの一方向ミラー。書き手はagentのみ。サービスア�
 4. `cd sync; npx tsx scripts/db-apply.ts sheet-import-loop.json` で正本DBへ反映する。
    - 書き込み規則(終了系は根拠があれば確定・終了からの復活はしない・手書きの詳しいステータスを粗い進行中で潰さない)はスクリプト側で保証されている。
    - 「保留」と報告された企業(複数トラックで特定不能)は、メール本文からどのトラックか判断できるなら position を付けて再実行し、判断できなければサマリで報告する。
+   - 「名寄せ要確認」と報告された企業は、DBには書かれていない。**サマリの冒頭で本人に確認**する
+     (同じ会社なら `npx tsx scripts/db-alias.ts add <別名> <正式名称>`、別会社なら `db-alias.ts new <名前>` で学習・解決する。学習後は自動で名寄せされる)。
    - 差分が16社以上でブレーキが掛かったら、内容が妥当なときのみ `--force` を付けて再実行する。
 5. `npx tsx scripts/db-mirror.ts` でミラー値を生成し、`mirror-out.json` を Read して、各 writes[] を
    mcp__google-workspace__modify_sheet_values で書き込む(range_name は `'<tab>'!<range>`、values はそのまま渡す)。

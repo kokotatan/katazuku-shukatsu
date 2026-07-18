@@ -3,7 +3,7 @@
  * インメモリSQLiteで実行。実行: cd sync && npx tsx scripts/check-db.ts
  */
 import { DatabaseSync } from 'node:sqlite'
-import { openDb, upsertCompany, insertSelection, listSelections, listCompanies, transition, sameCompany } from '../src/db'
+import { openDb, upsertCompany, insertSelection, listSelections, listCompanies, listEvents, transition, sameCompany, resolveCompany, addAlias, listPending } from '../src/db'
 import { applyDiff } from './db-apply'
 import { renderMirror } from './db-mirror'
 
@@ -73,6 +73,25 @@ check('apply: position指定ありは該当トラックだけ更新', pkshaAlg.n
 check('apply: 手書きステータスは維持(選考中で潰さない)', pkshaAlg.status === '書類選考中')
 check('apply: 新規企業はトラックごと追加される', fresh !== undefined && fresh.status === '出願済' && fresh.nextDate === '2026-07-25')
 check('apply: 結果集計(更新2/追加1/保留1)', res.updated.length === 2 && res.added.length === 1 && res.skipped.length === 1)
+
+// --- 名寄せの学習(2026-07-18本人方針: 正式名称ベース+怪しければ確認→学習) ---
+const gifId = upsertCompany(db, { name: 'ギフティ' })
+check('resolve: 正規化一致は確定', resolveCompany(db, 'ギフティ').kind === 'hit')
+check('resolve: 部分一致どまりは「怪しい」(自動マージしない)', resolveCompany(db, 'ギフティ（Giftee）').kind === 'suspicious')
+const resPend = applyDiff(db, [{ name: 'ギフティ（Giftee）', stage: 'entried' }])
+check('apply: 怪しい名寄せはDBに書かず要確認に積む', resPend.pending.length === 1 && listPending(db).some((p) => p.name === 'ギフティ（Giftee）'))
+check('apply: 要確認のときselectionは増えない', listSelections(db).every((s) => s.company !== 'ギフティ（Giftee）'))
+addAlias(db, 'ギフティ（Giftee）', 'ギフティ')
+check('alias学習後は確定になる', resolveCompany(db, 'ギフティ（Giftee）').kind === 'hit')
+check('alias学習で要確認が解決済みになる', !listPending(db).some((p) => p.name === 'ギフティ（Giftee）'))
+const resAfter = applyDiff(db, [{ name: 'ギフティ（Giftee）', stage: 'entried' }])
+check('学習後のapplyは正式名称の企業に入る', resAfter.added.length === 1 && upsertCompany(db, { name: 'ギフティ' }) === gifId)
+
+// --- イベント起点(2026-07-18本人方針: 状態変化は必ずイベントとして残る) ---
+const yashimaEvents = listEvents(db).filter((e) => e.summary.includes('辞退'))
+check('event: 八洲の合格→辞退がイベントとして記録されている', yashimaEvents.some((e) => e.kind === '状態変化' && e.summary === '合格 → 辞退'))
+check('event: 新規登録もイベントになる', listEvents(db).some((e) => e.kind === '新規'))
+check('event: 予定更新もイベントになる', listEvents(db).some((e) => e.kind === '予定更新' && e.summary.includes('面接日程を回答')))
 
 // codex反例: 既存1トラックの企業に「別ポジション」の情報が来たら、既存を書き換えず新トラックとして追加する
 const sansanId = upsertCompany(db, { name: 'Sansan' })
