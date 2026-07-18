@@ -14,15 +14,16 @@ $rep = (New-ScheduledTaskTrigger -Once -At '07:15' `
   -RepetitionDuration (New-TimeSpan -Hours 15)).Repetition
 $trigger.Repetition = $rep
 
-# PCが07:15に寝ていた日でも、その日最初のログオンで1回走らせる(2分遅延)
-$logonTrigger = New-ScheduledTaskTrigger -AtLogOn
-$logonTrigger.Delay = 'PT2M'
+# 注: 以前は AtLogOn トリガーで「07:15に寝ていた日は最初のログオンで1回走らせる」を実現していたが、
+# AtLogOn トリガーの登録は管理者権限を要求する(0x80070005)。同じ catch-up 挙動は下の
+# -StartWhenAvailable が担う(逃した時刻トリガーをPC復帰後に自動実行)ため、AtLogOn は削除した。
+# これで非管理者PowerShellのまま登録できる。
 
 $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -WakeToRun `
   -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Minutes 20)
 
 Register-ScheduledTask -TaskName 'katazuku-mail-watch' `
-  -Action $action -Trigger @($trigger, $logonTrigger) -Settings $settings `
+  -Action $action -Trigger $trigger -Settings $settings `
   -Description 'katazuku 自律メール対応: 未読見張り→緊急は返信下書き+カレンダー登録+トースト通知(ログは logs/mail-watch-*.log)' `
   -Force | Out-Null
 
