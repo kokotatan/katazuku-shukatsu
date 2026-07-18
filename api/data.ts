@@ -44,8 +44,15 @@ export default async function handler(req: { method?: string; query?: Record<str
         stream?: () => ReadableStream
         body?: ReadableStream
         arrayBuffer?: () => Promise<ArrayBuffer>
+        downloadUrl?: string
       } | null
       if (!b) return null
+      if (b.downloadUrl) {
+        // Privateストアのget()は署名付きdownloadUrl入りのメタデータを返す(実測 2026-07-18)
+        const resp = await fetch(b.downloadUrl)
+        if (!resp.ok) throw new Error(`downloadUrl fetch ${resp.status}`)
+        return await resp.text()
+      }
       if (typeof b.text === 'function') return await b.text()
       if (typeof b.stream === 'function') return await new Response(b.stream()).text()
       if (b.body) return await new Response(b.body).text()
