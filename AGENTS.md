@@ -12,6 +12,9 @@ data/katazuku.db(正本・SQLite/node:sqlite・gitignore) ──→ Googleシー
   agent(唯一の書き手): メール→ sync/scripts/db-apply.ts / DB→ db-mirror.ts → MCPでシートへ
 ```
 
+- **DBへの入力は6本(2026-07-18本人定義)**: ①メール(daily-sync/mail-watch) ②会話(本人→agent)
+  ③面接の録画・録音(interview-digest) ④提出結果(submit系エージェント) ⑤カレンダー ⑥調査結果(企業研究)。
+  現在①②のみ接続済み。③〜⑥を順次DB直結にするのが自動運転の残り工事
 - **書き手はagentのみ**。人はシートを直接編集しない(ミラーで消える)。人の修正依頼は会話でagentが受けてDBに書く
 - ステータス更新は `sync/src/db.ts` の `transition()` に集約(終了系は根拠があれば確定・終了からの復活なし・
   手書きの詳細ステータスを粗い進行中で潰さない・「辞退予定」は内定通知でも上書きしない)
@@ -48,6 +51,10 @@ npm run build                              # board(管理画面)ビルド + sync
      `chrome-prompts/submit.local.md` から再生成可能。証明写真は Bash `cp` で `katazuku-files` から取得可。
    - 顔取得ロジック: 公開情報(公式チームページ/Wantedly本人)から `curl`+`ffmpeg`で256px化→本人確認(名前+会社+経歴一致)。
    - 今後の面接で顔を自動取得したいなら、会議ウィンドウのスクショsamplerを `record-audio` 系に追加。
+
+6. **トラック重複の整理(daily-sync初回実走 2026-07-18 で判明)**: position照合が厳格すぎて、
+   エクサウィザーズ/八洲電機/LayerX/日本トレカセンター/PKSHA に既存と同じ話の別トラックが追加された。
+   samePositionの緩和(包含許容)+既存トラックへの統合ツール(db-merge-tracks)を作って重複を畳む
 
 ## 禁止・注意
 

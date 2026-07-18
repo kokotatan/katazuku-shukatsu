@@ -1,58 +1,68 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { AnchorButton, Button, StatusLabel } from 'smarthr-ui'
-import type { InboxEmail, PipelineCompany, TodayItem } from './types'
-import { aggregate, INBOX_KEY, loadJson, PIPELINE_KEY } from './lib/aggregate'
 import { AppNav } from './components/AppNav'
+import { requestAccessToken } from './lib/google'
+import { daysLeft, fetchAll, type AllData, type Track } from './lib/data'
+
+/**
+ * 今日やること — 朝いちばんに開くページ。
+ * 正本DB(→シートミラー)を読むだけ。localStorageの残骸ではなく、
+ * agentが毎朝手入れした現実(選考の生きた締切・待ち)だけを映す。
+ */
+
+const CLIENT_ID_KEY = 'katazuku-board/google-client-id' // boardと共通(同一オリジンなので一度のサインインで両方動く)
+const LEGACY_CLIENT_ID_KEY = 'katazuku-pipeline/google-client-id'
+const TOKEN_KEY = 'katazuku-board/token'
 
 const WEEKDAYS = '日月火水木金土'
 
-function dueLabel(item: TodayItem, now: Date): string {
-  const d = new Date(item.due)
-  const sameDay = d.toDateString() === now.toDateString()
-  const time = item.hasTime ? `${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}` : ''
-  if (sameDay) return item.hasTime ? time : '今日中'
-  return `${d.getMonth() + 1}/${d.getDate()}(${WEEKDAYS[d.getDay()]})${time ? ` ${time}` : ''}`
+function loadCachedToken(): string | null {
+  try {
+    const raw = sessionStorage.getItem(TOKEN_KEY)
+    if (!raw) return null
+    const { token, exp } = JSON.parse(raw) as { token: string; exp: number }
+    return Date.now() < exp ? token : null
+  } catch {
+    return null
+  }
 }
 
-function Section({
-  title,
-  items,
-  urgent,
-  now,
-  onDone,
-}: {
-  title: string
-  items: TodayItem[]
-  urgent?: boolean
-  now: Date
-  onDone: (item: TodayItem) => void
-}) {
-  if (items.length === 0) return null
+function isClosed(s: string): boolean {
+  return /不合格|辞退|欠席|振替不可|お見送り|実質終了/.test(s)
+}
+
+function dueLabel(t: Track): string {
+  const d = t.deadlineDate!
+  return `${d.getMonth() + 1}/${d.getDate()}(${WEEKDAYS[d.getDay()]})`
+}
+
+function Section({ title, tracks, urgent }: { title: string; tracks: Track[]; urgent?: boolean }) {
+  if (tracks.length === 0) return null
   return (
     <section className="mb-8">
       <h2 className="mb-2 flex items-baseline gap-2 border-b border-slate-200 pb-1.5">
-        <span className={`text-base font-semibold ${urgent ? 'text-red-600' : 'text-slate-800'}`}>
-          {title}
-        </span>
-        <span className="text-sm text-slate-400">{items.length}</span>
+        <span className={`text-base font-semibold ${urgent ? 'text-red-600' : 'text-slate-800'}`}>{title}</span>
+        <span className="text-sm text-slate-400">{tracks.length}</span>
       </h2>
       <ul>
-        {items.map((item) => (
-          <li key={item.key} className="flex items-center gap-3 border-b border-slate-100 py-2.5">
-            <span className="w-32 shrink-0">
-              <StatusLabel type={urgent ? 'error' : 'grey'} bold={urgent}>
-                {dueLabel(item, now)}
-              </StatusLabel>
+        {tracks.map((t, i) => (
+          <li key={i} className="flex items-center gap-3 border-b border-slate-100 py-2.5">
+            <span className="w-28 shrink-0">
+              {t.deadlineDate ? (
+                <StatusLabel type={urgent ? 'error' : 'grey'} bold={urgent}>
+                  {dueLabel(t)}
+                  {daysLeft(t.deadlineDate) < 0 ? ` ${-daysLeft(t.deadlineDate)}日超過` : ''}
+                </StatusLabel>
+              ) : (
+                <StatusLabel type="grey">待ち</StatusLabel>
+              )}
             </span>
-            <span className="shrink-0 text-sm font-semibold text-slate-800">{item.company}</span>
-            <span className="min-w-0 flex-1 truncate text-sm text-slate-500">{item.title}</span>
-            <StatusLabel type="grey">{item.source === 'inbox' ? 'メール' : 'ボード'}</StatusLabel>
-            {item.source === 'inbox' && (
-              <Button size="S" variant="secondary" onClick={() => onDone(item)}>
-                片付けた
-              </Button>
-            )}
-            <AnchorButton size="S" variant="text" href={item.source === 'inbox' ? '/inbox/' : '/status/'}>
+            <span className="shrink-0 text-sm font-semibold text-slate-800">
+              {t.company}
+              {t.position && <span className="font-normal text-slate-400">({t.position})</span>}
+            </span>
+            <span className="min-w-0 flex-1 truncate text-sm text-slate-500">{t.nextAction || t.status}</span>
+            <AnchorButton size="S" variant="text" href="/board/">
               開く
             </AnchorButton>
           </li>
@@ -63,96 +73,127 @@ function Section({
 }
 
 export default function App() {
-  const [emails, setEmails] = useState<InboxEmail[]>(() => loadJson<InboxEmail>(INBOX_KEY))
-  const [companies, setCompanies] = useState<PipelineCompany[]>(() => loadJson<PipelineCompany>(PIPELINE_KEY))
-  const [now, setNow] = useState(() => new Date())
-  const [toast, setToast] = useState<string | null>(null)
+  const [clientId, setClientId] = useState(
+    () => localStorage.getItem(CLIENT_ID_KEY) ?? localStorage.getItem(LEGACY_CLIENT_ID_KEY) ?? '',
+  )
+  const [token, setToken] = useState<string | null>(loadCachedToken)
+  const [data, setData] = useState<AllData | null>(null)
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
 
-  useEffect(() => {
-    const t = setInterval(() => setNow(new Date()), 60_000)
-    return () => clearInterval(t)
-  }, [])
-
-  useEffect(() => {
-    if (!toast) return
-    const t = setTimeout(() => setToast(null), 3000)
-    return () => clearTimeout(t)
-  }, [toast])
-
-  // 他タブ(Inbox/Pipeline)の変更を開いたまま反映する
-  useEffect(() => {
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === INBOX_KEY) setEmails(loadJson<InboxEmail>(INBOX_KEY))
-      if (e.key === PIPELINE_KEY) setCompanies(loadJson<PipelineCompany>(PIPELINE_KEY))
+  const load = useCallback(async (tk: string) => {
+    setLoading(true)
+    setError('')
+    try {
+      setData(await fetchAll(tk))
+    } catch (err) {
+      if (err instanceof Error && err.message === 'AUTH') {
+        sessionStorage.removeItem(TOKEN_KEY)
+        setToken(null)
+      } else {
+        setError(err instanceof Error ? err.message : String(err))
+      }
+    } finally {
+      setLoading(false)
     }
-    window.addEventListener('storage', onStorage)
-    return () => window.removeEventListener('storage', onStorage)
   }, [])
 
-  const buckets = useMemo(() => aggregate(emails, companies, now), [emails, companies, now])
+  useEffect(() => {
+    if (token) void load(token)
+  }, [token, load])
 
-  const markDone = (item: TodayItem) => {
-    const id = item.key.replace(/^inbox-/, '')
-    const latest = loadJson<InboxEmail>(INBOX_KEY).map((e) =>
-      e.id === id ? { ...e, status: 'done' as const, doneAt: new Date().toISOString() } : e,
-    )
-    localStorage.setItem(INBOX_KEY, JSON.stringify(latest))
-    setEmails(latest)
-    setToast('片付けました')
+  const signIn = async () => {
+    const cid = clientId.trim()
+    if (!cid) return
+    localStorage.setItem(CLIENT_ID_KEY, cid)
+    try {
+      const tk = await requestAccessToken(cid)
+      sessionStorage.setItem(TOKEN_KEY, JSON.stringify({ token: tk, exp: Date.now() + 50 * 60 * 1000 }))
+      setToken(tk)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    }
   }
 
-  const dateLabel = `${now.getMonth() + 1}月${now.getDate()}日(${WEEKDAYS[now.getDay()]})`
-  const empty = buckets.overdue.length + buckets.today.length + buckets.week.length === 0
+  const active = (data?.tracks ?? []).filter((t) => !isClosed(t.status))
+  const dated = active
+    .filter((t) => t.deadlineDate && !t.submitted)
+    .sort((a, b) => a.deadlineDate!.getTime() - b.deadlineDate!.getTime())
+  const overdue = dated.filter((t) => daysLeft(t.deadlineDate!) < 0)
+  const soon = dated.filter((t) => daysLeft(t.deadlineDate!) >= 0 && daysLeft(t.deadlineDate!) <= 2)
+  const week = dated.filter((t) => daysLeft(t.deadlineDate!) > 2 && daysLeft(t.deadlineDate!) <= 7)
+  const later = dated.filter((t) => daysLeft(t.deadlineDate!) > 7)
+  const waiting = active.filter(
+    (t) => !t.deadlineDate && /結果待ち|要確認|案内待ち|確定待ち|返信待ち/.test(t.status + t.nextAction),
+  )
 
   return (
     <div className="flex min-h-screen">
       <AppNav current="insight" />
-      <div className="min-h-screen min-w-0 flex-1 pb-14 md:pb-0">
-      <header className="sticky top-0 z-10 border-b border-slate-300 bg-white">
-        <div className="flex items-center gap-2.5 px-6 py-3">
-          <h1 className="flex items-baseline gap-2.5">
-            <span className="text-lg font-bold tracking-tight text-slate-900">今日やること</span>
-            <span className="hidden text-xs font-normal text-slate-500 sm:inline">
-              朝いちばんに開くページ。
-            </span>
-          </h1>
-          <span className="ml-auto text-sm font-bold text-slate-700">{dateLabel}</span>
-        </div>
-      </header>
-
-      <main className="max-w-3xl px-6 py-8">
-        {empty ? (
-          <div className="rounded-lg border border-slate-300 bg-white py-20 text-center">
-            <p className="text-2xl font-semibold tracking-wide text-slate-800">
-              今日は、もう何もない。
-            </p>
-            <p className="mt-2 text-sm text-slate-400">期限つきのタスクはすべて先の日付です</p>
+      <main className="mx-auto w-full max-w-3xl p-6">
+        <header className="mb-6 flex items-center gap-3">
+          <div>
+            <h1 className="text-xl font-bold text-slate-800">今日やること</h1>
+            <p className="text-xs text-slate-400">朝いちばんに開くページ。正本DBの生きた締切だけを映します</p>
           </div>
-        ) : (
-          <>
-            <Section title="期限切れ" items={buckets.overdue} urgent now={now} onDone={markDone} />
-            <Section title="今日" items={buckets.today} urgent now={now} onDone={markDone} />
-            <Section title="今週" items={buckets.week} now={now} onDone={markDone} />
-          </>
+          <span className="ml-auto text-xs text-slate-400">
+            {data ? `${data.loadedAt.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })} 時点` : ''}
+          </span>
+          {token && (
+            <Button size="S" variant="secondary" onClick={() => load(token)} disabled={loading}>
+              {loading ? '読込中…' : '更新'}
+            </Button>
+          )}
+        </header>
+
+        {!token && (
+          <div className="flex max-w-md flex-col gap-3">
+            <p className="text-sm text-slate-500">Googleでサインインすると、選考の締切と待ちが表示されます。</p>
+            <input
+              className="rounded border border-slate-300 p-2 text-sm"
+              value={clientId}
+              onChange={(e) => setClientId(e.target.value)}
+              placeholder="Google OAuth クライアントID"
+            />
+            <div>
+              <Button variant="primary" onClick={signIn} disabled={!clientId.trim()}>
+                サインインして表示
+              </Button>
+            </div>
+          </div>
         )}
 
-        <p className="mt-6 text-xs text-slate-400">
-          7日より先: {buckets.laterCount}件
-          {buckets.datelessCount > 0 && (
-            <>
-              {' '}/ 期限なしの要対応メール: {buckets.datelessCount}件(
-              <a href="/inbox/" className="underline decoration-slate-300 underline-offset-2">Inboxで確認</a>)
-            </>
-          )}
-        </p>
-      </main>
+        {error && <p className="mb-4 rounded bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+        {token && !data && !error && <p className="p-8 text-center text-sm text-slate-400">読み込んでいます…</p>}
 
-      {toast && (
-        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-lg bg-slate-800 px-5 py-2.5 text-sm font-medium text-white shadow-lg">
-          {toast}
-        </div>
-      )}
-      </div>
+        {data && (
+          <>
+            <Section title="期限切れ(至急・要判断)" tracks={overdue} urgent />
+            <Section title="今日〜あさって" tracks={soon} urgent />
+            <Section title="今週" tracks={week} />
+            <Section title="その先" tracks={later} />
+            <Section title="待ち(結果・案内)" tracks={waiting} />
+            {overdue.length + soon.length === 0 && (
+              <p className="rounded-lg bg-green-50 p-4 text-sm text-slate-600">
+                直近の締切はありません。自動運転が監視中です。
+              </p>
+            )}
+            {data.activities.length > 0 && (
+              <section className="mt-10">
+                <h2 className="mb-2 border-b border-slate-200 pb-1.5 text-sm font-semibold text-slate-500">
+                  自動運転の直近の動き
+                </h2>
+                {data.activities.slice(0, 5).map((a, i) => (
+                  <p key={i} className="border-b border-slate-100 py-1.5 text-xs text-slate-500">
+                    <span className="text-slate-400">{a.ts}</span> {a.action}
+                    {a.result && <span className="text-slate-400"> — {a.result}</span>}
+                  </p>
+                ))}
+              </section>
+            )}
+          </>
+        )}
+      </main>
     </div>
   )
 }
