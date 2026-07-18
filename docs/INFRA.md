@@ -22,7 +22,7 @@
 | タスク | 起動 | 実体 |
 |---|---|---|
 | katazuku-mail-watch | 毎時07:15-22:15 + WakeToRun(+ログオンは要管理者再登録) | scripts/mail-watch.ps1 |
-| katazuku-meeting-opener | 5分おき | scripts/open-meeting-urls.ps1(会議URL自動オープン・Haiku) |
+| katazuku-meeting-opener | 5分おき | scripts/open-meeting-urls.ps1(Meet/Zoom/Teamsを12分前に自動オープン・Haiku。開いた会議ごとに scripts/record-session.ps1 を切り離し起動し、開始時刻ちょうどにGame Bar録画→終了で interview-digest.ps1 議事録化) |
 | katazuku-daily-sync | 毎朝08:23 | scripts/daily-sync.ps1 |
 | katazuku-asa | 毎朝09:00 | scripts/katazuku.ps1 asa(対話ウィンドウ) |
 

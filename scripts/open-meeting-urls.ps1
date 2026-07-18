@@ -1,7 +1,8 @@
-﻿# katazuku 会議URL自動オープン
-# careerカレンダーを見て、約10分以内に始まる会議(Meet/Zoom URL付き)を既定ブラウザ(Chrome)で開く。
+﻿# katazuku 会議URL自動オープン + 録画セッション起動
+# careerカレンダーを見て、約12分以内に始まる会議(Meet/Zoom/Teams URL付き)を既定ブラウザで開く。
+# さらに開いた各会議について record-session.ps1 を切り離し起動し、開始時刻ちょうどに録画→終了で議事録化する。
 # タスクスケジューラから5分おきに起動される想定。LLMはHaiku(軽処理・安価)。
-# 同じURLは1日1回だけ開く(state file で重複防止)。
+# 同じURLは1日1回だけ開く(state file で重複防止=録画セッションも1会議1回だけ起動)。
 
 $ErrorActionPreference = 'Continue'
 $repo = Split-Path $PSScriptRoot -Parent
@@ -27,18 +28,28 @@ $prompt = ("現在時刻は {0} (JST) です。この時刻を基準に判断し
 カレンダーMCPツール(mcp__google-workspace__* または mcp__claude_ai_Google_Calendar__* のうち使える方)を使い、
 カレンダー okuyama.kotaro.career@gmail.com の予定のうち、
 「現在時刻から12分以内に開始」する予定で、location・description・会議リンクのいずれかに
-meet.google.com もしくは zoom.us のURLを含むものを探してください。
-該当する各予定について {"title": 件名, "start": 開始時刻, "url": 会議URL} を作り、JSON配列だけを出力。
-説明文・コードフェンス・前置きは一切書かない。該当なしなら [] だけを出力してください。
+meet.google.com / zoom.us / teams.microsoft.com のいずれかのURLを含むものを探してください。
+各予定について {"title": 件名, "start": "YYYY-MM-DD HH:mm", "end": "YYYY-MM-DD HH:mm", "url": 会議URL} を作る。
+
+出力は JSON 配列そのものだけ。表・箇条書き・見出し・コードフェンス・前置き・後書きを一切含めてはならない。
+1文字目は必ず [ で、最後の文字は ] にすること。該当なしなら [] だけを出力。
+例: [{"title":"面談","start":"2026-07-15 14:00","end":"2026-07-15 15:00","url":"https://meet.google.com/xxx"}]
 '@
 
-$out = & claude -p $prompt --model claude-haiku-4-5-20251001 `
-  --allowedTools 'mcp__google-workspace__get_events' 'mcp__google-workspace__list_calendars' `
-    'mcp__claude_ai_Google_Calendar__*' 2>$null | Out-String
-Log ("raw: {0}" -f $out.Trim())
+# Haikuが指示に反して表を返すことがあるため、JSON配列が取れるまで最大3回試す
+$out = ''
+$m = $null
+for ($try = 1; $try -le 3; $try++) {
+  $out = & claude -p $prompt --model claude-haiku-4-5-20251001 `
+    --allowedTools 'mcp__google-workspace__get_events' 'mcp__google-workspace__list_calendars' `
+      'mcp__claude_ai_Google_Calendar__*' 2>$null | Out-String
+  Log ("raw(try {0}): {1}" -f $try, $out.Trim())
+  $m = [regex]::Match($out, '\[.*\]', [System.Text.RegularExpressions.RegexOptions]::Singleline)
+  if ($m.Success) { break }
+  Log ("JSON配列が取れず。再試行 {0}/3" -f $try)
+}
 
 $alertFile = Join-Path $logDir 'alert-meeting-opener.txt'
-$m = [regex]::Match($out, '\[.*\]', [System.Text.RegularExpressions.RegexOptions]::Singleline)
 if (-not $m.Success) {
   Log 'JSON配列が見つからない'
   # 認証系の失敗と思われるときだけ alert に残す(asa が【自動化の故障】として報告する)。同日は1回だけ追記
@@ -61,10 +72,20 @@ if (-not $events -or $events.Count -eq 0) { Log '直近に開くべき会議な�
 $opened = @()
 if (Test-Path $stateFile) { $opened = @(Get-Content $stateFile) }
 
+$recordSession = Join-Path $PSScriptRoot 'record-session.ps1'
+
 foreach ($e in $events) {
   if (-not $e.url) { continue }
   if ($opened -contains $e.url) { Log ("既に開済: {0}" -f $e.url); continue }
   Start-Process $e.url
   Add-Content -Path $stateFile -Value $e.url
   Log ("開いた: {0} -> {1}" -f $e.title, $e.url)
+
+  # 開始時刻ちょうどに録画→終了で議事録、を担う録画セッションを切り離して起動(ポーリングなし)
+  $recArgs = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden',
+    '-File', ('"{0}"' -f $recordSession), '-Url', ('"{0}"' -f $e.url), '-Title', ('"{0}"' -f $e.title))
+  if ($e.start) { $recArgs += @('-StartTime', ('"{0}"' -f $e.start)) }
+  if ($e.end)   { $recArgs += @('-EndTime',   ('"{0}"' -f $e.end)) }
+  Start-Process powershell.exe -WindowStyle Hidden -ArgumentList $recArgs
+  Log ("録画セッション起動: {0} [{1}-{2}]" -f $e.title, $e.start, $e.end)
 }
