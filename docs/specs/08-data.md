@@ -1,73 +1,68 @@
-# Spec 08: Katazuku Data(就活データ基盤とその活かし)
+# Spec 08: Katazuku Data(DB中心のデータ基盤)  ※2026-07-18 全面改訂
 
-> 【前提 2026-07-16】面接録音→文字起こし→構造化ノートのパイプライン(`scripts/record-audio.ps1`
-> + `scripts/interview-digest.ps1` → `chrome-prompts/interview-notes.local.md`)は稼働済み。
-> ただし議事録は `.local.md` に貯まるだけで**Claudeしか読めず、アプリからは使えない**。
-> 本specはこの新しいデータ層を含めて「企業」軸で横断結合し、アプリで活かすところを定義する。
-> spec06(interview)の後半=「取込・活用」に相当。新しい取得元・バックエンドは作らない。
+> 【改訂の背景 2026-07-18】旧08は「localStorageのキーを企業軸で読み取り結合し status で見る」閲覧レイヤーの
+> 設計だった。だが本人の実画面は **katazukuアプリ + Googleカレンダー** であり、データが Sheet / localStorage /
+> カレンダー / ローカルファイルに分散し、agentが手で同期している構造そのものが、日程バッティングやステータス齟齬
+> (例: 八洲=シート「合格」なのに実態は辞退済)の温床だった。本specは土台を **DB中心** に置き換える。
 
-## 目的
+## 目的 / 直す問題
 
-katazukuの就活データは今、アプリ/ファイルごとにサイロ化している(inboxメール・pipeline企業・
-面接議事録・profileスニペット・カレンダー)。これらを**「企業」を軸に読み取り専用で横断結合**し、
-1社ぶんの全体像(選考段階・関連メール・面接で話したこと・懸念・締切・使ったES部品)を
-1画面で見られるようにする。**既にある素材を"つなぐ"だけ**で、新規収集はしない。
+**「正(source of truth)」をDB1つに定め、アプリ・カレンダー・Sheetをその"見る窓"にする。agentを唯一の書き手にする。**
 
-## 基盤(データ層)
+特に直すのは、選考ステータスの更新が効かない問題。旧 `status/src/lib/sheet.ts` は、自由記述ステータスのタブに対して
+**「合格/不合格/辞退などの最終状態は絶対に上書きしない・空欄補完のみ」** という制約を持っていた(L9-13, L144-151)。
+これは「Sheetが人の手入力とagent同期の両方に晒され、どちらが新しいか判別できない」ための苦肉の策で、結果として
+**メール由来の状態変化(辞退・合否)がシートに反映されない**弱さになっていた。DB中心化で「書き手はagent1つ・正はDB」に
+なれば、この矛盾は消え、**正しい遷移規則で堂々と更新できる**(下記「書き込みモデル」)。
 
-1. **面接議事録をアプリ可読にする**: `interview-digest` が、構造化ノートを `.local.md` への追記に加えて
-   localStorageキー `katazuku-interviews/notes` にも JSON で載せられるようにする(PC↔ブラウザは
-   他アプリと同じエクスポート/インポートJSON方式を踏襲。新しい注入経路は作らない)。
-   ```ts
-   interface InterviewNote {
-     id: string
-     company: string          // 表記ゆれは sameCompany で名寄せ
-     date: string             // YYYY-MM-DD
-     kind: string             // カジュアル面談 | 一次 | 二次 | 最終 | 人事 等
-     interviewer?: string
-     asked: string[]          // 聞かれたこと(想定質問の蓄積=用途1)
-     highlights: string[]     // 話したこと・自己分析素材(用途4/5)
-     firstPartyInfo: string[] // 相手が話した一次情報(用途2/4)
-     concerns: string[]       // 懸念フラグ(次選考で潰す=用途2)
-     nextActions: string[]
-     source: string           // logs/interviews/<...>.txt への参照
-   }
-   ```
-2. **横断結合ライブラリ** `status/src/lib/basin.ts`: 「企業」をキーに、次を read-only で束ねた
-   集約レコードを返す。企業名の名寄せは `status/src/lib/importer.ts` の `sameCompany`(NFKC・短名完全一致)。
-   - `katazuku-pipeline/companies`(選考段階・nextDate)
-   - `katazuku-inbox/emails`(その企業の要対応メール・締切)
-   - `katazuku-interviews/notes`(面接ノート)
-   - profile(notes)スニペットの `usedAt`(その企業で使ったES部品)
-   - **結合は純粋な読み取りのみ。他アプリのキーには書かない**(アプリ間連携の大原則)。
+## アーキテクチャ
 
-## 活かし(消費)— 新アプリは作らない
+```
+        ┌── katazuku アプリ(inbox/status/insight)  … 見る+書く窓(認証API経由でDBを読み書き)
+DB(正) ─┼── Google Calendar(色つき)               … 見る窓(agentがDBから同期)
+        └── Google Sheet(選考管理)                 … 見るだけの窓(DB→Sheet 一方向ミラー)
+   ↑
+   agent(唯一の書き手): メール→DB / ユーザーのアプリ操作→DB / DB→カレンダー・Sheet
+```
 
-3. 既存 **status(選考カンバン)に「企業詳細」を追加**。カードを開くと統合タイムライン:
-   - 選考段階の履歴 / 関連メール(inboxへ遷移)/ 面接ノート / 締切 / 使ったES部品(profileへ遷移)
-   - **「懸念フラグ」と「ネクストアクション」を上部固定**(次選考の対策に直結)
-4. **insight(今日やること)** に、面接ノートの `nextActions` のうち期限付きを合流(spec02の集約に1ソース足すだけ)。
+- **DB**: Vercel Marketplace の Postgres(Neon 想定)。フルの独自基盤は作らない。
+- **認証つき読み取りAPI**: `api/` に「ログイン本人にだけDBの中身をJSONで返す」エンドポイントを1本。
+  個人データを漏らさずにアプリが自動ロードする(手作業のlocalStorage JSON注入を廃止)ための最小の裏側。
+- **Sheetは読み取り専用ミラー**。編集はアプリ/agent(=DBに書く)に一本化。Sheet直編集は двой book=ドリフト源なので不可。
+  スマホでの俯瞰用に DB→Sheet を定期同期する。
 
-## デザイン
+## データモデル(最小)
 
-CLAUDE.md のSmartHR Design System準拠(絵文字禁止・smarthr-ui第一・AppNav・値は defaultColor同値)。
-企業詳細は smarthr-ui の Dialog/Drawer系で。懸念=`red-*` は警告専用の用途に合致するので可。
+- `company`(企業): id, name(名寄せキーは既存 `sameCompany`), industry, position, priority, notes
+- `selection`(選考): id, company_id, season(夏/冬/本選考/長期), status, next_action, next_date, source_note, updated_at, updated_by
+- `interview_note`(面接ノート): 旧08のInterviewNote(company, date, kind, asked/highlights/firstPartyInfo/concerns/nextActions/source)
+- `person`(人脈, spec07), `es_snippet`(ES素材/個人マスタ) … 段階的に寄せる
+
+## 書き込みモデル(「上書きしない」を正しく置き換える)
+
+- **status は遷移規則で更新する**(空欄補完のみ、はやめる)。ランク(出願予定<出願済<合格/不合格/辞退)で
+  **前進は反映**。最終状態(合格/不合格/辞退)への確定はメール根拠があれば反映してよい。八洲のような「辞退済なのに合格のまま」を解消。
+- **人の意図とagent更新の衝突**は "最終更新者(updated_by)と時刻" で解決(Sheet直編集を禁じたので実質agentのみ)。
+- 名寄せは `sameCompany`(NFKC・短名完全一致)を踏襲。重複行(GMOビジネス職/技術職のような別トラック)は別レコードで持つ。
+
+## 実装フェーズ(段階投入・各フェーズで完結)
+
+1. **DB + 認証読取API + agent書込 + Sheetミラー**。まずは選考/企業だけ。既存Sheetからの初期移行スクリプト。
+2. **アプリをDB読取に切替**(inbox/status/insight)。localStorage手注入を廃止。カレンダー同期は reconcile-calendar をDB源に繋ぎ替え。
+3. **面接ノート・人脈・ES素材(個人マスタ)をDBへ**。insight(spec09)はDB上の横断クエリで実装。
 
 ## セキュリティ
 
-- 面接ノート・メールは個人情報。**localStorageのみ**。エクスポートJSONは gitignore パターン
-  `interviews-export-*.json` を追加。
-- public/ に個人データを置く場合は `scripts/assemble.mjs` の除外処理にも必ず追加(本番漏洩防止)。
+- 個人データはDBに置き、**認証済み本人にのみ**APIで返す。public/ には出さない(静的アプリは認証API越しに読む)。
+- SA鍵・DB接続情報は gitignore 済みの場所(.env / credentials/)へ。設定ファイルへの平文直書き禁止。
 
-## 受け入れ条件
+## やらないこと
 
-- `status/scripts/check-basin.ts`(名寄せ・結合・重複排除・空データの単体テスト。tsx/自前assert形式)を追加し通過。
-- `interview-digest` の localStorage 書き出し(JSON整形)を検証する形を用意。
-- `npm run build` 通過。新規個人データパターンを gitignore と assemble.mjs 除外へ反映。
-- 既存アプリの localStorage を壊さないこと(結合は読み取りのみ)をテストで担保。
+- フルスクラッチの独自バックエンド/認証基盤は作らない(Vercel Marketplace + 最小 `api/` で足りる)。
+- Sheetの双方向同期はしない(DB→Sheetの一方向のみ)。ドリフトを戻さないため。
+- 旧08の「localStorageキー結合」路線は破棄(DB読取に置換)。
 
-## やらないこと(スコープ外)
+## 関連
 
-- バックエンド/DB/新規スクレイピングは作らない。
-- 他アプリの localStorage キーへの書き込みはしない(読み取り結合のみ)。
-- 新SPAは増やさない(既存 status への追加に留める)。
+- 方針メモ: DB=正・各面は窓・agentが唯一の書き手(本人合意2026-07-18)。旧 `status/src/lib/sheet.ts` の
+  「上書きしない」制約は本specで解消。reconcile-calendar は Phase2 で源を Sheet→DB に繋ぎ替える。
