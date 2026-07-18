@@ -103,6 +103,13 @@ $ok = (Test-Path $logFile) -and ((Get-Content -Raw $logFile) -match '===\s*inter
 if ($ok) {
   "interview-digest OK. notes appended to chrome-prompts/interview-notes.local.md (log: logs/$(Split-Path $logFile -Leaf))"
 
+  # 活動ログに「何を/何のために/どうしたか」を1行残す(本人が後から確認できる状態のため)
+  & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'log-activity.ps1') `
+    -By 'interview-digest' -Action ("面接の議事録を作成: " + $stem) `
+    -Why '録画を後から振り返り、次選考対策・志望動機に反映するため' `
+    -How '録音をvoiceboxで文字起こし→議事録化(要確認箇所はタイムスタンプ付きで明示)' `
+    -Link 'chrome-prompts/interview-notes.local.md' -Result '成功' | Out-Null
+
   # --- 掃除(本人方針 2026-07-16): 議事録が取れたら中間ファイルとデカい元録画を消す。 ------------
   # 「議事録取れたら消していい」。ただし議事録は不明瞭箇所を [mm:ss] で聞き直す設計なので、
   # 聞き直し用の 16kHz mono wav($audioPath)と文字起こし txt は必ず残す。消すのは:
