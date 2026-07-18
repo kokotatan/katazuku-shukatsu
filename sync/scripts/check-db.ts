@@ -53,10 +53,11 @@ check('海外表記: Inc.の有無は同一視', sameCompany('Mujin Inc.', 'Muji
 check('海外表記: Co., Ltd. も吸収', sameCompany('Sansan Co., Ltd.', 'Sansan'))
 const pkTestId = upsertCompany(db, { name: 'PKSHA' })
 setOfficialName(db, 'PKSHA', '株式会社PKSHA Technology')
-check('正式名称(株式会社付き)でも確定できる', resolveCompany(db, '株式会社PKSHA Technology').kind === 'hit')
+check('正式名称が「正」(name)になる', listCompanies(db).some((c) => c.name === '株式会社PKSHA Technology' && c.shortName === 'PKSHA'))
+check('正式名称(株式会社付き)で確定できる', resolveCompany(db, '株式会社PKSHA Technology').kind === 'hit')
 const rOfficial = resolveCompany(db, 'PKSHA Technology, Inc.')
 check('正式名称の英語表記(Inc.付き)でも確定できる', rOfficial.kind === 'hit' && rOfficial.companyId === pkTestId)
-check('正式名称はlistCompaniesに出る', listCompanies(db).some((c) => c.officialName === '株式会社PKSHA Technology'))
+check('昇格後も通称(PKSHA)で確定できる', resolveCompany(db, 'PKSHA').kind === 'hit')
 
 // --- applyDiff(日次反映) ---
 const yashimaId = upsertCompany(db, { name: '八洲電機' })
@@ -126,8 +127,9 @@ check('mirror: 残り日数は行番号入りの数式', selAll[yRow][11].starts
 check('mirror: 提出済はTRUE/FALSE文字列', dataRows.every((r) => r[12] === 'TRUE' || r[12] === 'FALSE'))
 check('mirror: 50行チャンクで全201行を覆う', selAll.length === 201 && selChunks[0].range.startsWith('A1:') && selChunks[selChunks.length - 1].range.endsWith('O201'))
 check('mirror: チャンクのrangeが行番号と一致', selChunks.every((w, i) => w.range === `A${i * 50 + 1}:O${i * 50 + w.values.length}`))
-check('mirror: 企業タブは7列(正式名称入り)で全社ぶん', coAll[0].length === 7 && coAll[0][1] === '正式名称' && coAll.slice(1).filter((r) => r[0]).length === listCompanies(db).length)
-check('mirror: 正式名称がB列に出る', coAll.some((r) => r[1] === '株式会社PKSHA Technology'))
+check('mirror: 企業タブは7列で全社ぶん', coAll[0].length === 7 && coAll.slice(1).filter((r) => r[0]).length === listCompanies(db).length)
+check('mirror: A列が正式名称・B列が通称', coAll[0][0] === '正式名称' && coAll[0][1] === '通称' && coAll.some((r) => r[0] === '株式会社PKSHA Technology' && r[1] === 'PKSHA'))
+check('mirror: 選考管理タブの表示は通称のまま', selAll.some((r) => r[0] === '八洲電機'))
 
 // codex反例: データ由来の「=」始まりを数式として書かない(USER_ENTERED注入対策)
 const evilId = upsertCompany(db, { name: '数式注入テスト社' })

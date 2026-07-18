@@ -237,6 +237,7 @@ export default function App() {
               </button>
               {openCompany === c.name && (
                 <div className="border-t border-slate-200 p-2 text-xs text-slate-600">
+                  {c.master?.officialName && <p className="mb-1 text-slate-400">正式名称: {c.master.officialName}</p>}
                   {c.tracks.map((t, i) => (
                     <p key={i} className="mb-1">
                       <span className="font-semibold">{t.period}{t.position && `・${t.position}`}</span>: {t.status}

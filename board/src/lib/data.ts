@@ -26,6 +26,8 @@ export interface Track {
 /** 企業マスタの1行。パスワード列は読んでも保持しない */
 export interface Master {
   company: string
+  /** 正式名称(株式会社/Inc.付き)。A列が正 */
+  officialName: string
   industry: string
   mypageUrl: string
   loginId: string
@@ -133,11 +135,12 @@ function parseTracks(rows: string[][]): Track[] {
 }
 
 function parseMaster(rows: string[][]): Master[] {
-  const h = rows.findIndex((r) => r.includes('企業名'))
+  const h = rows.findIndex((r) => r.includes('正式名称') || r.includes('企業名'))
   if (h === -1) return []
   const header = rows[h]
   const c = {
-    name: findCol(header, ['企業名']),
+    official: findCol(header, ['正式名称']),
+    name: findCol(header, ['通称', '企業名']),
     industry: findCol(header, ['業界']),
     mypageUrl: findCol(header, [], ['マイページ']),
     loginId: findCol(header, ['ログインID', 'ID']),
@@ -147,11 +150,12 @@ function parseMaster(rows: string[][]): Master[] {
   const out: Master[] = []
   for (let i = h + 1; i < rows.length; i++) {
     const r = rows[i]
-    const name = get(r, c.name)
+    const name = get(r, c.name) || get(r, c.official)
     if (!name) continue
     // パスワード列は意図的に読まない(画面にも状態にも持ち込まない)
     out.push({
       company: name,
+      officialName: get(r, c.official),
       industry: get(r, c.industry),
       mypageUrl: get(r, c.mypageUrl),
       loginId: get(r, c.loginId),

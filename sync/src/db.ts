@@ -26,9 +26,10 @@ export interface Selection {
 }
 
 export interface CompanyInfo {
+  /** 正式名称(株式会社/Inc.等の法人格付き)が「正」。未判明の間は現在の最良の名称 */
   name: string
-  /** 正式名称(株式会社/Inc.等の法人格付き)。書類・メール宛名の正はこちら */
-  officialName?: string
+  /** 通称(表示用。選考管理タブやboardで使う短い名前) */
+  shortName?: string
   industry: string
   mypageUrl: string
   loginId: string
@@ -98,10 +99,17 @@ export function openDb(path: string): DatabaseSync {
       source TEXT NOT NULL DEFAULT ''
     );
   `)
-  // マイグレーション: official_name(正式名称。株式会社/Inc.等の法人格付き。2026-07-18本人指示)
+  // マイグレーション(2026-07-18本人指示):
+  // name = 正式名称(株式会社/Inc.付き)が「正」。short_name = 通称(表示用)。
+  // 旧official_name列があれば name と入れ替えて廃止する。正式名称が未判明の会社は
+  // 現在の最良の名称が name に残り、企業研究で順次正式名称へ昇格させる(db-alias official)
   const cols = db.prepare('PRAGMA table_info(company)').all() as { name: string }[]
-  if (!cols.some((c) => c.name === 'official_name')) {
-    db.exec("ALTER TABLE company ADD COLUMN official_name TEXT NOT NULL DEFAULT ''")
+  const has = (c: string) => cols.some((x) => x.name === c)
+  if (!has('short_name')) db.exec("ALTER TABLE company ADD COLUMN short_name TEXT NOT NULL DEFAULT ''")
+  db.exec("UPDATE company SET short_name = name WHERE short_name = ''")
+  if (has('official_name')) {
+    db.exec("UPDATE company SET name = official_name WHERE official_name <> ''")
+    db.exec('ALTER TABLE company DROP COLUMN official_name')
   }
   return db
 }
@@ -200,9 +208,9 @@ export type Resolution =
  */
 export function resolveCompany(db: DatabaseSync, name: string): Resolution {
   const n = normalize(name)
-  const all = db.prepare('SELECT id, name, official_name FROM company').all() as { id: number; name: string; official_name: string }[]
-  // 通称でも正式名称(株式会社/Inc.付き)でも確定できる
-  const exact = all.find((r) => normalize(r.name) === n || (r.official_name && normalize(r.official_name) === n))
+  const all = db.prepare('SELECT id, name, short_name FROM company').all() as { id: number; name: string; short_name: string }[]
+  // 正式名称(=name)でも通称(short_name)でも確定できる
+  const exact = all.find((r) => normalize(r.name) === n || (r.short_name && normalize(r.short_name) === n))
   if (exact) return { kind: 'hit', companyId: exact.id }
   const alias = db.prepare('SELECT company_id FROM company_alias WHERE alias_norm = ?').get(n) as
     | { company_id: number }
@@ -269,7 +277,6 @@ export function upsertCompany(db: DatabaseSync, info: Partial<CompanyInfo> & { n
     const fill = (col: string, v?: string) => {
       if (v && !(cur[col] as string)) db.prepare(`UPDATE company SET ${col} = ?, updated_at = ? WHERE id = ?`).run(v, now, hit.id)
     }
-    fill('official_name', info.officialName)
     fill('industry', info.industry)
     fill('mypage_url', info.mypageUrl)
     fill('login_id', info.loginId)
@@ -278,8 +285,8 @@ export function upsertCompany(db: DatabaseSync, info: Partial<CompanyInfo> & { n
     return hit.id
   }
   const r = db.prepare(
-    'INSERT INTO company (name, official_name, industry, mypage_url, login_id, password, memo, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-  ).run(info.name, info.officialName ?? '', info.industry ?? '', info.mypageUrl ?? '', info.loginId ?? '', info.password ?? '', info.memo ?? '', now)
+    'INSERT INTO company (name, short_name, industry, mypage_url, login_id, password, memo, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+  ).run(info.name, info.shortName ?? info.name, info.industry ?? '', info.mypageUrl ?? '', info.loginId ?? '', info.password ?? '', info.memo ?? '', now)
   return Number(r.lastInsertRowid)
 }
 
@@ -303,8 +310,10 @@ export interface SelectionRow extends Selection {
 }
 
 export function listSelections(db: DatabaseSync): SelectionRow[] {
+  // 表示は通称(短い名前)。正式名称は company 側(name)が正
   const rows = db.prepare(`
-    SELECT s.id, s.company_id, c.name, s.season, s.position, s.priority, s.status,
+    SELECT s.id, s.company_id, CASE WHEN c.short_name <> '' THEN c.short_name ELSE c.name END AS disp,
+           s.season, s.position, s.priority, s.status,
            s.step1, s.step2, s.step3, s.step4, s.next_action, s.next_date, s.submitted, s.es_url, s.memo
     FROM selection s JOIN company c ON c.id = s.company_id
     ORDER BY s.id
@@ -312,7 +321,7 @@ export function listSelections(db: DatabaseSync): SelectionRow[] {
   return rows.map((r) => ({
     id: r.id as number,
     companyId: r.company_id as number,
-    company: r.name as string,
+    company: r.disp as string,
     season: r.season as string,
     position: r.position as string,
     priority: r.priority as string,
@@ -330,7 +339,7 @@ export function listCompanies(db: DatabaseSync): CompanyInfo[] {
   const rows = db.prepare('SELECT * FROM company ORDER BY id').all() as Record<string, unknown>[]
   return rows.map((r) => ({
     name: r.name as string,
-    officialName: (r.official_name as string) ?? '',
+    shortName: (r.short_name as string) ?? '',
     industry: r.industry as string,
     mypageUrl: r.mypage_url as string,
     loginId: r.login_id as string,
@@ -339,9 +348,12 @@ export function listCompanies(db: DatabaseSync): CompanyInfo[] {
   }))
 }
 
-/** 正式名称(株式会社/Inc.付き)を設定する。本人確認や企業研究で確定したら呼ぶ */
+/** 正式名称(株式会社/Inc.付き)へ昇格する。従来の名前は通称(short_name)として残る */
 export function setOfficialName(db: DatabaseSync, name: string, officialName: string): void {
   const r = resolveCompany(db, name)
   if (r.kind !== 'hit') throw new Error(`企業が見つかりません: ${name}`)
-  db.prepare('UPDATE company SET official_name = ?, updated_at = ? WHERE id = ?').run(officialName, new Date().toISOString(), r.companyId)
+  const cur = db.prepare('SELECT name, short_name FROM company WHERE id = ?').get(r.companyId) as { name: string; short_name: string }
+  const short = cur.short_name || cur.name
+  db.prepare('UPDATE company SET name = ?, short_name = ?, updated_at = ? WHERE id = ?')
+    .run(officialName, short, new Date().toISOString(), r.companyId)
 }
