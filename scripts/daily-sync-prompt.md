@@ -14,7 +14,9 @@ DB→シートの一方向ミラー。書き手はagentのみ。サービスア�
    - 選考の動き → stage にマッピング(出願予定=scouted, 出願済=entried, ES・テスト中=task, 面接中=interview, インターン合格=intern, 内定=offer, 不合格・お見送り=rejected, 辞退=closed)
    - 〆切・選考日(面接日程を含む) → nextDate (YYYY-MM-DD)
    - 次にやること → nextAction
-   - 業界が分かれば industry、職種・コースが特定できれば position(同じ会社に複数トラックがある場合の照合に使う)
+   - 業界が分かれば industry、職種・コース・開催区分(1day/3days等)が特定できれば position に入れる
+     (同じ会社に複数ポジション・複数コースで応募していることがあり、これがトラックを判別する鍵)
+   - name は本文にある表記のままでよい(株式会社/Inc.付きの正式名称でも通称でも、DB側の正規化とエイリアス学習で吸収する)
 3. 抽出結果を `{name, stage, nextAction, nextDate, industry, position}` の配列JSONとして `sync/sheet-import-loop.json` に書き出す(gitignore済み)。対象メールが無ければ空配列でよい。
 4. `cd sync; npx tsx scripts/db-apply.ts sheet-import-loop.json` で正本DBへ反映する。
    - 書き込み規則(終了系は根拠があれば確定・終了からの復活はしない・手書きの詳しいステータスを粗い進行中で潰さない)はスクリプト側で保証されている。

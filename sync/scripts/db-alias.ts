@@ -1,13 +1,14 @@
 /**
  * 名寄せの学習CLI。本人確認の結果をDBに教える。
  *
- *   npx tsx scripts/db-alias.ts list                       # 未解決の要確認と学習済み別名を表示
- *   npx tsx scripts/db-alias.ts add <別名> <正式名称>       # 「別名は正式名称と同じ会社」と学習
- *   npx tsx scripts/db-alias.ts new <名前>                 # 「これは別会社」と確定(新企業として登録)
+ *   npx tsx scripts/db-alias.ts list                        # 未解決の要確認と学習済み別名を表示
+ *   npx tsx scripts/db-alias.ts add <別名> <通称>            # 「別名は同じ会社」と学習
+ *   npx tsx scripts/db-alias.ts new <名前>                  # 「これは別会社」と確定(新企業として登録)
+ *   npx tsx scripts/db-alias.ts official <通称> <正式名称>   # 正式名称(株式会社/Inc.付き)を設定
  */
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
-import { openDb, addAlias, addPending, listPending, upsertCompany, resolveCompany } from '../src/db'
+import { openDb, addAlias, addPending, listPending, upsertCompany, resolveCompany, setOfficialName } from '../src/db'
 
 const DB_PATH = process.env.KATAZUKU_DB ?? join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'data', 'katazuku.db')
 const db = openDb(DB_PATH)
@@ -25,6 +26,9 @@ if (cmd === 'add' && a && b) {
     db.prepare('UPDATE pending_review SET resolved = 1 WHERE name = ?').run(a)
     console.log(`別会社として登録しました: ${a} (company_id=${cid})`)
   }
+} else if (cmd === 'official' && a && b) {
+  setOfficialName(db, a, b)
+  console.log(`正式名称を設定しました: ${a} = ${b}`)
 } else if (cmd === 'list' || !cmd) {
   const pend = listPending(db)
   console.log(`未解決の名寄せ確認: ${pend.length}件`)
@@ -33,7 +37,7 @@ if (cmd === 'add' && a && b) {
   console.log(`学習済み別名: ${aliases.length}件`)
   for (const al of aliases) console.log(`  - ${al.alias} = ${al.name}`)
 } else {
-  console.error('使い方: db-alias.ts list | add <別名> <正式名称> | new <名前>')
+  console.error('使い方: db-alias.ts list | add <別名> <通称> | new <名前> | official <通称> <正式名称>')
   process.exit(1)
 }
 

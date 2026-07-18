@@ -45,8 +45,8 @@ export function renderMirror(db: DatabaseSync): MirrorWrite[] {
   })
   while (selRows.length < SELECTION_ROWS) selRows.push(Array(selHeader.length).fill(''))
 
-  const coHeader = ['企業名', '業界', 'マイページURL', 'ログインID', 'パスワード', '会社メモ']
-  const coRows: string[][] = listCompanies(db).map((c) => [esc(c.name), esc(c.industry), esc(c.mypageUrl), esc(c.loginId), esc(c.password), esc(c.memo)])
+  const coHeader = ['企業名', '正式名称', '業界', 'マイページURL', 'ログインID', 'パスワード', '会社メモ']
+  const coRows: string[][] = listCompanies(db).map((c) => [esc(c.name), esc(c.officialName ?? ''), esc(c.industry), esc(c.mypageUrl), esc(c.loginId), esc(c.password), esc(c.memo)])
   while (coRows.length < COMPANY_ROWS) coRows.push(Array(coHeader.length).fill(''))
 
   // MCPの1回の書き込みが巨大になりすぎないよう50行ずつに分割する
@@ -60,7 +60,7 @@ export function renderMirror(db: DatabaseSync): MirrorWrite[] {
   }
   return [
     ...chunk(TAB_SELECTIONS, 'O', [selHeader, ...selRows]),
-    ...chunk(TAB_COMPANIES, 'F', [coHeader, ...coRows]),
+    ...chunk(TAB_COMPANIES, 'G', [coHeader, ...coRows]),
   ]
 }
 

@@ -3,7 +3,7 @@
  * インメモリSQLiteで実行。実行: cd sync && npx tsx scripts/check-db.ts
  */
 import { DatabaseSync } from 'node:sqlite'
-import { openDb, upsertCompany, insertSelection, listSelections, listCompanies, listEvents, transition, sameCompany, resolveCompany, addAlias, listPending } from '../src/db'
+import { openDb, upsertCompany, insertSelection, listSelections, listCompanies, listEvents, transition, sameCompany, resolveCompany, addAlias, listPending, setOfficialName } from '../src/db'
 import { applyDiff } from './db-apply'
 import { renderMirror } from './db-mirror'
 
@@ -47,6 +47,16 @@ upsertCompany(db, { name: 'トヨタ・コニック・プロ' })
 upsertCompany(db, { name: 'トヨタ' })
 check('トヨタ≠トヨタ・コニック・プロ(3文字は完全一致のみ)', listCompanies(db).length === before + 4)
 check('sameCompany: タイミーの表記ゆれは同一視のまま', sameCompany('株式会社タイミー', 'タイミー'))
+
+// --- 正式名称(株式会社/海外表記対応。2026-07-18本人指示) ---
+check('海外表記: Inc.の有無は同一視', sameCompany('Mujin Inc.', 'Mujin'))
+check('海外表記: Co., Ltd. も吸収', sameCompany('Sansan Co., Ltd.', 'Sansan'))
+const pkTestId = upsertCompany(db, { name: 'PKSHA' })
+setOfficialName(db, 'PKSHA', '株式会社PKSHA Technology')
+check('正式名称(株式会社付き)でも確定できる', resolveCompany(db, '株式会社PKSHA Technology').kind === 'hit')
+const rOfficial = resolveCompany(db, 'PKSHA Technology, Inc.')
+check('正式名称の英語表記(Inc.付き)でも確定できる', rOfficial.kind === 'hit' && rOfficial.companyId === pkTestId)
+check('正式名称はlistCompaniesに出る', listCompanies(db).some((c) => c.officialName === '株式会社PKSHA Technology'))
 
 // --- applyDiff(日次反映) ---
 const yashimaId = upsertCompany(db, { name: '八洲電機' })
@@ -116,7 +126,8 @@ check('mirror: 残り日数は行番号入りの数式', selAll[yRow][11].starts
 check('mirror: 提出済はTRUE/FALSE文字列', dataRows.every((r) => r[12] === 'TRUE' || r[12] === 'FALSE'))
 check('mirror: 50行チャンクで全201行を覆う', selAll.length === 201 && selChunks[0].range.startsWith('A1:') && selChunks[selChunks.length - 1].range.endsWith('O201'))
 check('mirror: チャンクのrangeが行番号と一致', selChunks.every((w, i) => w.range === `A${i * 50 + 1}:O${i * 50 + w.values.length}`))
-check('mirror: 企業タブは6列で全社ぶん', coAll[0].length === 6 && coAll.slice(1).filter((r) => r[0]).length === listCompanies(db).length)
+check('mirror: 企業タブは7列(正式名称入り)で全社ぶん', coAll[0].length === 7 && coAll[0][1] === '正式名称' && coAll.slice(1).filter((r) => r[0]).length === listCompanies(db).length)
+check('mirror: 正式名称がB列に出る', coAll.some((r) => r[1] === '株式会社PKSHA Technology'))
 
 // codex反例: データ由来の「=」始まりを数式として書かない(USER_ENTERED注入対策)
 const evilId = upsertCompany(db, { name: '数式注入テスト社' })
