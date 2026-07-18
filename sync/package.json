@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "check": "tsx scripts/check-sheet.ts",
-    "check:db": "tsx scripts/check-db.ts"
+    "check:db": "tsx scripts/check-db.ts",
+    "check:application": "tsx scripts/check-application.ts"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

@@ -37,7 +37,7 @@ data/katazuku.db(正本・SQLite/node:sqlite・gitignore)
 ```
 cd sync && npx tsx scripts/check-db.ts     # DB遷移規則・apply・mirror・6入力(75項目)
 cd sync && npx tsx scripts/check-sheet.ts  # 旧シート書込エンジン(40項目・移行完了まで残す)
-cd sync && npx tsx scripts/check-application.ts # 応募の承認・安全境界・冪等化(19項目)
+cd sync && npx tsx scripts/check-application.ts # 応募の承認・安全境界・冪等化(21項目)
 npm run build                              # board(管理画面)ビルド + sync全チェック
 ```
 

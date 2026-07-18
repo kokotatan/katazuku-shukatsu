@@ -89,6 +89,15 @@ get_events ↔ list_events、batch_modify_gmail_message_labels ↔ label/unlabel
 - シートや各アプリのlocalStorageを直接更新しない。ステータス遷移は必ず `db-apply.ts` 経由にする。
 - 反映した企業と内容を「自動で済ませたこと」に1行ずつ載せる。
 
+### 5.6 DBで確定した予定をカレンダーへ反映
+
+- `cd sync; npx tsx scripts/db-calendar-outbox.ts` で、DBにありexternal_idが空の予定を読む。
+- 各予定についてcareerカレンダーの同日同件名を検索し、無ければ手順2の運用規約で作成する。
+- 既存予定を再利用または新規作成できたものだけ、appointmentId、externalId、calendarIdをlinks配列の一時JSONへ書く。
+- `npx tsx scripts/db-link-calendar.ts <一時JSON>` で外部IDをDBへ戻し、`npx tsx scripts/db-snapshot.ts` を実行する。
+- 作成失敗した予定はlinkせず、次回のoutboxに残す。日時やURLを推測しない。
+- 反映件数を活動ログと「自動で済ませたこと」に残す。詳細はscripts/calendar-export-prompt.mdを参照する。
+
 ### 6. 面接の前日準備(prepパック)
 
 - 今日〜48時間以内にカレンダー上で面接・面談・座談会があれば、その企業のprepパックを作る:
