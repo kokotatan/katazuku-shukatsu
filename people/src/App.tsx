@@ -62,9 +62,12 @@ export default function App() {
     try {
       const data = JSON.parse(await file.text())
       if (!Array.isArray(data)) throw new Error('配列ではありません')
-      const { merged, added } = mergePeople(people, data as Partial<Person>[])
+      const { merged, added, updated } = mergePeople(people, data as Partial<Person>[])
       setPeople(merged)
-      setToast(added > 0 ? `${added}件を取り込みました` : '新しく追加できるものはありませんでした')
+      const parts: string[] = []
+      if (added > 0) parts.push(`${added}件を追加`)
+      if (updated > 0) parts.push(`${updated}件を更新`)
+      setToast(parts.length > 0 ? `${parts.join('、')}しました` : '追加・更新はありませんでした')
     } catch (err) {
       setToast(`インポート失敗: ${err instanceof Error ? err.message : String(err)}`)
     }

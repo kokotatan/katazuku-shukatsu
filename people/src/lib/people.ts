@@ -95,24 +95,65 @@ function isSamePerson(a: Person, b: Person): boolean {
   return a.name.trim() === b.name.trim() && sameCompany(a.company || '', b.company || '')
 }
 
+/** 文字列が非空(空白のみでない)か */
+function nonEmpty(v: string | undefined): boolean {
+  return !!v && v.trim() !== ''
+}
+
+/**
+ * 一致した既存レコードを取り込み側の値でマージ更新する(新規追加はしない)。
+ * - 文字列(role/metAt/howMet/notes/category): 既存が空のときだけ取り込み側で埋める(手動編集を尊重)
+ * - facePhoto: 取り込み側が非空ならそれを採用(顔の後入れ・差し替えを許可)。空なら既存を残す
+ * - followUp: 取り込み側の真偽値で更新
+ * - id: 既存を維持 / updatedAt: 更新時刻(now)
+ */
+function mergeInto(existing: Person, incoming: Person, now: string): Person {
+  return {
+    id: existing.id,
+    name: existing.name,
+    company: existing.company,
+    role: nonEmpty(existing.role) ? existing.role : incoming.role,
+    category: nonEmpty(existing.category) ? existing.category : incoming.category,
+    metAt: nonEmpty(existing.metAt) ? existing.metAt : incoming.metAt,
+    howMet: nonEmpty(existing.howMet) ? existing.howMet : incoming.howMet,
+    notes: nonEmpty(existing.notes) ? existing.notes : incoming.notes,
+    facePhoto: nonEmpty(incoming.facePhoto) ? incoming.facePhoto : existing.facePhoto,
+    followUp: incoming.followUp,
+    updatedAt: now,
+  }
+}
+
 /**
  * インポート用の非破壊マージ。
  * incoming の各要素を Person に正規化し(id/updatedAt が無ければ生成)、
- * name+company が既存(および取り込み済み)と一致するものは追加しない。
- * 追加分を先頭に積んだ配列と追加件数を返す。
+ * name+company が既存と一致すれば「新規追加せず既存を更新」(mergeInto のルール)、
+ * 一致しなければ先頭に新規追加する。名前の無いものは取り込まない。
+ * 取り込みファイル内での重複(同名同社)は1件に集約する(件数には数えない)。
+ * 追加分を先頭に積んだ配列と、追加件数・更新件数を返す。
  */
 export function mergePeople(
   existing: Person[],
   incoming: Partial<Person>[],
-): { merged: Person[]; added: number } {
+  now: string = new Date().toISOString(),
+): { merged: Person[]; added: number; updated: number } {
   const result = [...existing]
+  const addedIds = new Set<string>() // この取り込みで新規追加した id(重複集約を更新件数に数えないため)
   let added = 0
+  let updated = 0
   for (const raw of incoming) {
     const p = coercePerson(raw)
     if (!p.name.trim()) continue // 名前の無いものは取り込まない
-    if (result.some((e) => isSamePerson(e, p))) continue // 重複は追加しない
-    result.unshift(p)
-    added++
+    const idx = result.findIndex((e) => isSamePerson(e, p))
+    if (idx === -1) {
+      result.unshift(p)
+      addedIds.add(p.id)
+      added++
+      continue
+    }
+    const target = result[idx]
+    result[idx] = mergeInto(target, p, now)
+    // 取り込み内での重複は集約するだけ。既存レコードの更新だけを件数に数える
+    if (!addedIds.has(target.id)) updated++
   }
-  return { merged: result, added }
+  return { merged: result, added, updated }
 }
