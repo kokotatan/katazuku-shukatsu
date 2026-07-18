@@ -1,4 +1,4 @@
-# katazuku reconcile-calendar — 選考マスタ(シート)→カレンダーの整合を取る (タスクスケジューラ想定)
+﻿# katazuku reconcile-calendar — 選考マスタ(シート)→カレンダーの整合を取る (タスクスケジューラ想定)
 # 役割: 選考管理（新）の合否・参加状況を career カレンダーの色/参加予定に反映。
 #   不合格・辞退=グレー / 参加確定=トマト / 抜けは新規登録 / 日程衝突は検出のみ。個人カレンダーは読むだけ。
 # 破壊的操作(削除)はしない。冪等(実態と一致していれば無変更)。
@@ -28,8 +28,7 @@ if (Test-Path $notifyFile) { $notifyBefore = @(Get-Content $notifyFile -Encoding
 $prompt = Get-Content -Raw (Join-Path $PSScriptRoot 'reconcile-calendar-prompt.md')
 if ($DryRun) {
   $prompt = "【ドライラン】manage_event は呼ばない(カレンダーは変更しない)。`n" +
-            "ただし手順6の TOAST 行は通常どおり logs/reconcile-notify.txt に Write で追記すること" +
-            "(「変更する予定だったこと」も TOAST 行に含める)。`n`n" + $prompt
+            "TOAST 行と要約は応答テキストに出力するだけにする(reconcile-notify.txt には書かない=実変更のみを残す)。`n`n" + $prompt
 }
 
 $mode = if ($DryRun) { 'DryRun' } else { 'Apply' }
@@ -43,7 +42,10 @@ $tools = @('Read', 'Write',
   'mcp__google-workspace__list_calendars')
 if (-not $DryRun) { $tools += 'mcp__google-workspace__manage_event' }
 
-claude -p $prompt --allowedTools $tools *>> $logFile
+# claude 本体の出力は UTF-8。PS5.1 の *>> は既定 UTF-16LE になり文字化けし、下の故障検知(UTF-8読み)が
+# 壊れる。OutputEncoding を UTF-8 にしたうえで Out-File -Encoding utf8 に統一する。
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+claude -p $prompt --allowedTools $tools *>&1 | Out-File $logFile -Append -Encoding utf8
 
 # ---- 実行後: 新しく増えた通知行を Windows トーストで出す ----
 function Show-Toast([string]$title, [string]$body) {
@@ -72,7 +74,7 @@ if ((-not $DryRun) -and (Test-Path $notifyFile)) {
 # ---- 故障検知: ログに要約が無い・認証エラーの痕跡なら alert に残す(asa が翌朝報告する) ----
 $failReason = $null
 $tail = (Get-Content $logFile -Encoding UTF8 | Select-Object -Last 30) -join "`n"
-if ($tail -notmatch '対象|色変更|衝突|無変更') {
+if ($tail -notmatch '対象|色変更|衝突') {
   if ($tail -match '認証|ログイン|permission|credential') { $failReason = '認証・許可エラーの痕跡' }
   elseif ($tail.Length -lt 50) { $failReason = '出力が空(claude実行自体が失敗した可能性)' }
 }
