@@ -7,10 +7,16 @@
 ## アーキテクチャ(2026-07-18 DB中心化。docs/specs/08-data.md)
 
 ```
-data/katazuku.db(正本・SQLite/node:sqlite・gitignore) ──→ Googleシート(一方向ミラー・スマホ/PC俯瞰)
-        ↑                                             ──→ board/(管理画面。ミラーのシートを読むだけ)
-  agent(唯一の書き手): メール→ sync/scripts/db-apply.ts / DB→ db-mirror.ts → MCPでシートへ
+data/katazuku.db(正本・SQLite/node:sqlite・gitignore)
+   ↑ agent(唯一の書き手): メール→db-apply / 会話 / (今後: 面接録音・提出結果・カレンダー・調査)
+   ├─→ db-snapshot.ts: 書くたびスナップショットJSONを /api/push へプッシュ(+DB日次バックアップ)
+   │      → Vercel Blob → アプリ群が /api/data?key=合言葉 で読む(サインイン不要・数秒で反映)
+   └─→ db-mirror.ts → MCPでシートへ(一方向ミラー。スプレッドシートで眺めたい時用+バックアップ)
 ```
+
+- **DBに書いたら必ず `cd sync && npx tsx scripts/db-snapshot.ts` を実行**(アプリへの即時反映)。合言葉は repo直下 .env
+- スキーマ: company(name=正式名称/short_name) / selection(+outcome列挙) / **appointment(面接・締切の日時/URL/場所/相手)** /
+  event(+ref=元メールID) / company_alias / pending_review
 
 - **DBへの入力は6本(2026-07-18本人定義)**: ①メール(daily-sync/mail-watch) ②会話(本人→agent)
   ③面接の録画・録音(interview-digest) ④提出結果(submit系エージェント) ⑤カレンダー ⑥調査結果(企業研究)。

@@ -17,6 +17,9 @@ DB→シートの一方向ミラー。書き手はagentのみ。サービスア�
    - 業界が分かれば industry、職種・コース・開催区分(1day/3days等)が特定できれば position に入れる
      (同じ会社に複数ポジション・複数コースで応募していることがあり、これがトラックを判別する鍵)
    - name は本文にある表記のままでよい(株式会社/Inc.付きの正式名称でも通称でも、DB側の正規化とエイリアス学習で吸収する)
+   - **予定は構造化して取る(最重要)**: 面接・面談・説明会・提出締切は appointments 配列
+     `[{at(ISO・時刻まで), kind(面接/面談/締切/説明会/テスト), title, url(Meet/Zoom/提出ページ), location, person(面接官等)}]`。
+     **会議URLと時刻は必ず拾う**(朝のページに「15:00 面接 [開く]」と出すための核)。ref にGmailメッセージIDを入れる
 3. 抽出結果を `{name, stage, nextAction, nextDate, industry, position}` の配列JSONとして `sync/sheet-import-loop.json` に書き出す(gitignore済み)。対象メールが無ければ空配列でよい。
 4. `cd sync; npx tsx scripts/db-apply.ts sheet-import-loop.json` で正本DBへ反映する。
    - 書き込み規則(終了系は根拠があれば確定・終了からの復活はしない・手書きの詳しいステータスを粗い進行中で潰さない)はスクリプト側で保証されている。
@@ -24,7 +27,8 @@ DB→シートの一方向ミラー。書き手はagentのみ。サービスア�
    - 「名寄せ要確認」と報告された企業は、DBには書かれていない。**サマリの冒頭で本人に確認**する
      (同じ会社なら `npx tsx scripts/db-alias.ts add <別名> <正式名称>`、別会社なら `db-alias.ts new <名前>` で学習・解決する。学習後は自動で名寄せされる)。
    - 差分が16社以上でブレーキが掛かったら、内容が妥当なときのみ `--force` を付けて再実行する。
-5. `npx tsx scripts/db-mirror.ts` でミラー値を生成し、`mirror-out.json` を Read して、各 writes[] を
+5. `npx tsx scripts/db-snapshot.ts` を実行する(アプリへの即時反映+DBの日次バックアップ。プッシュ失敗は警告のみで続行)。
+6. `npx tsx scripts/db-mirror.ts` でミラー値を生成し、`mirror-out.json` を Read して、各 writes[] を
    mcp__google-workspace__modify_sheet_values で書き込む(range_name は `'<tab>'!<range>`、values はそのまま渡す)。
    これでシートがDBの最新を映す。シートの条件付き書式・列幅は値の上書きでは壊れない。
 6. 受信トレイの整理(Gmailはフラット化する運用):

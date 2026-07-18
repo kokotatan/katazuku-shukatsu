@@ -12,7 +12,7 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join, resolve } from 'node:path'
 import type { DatabaseSync } from 'node:sqlite'
-import { openDb, upsertCompany, insertSelection, transition, samePosition, resolveCompany, addPending, addEvent, listPending, STATUS_FOR, type Stage } from '../src/db'
+import { openDb, upsertCompany, insertSelection, transition, samePosition, resolveCompany, addPending, addEvent, addAppointment, listPending, outcomeOf, STATUS_FOR, type Stage } from '../src/db'
 
 export const MAX_APPLY_CHANGES = 15
 
@@ -24,6 +24,10 @@ export interface DiffItem {
   industry?: string
   season?: string
   position?: string
+  /** 面接・締切・説明会などの予定(日時はISO。時刻・URL・場所・相手まで取る) */
+  appointments?: { at: string; kind?: string; title: string; url?: string; location?: string; person?: string }[]
+  /** 根拠メールのID等(イベントのref) */
+  ref?: string
 }
 
 export interface ApplyResult {
@@ -83,7 +87,11 @@ export function applyDiff(db: DatabaseSync, items: DiffItem[], by = 'daily-sync'
         esUrl: '',
         memo: '',
       }, by)
-      addEvent(db, sid, '新規', `${STATUS_FOR[it.stage]}として登録${it.position ? `(${it.position})` : ''}`, by)
+      addEvent(db, sid, '新規', `${STATUS_FOR[it.stage]}として登録${it.position ? `(${it.position})` : ''}`, by, undefined, it.ref)
+      for (const ap of it.appointments ?? []) {
+        addAppointment(db, { selectionId: sid, at: ap.at, kind: ap.kind ?? 'その他', title: ap.title, url: ap.url, location: ap.location, person: ap.person })
+        addEvent(db, sid, '予定追加', `${ap.title} (${ap.at})`, by, undefined, it.ref)
+      }
       res.added.push(name)
       continue
     }
@@ -97,9 +105,17 @@ export function applyDiff(db: DatabaseSync, items: DiffItem[], by = 'daily-sync'
     let changed = false
     const next = transition(target.status, it.stage)
     if (next) {
-      db.prepare('UPDATE selection SET status = ?, updated_at = ?, updated_by = ? WHERE id = ?').run(next, now, by, target.id)
-      addEvent(db, target.id, '状態変化', `${target.status || '(空)'} → ${next}`, by)
+      db.prepare('UPDATE selection SET status = ?, outcome = ?, updated_at = ?, updated_by = ? WHERE id = ?')
+        .run(next, outcomeOf(next), now, by, target.id)
+      addEvent(db, target.id, '状態変化', `${target.status || '(空)'} → ${next}`, by, undefined, it.ref)
       changed = true
+    }
+    for (const ap of it.appointments ?? []) {
+      const added = addAppointment(db, { selectionId: target.id, at: ap.at, kind: ap.kind ?? 'その他', title: ap.title, url: ap.url, location: ap.location, person: ap.person })
+      if (added.created) {
+        addEvent(db, target.id, '予定追加', `${ap.title} (${ap.at})`, by, undefined, it.ref)
+        changed = true
+      }
     }
     // 次アクション・締切はメール由来の最新情報で更新する(agentが唯一の書き手)
     if (it.nextAction && it.nextAction !== target.next_action) {

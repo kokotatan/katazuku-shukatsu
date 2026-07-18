@@ -1,41 +1,28 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Button } from 'smarthr-ui'
-import { requestAccessToken } from './lib/google'
-import { daysLeft, fetchAll, type AllData, type Track } from './lib/data'
+import { daysLeft, fetchAll, READ_KEY_STORAGE, type AllData, type Appointment, type Track } from './lib/data'
 
 /**
- * katazuku 管理画面(唯一の「見る窓」)。
- * 正本はローカルDB(data/katazuku.db)。ここはそのミラーであるシートを読むだけで、
- * 自分のデータを一切持たない(書き込みもしない)。スマホ・PCどちらでも最新が映る。
+ * katazuku 管理画面。正本DBのスナップショット(/api/data)を読むだけ。
+ * サインイン不要 — 合言葉を初回に1回。agentが書けば数秒後にここに映る。
  */
-
-const CLIENT_ID_KEY = 'katazuku-board/google-client-id'
-const LEGACY_CLIENT_ID_KEY = 'katazuku-pipeline/google-client-id' // 旧statusアプリからの引き継ぎ
-const TOKEN_KEY = 'katazuku-board/token'
 
 type Tab = 'today' | 'tracks' | 'companies' | 'log'
 
-function loadCachedToken(): string | null {
-  try {
-    const raw = sessionStorage.getItem(TOKEN_KEY)
-    if (!raw) return null
-    const { token, exp } = JSON.parse(raw) as { token: string; exp: number }
-    return Date.now() < exp ? token : null
-  } catch {
-    return null
-  }
-}
-
-/** ステータス文字列 → 行の色(シートの条件付き書式と同じ判定) */
-function statusClass(s: string): string {
-  if (/不合格|辞退|欠席|振替不可|お見送り|実質終了/.test(s)) return 'bg-slate-100 text-slate-400'
+function statusClass(s: string, outcome: string): string {
+  if (outcome === '不合格' || outcome === '辞退') return 'bg-slate-100 text-slate-400'
   if (/要確認|結果待ち/.test(s)) return 'bg-amber-50'
-  if (/合格|参加|通過|内定/.test(s.replace(/不合格/g, ''))) return 'bg-green-50'
+  if (outcome === '合格' || outcome === '内定') return 'bg-green-50'
   return 'bg-white'
 }
 
-function isClosed(s: string): boolean {
-  return /不合格|辞退|欠席|振替不可|お見送り|実質終了/.test(s)
+const WEEKDAYS = '日月火水木金土'
+
+function fmtAt(a: Appointment): string {
+  if (!a.atDate) return a.at
+  const d = a.atDate
+  const base = `${d.getMonth() + 1}/${d.getDate()}(${WEEKDAYS[d.getDay()]})`
+  return a.hasTime ? `${base} ${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}` : base
 }
 
 function DeadlineBadge({ t }: { t: Track }) {
@@ -47,97 +34,77 @@ function DeadlineBadge({ t }: { t: Track }) {
 }
 
 export default function App() {
-  const [clientId, setClientId] = useState(
-    () => localStorage.getItem(CLIENT_ID_KEY) ?? localStorage.getItem(LEGACY_CLIENT_ID_KEY) ?? '',
-  )
-  const [token, setToken] = useState<string | null>(loadCachedToken)
+  const [keyInput, setKeyInput] = useState('')
+  const [needKey, setNeedKey] = useState(false)
   const [data, setData] = useState<AllData | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [tab, setTab] = useState<Tab>('today')
   const [openCompany, setOpenCompany] = useState<string | null>(null)
 
-  const load = useCallback(async (tk: string) => {
+  const load = useCallback(async () => {
     setLoading(true)
     setError('')
     try {
-      setData(await fetchAll(tk))
+      setData(await fetchAll())
+      setNeedKey(false)
     } catch (err) {
-      if (err instanceof Error && err.message === 'AUTH') {
-        sessionStorage.removeItem(TOKEN_KEY)
-        setToken(null)
-      } else {
-        setError(err instanceof Error ? err.message : String(err))
-      }
+      if (err instanceof Error && err.message === 'KEY') setNeedKey(true)
+      else setError(err instanceof Error ? err.message : String(err))
     } finally {
       setLoading(false)
     }
   }, [])
 
   useEffect(() => {
-    if (token) void load(token)
-  }, [token, load])
+    void load()
+  }, [load])
 
-  const signIn = async () => {
-    const cid = clientId.trim()
-    if (!cid) return
-    localStorage.setItem(CLIENT_ID_KEY, cid)
-    setError('')
-    try {
-      const tk = await requestAccessToken(cid)
-      sessionStorage.setItem(TOKEN_KEY, JSON.stringify({ token: tk, exp: Date.now() + 50 * 60 * 1000 }))
-      setToken(tk)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
-    }
+  const saveKey = () => {
+    localStorage.setItem(READ_KEY_STORAGE, keyInput.trim())
+    void load()
   }
 
-  // ---- 未サインイン ----
-  if (!token) {
+  if (needKey) {
     return (
       <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-4 p-6">
         <div className="flex items-center gap-3">
           <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-teal-500 text-xl font-bold text-white">片</span>
           <div>
             <h1 className="text-lg font-bold text-slate-800">katazuku 管理画面</h1>
-            <p className="text-xs text-slate-500">就活、自動運転。選考・締切・活動ログを見る</p>
+            <p className="text-xs text-slate-500">合言葉を入れると表示されます(この端末では今回だけ)</p>
           </div>
         </div>
-        <label className="flex flex-col gap-1 text-xs font-semibold text-slate-500">
-          Google OAuth クライアントID
-          <input
-            className="rounded border border-slate-300 p-2 text-sm text-slate-800"
-            value={clientId}
-            onChange={(e) => setClientId(e.target.value)}
-            placeholder="xxxx.apps.googleusercontent.com"
-          />
-        </label>
-        <Button variant="primary" onClick={signIn} disabled={!clientId.trim()}>
-          Googleでサインインして表示
+        <input
+          className="rounded border border-slate-300 p-2 text-sm"
+          type="password"
+          value={keyInput}
+          onChange={(e) => setKeyInput(e.target.value)}
+          placeholder="合言葉"
+        />
+        <Button variant="primary" onClick={saveKey} disabled={!keyInput.trim()}>
+          表示する
         </Button>
         {error && <p className="rounded bg-red-50 p-3 text-sm text-red-700">{error}</p>}
-        <p className="text-xs leading-relaxed text-slate-400">
-          読み取り専用。データの正本はローカルDBで、この画面はそのミラー(シート)を映すだけです。
-        </p>
       </div>
     )
   }
 
   const tracks = data?.tracks ?? []
-  const active = tracks.filter((t) => !isClosed(t.status))
+  const active = tracks.filter((t) => t.outcome !== '不合格' && t.outcome !== '辞退')
+  const upcoming = (data?.appointments ?? []).filter((a) => a.atDate && daysLeft(a.atDate) >= 0 && daysLeft(a.atDate) <= 14)
   const withDeadline = active
     .filter((t) => t.deadlineDate && !t.submitted)
     .sort((a, b) => a.deadlineDate!.getTime() - b.deadlineDate!.getTime())
-  const waiting = active.filter((t) => /結果待ち|要確認|案内待ち/.test(t.status + t.nextAction))
-  const seasons = [...new Set(tracks.map((t) => t.period).filter(Boolean))]
+  const waiting = active.filter((t) => /結果待ち|要確認|案内待ち|確定待ち/.test(t.status + t.nextAction))
 
   const companies = [...new Set(tracks.map((t) => t.company))]
     .map((name) => ({
       name,
       tracks: tracks.filter((t) => t.company === name),
-      master: data?.master.find((m) => m.company === name),
+      master: data?.master.find((m) => m.company === name || m.officialName === name),
     }))
-    .sort((a, b) => Number(a.tracks.every((t) => isClosed(t.status))) - Number(b.tracks.every((t) => isClosed(t.status))))
+    .sort((a, b) => Number(a.tracks.every((t) => t.outcome === '不合格' || t.outcome === '辞退')) - Number(b.tracks.every((t) => t.outcome === '不合格' || t.outcome === '辞退')))
 
   const TabBtn = ({ k, label }: { k: Tab; label: string }) => (
     <button
@@ -154,9 +121,11 @@ export default function App() {
         <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-teal-500 font-bold text-white">片</span>
         <h1 className="font-bold text-slate-800">katazuku</h1>
         <span className="ml-auto text-xs text-slate-400">
-          {data ? `${data.loadedAt.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })} 時点` : ''}
+          {data?.generatedAt
+            ? `DB ${data.generatedAt.toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })} 時点`
+            : ''}
         </span>
-        <Button size="S" variant="secondary" onClick={() => token && load(token)} disabled={loading}>
+        <Button size="S" variant="secondary" onClick={() => load()} disabled={loading}>
           {loading ? '読込中…' : '更新'}
         </Button>
       </header>
@@ -174,10 +143,31 @@ export default function App() {
       {data && tab === 'today' && (
         <div className="flex flex-col gap-4">
           <section>
-            <h2 className="mb-1 text-sm font-bold text-slate-500">締切・選考日(近い順)</h2>
-            {withDeadline.length === 0 && <p className="text-sm text-slate-400">直近の締切はありません</p>}
+            <h2 className="mb-1 text-sm font-bold text-slate-500">予定(面接・締切)</h2>
+            {upcoming.length === 0 && <p className="text-sm text-slate-400">14日以内の予定はありません</p>}
+            {upcoming.map((a, i) => (
+              <div key={i} className="mb-1 flex items-center gap-2 rounded-lg border border-slate-300 bg-white p-2">
+                <span className={`shrink-0 rounded px-1.5 py-0.5 text-xs font-bold ${daysLeft(a.atDate!) <= 1 ? 'bg-red-50 text-red-700' : 'bg-slate-100 text-slate-500'}`}>
+                  {fmtAt(a)}
+                </span>
+                <span className="text-sm font-bold text-slate-800">{a.company}</span>
+                <span className="min-w-0 flex-1 truncate text-xs text-slate-500">
+                  {a.title}
+                  {a.person && ` / ${a.person}`}
+                  {a.location && ` @${a.location}`}
+                </span>
+                {a.url && (
+                  <a className="shrink-0 rounded bg-blue-600 px-2 py-1 text-xs font-bold text-white" href={a.url} target="_blank" rel="noreferrer">
+                    開く
+                  </a>
+                )}
+              </div>
+            ))}
+          </section>
+          <section>
+            <h2 className="mb-1 text-sm font-bold text-slate-500">締切(トラック)</h2>
             {withDeadline.map((t, i) => (
-              <div key={i} className={`mb-1 rounded-lg border border-slate-300 p-2 ${statusClass(t.status)}`}>
+              <div key={i} className={`mb-1 rounded-lg border border-slate-300 p-2 ${statusClass(t.status, t.outcome)}`}>
                 <div className="flex items-center text-sm font-bold text-slate-800">
                   {t.company}
                   {t.position && <span className="ml-1 font-normal text-slate-500">({t.position})</span>}
@@ -200,19 +190,16 @@ export default function App() {
       )}
 
       {data && tab === 'tracks' && (
-        <div className="overflow-x-auto">
-          {seasons.length > 1 && <p className="mb-1 text-xs text-slate-400">{seasons.join(' / ')}</p>}
+        <div>
           {tracks.map((t, i) => (
-            <div key={i} className={`mb-1 rounded-lg border border-slate-300 p-2 ${statusClass(t.status)}`}>
+            <div key={i} className={`mb-1 rounded-lg border border-slate-300 p-2 ${statusClass(t.status, t.outcome)}`}>
               <div className="flex items-baseline gap-1 text-sm">
                 <b className="text-slate-800">{t.company}</b>
                 <span className="text-xs text-slate-500">{t.period}{t.position && `・${t.position}`}</span>
                 <DeadlineBadge t={t} />
               </div>
               <p className="text-xs text-slate-600">{t.status}</p>
-              {t.steps.length > 0 && (
-                <p className="text-xs text-slate-400">{t.steps.join(' → ')}</p>
-              )}
+              {t.steps.length > 0 && <p className="text-xs text-slate-400">{t.steps.join(' → ')}</p>}
               {t.nextAction && <p className="text-xs text-blue-700">次: {t.nextAction}</p>}
             </div>
           ))}
@@ -237,7 +224,9 @@ export default function App() {
               </button>
               {openCompany === c.name && (
                 <div className="border-t border-slate-200 p-2 text-xs text-slate-600">
-                  {c.master?.officialName && <p className="mb-1 text-slate-400">正式名称: {c.master.officialName}</p>}
+                  {c.master?.officialName && c.master.officialName !== c.name && (
+                    <p className="mb-1 text-slate-400">正式名称: {c.master.officialName}</p>
+                  )}
                   {c.tracks.map((t, i) => (
                     <p key={i} className="mb-1">
                       <span className="font-semibold">{t.period}{t.position && `・${t.position}`}</span>: {t.status}

@@ -96,7 +96,23 @@ export function openDb(path: string): DatabaseSync {
       at TEXT NOT NULL,
       kind TEXT NOT NULL,
       summary TEXT NOT NULL,
-      source TEXT NOT NULL DEFAULT ''
+      source TEXT NOT NULL DEFAULT '',
+      ref TEXT NOT NULL DEFAULT ''
+    );
+    -- 予定(2026-07-18本人指摘「取っている情報が足りない」への回答):
+    -- 面接の時刻・会議URL・場所・相手、提出物の締切を構造化して持つ。1トラックに複数持てる。
+    -- kind: 面接 / 面談 / 締切 / 説明会 / テスト / その他
+    CREATE TABLE IF NOT EXISTS appointment (
+      id INTEGER PRIMARY KEY,
+      selection_id INTEGER NOT NULL REFERENCES selection(id),
+      at TEXT NOT NULL,               -- ISO日時(時刻不明なら日付のみ)
+      kind TEXT NOT NULL DEFAULT 'その他',
+      title TEXT NOT NULL,
+      url TEXT NOT NULL DEFAULT '',   -- Meet/Zoom/提出ページ
+      location TEXT NOT NULL DEFAULT '',
+      person TEXT NOT NULL DEFAULT '',-- 相手(面接官等)
+      status TEXT NOT NULL DEFAULT '予定',  -- 予定 / 完了 / 中止
+      created_at TEXT NOT NULL
     );
   `)
   // マイグレーション(2026-07-18本人指示):
@@ -111,7 +127,31 @@ export function openDb(path: string): DatabaseSync {
     db.exec("UPDATE company SET name = official_name WHERE official_name <> ''")
     db.exec('ALTER TABLE company DROP COLUMN official_name')
   }
+  // selection.outcome: 状態の機械判定用の列挙(進行中/合格/不合格/辞退/内定/終了)。statusは人間可読の自由文のまま
+  const scols = db.prepare('PRAGMA table_info(selection)').all() as { name: string }[]
+  if (!scols.some((c) => c.name === 'outcome')) {
+    db.exec("ALTER TABLE selection ADD COLUMN outcome TEXT NOT NULL DEFAULT ''")
+    db.exec(`UPDATE selection SET outcome = CASE
+      WHEN status GLOB '*不合格*' OR status GLOB '*欠席*' OR status GLOB '*振替不可*' OR status GLOB '*見送り*' OR status GLOB '*実質終了*' THEN '不合格'
+      WHEN status GLOB '*辞退*' THEN '辞退'
+      WHEN status GLOB '*内定*' THEN '内定'
+      WHEN REPLACE(status,'不合格','') GLOB '*合格*' OR status GLOB '*参加*' OR status GLOB '*通過*' THEN '合格'
+      ELSE '進行中' END`)
+  }
+  const ecols = db.prepare('PRAGMA table_info(event)').all() as { name: string }[]
+  if (!ecols.some((c) => c.name === 'ref')) db.exec("ALTER TABLE event ADD COLUMN ref TEXT NOT NULL DEFAULT ''")
   return db
+}
+
+/** statusの自由文からoutcome(列挙)を機械判定する。書き込み側はstatus更新時に必ずこれも更新する */
+export function outcomeOf(status: string): string {
+  const s = status.trim()
+  if (!s) return '進行中'
+  if (/不合格|欠席|振替不可|お見送り|見送り|実質終了/.test(s)) return '不合格'
+  if (/辞退/.test(s)) return '辞退'
+  if (/内定/.test(s)) return '内定'
+  if (/合格|参加|通過/.test(s.replace(/不合格/g, ''))) return '合格'
+  return '進行中'
 }
 
 // ---- 名寄せ(sheet.tsと同一規則) ----
@@ -246,9 +286,70 @@ export function listPending(db: DatabaseSync): { name: string; context: string; 
 
 // ---- イベント(状態変化の一次記録) ----
 
-export function addEvent(db: DatabaseSync, selectionId: number, kind: string, summary: string, source = '', at?: string): void {
-  db.prepare('INSERT INTO event (selection_id, at, kind, summary, source) VALUES (?, ?, ?, ?, ?)')
-    .run(selectionId, at ?? new Date().toISOString(), kind, summary, source)
+export function addEvent(db: DatabaseSync, selectionId: number, kind: string, summary: string, source = '', at?: string, ref?: string): void {
+  db.prepare('INSERT INTO event (selection_id, at, kind, summary, source, ref) VALUES (?, ?, ?, ?, ?, ?)')
+    .run(selectionId, at ?? new Date().toISOString(), kind, summary, source, ref ?? '')
+}
+
+// ---- 予定(面接・締切・説明会) ----
+
+export interface Appointment {
+  id?: number
+  selectionId: number
+  at: string
+  kind: string
+  title: string
+  url?: string
+  location?: string
+  person?: string
+  status?: string
+}
+
+/** 予定を追加する。同一(トラック×日時×タイトル)は重複させず、空欄だけ補完する */
+export function addAppointment(db: DatabaseSync, a: Appointment): { id: number; created: boolean } {
+  const now = new Date().toISOString()
+  const dup = db.prepare('SELECT id, url, location, person FROM appointment WHERE selection_id = ? AND at = ? AND title = ?')
+    .get(a.selectionId, a.at, a.title) as { id: number; url: string; location: string; person: string } | undefined
+  if (dup) {
+    const fill = (col: string, v?: string) => {
+      if (v && !(dup as unknown as Record<string, string>)[col]) db.prepare(`UPDATE appointment SET ${col} = ? WHERE id = ?`).run(v, dup.id)
+    }
+    fill('url', a.url)
+    fill('location', a.location)
+    fill('person', a.person)
+    return { id: dup.id, created: false }
+  }
+  const r = db.prepare(
+    'INSERT INTO appointment (selection_id, at, kind, title, url, location, person, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+  ).run(a.selectionId, a.at, a.kind || 'その他', a.title, a.url ?? '', a.location ?? '', a.person ?? '', a.status ?? '予定', now)
+  return { id: Number(r.lastInsertRowid), created: true }
+}
+
+export interface AppointmentRow extends Required<Appointment> {
+  company: string
+}
+
+export function listAppointments(db: DatabaseSync): AppointmentRow[] {
+  const rows = db.prepare(`
+    SELECT a.id, a.selection_id, a.at, a.kind, a.title, a.url, a.location, a.person, a.status,
+           CASE WHEN c.short_name <> '' THEN c.short_name ELSE c.name END AS company
+    FROM appointment a
+    JOIN selection s ON s.id = a.selection_id
+    JOIN company c ON c.id = s.company_id
+    ORDER BY a.at
+  `).all() as Record<string, unknown>[]
+  return rows.map((r) => ({
+    id: r.id as number,
+    selectionId: r.selection_id as number,
+    at: r.at as string,
+    kind: r.kind as string,
+    title: r.title as string,
+    url: r.url as string,
+    location: r.location as string,
+    person: r.person as string,
+    status: r.status as string,
+    company: r.company as string,
+  }))
 }
 
 export interface EventRow {
@@ -294,12 +395,12 @@ export function insertSelection(db: DatabaseSync, companyId: number, s: Selectio
   const now = new Date().toISOString()
   const r = db.prepare(`
     INSERT INTO selection (company_id, season, position, priority, status, step1, step2, step3, step4,
-      next_action, next_date, submitted, es_url, memo, updated_at, updated_by)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      next_action, next_date, submitted, es_url, memo, outcome, updated_at, updated_by)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     companyId, s.season, s.position, s.priority, s.status,
     s.steps[0] ?? '', s.steps[1] ?? '', s.steps[2] ?? '', s.steps[3] ?? '',
-    s.nextAction, s.nextDate, s.submitted ? 1 : 0, s.esUrl, s.memo, now, by,
+    s.nextAction, s.nextDate, s.submitted ? 1 : 0, s.esUrl, s.memo, outcomeOf(s.status), now, by,
   )
   return Number(r.lastInsertRowid)
 }

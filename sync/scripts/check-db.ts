@@ -3,7 +3,7 @@
  * インメモリSQLiteで実行。実行: cd sync && npx tsx scripts/check-db.ts
  */
 import { DatabaseSync } from 'node:sqlite'
-import { openDb, upsertCompany, insertSelection, listSelections, listCompanies, listEvents, transition, sameCompany, resolveCompany, addAlias, listPending, setOfficialName } from '../src/db'
+import { openDb, upsertCompany, insertSelection, listSelections, listCompanies, listEvents, listAppointments, addAppointment, outcomeOf, transition, sameCompany, resolveCompany, addAlias, listPending, setOfficialName } from '../src/db'
 import { applyDiff } from './db-apply'
 import { renderMirror } from './db-mirror'
 
@@ -137,6 +137,27 @@ insertSelection(db, evilId, { company: '数式注入テスト社', season: '夏'
 const evilRow = renderMirror(db).filter((w) => w.tab.includes('選考管理')).flatMap((w) => w.values).find((r) => r[0] === '数式注入テスト社')!
 check("codex反例: '=..'はアポストロフィで無害化", evilRow[4] === "'=EVIL()" && evilRow[14] === `'=HYPERLINK("x")`)
 check("codex反例: '+..'も無害化・自前の残り日数の数式だけ生きる", evilRow[9] === "'+1234" && evilRow[11].startsWith('=ifs('))
+
+// --- outcome(機械判定の列挙。status自由文と分離) ---
+check('outcome: 進行中の自由文', outcomeOf('人事面接済(7/16)') === '進行中')
+check('outcome: 「合格→本人辞退予定」は辞退', outcomeOf('合格→本人辞退予定') === '辞退')
+check('outcome: 不合格は合格に化けない', outcomeOf('不合格') === '不合格')
+check('outcome: 参加確定は合格系', outcomeOf('参加確定 8/19-21') === '合格')
+
+// --- appointment(予定。時刻・URL・場所・相手まで構造化して持つ) ---
+const apSel = listSelections(db).find((s) => s.company === 'PKSHA' && s.position === 'アルゴリズム')!
+const ap1 = addAppointment(db, { selectionId: apSel.id, at: '2026-07-21T23:59', kind: '締切', title: '研究資料PDF提出' })
+check('appointment: 新規作成', ap1.created)
+const ap2 = addAppointment(db, { selectionId: apSel.id, at: '2026-07-21T23:59', kind: '締切', title: '研究資料PDF提出', url: 'https://example.com/submit' })
+check('appointment: 同一(トラック×日時×タイトル)は重複しない', !ap2.created && ap2.id === ap1.id)
+check('appointment: 空欄のURLは後から補完される', listAppointments(db).some((a) => a.title === '研究資料PDF提出' && a.url === 'https://example.com/submit'))
+
+const apRes = applyDiff(db, [{ name: '予定テスト社', stage: 'interview', appointments: [{ at: '2026-07-25T15:00', kind: '面接', title: '2次面接', url: 'https://zoom.us/j/xxx', person: '川島氏' }] }])
+check('apply: 予定つき新規はappointmentも入る', apRes.added.length === 1 && listAppointments(db).some((a) => a.title === '2次面接' && a.person === '川島氏'))
+check('apply: 予定追加はイベントに残る', listEvents(db).some((e) => e.kind === '予定追加' && e.summary.includes('2次面接')))
+const evBefore = listEvents(db).length
+applyDiff(db, [{ name: '予定テスト社', stage: 'interview', appointments: [{ at: '2026-07-25T15:00', kind: '面接', title: '2次面接' }] }])
+check('apply: 同じ予定の再適用でイベントは増えない', listEvents(db).length === evBefore)
 
 if (failed) {
   console.error(`\n${failed}件失敗`)
