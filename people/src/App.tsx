@@ -5,9 +5,14 @@ import { loadPeople, mergePeople, newPersonId, savePeople } from './lib/people'
 import { AppNav } from './components/AppNav'
 import { PeopleView } from './components/PeopleView'
 import { PersonDialog, type PersonInput } from './components/PersonDialog'
+import { PersonDetail } from './components/PersonDetail'
 
-/** モーダルの状態: 閉/新規追加/既存編集 */
-type DialogState = { mode: 'closed' } | { mode: 'add' } | { mode: 'edit'; person: Person }
+/** モーダルの状態: 閉/新規追加/詳細表示/既存編集 */
+type DialogState =
+  | { mode: 'closed' }
+  | { mode: 'add' }
+  | { mode: 'view'; person: Person }
+  | { mode: 'edit'; person: Person }
 
 export default function App() {
   // 初期値は localStorage から読む。以降の変更は useEffect で必ず保存する
@@ -109,10 +114,18 @@ export default function App() {
 
         <PeopleView
           people={people}
-          onSelectPerson={(person) => setDialog({ mode: 'edit', person })}
+          onSelectPerson={(person) => setDialog({ mode: 'view', person })}
         />
 
-        {dialog.mode !== 'closed' && (
+        {dialog.mode === 'view' && (
+          <PersonDetail
+            person={dialog.person}
+            onEdit={() => setDialog({ mode: 'edit', person: dialog.person })}
+            onClose={() => setDialog({ mode: 'closed' })}
+          />
+        )}
+
+        {(dialog.mode === 'add' || dialog.mode === 'edit') && (
           <PersonDialog
             initial={dialog.mode === 'edit' ? dialog.person : null}
             people={people}

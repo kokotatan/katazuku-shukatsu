@@ -39,6 +39,39 @@ export function personCategory(p: { category?: string }): string {
   return p.category && p.category.trim() ? p.category.trim() : DEFAULT_CATEGORY
 }
 
+/**
+ * metAt 先頭から「出会った年月」を YYYY-MM で導出する。取れなければ ''。
+ * 例「2026-07 二次面接」「2026/7」「2026年7月」→「2026-07」。
+ * 年の無い簡易表記(例「7/16 二次面接」)は年月を確定できないので '' を返す。
+ */
+export function metMonth(p: { metAt?: string }): string {
+  const m = (p.metAt ?? '').trim().match(/^(\d{4})[-/年](\d{1,2})/)
+  if (!m) return ''
+  const month = Number(m[2])
+  if (month < 1 || month > 12) return ''
+  return `${m[1]}-${String(month).padStart(2, '0')}`
+}
+
+/** 登録済みの人から、実在する会社名の一覧を作る(重複除去・50音/コード順) */
+export function distinctCompanies(people: { company?: string }[]): string[] {
+  const set = new Set<string>()
+  for (const p of people) {
+    const c = (p.company ?? '').trim()
+    if (c) set.add(c)
+  }
+  return [...set].sort((a, b) => a.localeCompare(b, 'ja'))
+}
+
+/** 登録済みの人から、出会った年月(YYYY-MM)の一覧を作る(重複除去・新しい順) */
+export function distinctMonths(people: { metAt?: string }[]): string[] {
+  const set = new Set<string>()
+  for (const p of people) {
+    const m = metMonth(p)
+    if (m) set.add(m)
+  }
+  return [...set].sort().reverse()
+}
+
 /** 任意のオブジェクトを Person に正規化する(id/updatedAt/欠損フィールドを補完) */
 function coercePerson(raw: Partial<Person>): Person {
   const s = (v: unknown): string => (v == null ? '' : String(v))
