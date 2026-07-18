@@ -1,11 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Button, Input, Select, StatusLabel, Textarea } from 'smarthr-ui'
-import { KINDS, type Kind, type Snippet } from './types'
+import { KINDS, emptyBasicProfile, type BasicProfile, type Kind, type Snippet } from './types'
 import { countChars, targetLabel } from './lib/count'
 import { AppNav } from './components/AppNav'
+import { BasicProfileForm } from './components/BasicProfileForm'
 
 const STORAGE_KEY = 'katazuku-notes/snippets'
+const BASIC_KEY = 'katazuku-profile/basic'
 const PIPELINE_KEY = 'katazuku-pipeline/companies'
+
+/** タブ。基本情報を先頭に置き、以降は既存のスニペット種別 */
+type Tab = 'basic' | Kind
 
 function load(): Snippet[] {
   try {
@@ -15,6 +20,16 @@ function load(): Snippet[] {
     // 壊れたデータは空扱い
   }
   return []
+}
+
+function loadBasic(): BasicProfile {
+  try {
+    const raw = localStorage.getItem(BASIC_KEY)
+    if (raw !== null) return { ...emptyBasicProfile(), ...(JSON.parse(raw) as Partial<BasicProfile>) }
+  } catch {
+    // 壊れたデータは空扱い
+  }
+  return emptyBasicProfile()
 }
 
 function pipelineCompanyNames(): string[] {
@@ -31,7 +46,8 @@ function pipelineCompanyNames(): string[] {
 
 export default function App() {
   const [snippets, setSnippets] = useState<Snippet[]>(load)
-  const [kind, setKind] = useState<Kind>('gakuchika')
+  const [basic, setBasic] = useState<BasicProfile>(loadBasic)
+  const [tab, setTab] = useState<Tab>('basic')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [toast, setToast] = useState<string | null>(null)
   const fileInput = useRef<HTMLInputElement>(null)
@@ -40,15 +56,25 @@ export default function App() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(snippets))
   }, [snippets])
 
+  // 基本情報は入力のたびに即時保存(リロードしても残る)
+  useEffect(() => {
+    localStorage.setItem(BASIC_KEY, JSON.stringify(basic))
+  }, [basic])
+
   useEffect(() => {
     if (!toast) return
     const t = setTimeout(() => setToast(null), 3000)
     return () => clearTimeout(t)
   }, [toast])
 
+  const activeKind: Kind | null = tab === 'basic' ? null : tab
+
   const list = useMemo(
-    () => snippets.filter((s) => s.kind === kind).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
-    [snippets, kind],
+    () =>
+      activeKind === null
+        ? []
+        : snippets.filter((s) => s.kind === activeKind).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
+    [snippets, activeKind],
   )
   const editing = snippets.find((s) => s.id === editingId) ?? null
 
@@ -57,10 +83,14 @@ export default function App() {
       prev.map((s) => (s.id === id ? { ...s, ...p, updatedAt: new Date().toISOString() } : s)),
     )
 
+  const patchBasic = (p: Partial<BasicProfile>) =>
+    setBasic((prev) => ({ ...prev, ...p, updatedAt: new Date().toISOString() }))
+
   const create = () => {
+    if (activeKind === null) return
     const s: Snippet = {
       id: `s-${Date.now()}`,
-      kind,
+      kind: activeKind,
       title: '',
       body: '',
       targetChars: null,
@@ -91,7 +121,9 @@ export default function App() {
   }
 
   const exportJson = () => {
-    const blob = new Blob([JSON.stringify(snippets, null, 2)], { type: 'application/json' })
+    // 部品(snippets)と基本情報(basic)をまとめて書き出す
+    const payload = { version: 2, snippets, basic }
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
     const a = document.createElement('a')
     a.href = URL.createObjectURL(blob)
     a.download = `profile-export-${new Date().toISOString().slice(0, 10)}.json`
@@ -101,12 +133,31 @@ export default function App() {
 
   const importJson = async (file: File) => {
     try {
-      const data = JSON.parse(await file.text()) as Snippet[]
-      if (!Array.isArray(data)) throw new Error('配列ではありません')
+      const data = JSON.parse(await file.text()) as
+        | Snippet[]
+        | { snippets?: Snippet[]; basic?: Partial<BasicProfile> }
+      // 旧形式(配列=部品のみ)と新形式({snippets, basic})の両方を受ける
+      const incoming = Array.isArray(data) ? data : (data.snippets ?? [])
       const known = new Set(snippets.map((s) => s.id))
-      const fresh = data.filter((s) => s.id && !known.has(s.id))
+      const fresh = incoming.filter((s) => s.id && !known.has(s.id))
       setSnippets((prev) => [...fresh, ...prev])
-      setToast(`${fresh.length}件を取り込みました`)
+      // 基本情報は既存を壊さないよう、値が入っているフィールドだけ上書きマージ
+      const incomingBasic = Array.isArray(data) ? undefined : data.basic
+      let basicFields = 0
+      if (incomingBasic) {
+        const overlay: Partial<BasicProfile> = {}
+        for (const [k, v] of Object.entries(incomingBasic)) {
+          if (k === 'updatedAt') continue
+          if (typeof v === 'string' && v !== '') {
+            ;(overlay as Record<string, string>)[k] = v
+            basicFields++
+          }
+        }
+        if (basicFields > 0) patchBasic(overlay)
+      }
+      setToast(
+        `部品${fresh.length}件` + (basicFields > 0 ? ` / 基本情報${basicFields}項目` : '') + 'を取り込みました',
+      )
     } catch (err) {
       setToast(`インポート失敗: ${err instanceof Error ? err.message : String(err)}`)
     }
@@ -149,13 +200,23 @@ export default function App() {
       <main className="max-w-3xl px-6 py-6">
         {editing === null ? (
           <>
-            <nav className="mb-4 flex gap-1 border-b border-slate-200">
+            <nav className="mb-4 flex gap-1 overflow-x-auto border-b border-slate-200">
+              <button
+                onClick={() => setTab('basic')}
+                className={`-mb-px shrink-0 border-b-2 px-3 py-2 text-sm font-medium transition ${
+                  tab === 'basic'
+                    ? 'border-blue-500 font-bold text-blue-600'
+                    : 'border-transparent text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                基本情報
+              </button>
               {KINDS.map((k) => (
                 <button
                   key={k.key}
-                  onClick={() => setKind(k.key)}
-                  className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium transition ${
-                    kind === k.key
+                  onClick={() => setTab(k.key)}
+                  className={`-mb-px shrink-0 border-b-2 px-3 py-2 text-sm font-medium transition ${
+                    tab === k.key
                       ? 'border-blue-500 font-bold text-blue-600'
                       : 'border-transparent text-slate-500 hover:text-slate-700'
                   }`}
@@ -168,39 +229,47 @@ export default function App() {
               ))}
             </nav>
 
-            <button
-              onClick={create}
-              className="mb-4 w-full rounded-lg border border-slate-300 bg-white py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50 hover:text-blue-600"
-            >
-              + 新しい部品を書く
-            </button>
-
-            {list.length === 0 ? (
-              <p className="py-16 text-center text-sm text-slate-400">
-                まだ部品がありません。書いたESはここに貯めて使い回しましょう
-              </p>
+            {tab === 'basic' ? (
+              <BasicProfileForm value={basic} onChange={patchBasic} />
             ) : (
-              <ul>
-                {list.map((s) => {
-                  const c = countChars(s.body)
-                  return (
-                    <li key={s.id}>
-                      <button
-                        onClick={() => setEditingId(s.id)}
-                        className="flex w-full items-baseline gap-3 border-b border-slate-100 px-1 py-3 text-left transition hover:bg-slate-50"
-                      >
-                        <span className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-800">
-                          {s.title || '無題'}
-                        </span>
-                        <span className="shrink-0 text-sm tabular-nums text-slate-500">{c.chars}字</span>
-                        {s.usedAt.length > 0 && (
-                          <span className="shrink-0 text-[11px] text-slate-400">{s.usedAt.length}社で使用</span>
-                        )}
-                      </button>
-                    </li>
-                  )
-                })}
-              </ul>
+              <>
+                <button
+                  onClick={create}
+                  className="mb-4 w-full rounded-lg border border-slate-300 bg-white py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50 hover:text-blue-600"
+                >
+                  + 新しい部品を書く
+                </button>
+
+                {list.length === 0 ? (
+                  <p className="py-16 text-center text-sm text-slate-400">
+                    まだ部品がありません。書いたESはここに貯めて使い回しましょう
+                  </p>
+                ) : (
+                  <ul>
+                    {list.map((s) => {
+                      const c = countChars(s.body)
+                      return (
+                        <li key={s.id}>
+                          <button
+                            onClick={() => setEditingId(s.id)}
+                            className="flex w-full items-baseline gap-3 border-b border-slate-100 px-1 py-3 text-left transition hover:bg-slate-50"
+                          >
+                            <span className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-800">
+                              {s.title || '無題'}
+                            </span>
+                            <span className="shrink-0 text-sm tabular-nums text-slate-500">{c.chars}字</span>
+                            {s.usedAt.length > 0 && (
+                              <span className="shrink-0 text-[11px] text-slate-400">
+                                {s.usedAt.length}社で使用
+                              </span>
+                            )}
+                          </button>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                )}
+              </>
             )}
           </>
         ) : (
