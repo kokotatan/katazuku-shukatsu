@@ -1,419 +1,74 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Button, Input, StatusLabel, Textarea } from 'smarthr-ui'
-import { KIND_META, type PrepEntry, type PrepKind } from './types'
-import { companySummary, focusDeck, retrospectives } from './lib/select'
-import { sameCompany } from './lib/names'
+import { useState } from 'react'
+import { formatDate, textValue } from '@katazuku/data'
 import { AppNav } from './components/AppNav'
-
-const STORAGE_KEY = 'katazuku-prep/entries'
-const PIPELINE_KEY = 'katazuku-pipeline/companies'
-
-function load(): PrepEntry[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw !== null) return JSON.parse(raw) as PrepEntry[]
-  } catch {
-    // 壊れたデータは空扱い
-  }
-  return []
-}
-
-function pipelineNames(): string[] {
-  try {
-    const raw = localStorage.getItem(PIPELINE_KEY)
-    if (raw !== null) {
-      return (JSON.parse(raw) as { name?: string }[]).map((c) => c.name ?? '').filter(Boolean)
-    }
-  } catch {
-    // なければ空
-  }
-  return []
-}
-
-type View =
-  | { mode: 'home' }
-  | { mode: 'company'; company: string }
-  | { mode: 'focus'; company: string }
+import { DataState } from './components/DataState'
+import { useKatazukuData } from './lib/useKatazukuData'
 
 export default function App() {
-  const [entries, setEntries] = useState<PrepEntry[]>(load)
-  const [view, setView] = useState<View>(() => {
-    const company = new URLSearchParams(window.location.search).get('company')
-    return company ? { mode: 'company', company } : { mode: 'home' }
-  })
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(entries))
-  }, [entries])
-
-  const add = (entry: Omit<PrepEntry, 'id' | 'updatedAt'>) =>
-    setEntries((prev) => [
-      { ...entry, id: `p-${Date.now()}`, updatedAt: new Date().toISOString() },
-      ...prev,
-    ])
-  const patch = (id: string, p: Partial<PrepEntry>) =>
-    setEntries((prev) =>
-      prev.map((e) => (e.id === id ? { ...e, ...p, updatedAt: new Date().toISOString() } : e)),
-    )
-  const remove = (id: string) => setEntries((prev) => prev.filter((e) => e.id !== id))
+  const { data, error, loading, reload, setKey } = useKatazukuData()
+  const upcoming = (data?.appointments || [])
+    .filter((appointment) => appointment.status === '予定' && new Date(appointment.at).getTime() >= Date.now() - 60 * 60 * 1000)
+    .sort((a, b) => a.at.localeCompare(b.at))
+  const companies = Array.from(new Set([
+    ...upcoming.map((appointment) => appointment.company),
+    ...(data?.dossiers || []).map((dossier) => dossier.company),
+  ])).filter(Boolean)
+  const [selected, setSelected] = useState('')
+  const company = selected || upcoming[0]?.company || companies[0] || ''
+  const dossier = data?.dossiers.find((item) => item.company === company)
+  const interviews = (data?.interviews || []).filter((item) => item.company === company)
 
   return (
-    <div className="flex min-h-screen">
+    <div className="min-h-screen bg-slate-50 text-slate-900 md:flex">
       <AppNav current="prep" />
-      <div className="min-h-screen min-w-0 flex-1 pb-14 md:pb-0">
-      <header className="sticky top-0 z-10 border-b border-slate-300 bg-white">
-        <div className="flex items-center gap-2.5 px-6 py-3">
-          <h1 className="flex items-baseline gap-2.5">
-            <span className="text-lg font-bold tracking-tight text-slate-900">面接準備</span>
-            <span className="hidden text-xs font-normal text-slate-500 sm:inline">
-              振り返りと想定問答を企業ごとに。
-            </span>
-          </h1>
-          <div className="ml-auto flex items-center gap-2">
-            {view.mode !== 'home' && (
-              <Button size="S" variant="secondary" onClick={() => setView({ mode: 'home' })}>
-                一覧へ
-              </Button>
-            )}
-          </div>
-        </div>
-      </header>
+      <main className="min-w-0 flex-1 px-4 py-6 pb-24 md:px-8 md:py-8">
+        <header className="mb-6 flex flex-wrap items-end justify-between gap-3">
+          <div><p className="text-xs font-bold tracking-wide text-blue-700">PREP</p><h1 className="mt-1 text-2xl font-bold">面接準備</h1><p className="mt-1 text-sm text-slate-600">予定・企業研究・過去面接を会社ごとに束ねます。</p></div>
+          <button type="button" onClick={reload} className="rounded-md border border-slate-400 bg-white px-3 py-2 text-sm font-bold hover:bg-slate-100">再読込</button>
+        </header>
+        {!data ? <DataState loading={loading} error={error} onSaveKey={setKey} /> : (
+          <>
+            <section className="mb-5 grid gap-3 lg:grid-cols-2" aria-label="直近予定">
+              {upcoming.slice(0, 4).map((appointment) => (
+                <button key={appointment.id} type="button" onClick={() => setSelected(appointment.company)} className="rounded-xl border border-slate-300 bg-white p-4 text-left shadow-sm hover:border-blue-500">
+                  <div className="flex items-start justify-between gap-3"><div><p className="text-xs font-bold text-blue-700">{appointment.company}</p><h2 className="mt-1 font-bold">{appointment.title}</h2></div><time className="text-sm font-bold">{formatDate(appointment.at)}</time></div>
+                  <p className="mt-2 text-sm text-slate-600">{[appointment.person, appointment.location].filter(Boolean).join(' / ') || appointment.kind}</p>
+                </button>
+              ))}
+              {upcoming.length === 0 && <div className="rounded-xl border border-slate-300 bg-white p-5 text-sm text-slate-600">今後の予定はありません。</div>}
+            </section>
 
-      {view.mode === 'home' && (
-        <Home entries={entries} onOpen={(company) => setView({ mode: 'company', company })} onAdd={add} />
-      )}
-      {view.mode === 'company' && (
-        <Company
-          entries={entries}
-          company={view.company}
-          onAdd={add}
-          onPatch={patch}
-          onRemove={remove}
-          onFocus={() => setView({ mode: 'focus', company: view.company })}
-        />
-      )}
-      {view.mode === 'focus' && (
-        <Focus
-          deck={focusDeck(entries, view.company)}
-          company={view.company}
-          onExit={() => setView({ mode: 'company', company: view.company })}
-        />
-      )}
-      </div>
-    </div>
-  )
-}
+            <div className="mb-5 flex flex-wrap items-center gap-3 rounded-xl border border-slate-300 bg-white p-4">
+              <label htmlFor="prep-company" className="text-sm font-bold">準備する会社</label>
+              <select id="prep-company" value={company} onChange={(event) => setSelected(event.target.value)} className="min-w-56 rounded-md border border-slate-400 bg-white px-3 py-2 text-sm">
+                {companies.map((name) => <option key={name} value={name}>{name}</option>)}
+              </select>
+            </div>
 
-function EntryForm({ company, onAdd }: { company: string; onAdd: (e: Omit<PrepEntry, 'id' | 'updatedAt'>) => void }) {
-  const [kind, setKind] = useState<PrepKind>(company ? 'qa' : 'axis')
-  const [question, setQuestion] = useState('')
-  const [answer, setAnswer] = useState('')
-  const placeholder: Record<PrepKind, [string, string]> = {
-    qa: ['想定質問(例: なぜこの会社?)', '自分の答え'],
-    retro: ['場面(例: 〇〇の一次面接)', '何が起きたか・次どうするか'],
-    axis: ['テーマ(例: 就活の軸)', '自分の言葉で'],
-  }
-  return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault()
-        if (!question.trim() && !answer.trim()) return
-        onAdd({ company: kind === 'axis' ? '' : company, kind, question: question.trim(), answer: answer.trim() })
-        setQuestion('')
-        setAnswer('')
-      }}
-      className="mb-6 rounded-lg border border-slate-300 bg-white p-4"
-    >
-      <div className="mb-2 flex gap-1">
-        {(Object.keys(KIND_META) as PrepKind[]).map((k) => (
-          <Button
-            key={k}
-            type="button"
-            size="S"
-            variant={kind === k ? 'primary' : 'secondary'}
-            onClick={() => setKind(k)}
-          >
-            {KIND_META[k].label}
-          </Button>
-        ))}
-      </div>
-      <Input
-        width="100%"
-        value={question}
-        onChange={(e) => setQuestion(e.target.value)}
-        placeholder={placeholder[kind][0]}
-        className="mb-2 font-semibold"
-      />
-      <Textarea
-        width="100%"
-        value={answer}
-        onChange={(e) => setAnswer(e.target.value)}
-        rows={3}
-        placeholder={placeholder[kind][1]}
-        className="mb-2"
-      />
-      <Button type="submit" variant="primary">
-        追加
-      </Button>
-    </form>
-  )
-}
-
-function EntryRow({ entry, onPatch, onRemove }: { entry: PrepEntry; onPatch: (p: Partial<PrepEntry>) => void; onRemove: () => void }) {
-  const [editing, setEditing] = useState(false)
-  if (editing) {
-    return (
-      <li className="border-b border-slate-100 py-3">
-        <Input
-          width="100%"
-          value={entry.question}
-          onChange={(e) => onPatch({ question: e.target.value })}
-          className="mb-1.5 font-semibold"
-        />
-        <Textarea
-          width="100%"
-          value={entry.answer}
-          onChange={(e) => onPatch({ answer: e.target.value })}
-          rows={3}
-          className="mb-1.5"
-        />
-        <Button size="S" variant="text" onClick={() => setEditing(false)}>
-          閉じる
-        </Button>
-      </li>
-    )
-  }
-  return (
-    <li className="group border-b border-slate-100 py-3">
-      <div className="flex items-baseline gap-2">
-        <span className="shrink-0">
-          <StatusLabel type="grey">{KIND_META[entry.kind].label}</StatusLabel>
-        </span>
-        <button onClick={() => setEditing(true)} className="min-w-0 flex-1 text-left">
-          <p className="text-sm font-semibold text-slate-800">{entry.question || '(無題)'}</p>
-          <p className="mt-0.5 whitespace-pre-wrap text-sm leading-relaxed text-slate-500">{entry.answer}</p>
-        </button>
-        <button
-          onClick={() => { if (window.confirm('削除しますか?')) onRemove() }}
-          className="shrink-0 text-xs text-slate-300 transition group-hover:text-red-600"
-        >
-          削除
-        </button>
-      </div>
-    </li>
-  )
-}
-
-function Home({
-  entries,
-  onOpen,
-  onAdd,
-}: {
-  entries: PrepEntry[]
-  onOpen: (company: string) => void
-  onAdd: (e: Omit<PrepEntry, 'id' | 'updatedAt'>) => void
-}) {
-  const [companyDraft, setCompanyDraft] = useState('')
-  const summary = useMemo(() => companySummary(entries), [entries])
-  const retros = useMemo(() => retrospectives(entries), [entries])
-  const axes = entries.filter((e) => e.kind === 'axis')
-  const options = useMemo(pipelineNames, [])
-
-  return (
-    <main className="max-w-3xl px-6 py-6">
-      <form
-        onSubmit={(e) => {
-          e.preventDefault()
-          if (companyDraft.trim()) onOpen(companyDraft.trim())
-        }}
-        className="mb-6 flex gap-2"
-      >
-        <div className="flex-1">
-          <Input
-            width="100%"
-            value={companyDraft}
-            onChange={(e) => setCompanyDraft(e.target.value)}
-            list="company-options"
-            placeholder="企業名を入れて対策ノートを開く(選考ボードから補完)"
-          />
-        </div>
-        <datalist id="company-options">
-          {options.map((name) => (
-            <option key={name} value={name} />
-          ))}
-        </datalist>
-        <Button type="submit" variant="primary">
-          開く
-        </Button>
-      </form>
-
-      {summary.length > 0 && (
-        <section className="mb-8">
-          <h2 className="mb-2 border-b border-slate-200 pb-1.5 text-base font-semibold text-slate-800">
-            企業別ノート
-          </h2>
-          <ul className="flex flex-wrap gap-2 pt-2">
-            {summary.map((g) => (
-              <li key={g.company}>
-                <Button
-                  size="S"
-                  variant="secondary"
-                  onClick={() => onOpen(g.company)}
-                  suffix={<StatusLabel type="grey">{g.count}</StatusLabel>}
-                >
-                  {g.company}
-                </Button>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-      <section className="mb-8">
-        <h2 className="mb-2 border-b border-slate-200 pb-1.5 text-base font-semibold text-slate-800">
-          就活の軸(全社共通)
-        </h2>
-        <EntryForm company="" onAdd={onAdd} />
-        {axes.length === 0 && (
-          <p className="text-sm text-slate-400">「自分は何で会社を選ぶのか」を一行ずつ。面接直前モードの最初に出ます</p>
+            <div className="grid gap-5 xl:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
+              <section className="rounded-xl border border-slate-300 bg-white p-5 shadow-sm">
+                <div className="flex items-center justify-between gap-3"><h2 className="text-lg font-bold">企業研究</h2>{dossier && <time className="text-xs text-slate-500">{formatDate(dossier.researchedAt)}</time>}</div>
+                {dossier ? (
+                  <>
+                    <p className="mt-4 whitespace-pre-wrap text-sm leading-7">{dossier.summary}</p>
+                    <dl className="mt-5 grid gap-4 border-t border-slate-200 pt-5">
+                      {Object.entries(dossier.facts).map(([key, value]) => <div key={key}><dt className="text-xs font-bold uppercase tracking-wide text-blue-700">{key}</dt><dd className="mt-1 whitespace-pre-wrap text-sm leading-6">{textValue(value)}</dd></div>)}
+                    </dl>
+                    <div className="mt-5 border-t border-slate-200 pt-4"><h3 className="text-sm font-bold">根拠</h3><ul className="mt-2 space-y-1">{dossier.sources.map((source, index) => <li key={source.url || index} className="text-sm">{source.url ? <a href={source.url} target="_blank" rel="noreferrer" className="text-blue-700 underline">{source.title || source.url}</a> : source.title}</li>)}</ul></div>
+                  </>
+                ) : <p className="mt-4 text-sm text-slate-500">この会社のdossierはまだありません。企業研究パイプライン実行後にここへ入ります。</p>}
+              </section>
+              <aside className="rounded-xl border border-slate-300 bg-white p-5 shadow-sm">
+                <h2 className="font-bold">過去面接</h2>
+                <div className="mt-4 space-y-4">
+                  {interviews.map((interview) => <article key={interview.id} className="border-b border-slate-200 pb-4"><p className="text-xs text-slate-500">{formatDate(interview.occurredAt)}</p><h3 className="mt-1 text-sm font-bold">{interview.title}</h3><p className="mt-2 text-sm leading-6 text-slate-600">{interview.summary}</p></article>)}
+                  {interviews.length === 0 && <p className="text-sm text-slate-500">面接記録はまだありません。</p>}
+                </div>
+              </aside>
+            </div>
+          </>
         )}
-        <ul>
-          {axes.map((e) => (
-            <li key={e.id} className="border-b border-slate-100 py-3">
-              <p className="text-sm font-semibold text-slate-800">{e.question}</p>
-              <p className="mt-0.5 whitespace-pre-wrap text-sm text-slate-500">{e.answer}</p>
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      {retros.length > 0 && (
-        <section>
-          <h2 className="mb-2 border-b border-slate-200 pb-1.5 text-base font-semibold text-slate-800">
-            振り返りの横断ビュー
-            <span className="ml-2 text-xs font-normal text-slate-400">同じ失敗を繰り返していないか</span>
-          </h2>
-          <ul>
-            {retros.map((e) => (
-              <li key={e.id} className="border-b border-slate-100 py-3">
-                <p className="text-xs text-slate-400">{e.company}</p>
-                <p className="text-sm font-semibold text-slate-800">{e.question}</p>
-                <p className="mt-0.5 whitespace-pre-wrap text-sm text-slate-500">{e.answer}</p>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-    </main>
-  )
-}
-
-function Company({
-  entries,
-  company,
-  onAdd,
-  onPatch,
-  onRemove,
-  onFocus,
-}: {
-  entries: PrepEntry[]
-  company: string
-  onAdd: (e: Omit<PrepEntry, 'id' | 'updatedAt'>) => void
-  onPatch: (id: string, p: Partial<PrepEntry>) => void
-  onRemove: (id: string) => void
-  onFocus: () => void
-}) {
-  const mine = entries.filter((e) => e.company && sameCompany(e.company, company))
-  return (
-    <main className="max-w-3xl px-6 py-6">
-      <div className="mb-4 flex items-baseline gap-3">
-        <h1 className="text-2xl font-semibold text-slate-900">{company}</h1>
-        <Button className="ml-auto" variant="primary" onClick={onFocus}>
-          直前モードを開始
-        </Button>
-      </div>
-      <EntryForm company={company} onAdd={onAdd} />
-      {mine.length === 0 ? (
-        <p className="py-10 text-center text-sm text-slate-400">
-          まだ何もありません。面接後の振り返りと、聞かれそうな質問への答えを貯めましょう
-        </p>
-      ) : (
-        <ul>
-          {mine.map((e) => (
-            <EntryRow key={e.id} entry={e} onPatch={(p) => onPatch(e.id, p)} onRemove={() => onRemove(e.id)} />
-          ))}
-        </ul>
-      )}
-    </main>
-  )
-}
-
-function Focus({ deck, company, onExit }: { deck: PrepEntry[]; company: string; onExit: () => void }) {
-  const [index, setIndex] = useState(0)
-  const [showAnswer, setShowAnswer] = useState(false)
-
-  useEffect(() => {
-    const handler = (ev: KeyboardEvent) => {
-      const key = ev.key.toLowerCase()
-      if (key === 'escape') onExit()
-      if (key === 'j' || key === 'enter' || key === 'arrowright' || key === ' ') {
-        ev.preventDefault()
-        if (!showAnswer) setShowAnswer(true)
-        else if (index < deck.length - 1) {
-          setIndex(index + 1)
-          setShowAnswer(false)
-        } else onExit()
-      }
-      if (key === 'k' || key === 'arrowleft') {
-        if (index > 0) {
-          setIndex(index - 1)
-          setShowAnswer(false)
-        }
-      }
-    }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  })
-
-  if (deck.length === 0) {
-    return (
-      <main className="mx-auto max-w-2xl px-4 py-24 text-center">
-        <p className="text-xl text-slate-700">読むものがまだありません</p>
-        <p className="mt-2 text-sm text-slate-400">軸と想定問答を追加してから直前モードを使ってください</p>
-        <div className="mt-6">
-          <Button variant="secondary" onClick={onExit}>
-            戻る
-          </Button>
-        </div>
       </main>
-    )
-  }
-
-  const entry = deck[index]
-  return (
-    <main
-      className="mx-auto flex min-h-[80vh] max-w-2xl cursor-pointer flex-col justify-center px-6 py-12"
-      onClick={() => {
-        if (!showAnswer) setShowAnswer(true)
-        else if (index < deck.length - 1) {
-          setIndex(index + 1)
-          setShowAnswer(false)
-        } else onExit()
-      }}
-    >
-      <p className="mb-6 text-xs tracking-widest text-slate-400">
-        {company} 直前モード {index + 1} / {deck.length}
-        <span className="ml-3">{KIND_META[entry.kind].label}</span>
-      </p>
-      <h1 className="text-3xl font-semibold leading-relaxed tracking-wide text-slate-900">
-        {entry.question || '(無題)'}
-      </h1>
-      {showAnswer ? (
-        <p className="mt-8 whitespace-pre-wrap text-base leading-loose text-slate-600">{entry.answer}</p>
-      ) : (
-        <p className="mt-8 text-sm text-slate-400">クリック / Enter で自分の答えを表示</p>
-      )}
-      <p className="mt-12 text-[11px] text-slate-300">J・Enter: 次へ / K: 戻る / Esc: 終了</p>
-    </main>
+    </div>
   )
 }

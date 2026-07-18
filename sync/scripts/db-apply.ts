@@ -60,13 +60,20 @@ export function applyDiff(db: DatabaseSync, items: DiffItem[], by = 'daily-sync'
     const sels = db.prepare('SELECT id, position, status, next_action, next_date FROM selection WHERE company_id = ?')
       .all(cid) as { id: number; position: string; status: string; next_action: string; next_date: string }[]
 
-    // トラックの特定: position指定があれば完全一致のみ。一致ゼロなら「別トラックの新情報」として追加する。
+    // トラックの特定: position指定があれば完全一致または長い名称の包含一致。
+    // 既存が1本かつposition空欄なら、具体名が判明した同じトラックとして育てる。
     // position指定なしで複数トラック → どれの話か分からないので保留(壊すより触らない)
     let target: (typeof sels)[number] | undefined
     let addAsNewTrack = sels.length === 0
     if (!addAsNewTrack) {
       if (it.position) {
         target = sels.find((s) => samePosition(s.position, it.position!))
+        if (!target && sels.length === 1 && !sels[0].position.trim()) {
+          target = sels[0]
+          db.prepare('UPDATE selection SET position = ?, updated_at = ?, updated_by = ? WHERE id = ?')
+            .run(it.position, now, by, target.id)
+          target.position = it.position
+        }
         if (!target) addAsNewTrack = true // 例: Sansan(3days)しか無いところに Sansan 1day の話が来た
       } else if (sels.length === 1) {
         target = sels[0]

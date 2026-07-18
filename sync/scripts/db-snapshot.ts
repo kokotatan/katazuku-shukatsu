@@ -12,6 +12,7 @@ import { copyFileSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSy
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { openDb, listCompanies, listSelections, listAppointments, listEvents } from '../src/db'
+import { listPlatformSnapshot } from '../src/platform'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 const DB_PATH = process.env.KATAZUKU_DB ?? join(root, 'data', 'katazuku.db')
@@ -40,6 +41,7 @@ function buildSnapshot() {
     appointments: listAppointments(db),
     events: listEvents(db).slice(-100),
     activities: loadActivities(),
+    ...listPlatformSnapshot(db),
   }
 }
 
@@ -82,11 +84,17 @@ async function main() {
     console.log('KATAZUKU_WRITE_SECRET が .env に無いためプッシュはスキップ(生成のみ)')
     return
   }
-  const res = await fetch(url, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${secret}` },
-    body: JSON.stringify(snap),
-  })
+  let res: Response
+  try {
+    res = await fetch(url, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${secret}` },
+      body: JSON.stringify(snap),
+    })
+  } catch (error) {
+    console.error(`警告: プッシュ接続失敗: ${error instanceof Error ? error.message : String(error)}`)
+    return
+  }
   if (!res.ok) {
     // 輸送はベストエフォート(未設定・オフラインでもDB本体の処理は成功扱い)。ただし警告は残す
     console.error(`警告: プッシュ失敗 (${res.status}): ${(await res.text()).slice(0, 200)}`)

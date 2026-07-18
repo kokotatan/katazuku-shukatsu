@@ -9,6 +9,7 @@
 import { DatabaseSync } from 'node:sqlite'
 import { mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
+import { ensurePlatformSchema } from './platform'
 
 export interface Selection {
   id?: number
@@ -143,6 +144,7 @@ export function openDb(path: string): DatabaseSync {
   // appointment.end_at: 会議の終了時刻(録画の自動停止に必須。無ければ開始+60分とみなす)
   const acols = db.prepare('PRAGMA table_info(appointment)').all() as { name: string }[]
   if (!acols.some((c) => c.name === 'end_at')) db.exec("ALTER TABLE appointment ADD COLUMN end_at TEXT NOT NULL DEFAULT ''")
+  ensurePlatformSchema(db)
   return db
 }
 
@@ -193,9 +195,13 @@ export const STATUS_FOR: Record<Stage, string> = {
   closed: '辞退',
 }
 
-/** ポジション(トラック)の同一判定。企業名の部分一致規則は流用せず、正規化後の完全一致のみ */
+/** ポジション(トラック)の同一判定。完全一致に加え、両方4文字以上なら包含も許容する */
 export function samePosition(a: string, b: string): boolean {
-  return normalize(a) === normalize(b)
+  const na = normalize(a)
+  const nb = normalize(b)
+  if (!na || !nb) return na === nb
+  if (na === nb) return true
+  return na.length >= 4 && nb.length >= 4 && (na.includes(nb) || nb.includes(na))
 }
 
 /** 終了系(不合格・辞退など)。復活させない */

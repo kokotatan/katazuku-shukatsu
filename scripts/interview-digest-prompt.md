@@ -30,7 +30,17 @@
    4. 懸念・違和感フラグ(相手の反応や自分の発言で引っかかった点)
    5. self-wiki / submit.local.md への更新提案(新しく言語化できた強み・エピソード等。反映は本人判断)
 6. **追記**: 作った節を `chrome-prompts/interview-notes.local.md` の「## 自己分析素材」の直前に Edit で挿入する。既存の内容は絶対に壊さない(挿入のみ)。
-7. **サマリ出力**: 企業名・日付・保存先・示唆の要点(特にフォローアップで急ぐもの)を簡潔に出力し、最終行に単独で `=== interview-digest 完了 ===` と出力する。
+7. **DB反映JSONの作成**: 末尾の `DB_JSON` へ、次のキーだけを持つ厳格JSONを Write で新規作成する。Markdownやコメントを混ぜない。
+   - `runId`: `APPOINTMENT_ID` が1以上なら `meeting-<予定ID>`。0なら元ファイル名と日付から再実行しても同じになるID
+   - `appointmentId`: `APPOINTMENT_ID` が1以上のときだけ数値で入れる
+   - `company`, `position`(分かる場合), `occurredAt`(ISO 8601), `title`, `summary`, `transcriptPath`
+   - `questions`: `[{question, answer?, feedback?}]`
+   - `people`: `[{name, company?, role?, category?, notes: string[], confidence: 0..1}]`
+   - `profileSuggestions`: `[{field, value, confidence: 0..1}]`。fieldは strengths / weaknesses / careerAxis / desiredRole / desiredIndustry のいずれか。確定個人情報は入れない
+   - `followUps`: 文字列配列
+   発言から確認できない値は作らず、省略または空配列にする。人物メモは追記専用、プロフィールは候補追加であり、確定情報を上書きしない。
+
+8. **サマリ出力**: 企業名・日付・保存先・示唆の要点(特にフォローアップで急ぐもの)を簡潔に出力し、最終行に単独で `=== interview-digest 完了 ===` と出力する。
 
 注意:
 - 全処理はローカル(voicebox)とローカルファイルのみ。外部送信はしない。

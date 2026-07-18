@@ -1,6 +1,23 @@
 # katazuku 開発進捗
 
-最終更新: 2026-07-13
+最終更新: 2026-07-18
+
+
+## DB中心化の残り工事を完了(2026-07-18)
+
+- DB入力6本を接続:
+  - メール: 選考差分に加えmail_itemとsubmissionをdaily-syncから反映
+  - 会話: agentのみが正本へ書く既存経路
+  - 面接: 厳格JSON + db-apply-interviewで面接・人物・人物メモ・プロフィール候補を1トランザクション反映
+  - 提出結果: db-apply-submission。statusはtransition()経由
+  - カレンダー: external_id/end_at/source_hash付きappointment upsert
+  - 企業研究: 根拠URL付きcompany_dossier
+- 人物11名、基本情報、顔3枚をDBへ移行。写真本体はPrivate Blob用領域へ分離し、snapshotにはstorage keyだけを掲載。
+- meeting_run状態機械を実装し、会議予定ID単位の一回限り実行へ移行。
+- inbox/status/profile/people/prep/impactのlocalStorage正本を廃止し、共通 @katazuku/data で認証snapshotを読む構成へ移行。
+- トラック照合を包含一致+空欄昇格へ改善し、エクサウィザーズ、八洲電機、LayerX、日本トレカセンター、PKSHAの重複5組を統合。選考トラックは92→87。
+- snapshotにpassword/data:imageが無いことを検査。DBテストへ新スキーマ・写真分離・トラック重複防止を追加。
+- Windowsタスク5本の登録スクリプトとランナーは用意済み。ただしCodex実行環境からWindows Task Scheduler APIが拒否されたため、OSへの実登録だけ未完。daily-sync/calendar-syncは実走したが、Claudeトークン切れによりConnectionRefusedで停止。トークン復旧後の再実走と本番スマホ確認が外部確認として残る。
 
 ## 就活運用の実行 + 面接議事録パイプライン(2026-07-13 午後〜夕)
 

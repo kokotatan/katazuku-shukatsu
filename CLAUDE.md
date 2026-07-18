@@ -7,16 +7,18 @@
 ## アーキテクチャ(2026-07-18 DB中心化。詳細は docs/specs/08-data.md と AGENTS.md)
 
 ```
-data/katazuku.db(正本・SQLite・gitignore) ──→ Googleシート(一方向ミラー=アプリへの配管+スマホ俯瞰)
-        ↑                                 ──→ アプリ群(人間用UI。ミラーを読む窓。localStorageを正にしない)
-  agent(唯一の書き手): メール→ sync/scripts/db-apply.ts / DB→ db-mirror.ts → MCPでシートへ書込
+data/katazuku.db(正本・SQLite・gitignore) ──→ 認証snapshot → アプリ群(読み取り専用)
+        ↑                                 └─→ Googleシート(一方向ミラー)
+  agent(唯一の書き手): メール / 会話 / 面接 / 提出結果 / カレンダー / 企業研究
 ```
 
 **方針確定(2026-07-18 本人)**: アプリ群は残す(シートは見えにくいので人間用UIはアプリ)。
 廃止されたのは「各アプリが個別にlocalStorageを正として持つこと」だけ。
-各アプリは順次「ミラーのシートを読む窓」に改修する(board/src/lib/data.ts の方式を共通化)。
+各アプリは共通 @katazuku/data から /api/data を読む。localStorageに保存する正本データは禁止。
 
 - **書き手はagentのみ**。人はシートを直接編集しない(次のミラーで消える)。修正依頼は会話で受けてDBに書く
+- DB入力: db-apply-mail / db-apply-interview / db-apply-submission / db-apply-calendar / db-apply-research
+- 人物写真はDB/snapshot/gitへ入れず、person_photo.storage_key + 認証付き /api/photo で配信する
 - ステータス更新規則は `sync/src/db.ts` の `transition()` に集約。終了系(不合格/辞退)は根拠があれば確定・
   終了からの復活はしない・手書きの詳細ステータスを粗い進行中で潰さない・「辞退予定」は内定でも上書きしない
 - 自律処理は必ず活動ログに1行残す: `scripts/log-activity.ps1`(logs/activity-log.jsonl とシート「活動ログ」タブ)。

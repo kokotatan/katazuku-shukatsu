@@ -15,6 +15,7 @@ param(
   [Parameter(Mandatory = $true)]
   [Alias('AudioPath')]
   [string]$InputPath,
+  [int]$AppointmentId = 0,
   # 既定では議事録が取れたら中間ファイル(チャンク)と巨大な元録画を消してディスクを節約する。
   # 元動画を残したいときだけ -KeepSource を付ける。聞き直し用の16kHz wavと文字起こしtxtは常に残る。
   [switch]$KeepSource
@@ -86,7 +87,8 @@ if ($chunkCount -eq 0) { Write-Error "ffmpeg produced no chunks from $audioPath"
 
 # Feed the base prompt + the (ASCII) chunk dir marker to a single headless claude run.
 $prompt = Get-Content -Raw (Join-Path $PSScriptRoot 'interview-digest-prompt.md')
-$prompt = $prompt + "`n`nCHUNK_DIR=" + $chunkDir + "`nCHUNK_COUNT=" + $chunkCount + "`nSOURCE_FILE=" + $InputPath + "`n"
+$dbJson = Join-Path $intDir ($stem + '-db.json')
+$prompt = $prompt + "`n`nCHUNK_DIR=" + $chunkDir + "`nCHUNK_COUNT=" + $chunkCount + "`nSOURCE_FILE=" + $InputPath + "`nAPPOINTMENT_ID=" + $AppointmentId + "`nDB_JSON=" + $dbJson + "`n"
 
 # PowerShell 5.1 wraps a native exe's stderr lines in NativeCommandError, which $ErrorActionPreference='Stop'
 # turns fatal. claude writes a harmless "no stdin data received" warning to stderr, so relax EAP for this call
@@ -101,6 +103,20 @@ $ErrorActionPreference = $prevEAP
 
 $ok = (Test-Path $logFile) -and ((Get-Content -Raw $logFile) -match '===\s*interview-digest\s*完了\s*===')
 if ($ok) {
+  if (-not (Test-Path $dbJson)) {
+    Write-Warning "interview-digest FAILED (DB JSONが無い): $dbJson"
+    exit 1
+  }
+  try {
+    Push-Location (Join-Path $repo 'sync')
+    if ($AppointmentId -gt 0) {
+      npx tsx scripts/db-meeting-run.ts transition $AppointmentId digesting 2>&1 | Out-File -FilePath $logFile -Append -Encoding utf8
+      if ($LASTEXITCODE -ne 0) { throw 'meeting_runをdigestingへ進められませんでした' }
+    }
+    npx tsx scripts/db-apply-interview.ts $dbJson 2>&1 | Out-File -FilePath $logFile -Append -Encoding utf8
+    if ($LASTEXITCODE -ne 0) { throw '面接JSONをDBへ反映できませんでした' }
+    npx tsx scripts/db-snapshot.ts 2>&1 | Out-File -FilePath $logFile -Append -Encoding utf8
+  } finally { Pop-Location }
   "interview-digest OK. notes appended to chrome-prompts/interview-notes.local.md (log: logs/$(Split-Path $logFile -Leaf))"
 
   # 活動ログに「何を/何のために/どうしたか」を1行残す(本人が後から確認できる状態のため)

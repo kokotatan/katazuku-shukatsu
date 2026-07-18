@@ -25,6 +25,7 @@ param(
   [int]$DurationSec = 0,
   [string]$Title = '面接',
   [string]$Url = '',
+  [int]$AppointmentId = 0,
   [switch]$DryRun,
   [switch]$NoDigest
 )
@@ -151,4 +152,5 @@ if ($NoDigest) { return }
 Log '議事録生成をキック'
 Start-Process powershell.exe -WindowStyle Hidden -ArgumentList @(
   '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ('"{0}"' -f $digest),
-  '-InputPath', ('"{0}"' -f $outWav))
+  '-InputPath', ('"{0}"' -f $outWav),
+  '-AppointmentId', $AppointmentId)

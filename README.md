@@ -1,46 +1,50 @@
 # katazuku-shukatsu
 
 就活を自動運転する個人エージェント基盤。ユーザーは開発者本人ただ一人。
+ルーチンをDBへ集約し、本人は「考える・受ける・認証する・決める」に集中する。
 
-自己分析やESの生成はすでにAIで解ける。残る摩擦は「メールの海の仕分け・締切と日程の管理・
-フォーム入力・議事録・企業研究」という機械的なルーチンで、katazuku はそこをエージェントで消し、
-本人は「考える・受ける・認証する・決める」だけに集中する。命名は「片付く」に由来する。
+## アーキテクチャ
 
-## アーキテクチャ(2026-07-18 DB中心化)
+`data/katazuku.db`（SQLite、gitignore）が唯一の正本です。書き手はagentだけです。
 
-```
-data/katazuku.db(正本・SQLite) ──→ Googleシート(一方向ミラー。スマホ/PC俯瞰)
-        ↑                       ──→ board/(管理画面SPA。ミラーを読むだけ)
-  agent(唯一の書き手): Gmail → db-apply / DB → db-mirror → シート
-```
+- 入力: メール、本人との会話、面接録音、提出結果、Google Calendar、企業研究
+- 配信: `db-snapshot.ts` → 認証付きVercel Blob → 8アプリが `/api/data` を読む
+- 写真: DB・snapshot・gitには入れず、Private Blobを `/api/photo` 経由で読む
+- ミラー: `db-mirror.ts` → Google Sheets。シートは閲覧とバックアップ用
+- 監査: 自律処理は `logs/activity-log.jsonl` とシート「活動ログ」へ記録
 
-- 正本はローカルSQLite1つ。シートとアプリは「見る窓」。書き手はエージェントのみ
-- 自律処理はすべて活動ログ(何を・何のために・どうしたか)に記録され、後から確認できる
+## アプリ
 
-## 構成
+`inbox`、`status`、`insight`、`profile`、`people`、`prep`、`impact`、`board` は残しています。
+各アプリはSmartHR Design Systemの見た目を維持し、localStorageを正本にせず、共通パッケージ
+`@katazuku/data` からDBスナップショットを読みます。localStorageに残すのは閲覧用合言葉だけです。
 
-```
-board/           管理画面(Vite + React 19 + TS + Tailwind v4 + smarthr-ui。読み取り専用)
-sync/            正本DBと同期エンジン(node:sqlite・依存ゼロ) + check-* テスト
-scripts/         自動運転ランナー(mail-watch / daily-sync / interview-digest / log-activity 等)
-chrome-prompts/  Claude in Chrome 用プロンプト台帳(書類提出・日程返信・イベント予約など)
-docs/            インフラ台帳(INFRA.md)・仕様(specs/)・進捗(PROGRESS.md)
-```
+## 主な自動運転
 
-旧アプリ群(inbox/status/insight/profile/people/prep/impact/landing/api)はタグ
-`apps-archive-20260718` にアーカイブ済み。
+- `daily-sync.ps1`: Gmail → 選考・正規化メール・提出結果 → DB → snapshot → シート
+- `calendar-sync.ps1`: Google Calendar → appointmentをexternalId/hashで冪等upsert
+- `meeting-autopilot.ps1`: 予定10分前にURL、5分後に録音、meeting_run状態機械で一回限り実行
+- `interview-digest.ps1`: 音声 → Whisper → 厳格JSON → 面接・人物・人物メモ・プロフィール候補
+- `research-company.ps1`: 一次情報中心の企業研究 → company_dossier
+- `db-merge-tracks.ts`: 重複した選考トラックを関連レコードごと統合
+- `application-autopilot.ps1`: エントリー、完成済みES転記、本人承認後の提出、適性検査準備、面接予定を1つのrunで追跡
+- `db-calendar-outbox.ts`: DBで確定した面接・締切を外部カレンダーへ冪等に反映するための送信待ち一覧
 
-## 開発
+応募自動運転の設計は `docs/specs/11-application-autopilot.md`、将来の公開範囲と準備は
+`docs/oss-roadmap.md` にまとめています。
 
-```powershell
-git clone https://github.com/kokotatan/katazuku-shukatsu
-npm run build                        # board ビルド + sync 全テスト
-npm --prefix board run dev           # 管理画面の開発サーバー
-cd sync; npx tsx scripts/check-db.ts # DBのテスト単体
-```
+DBを書いたら必ず次を実行します。
 
-エージェント向けの詳細な規約は [CLAUDE.md](CLAUDE.md) と [AGENTS.md](AGENTS.md) を参照。
+`cd sync && npx tsx scripts/db-snapshot.ts`
 
----
+## 検証
 
-[kokotatan](https://github.com/kokotatan)
+`cd sync && npx tsx scripts/check-db.ts`
+
+`cd sync && npx tsx scripts/check-sheet.ts`
+
+`cd sync && npx tsx scripts/check-application.ts`
+
+`npm run build`
+
+機密情報、`.env`、`data/`、`logs/`、`*.local.md` はコミットしません。

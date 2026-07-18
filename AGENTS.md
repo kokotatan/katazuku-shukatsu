@@ -8,7 +8,7 @@
 
 ```
 data/katazuku.db(正本・SQLite/node:sqlite・gitignore)
-   ↑ agent(唯一の書き手): メール→db-apply / 会話 / (今後: 面接録音・提出結果・カレンダー・調査)
+   ↑ agent(唯一の書き手): メール / 会話 / 面接録音 / 提出結果 / カレンダー / 企業研究
    ├─→ db-snapshot.ts: 書くたびスナップショットJSONを /api/push へプッシュ(+DB日次バックアップ)
    │      → Vercel Blob → アプリ群が /api/data?key=合言葉 で読む(サインイン不要・数秒で反映)
    └─→ db-mirror.ts → MCPでシートへ(一方向ミラー。スプレッドシートで眺めたい時用+バックアップ)
@@ -16,11 +16,14 @@ data/katazuku.db(正本・SQLite/node:sqlite・gitignore)
 
 - **DBに書いたら必ず `cd sync && npx tsx scripts/db-snapshot.ts` を実行**(アプリへの即時反映)。合言葉は repo直下 .env
 - スキーマ: company(name=正式名称/short_name) / selection(+outcome列挙) / **appointment(面接・締切の日時/URL/場所/相手)** /
-  event(+ref=元メールID) / company_alias / pending_review
+  event(+ref=元メールID) / company_alias / pending_review / mail_item / submission / company_dossier /
+  interview_note / meeting_run / person / person_note / appointment_person / person_photo / profile_basic / profile_suggestion
+  / application_run / application_event / application_material / web_assessment
 
 - **DBへの入力は6本(2026-07-18本人定義)**: ①メール(daily-sync/mail-watch) ②会話(本人→agent)
   ③面接の録画・録音(interview-digest) ④提出結果(submit系エージェント) ⑤カレンダー ⑥調査結果(企業研究)。
-  現在①②のみ接続済み。③〜⑥を順次DB直結にするのが自動運転の残り工事
+  **6本すべて接続済み(2026-07-18)**。専用入口は db-apply-mail / db-apply-interview / db-apply-submission /
+  db-apply-calendar / db-apply-research。カレンダー・Gmail・企業研究の実走には各コネクタとWindows定常タスクが必要
 - **書き手はagentのみ**。人はシートを直接編集しない(ミラーで消える)。人の修正依頼は会話でagentが受けてDBに書く
 - ステータス更新は `sync/src/db.ts` の `transition()` に集約(終了系は根拠があれば確定・終了からの復活なし・
   手書きの詳細ステータスを粗い進行中で潰さない・「辞退予定」は内定通知でも上書きしない)
@@ -32,23 +35,24 @@ data/katazuku.db(正本・SQLite/node:sqlite・gitignore)
 ## テスト(変更したら必ず全部通す)
 
 ```
-cd sync && npx tsx scripts/check-db.ts     # DB遷移規則・apply・mirror(39項目)
-cd sync && npx tsx scripts/check-sheet.ts  # 旧シート書込エンジン(41項目・移行完了まで残す)
+cd sync && npx tsx scripts/check-db.ts     # DB遷移規則・apply・mirror・6入力(75項目)
+cd sync && npx tsx scripts/check-sheet.ts  # 旧シート書込エンジン(40項目・移行完了まで残す)
+cd sync && npx tsx scripts/check-application.ts # 応募の承認・安全境界・冪等化(19項目)
 npm run build                              # board(管理画面)ビルド + sync全チェック
 ```
 
 ## 進行中のタスク(2026-07-18時点)
 
-1. **【方針確定 2026-07-18 18:48 本人】アプリ群は残す(復活済み)**: シートは見えにくいので人間用UIはアプリ群。
-   廃止は「各アプリがlocalStorageを正として持つこと」だけ。次の改修=各アプリを「ミラーのシートを読む窓」化
-   (board/src/lib/data.ts の読み取り方式を共通ライブラリ化して各アプリへ)。
+1. **【完了 2026-07-18】アプリ群は残し、DB読取へ移行**: シートは見えにくいので人間用UIはアプリ群。
+   廃止は「各アプリがlocalStorageを正として持つこと」だけ。inbox/status/profile/people/prep/impactは
+   共通 @katazuku/data で /api/data を読む。insight/boardも同じsnapshotを読む。
    **見た目はSmartHR Design Systemのまま維持**(本人が気に入っている。刷新はしない。細部改善のみ可)。
    api/ のみ廃止のまま(履歴はタグ apps-archive-20260718)
-2. **daily-syncの実走確認**: scripts/daily-sync-prompt.md の新フロー(抽出→db-apply→db-mirror→MCP書込)を初回実行で確認
+2. **外部実走確認のみ残る**: daily-sync/calendar-sync/asa/mail-watchは実装済み。Windowsタスク登録と実コネクタでの初回実走を確認
 3. **board/の実機確認**: katazuku.kotalabo.com にデプロイ後、スマホでOAuth→表示確認
 4. **次の構想**: 企業研究・面接対策パイプライン(deep research・IR・ブログ/動画・OBOG・業務/顧客/技術理解を
    企業ごとのdossierに集約し、DBと面接準備に接続する)。着手前に本人と設計を確認する
-5. **【DB完成後・本人事前承認済み(2026-07-18)・指示不要で実施】人脈/基本情報/顔をDBへ載せ、面接から自動更新**:
+5. **【完了 2026-07-18】人脈/基本情報/顔をDBへ移行し、面接から自動更新**:
    - people(面接官)・個人マスタの基本情報・面接官の顔写真を DB に投入し、`board/` から見えるようにする(spec07/08/10)。
    - 面接録音→議事録(interview-digest)から、面接官→people と、自己PR系(strengths/weaknesses/careerAxis/
      desiredRole/desiredIndustry)を **DBへ自動更新**。氏名・住所等の確定情報は上書きしない(候補追加のみ)。
@@ -58,9 +62,9 @@ npm run build                              # board(管理画面)ビルド + sync
    - 顔取得ロジック: 公開情報(公式チームページ/Wantedly本人)から `curl`+`ffmpeg`で256px化→本人確認(名前+会社+経歴一致)。
    - 今後の面接で顔を自動取得したいなら、会議ウィンドウのスクショsamplerを `record-audio` 系に追加。
 
-6. **トラック重複の整理(daily-sync初回実走 2026-07-18 で判明)**: position照合が厳格すぎて、
+6. **【完了 2026-07-18】トラック重複の整理**: position照合が厳格すぎて、
    エクサウィザーズ/八洲電機/LayerX/日本トレカセンター/PKSHA に既存と同じ話の別トラックが追加された。
-   samePositionの緩和(包含許容)+既存トラックへの統合ツール(db-merge-tracks)を作って重複を畳む
+   samePositionを包含許容+空欄昇格へ緩和し、db-merge-tracksで5組を関連イベントごと統合済み
 
 7. **会議自動運転の次段(codex設計 2026-07-18を採用)**: 現状は meeting-autopilot.ps1 が
    「DB予定→10分前に開く→開始5分後にrecord-audio→終了+3分停止→議事録→完了化イベント」まで実装済み。
@@ -70,7 +74,10 @@ npm run build                              # board(管理画面)ビルド + sync
    (d) 議事録→DB反映は自由記述でなく厳格JSON+専用CLI(db-apply-interview)で1トランザクション。event.ref=run_idで冪等化
    (e) personスキーマ: person / appointment_person / person_note(追記専用・根拠ref+confidence) /
        person_photo(storage_key・sha256・verified_at。**画像はsnapshot/gitに出さず認証API配信**)。spec10担当と共同
-8. **抽出強化**: daily-syncのappointmentsに endAt(終了時刻)も取らせる。カレンダー入力(⑤)の接続
+8. **【完了 2026-07-18】抽出強化**: daily-syncのappointmentsはendAtを取得し、カレンダー入力(⑤)も接続済み
+9. **応募自動運転の外部実走**: 状態機械、承認ゲート、適性検査の安全境界、DB→カレンダーoutboxは実装済み。
+   次は各社サイトでエントリー・完成済みES転記・本人承認後の送信・面接予約を実走し、
+   サイト別アダプターと回帰fixtureを蓄積する。設計はdocs/specs/11、OSS論点はdocs/oss-roadmap.md。
 
 ## 禁止・注意
 

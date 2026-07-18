@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "build": "tsc --noEmit && vite build --configLoader runner",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -14,7 +14,8 @@
     "react-intl": "^10.1.15",
     "react-is": "^19.2.7",
     "smarthr-ui": "^98.0.0",
-    "styled-components": "^5.3.11"
+    "styled-components": "^5.3.11",
+    "@katazuku/data": "file:../shared"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.1.10",

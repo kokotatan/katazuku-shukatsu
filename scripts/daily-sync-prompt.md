@@ -20,8 +20,16 @@ DB→シートの一方向ミラー。書き手はagentのみ。サービスア�
    - **予定は構造化して取る(最重要)**: 面接・面談・説明会・提出締切は appointments 配列
      `[{at(ISO・時刻まで), endAt(終了時刻。「15:00-15:30」等から。録画の自動停止に使う), kind(面接/面談/締切/説明会/テスト), title, url(Meet/Zoom/提出ページ), location, person(面接官等)}]`。
      **会議URLと時刻は必ず拾う**(朝のページに「15:00 面接 [開く]」と出すための核)。ref にGmailメッセージIDを入れる
-3. 抽出結果を `{name, stage, nextAction, nextDate, industry, position}` の配列JSONとして `sync/sheet-import-loop.json` に書き出す(gitignore済み)。対象メールが無ければ空配列でよい。
-4. `cd sync; npx tsx scripts/db-apply.ts sheet-import-loop.json` で正本DBへ反映する。
+3. 同じメールから次の3ファイルを作る(いずれもgitignore済み。対象なしは空配列):
+   - 選考差分を sync/sheet-import-loop.json へ [{name,stage,nextAction,nextDate,industry,position,appointments,ref}]
+   - Inbox表示用を sync/mail-import-loop.json へ {items:[{id,receivedAt,sender,subject,summary,category,needsAction,deadline,status,company,position,sourceRef}]}
+     本文全文は入れず、判断に必要な短いsummaryだけにする。id/sourceRefはGmailメッセージID
+   - 提出完了・提出結果が明示されたメールを sync/submission-import-loop.json へ
+     [{sourceRef,company,position,kind,submittedAt,result,detail}]。resultは合格/不合格/内定/辞退等、メールで確定できる場合だけ
+4. cd sync で次を順に実行し、正本DBへ反映する:
+   - npx tsx scripts/db-apply.ts sheet-import-loop.json
+   - npx tsx scripts/db-apply-mail.ts mail-import-loop.json
+   - submission-import-loop.json が空でなければ npx tsx scripts/db-apply-submission.ts submission-import-loop.json
    - 書き込み規則(終了系は根拠があれば確定・終了からの復活はしない・手書きの詳しいステータスを粗い進行中で潰さない)はスクリプト側で保証されている。
    - 「保留」と報告された企業(複数トラックで特定不能)は、メール本文からどのトラックか判断できるなら position を付けて再実行し、判断できなければサマリで報告する。
    - 「名寄せ要確認」と報告された企業は、DBには書かれていない。**サマリの冒頭で本人に確認**する

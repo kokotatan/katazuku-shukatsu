@@ -1,68 +1,87 @@
-# Spec 08: Katazuku Data(DB中心のデータ基盤)  ※2026-07-18 全面改訂
+# Spec 08: DB中心データ基盤
 
-> 【改訂の背景 2026-07-18】旧08は「localStorageのキーを企業軸で読み取り結合し status で見る」閲覧レイヤーの
-> 設計だった。だが本人の実画面は **katazukuアプリ + Googleカレンダー** であり、データが Sheet / localStorage /
-> カレンダー / ローカルファイルに分散し、agentが手で同期している構造そのものが、日程バッティングやステータス齟齬
-> (例: 八洲=シート「合格」なのに実態は辞退済)の温床だった。本specは土台を **DB中心** に置き換える。
+最終更新: 2026-07-18
 
-## 目的 / 直す問題
+## 原則
 
-**「正(source of truth)」をDB1つに定め、アプリ・カレンダー・Sheetをその"見る窓"にする。agentを唯一の書き手にする。**
+- 正本は `data/katazuku.db` 1つ
+- 書き手はagentだけ
+- アプリ、Google Sheets、Google Calendarは入力または閲覧窓であり、正本ではない
+- 状態変化はeventへ根拠付きで残し、selection.status/outcomeは結果のキャッシュとして扱う
+- DBを書いたら必ず `cd sync && npx tsx scripts/db-snapshot.ts`
 
-特に直すのは、選考ステータスの更新が効かない問題。旧 `status/src/lib/sheet.ts` は、自由記述ステータスのタブに対して
-**「合格/不合格/辞退などの最終状態は絶対に上書きしない・空欄補完のみ」** という制約を持っていた(L9-13, L144-151)。
-これは「Sheetが人の手入力とagent同期の両方に晒され、どちらが新しいか判別できない」ための苦肉の策で、結果として
-**メール由来の状態変化(辞退・合否)がシートに反映されない**弱さになっていた。DB中心化で「書き手はagent1つ・正はDB」に
-なれば、この矛盾は消え、**正しい遷移規則で堂々と更新できる**(下記「書き込みモデル」)。
-
-## アーキテクチャ
+## 配線
 
 ```
-        ┌── katazuku アプリ(inbox/status/insight)  … 見る+書く窓(認証API経由でDBを読み書き)
-DB(正) ─┼── Google Calendar(色つき)               … 見る窓(agentがDBから同期)
-        └── Google Sheet(選考管理)                 … 見るだけの窓(DB→Sheet 一方向ミラー)
-   ↑
-   agent(唯一の書き手): メール→DB / ユーザーのアプリ操作→DB / DB→カレンダー・Sheet
+Gmail ───────────────┐
+本人との会話 ────────┤
+面接録音 ────────────┤
+提出結果 ────────────┼─→ data/katazuku.db
+Google Calendar ─────┤       ├─→ snapshot → Private Blob → 8アプリ
+企業研究 ────────────┘       └─→ Google Sheets（一方向ミラー）
 ```
 
-- **DB**: Vercel Marketplace の Postgres(Neon 想定)。フルの独自基盤は作らない。
-- **認証つき読み取りAPI**: `api/` に「ログイン本人にだけDBの中身をJSONで返す」エンドポイントを1本。
-  個人データを漏らさずにアプリが自動ロードする(手作業のlocalStorage JSON注入を廃止)ための最小の裏側。
-- **Sheetは読み取り専用ミラー**。編集はアプリ/agent(=DBに書く)に一本化。Sheet直編集は двой book=ドリフト源なので不可。
-  スマホでの俯瞰用に DB→Sheet を定期同期する。
+6入力すべてに専用CLIがある。
 
-## データモデル(最小)
+| 入力 | 入口 |
+|---|---|
+| メール | `db-apply.ts` + `db-apply-mail.ts` |
+| 会話 | agentがdb.tsの規則で書く |
+| 面接 | `db-apply-interview.ts` |
+| 提出結果 | `db-apply-submission.ts` |
+| カレンダー | `db-apply-calendar.ts` |
+| 企業研究 | `db-apply-research.ts` |
 
-- `company`(企業): id, name(名寄せキーは既存 `sameCompany`), industry, position, priority, notes
-- `selection`(選考): id, company_id, season(夏/冬/本選考/長期), status, next_action, next_date, source_note, updated_at, updated_by
-- `interview_note`(面接ノート): 旧08のInterviewNote(company, date, kind, asked/highlights/firstPartyInfo/concerns/nextActions/source)
-- `person`(人脈, spec07), `es_snippet`(ES素材/個人マスタ) … 段階的に寄せる
+## スキーマ
 
-## 書き込みモデル(「上書きしない」を正しく置き換える)
+- 企業・選考: company / company_alias / selection / pending_review
+- 出来事・予定: event / appointment
+  - appointmentはexternal_id、calendar_id、source_hash、end_atを持つ
+- 会議: meeting_run
+- 面接・人物: interview_note / person / person_note / appointment_person / person_photo
+- 個人情報: profile_basic / profile_suggestion
+- 提出・研究・メール: submission / company_dossier / mail_item
+- 応募自動運転: application_run / application_event / application_material / web_assessment
 
-- **status は遷移規則で更新する**(空欄補完のみ、はやめる)。ランク(出願予定<出願済<合格/不合格/辞退)で
-  **前進は反映**。最終状態(合格/不合格/辞退)への確定はメール根拠があれば反映してよい。八洲のような「辞退済なのに合格のまま」を解消。
-- **人の意図とagent更新の衝突**は "最終更新者(updated_by)と時刻" で解決(Sheet直編集を禁じたので実質agentのみ)。
-- 名寄せは `sameCompany`(NFKC・短名完全一致)を踏襲。重複行(GMOビジネス職/技術職のような別トラック)は別レコードで持つ。
+appointmentはカレンダー入力だけでなく、external_idが空の予定をoutboxとして外部カレンダーへ出力する。
+作成成功後にexternal_idをDBへ戻し、二重作成を防ぐ。
 
-## 実装フェーズ(段階投入・各フェーズで完結)
+## 遷移規則
 
-1. **DB + 認証読取API + agent書込 + Sheetミラー**。まずは選考/企業だけ。既存Sheetからの初期移行スクリプト。
-2. **アプリをDB読取に切替**(inbox/status/insight)。localStorage手注入を廃止。カレンダー同期は reconcile-calendar をDB源に繋ぎ替え。
-3. **面接ノート・人脈・ES素材(個人マスタ)をDBへ**。insight(spec09)はDB上の横断クエリで実装。
+selection.statusの更新は `transition()` に集約する。
 
-## セキュリティ
+- 終了系は根拠があれば確定する
+- 終了済みから復活させない
+- 詳しい進行状態を粗い「出願済」「選考中」で潰さない
+- 「辞退予定」は本人意思として内定通知でも上書きしない
+- status自由文とoutcome列挙を分ける
 
-- 個人データはDBに置き、**認証済み本人にのみ**APIで返す。public/ には出さない(静的アプリは認証API越しに読む)。
-- SA鍵・DB接続情報は gitignore 済みの場所(.env / credentials/)へ。設定ファイルへの平文直書き禁止。
+## 名寄せ
 
-## やらないこと
+- company: NFKC、法人格・英語法人表記を吸収。部分一致は両方4文字以上
+- position: 完全一致または両方4文字以上の包含一致
+- 既存1トラックのpositionが空なら、後から分かった具体名へ昇格する
+- 怪しい会社名はpending_reviewへ置き、自動マージしない
+- 既存重複は `db-merge-tracks.ts` で関連レコードごと統合する
 
-- フルスクラッチの独自バックエンド/認証基盤は作らない(Vercel Marketplace + 最小 `api/` で足りる)。
-- Sheetの双方向同期はしない(DB→Sheetの一方向のみ)。ドリフトを戻さないため。
-- 旧08の「localStorageキー結合」路線は破棄(DB読取に置換)。
+## スナップショットと機密
 
-## 関連
+snapshotには表示に必要なデータだけを含める。
 
-- 方針メモ: DB=正・各面は窓・agentが唯一の書き手(本人合意2026-07-18)。旧 `status/src/lib/sheet.ts` の
-  「上書きしない」制約は本specで解消。reconcile-calendar は Phase2 で源を Sheet→DB に繋ぎ替える。
+- company.passwordは除外
+- data URL画像は再帰的に除外
+- 写真本体はPrivate Blob、snapshotはstorageKeyだけ
+- APIはread/write別の秘密で認証
+- `data/`、`logs/`、`.env`、`*.local.md` はgitignore
+
+## アプリ
+
+共通パッケージ `@katazuku/data` が `/api/data` を読む。
+inbox/status/profile/people/prep/impactは2026-07-18にlocalStorage正本を廃止した。
+insight/boardも同じsnapshotを読む。ブラウザに保存するのは閲覧用合言葉だけ。
+
+## 検証
+
+- `check-db.ts`: 遷移、名寄せ、apply、mirror、新スキーマ、写真分離
+- `check-sheet.ts`: 旧シートエンジン。移行完了まで残す
+- 6入力はテストDBでcalendar→mail→submission→research→meeting_run→interviewを統合検証する

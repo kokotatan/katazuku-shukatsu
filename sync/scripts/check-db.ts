@@ -3,9 +3,11 @@
  * インメモリSQLiteで実行。実行: cd sync && npx tsx scripts/check-db.ts
  */
 import { DatabaseSync } from 'node:sqlite'
-import { openDb, upsertCompany, insertSelection, listSelections, listCompanies, listEvents, listAppointments, addAppointment, outcomeOf, transition, sameCompany, resolveCompany, addAlias, listPending, setOfficialName } from '../src/db'
+import { openDb, upsertCompany, insertSelection, listSelections, listCompanies, listEvents, listAppointments, addAppointment, outcomeOf, transition, sameCompany, samePosition, resolveCompany, addAlias, listPending, setOfficialName } from '../src/db'
 import { applyDiff } from './db-apply'
 import { renderMirror } from './db-mirror'
+import { listPlatformSnapshot } from '../src/platform'
+import { transaction, upsertPerson } from '../src/inputs'
 
 let failed = 0
 function check(label: string, cond: boolean, detail = '') {
@@ -47,6 +49,8 @@ upsertCompany(db, { name: 'トヨタ・コニック・プロ' })
 upsertCompany(db, { name: 'トヨタ' })
 check('トヨタ≠トヨタ・コニック・プロ(3文字は完全一致のみ)', listCompanies(db).length === before + 4)
 check('sameCompany: タイミーの表記ゆれは同一視のまま', sameCompany('株式会社タイミー', 'タイミー'))
+check('samePosition: 長い職種名の包含を同一視', samePosition('アルゴリズム', 'アルゴリズムエンジニア サマーインターン'))
+check('samePosition: 短い名称の包含は誤統合しない', !samePosition('AI', 'AIエンジニア'))
 
 // --- 正式名称(株式会社/海外表記対応。2026-07-18本人指示) ---
 check('海外表記: Inc.の有無は同一視', sameCompany('Mujin Inc.', 'Mujin'))
@@ -106,10 +110,10 @@ check('event: 予定更新もイベントになる', listEvents(db).some((e) => 
 
 // codex反例: 既存1トラックの企業に「別ポジション」の情報が来たら、既存を書き換えず新トラックとして追加する
 const sansanId = upsertCompany(db, { name: 'Sansan' })
-insertSelection(db, sansanId, { company: 'Sansan', season: '夏', position: '', priority: '', status: '参加確定 7/19-22', steps: [], nextAction: '', nextDate: '', submitted: false, esUrl: '', memo: '' })
+insertSelection(db, sansanId, { company: 'Sansan', season: '夏', position: '3days', priority: '', status: '参加確定 7/19-22', steps: [], nextAction: '', nextDate: '', submitted: false, esUrl: '', memo: '' })
 const res2 = applyDiff(db, [{ name: 'Sansan', stage: 'intern', position: '1day', season: '夏' }])
 const sansans = listSelections(db).filter((s) => s.company === 'Sansan')
-check('codex反例: position不一致は既存トラックを書き換えない', sansans.find((s) => s.position === '')?.status === '参加確定 7/19-22')
+check('codex反例: position不一致は既存トラックを書き換えない', sansans.find((s) => s.position === '3days')?.status === '参加確定 7/19-22')
 check('codex反例: 別ポジションは新トラックとして追加される', res2.added.length === 1 && sansans.some((s) => s.position === '1day' && s.status === '合格'))
 
 // --- renderMirror(シートへの一方向ミラー) ---
@@ -158,6 +162,42 @@ check('apply: 予定追加はイベントに残る', listEvents(db).some((e) => 
 const evBefore = listEvents(db).length
 applyDiff(db, [{ name: '予定テスト社', stage: 'interview', appointments: [{ at: '2026-07-25T15:00', kind: '面接', title: '2次面接' }] }])
 check('apply: 同じ予定の再適用でイベントは増えない', listEvents(db).length === evBefore)
+
+
+// --- トラック重複防止 ---
+const blankCompanyId = upsertCompany(db, { name: '空トラックテスト社' })
+insertSelection(db, blankCompanyId, { company: '空トラックテスト社', season: '', position: '', priority: '', status: '出願済', steps: [], nextAction: '', nextDate: '', submitted: false, esUrl: '', memo: '' })
+applyDiff(db, [{ name: '空トラックテスト社', position: 'データサイエンティスト', stage: 'interview' }])
+const promotedTracks = listSelections(db).filter((selection) => selection.company === '空トラックテスト社')
+check('track: 既存1本がposition空欄なら具体名へ昇格して重複しない', promotedTracks.length === 1 && promotedTracks[0].position === 'データサイエンティスト')
+
+// --- 6入力の共通DB基盤 ---
+const appointmentColumns = (db.prepare('PRAGMA table_info(appointment)').all() as { name: string }[]).map((column) => column.name)
+check('calendar: external_id/end_at/source_hashを保持', ['external_id', 'end_at', 'source_hash'].every((name) => appointmentColumns.includes(name)))
+
+const personId1 = upsertPerson(db, { name: '面接 テスト', company: '予定テスト社', role: '採用担当' })
+const personId2 = upsertPerson(db, { name: '面接 テスト', company: '予定テスト社', role: '別表記' })
+check('people: 同じ氏名×会社は重複しない', personId1 === personId2)
+db.prepare("INSERT INTO person_note (person_id, at, note, source_ref, confidence) VALUES (?, '2026-07-18', '顧客志向を重視', 'test-run', 0.9)")
+  .run(personId1)
+db.prepare("INSERT INTO person_photo (person_id, storage_key, sha256, verified_at) VALUES (?, 'people/test.jpg', 'abc', '2026-07-18')")
+  .run(personId1)
+
+transaction(db, () => {
+  db.prepare("INSERT INTO profile_basic (id, data_json, updated_at, updated_by) VALUES (1, ?, '2026-07-18', 'test')")
+    .run(JSON.stringify({ name: 'テスト', photo: 'data:image/jpeg;base64,SECRET', photoKey: 'profile/basic.jpg' }))
+  db.prepare("INSERT INTO profile_suggestion (field, value, source_ref, confidence, status, created_at) VALUES ('strengths', '改善力', 'test-run', 0.8, '候補', '2026-07-18')")
+    .run()
+})
+const platformSnapshot = listPlatformSnapshot(db)
+const profileJson = JSON.stringify(platformSnapshot.profile)
+check('profile: 画像本体をsnapshotへ出さない', !profileJson.includes('data:image') && profileJson.includes('profile/basic.jpg'))
+check('people: 写真はstorage keyだけをsnapshotへ出す', platformSnapshot.people.some((person) => person.photoKey === 'people/test.jpg'))
+check('interview: 人物メモとプロフィール候補は根拠付き', platformSnapshot.personNotes.some((note) => note.sourceRef === 'test-run') && platformSnapshot.profileSuggestions.some((suggestion) => suggestion.sourceRef === 'test-run'))
+
+const requiredTables = ['meeting_run', 'interview_note', 'submission', 'company_dossier', 'mail_item', 'appointment_person']
+const schemaTables = (db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as { name: string }[]).map((row) => row.name)
+check('6入力: 必要な専用テーブルが揃う', requiredTables.every((name) => schemaTables.includes(name)))
 
 if (failed) {
   console.error(`\n${failed}件失敗`)
