@@ -1,4 +1,4 @@
-# meeting-autopilot をタスクスケジューラに登録する(5分毎)。
+﻿# meeting-autopilot をタスクスケジューラに登録する(5分毎)。
 # 旧 katazuku-meeting-opener(カレンダー直読み)が残っている場合は二重に開くので無効化する:
 #   schtasks /Change /TN "katazuku-meeting-opener" /DISABLE
 # 実行(1回): powershell -NoProfile -ExecutionPolicy Bypass -File scripts\register-meeting-autopilot.ps1
