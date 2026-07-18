@@ -51,6 +51,14 @@ switch ($Command) {
     Open-App 'prep' 4177 $q
   }
   'company' { Start-Process $sheetUrl }               # 企業マスタ: 選考管理シート
+  'apply'   {                                          # 会社名だけで企業研究から応募後準備まで開始
+    if (-not $Rest) { throw '会社名を指定してください。例: katazuku apply 株式会社〇〇' }
+    & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $root 'scripts\apply-company.ps1') -Company ($Rest -join ' ')
+  }
+  'research' {                                       # 一次情報中心の企業研究をDBへ保存
+    if (-not $Rest) { throw '会社名を指定してください。例: katazuku research 株式会社〇〇' }
+    & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $root 'scripts\research-company.ps1') -Company ($Rest -join ' ')
+  }
   'submit'  {                                          # 個人データ入りの実戦版があればそちらを使う
     $f = if (Test-Path (Join-Path $root 'chrome-prompts\submit.local.md')) { 'submit.local.md' } else { '05-es-submit.md' }
     Copy-Prompt $f '書類提出(ES転記・提出)'
@@ -75,6 +83,8 @@ switch ($Command) {
 katazuku <command>
 
   第一波
+  apply <社名>  応募自動運転   企業研究→公式応募→適性検査準備・面接予定まで
+  research <社名> 企業研究    一次情報中心のdossierをDBへ保存
   submit     書類提出     ES転記プロンプトをコピー(Claude in Chromeへ)
   test       適性検査     受検準備プロンプトをコピー(受検代行はしない)
   asa        けさの3件    下書きも予定登録も自動で済ませ、残ったやること3件だけ出す(毎朝9時)

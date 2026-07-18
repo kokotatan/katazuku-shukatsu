@@ -8,6 +8,7 @@ COMPANY と POSITION の企業研究を行い、面接準備に使える根拠�
 
 手順:
 1. 会社概要だけでなく、事業、顧客、プロダクト、収益構造、技術、財務、カルチャー、競争優位、リスク、直近ニュースを調査する。
+   公式新卒採用ページがある場合は、募集職種、選考フロー、応募期限、公式エントリーURLも調べる。
 2. 面接で使える「なぜこの会社か」「入社後何をするか」「確認すべき問い」を抽出する。
 3. DB_JSONへ次の厳格JSONをWriteする。Markdownやコメントは混ぜない:
    {
@@ -19,7 +20,8 @@ COMPANY と POSITION の企業研究を行い、面接準備に使える根拠�
      "facts":{
        "business":..., "customers":..., "products":..., "technology":...,
        "financials":..., "culture":..., "competition":..., "risks":...,
-       "recentNews":..., "interviewAngles":..., "questionsToAsk":...
+       "recentNews":..., "recruiting":..., "selectionProcess":...,
+       "interviewAngles":..., "questionsToAsk":...
      },
      "sources":[{"title":"資料名","url":"https://...","retrievedAt":"ISO 8601"}]
    }

@@ -28,6 +28,8 @@
 - `research-company.ps1`: 一次情報中心の企業研究 → company_dossier
 - `db-merge-tracks.ts`: 重複した選考トラックを関連レコードごと統合
 - `application-autopilot.ps1`: エントリー、完成済みES転記、本人承認後の提出、適性検査準備、面接予定を1つのrunで追跡
+- `katazuku apply <会社名>`: Codexを既定の実行役として、企業研究、公式応募経路の特定、ブラウザ入力、本人確認後の提出、適性検査準備・面接予定までを一続きで実行
+- `katazuku research <会社名>`: 一次情報中心の企業研究だけを実行してdossierを更新
 - `db-calendar-outbox.ts`: DBで確定した面接・締切を外部カレンダーへ冪等に反映するための送信待ち一覧
 
 応募自動運転の設計は `docs/specs/11-application-autopilot.md`、将来の公開範囲と準備は

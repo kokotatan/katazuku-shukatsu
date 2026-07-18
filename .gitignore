@@ -16,6 +16,8 @@ gmail-import-*.json
 notes-export-*.json
 profile-export-*.json
 people-export-*.json
+sync/research-*-loop.json
+sync/application-*-loop.json
 prep/seed-example.json
 
 # Googleサービスアカウントの鍵(秘密情報)

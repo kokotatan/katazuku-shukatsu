@@ -35,6 +35,12 @@ DB→シートの一方向ミラー。書き手はagentのみ。サービスア�
    - 「名寄せ要確認」と報告された企業は、DBには書かれていない。**サマリの冒頭で本人に確認**する
      (同じ会社なら `npx tsx scripts/db-alias.ts add <別名> <正式名称>`、別会社なら `db-alias.ts new <名前>` で学習・解決する。学習後は自動で名寄せされる)。
    - 差分が16社以上でブレーキが掛かったら、内容が妥当なときのみ `--force` を付けて再実行する。
+   - **応募runの自動追従**: `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/application-autopilot.ps1 -Action list`で進行中runを取得し、
+     企業とpositionが一意に一致するメールについて、適性検査案内は`assessment_detected`または情報が揃えば`assessment_ready`、
+     面接確定は`interview_scheduled`のJSONを`logs/`以下に作り、`application-autopilot.ps1 -Action event -InputJson <JSON>`で反映する。
+     `eventId`は`mail:<GmailメッセージID>:<イベント種別>`として冪等にする。paused/failedのrunは自動再開せず本人へ報告する。
+     本人承認が必要な`entry_submitted`、`es_submitted`、`entry_es_submitted`、`assessment_completed`をメールから推測して記録しない。
+     複数runで特定不能なら保留として本人へ報告する。
 5. `npx tsx scripts/db-snapshot.ts` を実行する(アプリへの即時反映+DBの日次バックアップ。プッシュ失敗は警告のみで続行)。
 6. `npx tsx scripts/db-mirror.ts` でミラー値を生成し、`mirror-out.json` を Read して、各 writes[] を
    mcp__google-workspace__modify_sheet_values で書き込む(range_name は `'<tab>'!<range>`、values はそのまま渡す)。
