@@ -38,26 +38,12 @@ export default async function handler(req: { method?: string; query?: Record<str
 
   if (text === null && typeof blobMod.get === 'function') {
     text = await attempt('get', async () => {
-      const r = await (blobMod.get as GetFn)('snapshot.json', { access: 'private' })
-      const b = r?.blob as unknown as {
-        text?: () => Promise<string>
-        stream?: () => ReadableStream
-        body?: ReadableStream
-        arrayBuffer?: () => Promise<ArrayBuffer>
-        downloadUrl?: string
+      // SDK v2.6の正式仕様: get()は { statusCode, stream, blob(メタデータ) } を返す。中身はstream
+      const r = (await (blobMod.get as GetFn)('snapshot.json', { access: 'private' })) as unknown as {
+        stream?: ReadableStream | null
       } | null
-      if (!b) return null
-      if (b.downloadUrl) {
-        // Privateストアのget()は署名付きdownloadUrl入りのメタデータを返す(実測 2026-07-18)
-        const resp = await fetch(b.downloadUrl)
-        if (!resp.ok) throw new Error(`downloadUrl fetch ${resp.status}`)
-        return await resp.text()
-      }
-      if (typeof b.text === 'function') return await b.text()
-      if (typeof b.stream === 'function') return await new Response(b.stream()).text()
-      if (b.body) return await new Response(b.body).text()
-      if (typeof b.arrayBuffer === 'function') return new TextDecoder().decode(await b.arrayBuffer())
-      throw new Error('unknown blob shape: ' + Object.keys(b as object).join(','))
+      if (!r?.stream) return null
+      return await new Response(r.stream).text()
     })
   }
   if (text === null && typeof blobMod.head === 'function') {
