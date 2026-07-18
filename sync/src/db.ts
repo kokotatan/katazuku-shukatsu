@@ -39,6 +39,8 @@ export function openDb(path: string): DatabaseSync {
   const db = new DatabaseSync(path)
   db.exec(`
     PRAGMA journal_mode = WAL;
+    PRAGMA busy_timeout = 5000;
+    PRAGMA foreign_keys = ON;
     CREATE TABLE IF NOT EXISTS company (
       id INTEGER PRIMARY KEY,
       name TEXT NOT NULL UNIQUE,
@@ -92,7 +94,7 @@ export function sameCompany(a: string, b: string): boolean {
 
 // ---- ステータス遷移規則(specの「書き込みモデル」) ----
 
-export type Stage = 'scouted' | 'entried' | 'task' | 'interview' | 'intern' | 'offer' | 'closed'
+export type Stage = 'scouted' | 'entried' | 'task' | 'interview' | 'intern' | 'offer' | 'rejected' | 'closed'
 
 export const STATUS_FOR: Record<Stage, string> = {
   scouted: '出願予定',
@@ -101,7 +103,13 @@ export const STATUS_FOR: Record<Stage, string> = {
   interview: '選考中',
   intern: '合格',
   offer: '内定',
+  rejected: '不合格',
   closed: '辞退',
+}
+
+/** ポジション(トラック)の同一判定。企業名の部分一致規則は流用せず、正規化後の完全一致のみ */
+export function samePosition(a: string, b: string): boolean {
+  return normalize(a) === normalize(b)
 }
 
 /** 終了系(不合格・辞退など)。復活させない */
@@ -122,8 +130,9 @@ function rank(status: string): number {
 /**
  * メール根拠の新情報(stage)で現ステータスをどう更新するか。
  * 返り値: 書き込むべき新ステータス / null = 触らない。
- * - 終了系(辞退・不合格)は根拠があれば合格からでも確定できる(八洲問題の解消)
+ * - 終了系(不合格・辞退)は根拠があれば合格からでも確定できる(八洲問題の解消)。不合格と辞退は別語で書く
  * - 終了系からの復活はさせない
+ * - 内定は終了系以外のすべてを上書きできる(「面接合格」等の途中経過に含まれる「合格」で弾かない)
  * - 進行中の自由記述(詳しい手書きステータス)は、粗い「出願済」等で潰さない
  */
 export function transition(current: string, stage: Stage): string | null {
@@ -131,8 +140,9 @@ export function transition(current: string, stage: Stage): string | null {
   const cur = current.trim()
   if (cur === want) return null
   if (FINAL_NEG.test(cur)) return null // 終了済は動かさない
-  if (stage === 'closed') return want // 終了の根拠は最優先で確定
-  if (stage === 'intern' || stage === 'offer') {
+  if (stage === 'closed' || stage === 'rejected') return want // 終了の根拠は最優先で確定
+  if (stage === 'offer') return want // 内定の根拠は途中経過の「合格」表記に関係なく確定
+  if (stage === 'intern') {
     return isFinalPos(cur) ? null : want // 合格の根拠は進行中を確定に進める
   }
   // 進行中系(scouted〜interview)は、空欄 or より浅いランクのときだけ前進

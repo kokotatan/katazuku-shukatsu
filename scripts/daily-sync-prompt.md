@@ -11,7 +11,7 @@ DB→シートの一方向ミラー。書き手はagentのみ。サービスア�
    (以降の手順でツール名を挙げている箇所も同様に読み替える)。**どちらも利用できない環境のときだけ**
    「Gmail MCP が使えないため中止」と出力して終了する(この場合は最後の完了行を出さない)。
 2. メールから企業ごとに以下を抽出する:
-   - 選考の動き → stage にマッピング(出願予定=scouted, 出願済=entried, ES・テスト中=task, 面接中=interview, インターン合格=intern, 内定=offer, 不合格・辞退=closed)
+   - 選考の動き → stage にマッピング(出願予定=scouted, 出願済=entried, ES・テスト中=task, 面接中=interview, インターン合格=intern, 内定=offer, 不合格・お見送り=rejected, 辞退=closed)
    - 〆切・選考日(面接日程を含む) → nextDate (YYYY-MM-DD)
    - 次にやること → nextAction
    - 業界が分かれば industry、職種・コースが特定できれば position(同じ会社に複数トラックがある場合の照合に使う)

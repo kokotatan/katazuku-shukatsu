@@ -26,22 +26,27 @@ export interface MirrorWrite {
   values: string[][]
 }
 
+/** USER_ENTEREDで書くため、データ由来の値が数式として解釈されないようにする(唯一の数式はL列で自前生成) */
+function esc(v: string): string {
+  return /^[=+]/.test(v) ? `'${v}` : v
+}
+
 export function renderMirror(db: DatabaseSync): MirrorWrite[] {
   const selHeader = ['企業名', '時期', 'ポジション', '志望度', 'ステータス', '選考①', '選考②', '選考③', '選考④', '次アクション', '締切・選考日', '残り日数', '提出済', 'ES・資料URL', '選考メモ']
   const selRows: string[][] = listSelections(db).map((s, i) => {
     const r = i + 2 // シート上の行番号(1=ヘッダ)
     return [
-      s.company, s.season, s.position, s.priority, s.status,
-      s.steps[0] ?? '', s.steps[1] ?? '', s.steps[2] ?? '', s.steps[3] ?? '',
-      s.nextAction, s.nextDate.replace(/-/g, '/'),
+      esc(s.company), esc(s.season), esc(s.position), esc(s.priority), esc(s.status),
+      esc(s.steps[0] ?? ''), esc(s.steps[1] ?? ''), esc(s.steps[2] ?? ''), esc(s.steps[3] ?? ''),
+      esc(s.nextAction), esc(s.nextDate.replace(/-/g, '/')),
       `=ifs($K${r}-today()>0,ifs($M${r}=false,"残り"&$K${r}-today()&"日",$M${r}=true,"Done"),$K${r}-today()<1,"")`,
-      s.submitted ? 'TRUE' : 'FALSE', s.esUrl, s.memo,
+      s.submitted ? 'TRUE' : 'FALSE', esc(s.esUrl), esc(s.memo),
     ]
   })
   while (selRows.length < SELECTION_ROWS) selRows.push(Array(selHeader.length).fill(''))
 
   const coHeader = ['企業名', '業界', 'マイページURL', 'ログインID', 'パスワード', '会社メモ']
-  const coRows: string[][] = listCompanies(db).map((c) => [c.name, c.industry, c.mypageUrl, c.loginId, c.password, c.memo])
+  const coRows: string[][] = listCompanies(db).map((c) => [esc(c.name), esc(c.industry), esc(c.mypageUrl), esc(c.loginId), esc(c.password), esc(c.memo)])
   while (coRows.length < COMPANY_ROWS) coRows.push(Array(coHeader.length).fill(''))
 
   // MCPの1回の書き込みが巨大になりすぎないよう50行ずつに分割する

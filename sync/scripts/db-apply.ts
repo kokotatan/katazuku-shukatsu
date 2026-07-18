@@ -12,7 +12,7 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join, resolve } from 'node:path'
 import type { DatabaseSync } from 'node:sqlite'
-import { openDb, upsertCompany, insertSelection, transition, sameCompany, STATUS_FOR, type Stage } from '../src/db'
+import { openDb, upsertCompany, insertSelection, transition, samePosition, STATUS_FOR, type Stage } from '../src/db'
 
 export const MAX_APPLY_CHANGES = 15
 
@@ -36,6 +36,9 @@ export function applyDiff(db: DatabaseSync, items: DiffItem[], by = 'daily-sync'
   const now = new Date().toISOString()
   const res: ApplyResult = { updated: [], added: [], skipped: [] }
 
+  // バッチ全体を1トランザクションに(半適用を防ぐ。busy_timeoutはopenDbで設定済み)
+  db.exec('BEGIN IMMEDIATE')
+  try {
   for (const it of items) {
     const name = (it.name ?? '').trim()
     if (!name) continue
@@ -44,12 +47,20 @@ export function applyDiff(db: DatabaseSync, items: DiffItem[], by = 'daily-sync'
     const sels = db.prepare('SELECT id, position, status, next_action, next_date FROM selection WHERE company_id = ?')
       .all(cid) as { id: number; position: string; status: string; next_action: string; next_date: string }[]
 
-    let target = sels.length === 1 ? sels[0] : undefined
-    if (!target && sels.length > 1 && it.position) {
-      target = sels.find((s) => s.position && it.position && sameCompany(s.position, it.position))
+    // トラックの特定: position指定があれば完全一致のみ。一致ゼロなら「別トラックの新情報」として追加する。
+    // position指定なしで複数トラック → どれの話か分からないので保留(壊すより触らない)
+    let target: (typeof sels)[number] | undefined
+    let addAsNewTrack = sels.length === 0
+    if (!addAsNewTrack) {
+      if (it.position) {
+        target = sels.find((s) => samePosition(s.position, it.position!))
+        if (!target) addAsNewTrack = true // 例: Sansan(3days)しか無いところに Sansan 1day の話が来た
+      } else if (sels.length === 1) {
+        target = sels[0]
+      }
     }
 
-    if (sels.length === 0) {
+    if (addAsNewTrack) {
       insertSelection(db, cid, {
         company: name,
         season: it.season ?? '',
@@ -88,6 +99,11 @@ export function applyDiff(db: DatabaseSync, items: DiffItem[], by = 'daily-sync'
       changed = true
     }
     if (changed) res.updated.push(name)
+  }
+  db.exec('COMMIT')
+  } catch (err) {
+    db.exec('ROLLBACK')
+    throw err
   }
   return res
 }

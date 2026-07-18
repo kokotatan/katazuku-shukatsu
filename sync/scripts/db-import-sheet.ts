@@ -83,16 +83,22 @@ const seed: Seed = raw.selectionsGrid
   : raw
 
 const db = openDb(DB_PATH)
-if (args.includes('--reset')) {
-  db.exec('DELETE FROM selection; DELETE FROM company;')
-  console.log('既存データを削除しました(--reset)')
+db.exec('BEGIN IMMEDIATE') // 途中失敗で半分だけ入るのを防ぐ
+try {
+  if (args.includes('--reset')) {
+    db.exec('DELETE FROM selection; DELETE FROM company;')
+    console.log('既存データを削除しました(--reset)')
+  }
+  for (const c of seed.companies ?? []) upsertCompany(db, c)
+  let n = 0
+  for (const s of seed.selections ?? []) {
+    const cid = upsertCompany(db, { name: s.company })
+    insertSelection(db, cid, s, 'import')
+    n++
+  }
+  db.exec('COMMIT')
+  console.log(`取り込み完了: 選考 ${n}行 / 企業 ${(seed.companies ?? []).length}社 -> ${DB_PATH}`)
+} catch (err) {
+  db.exec('ROLLBACK')
+  throw err
 }
-
-for (const c of seed.companies ?? []) upsertCompany(db, c)
-let n = 0
-for (const s of seed.selections ?? []) {
-  const cid = upsertCompany(db, { name: s.company })
-  insertSelection(db, cid, s, 'import')
-  n++
-}
-console.log(`取り込み完了: 選考 ${n}行 / 企業 ${(seed.companies ?? []).length}社 -> ${DB_PATH}`)
