@@ -47,6 +47,7 @@ export interface BasicProfile {
   homeAddress: string
   /** 証明写真 dataURL */
   photo: string
+  // 学歴: university 以下は大学院(最終学歴)として扱う
   university: string
   faculty: string
   department: string
@@ -57,6 +58,16 @@ export interface BasicProfile {
   enrollYm: string
   /** 卒業・修了予定年月 YYYY-MM */
   gradYm: string
+  // 学部(学士課程)
+  undergradSchool: string
+  undergradFaculty: string
+  undergradDepartment: string
+  undergradLab: string
+  /** 学部 入学年月 YYYY-MM */
+  undergradEnrollYm: string
+  /** 学部 卒業年月 YYYY-MM */
+  undergradGradYm: string
+  undergradGpa: string
   highSchool: string
   certifications: string
   languages: string
@@ -70,6 +81,18 @@ export interface BasicProfile {
   weaknesses: string
   hobbies: string
   clubs: string
+  // 緊急連絡先
+  emergencyName: string
+  emergencyRelation: string
+  emergencyPhone: string
+  emergencyPostal: string
+  emergencyAddress: string
+  // その他
+  mbti: string
+  /** キャリア軸・自己PRの軸 */
+  careerAxis: string
+  /** このサービス/企業を知ったきっかけ */
+  foundVia: string
   updatedAt: string
 }
 
@@ -99,6 +122,13 @@ export function emptyBasicProfile(): BasicProfile {
     gpa: '',
     enrollYm: '',
     gradYm: '',
+    undergradSchool: '',
+    undergradFaculty: '',
+    undergradDepartment: '',
+    undergradLab: '',
+    undergradEnrollYm: '',
+    undergradGradYm: '',
+    undergradGpa: '',
     highSchool: '',
     certifications: '',
     languages: '',
@@ -112,6 +142,14 @@ export function emptyBasicProfile(): BasicProfile {
     weaknesses: '',
     hobbies: '',
     clubs: '',
+    emergencyName: '',
+    emergencyRelation: '',
+    emergencyPhone: '',
+    emergencyPostal: '',
+    emergencyAddress: '',
+    mbti: '',
+    careerAxis: '',
+    foundVia: '',
     updatedAt: '',
   }
 }
