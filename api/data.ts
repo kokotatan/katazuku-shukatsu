@@ -39,7 +39,18 @@ export default async function handler(req: { method?: string; query?: Record<str
   if (text === null && typeof blobMod.get === 'function') {
     text = await attempt('get', async () => {
       const r = await (blobMod.get as GetFn)('snapshot.json', { access: 'private' })
-      return r?.blob ? await r.blob.text() : null
+      const b = r?.blob as unknown as {
+        text?: () => Promise<string>
+        stream?: () => ReadableStream
+        body?: ReadableStream
+        arrayBuffer?: () => Promise<ArrayBuffer>
+      } | null
+      if (!b) return null
+      if (typeof b.text === 'function') return await b.text()
+      if (typeof b.stream === 'function') return await new Response(b.stream()).text()
+      if (b.body) return await new Response(b.body).text()
+      if (typeof b.arrayBuffer === 'function') return new TextDecoder().decode(await b.arrayBuffer())
+      throw new Error('unknown blob shape: ' + Object.keys(b as object).join(','))
     })
   }
   if (text === null && typeof blobMod.head === 'function') {

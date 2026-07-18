@@ -62,6 +62,16 @@ npm run build                              # board(管理画面)ビルド + sync
    エクサウィザーズ/八洲電機/LayerX/日本トレカセンター/PKSHA に既存と同じ話の別トラックが追加された。
    samePositionの緩和(包含許容)+既存トラックへの統合ツール(db-merge-tracks)を作って重複を畳む
 
+7. **会議自動運転の次段(codex設計 2026-07-18を採用)**: 現状は meeting-autopilot.ps1 が
+   「DB予定→10分前に開く→開始5分後にrecord-audio→終了+3分停止→議事録→完了化イベント」まで実装済み。
+   次にやる: (a) カレンダーコネクタ→appointment upsert(external_id/end_at/hash付き。LLMの毎回カレンダー検索を廃止)
+   (b) meeting_run状態機械(armed→opened→recording→…→done。予定ID単位の一回限りタスク+WakeToRun)
+   (c) 会議終了の実検出(会議窓消滅15秒→予定終了後の無音90-120秒→終了+30分強制停止の順)
+   (d) 議事録→DB反映は自由記述でなく厳格JSON+専用CLI(db-apply-interview)で1トランザクション。event.ref=run_idで冪等化
+   (e) personスキーマ: person / appointment_person / person_note(追記専用・根拠ref+confidence) /
+       person_photo(storage_key・sha256・verified_at。**画像はsnapshot/gitに出さず認証API配信**)。spec10担当と共同
+8. **抽出強化**: daily-syncのappointmentsに endAt(終了時刻)も取らせる。カレンダー入力(⑤)の接続
+
 ## 禁止・注意
 
 - `credentials/`・`.env`・service-account.json・`data/`・`logs/`・`*.local.md` はコミットしない(gitignore済)

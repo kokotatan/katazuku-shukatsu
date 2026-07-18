@@ -24,8 +24,8 @@ export interface DiffItem {
   industry?: string
   season?: string
   position?: string
-  /** 面接・締切・説明会などの予定(日時はISO。時刻・URL・場所・相手まで取る) */
-  appointments?: { at: string; kind?: string; title: string; url?: string; location?: string; person?: string }[]
+  /** 面接・締切・説明会などの予定(日時はISO。時刻・終了時刻・URL・場所・相手まで取る) */
+  appointments?: { at: string; endAt?: string; kind?: string; title: string; url?: string; location?: string; person?: string }[]
   /** 根拠メールのID等(イベントのref) */
   ref?: string
 }
@@ -89,7 +89,7 @@ export function applyDiff(db: DatabaseSync, items: DiffItem[], by = 'daily-sync'
       }, by)
       addEvent(db, sid, '新規', `${STATUS_FOR[it.stage]}として登録${it.position ? `(${it.position})` : ''}`, by, undefined, it.ref)
       for (const ap of it.appointments ?? []) {
-        addAppointment(db, { selectionId: sid, at: ap.at, kind: ap.kind ?? 'その他', title: ap.title, url: ap.url, location: ap.location, person: ap.person })
+        addAppointment(db, { selectionId: sid, at: ap.at, endAt: ap.endAt, kind: ap.kind ?? 'その他', title: ap.title, url: ap.url, location: ap.location, person: ap.person })
         addEvent(db, sid, '予定追加', `${ap.title} (${ap.at})`, by, undefined, it.ref)
       }
       res.added.push(name)
@@ -111,7 +111,7 @@ export function applyDiff(db: DatabaseSync, items: DiffItem[], by = 'daily-sync'
       changed = true
     }
     for (const ap of it.appointments ?? []) {
-      const added = addAppointment(db, { selectionId: target.id, at: ap.at, kind: ap.kind ?? 'その他', title: ap.title, url: ap.url, location: ap.location, person: ap.person })
+      const added = addAppointment(db, { selectionId: target.id, at: ap.at, endAt: ap.endAt, kind: ap.kind ?? 'その他', title: ap.title, url: ap.url, location: ap.location, person: ap.person })
       if (added.created) {
         addEvent(db, target.id, '予定追加', `${ap.title} (${ap.at})`, by, undefined, it.ref)
         changed = true

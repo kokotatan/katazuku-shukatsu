@@ -18,7 +18,7 @@ DB→シートの一方向ミラー。書き手はagentのみ。サービスア�
      (同じ会社に複数ポジション・複数コースで応募していることがあり、これがトラックを判別する鍵)
    - name は本文にある表記のままでよい(株式会社/Inc.付きの正式名称でも通称でも、DB側の正規化とエイリアス学習で吸収する)
    - **予定は構造化して取る(最重要)**: 面接・面談・説明会・提出締切は appointments 配列
-     `[{at(ISO・時刻まで), kind(面接/面談/締切/説明会/テスト), title, url(Meet/Zoom/提出ページ), location, person(面接官等)}]`。
+     `[{at(ISO・時刻まで), endAt(終了時刻。「15:00-15:30」等から。録画の自動停止に使う), kind(面接/面談/締切/説明会/テスト), title, url(Meet/Zoom/提出ページ), location, person(面接官等)}]`。
      **会議URLと時刻は必ず拾う**(朝のページに「15:00 面接 [開く]」と出すための核)。ref にGmailメッセージIDを入れる
 3. 抽出結果を `{name, stage, nextAction, nextDate, industry, position}` の配列JSONとして `sync/sheet-import-loop.json` に書き出す(gitignore済み)。対象メールが無ければ空配列でよい。
 4. `cd sync; npx tsx scripts/db-apply.ts sheet-import-loop.json` で正本DBへ反映する。
