@@ -1,13 +1,13 @@
 import { sameCompany } from './importer'
 
 /**
- * 面接準備(prep)で登録した「会った人」を読み取り専用で参照する。
- * localStorage キー `katazuku-prep/people` は prep 側の所有物なので、
+ * people アプリで登録した「会った人」を読み取り専用で参照する。
+ * localStorage キー `katazuku-people/people` は people 側の所有物なので、
  * ここでは絶対に書き込まない(読むだけ)。
  */
-const PEOPLE_KEY = 'katazuku-prep/people'
+const PEOPLE_KEY = 'katazuku-people/people'
 
-/** prep の Person と同形。status では読み取りにのみ使う */
+/** people の Person と同形。status では読み取りにのみ使う */
 export interface Person {
   id: string
   name: string
