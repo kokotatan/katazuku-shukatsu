@@ -6,7 +6,7 @@
 「Yes/No」のような説明が要る言葉は使わない。中学生でも分かる言葉だけで書く。
 このルーチンは無視されても安全に設計する(今日流れたものは明日また出る)。責める文言は使わない。
 
-参照: 選考管理シート(Google Drive)・docs/PROGRESS.md・個人マスタ(chrome-prompts/submit.local.md §4〜§11)。
+参照: 正本DB(data/katazuku.db)・docs/PROGRESS.md・個人マスタ(chrome-prompts/submit.local.md §4〜§11)。
 プロジェクト規約に従い、**絵文字は一切使わない**(カレンダー本文・返信下書きも含む)。出力は日本語。
 
 MCPツールは環境により mcp__google-workspace__ 系または mcp__claude_ai_* 系(claude_ai_Gmail /
@@ -69,24 +69,24 @@ get_events ↔ list_events、batch_modify_gmail_message_labels ↔ label/unlabel
 - **締切当日に面接など重要予定が重なる繁忙日**の場合は、作業ブロックを数日前倒しする(本人の負荷を締切日に集中させない)。
 - 登録前に同名が無いか get_events で確認する。時間帯は空きに合わせた仮置きでよい(本人が動かすのは自由)。
 
-### 5. 選考管理シートとの突合(エントリーし忘れの検出)
+### 5. 正本DBとの突合(エントリーし忘れの検出)
 
-- Google Drive MCP で選考管理シート(「選考管理シート_奥山彪太郎」)を読む。
+- `cd sync; npx tsx scripts/db-inspect.ts` で正本DB `data/katazuku.db` の選考状況を読む。
 - 「〆切・選考日が7日以内に迫っているのに、出願状況が未出願・気になる止まり」の企業を洗い出し、「きょうやること」の候補に含める。
-- Drive MCP が使えない環境なら「シート突合はスキップ」と明記して先へ進む(黙って省略しない)。
+- DBを読めない場合は「DB突合は失敗」と故障として明記し、シートやlocalStorageを代わりの正本にしない。
 
-### 5.5 選考ボード(katazuku Status)の実態同期【人が動かさなくても合っている状態を保つ】
+### 5.5 正本DBの実態同期【人が動かさなくても合っている状態を保つ】
 
 - 手順1で読んだメール(+必要なら `選考結果 OR 合格 OR 不合格 OR 面接 newer_than:3d` の追加検索)から、
   選考の**進展**(結果連絡・面接確定・課題案内・提出完了など)を企業ごとに抽出する。
-- Claude in Chrome が使える環境なら、https://katazuku.kotalabo.com/status/ を開き、
-  javascript で localStorage `katazuku-pipeline/companies` に反映する:
-  - **既存カードのステージは前進のみ**(後退させない)。削除は絶対にしない。
-  - nextAction / nextDate は最新の実態で上書き。memo は消さず追記。
-  - ボードに無い進行中企業は新規カードとして追加(id は `c-<Date.now()>-<連番>`)。
-  - 企業名の照合は NFKC 正規化+「株式会社」等除去のゆるい一致(status/src/lib/importer.ts の sameCompany と同義)。
-- ブラウザが使えない環境なら、検出したズレを「きょうやること」ではなく「自動で済ませたこと」の下に
-  【ボード更新案】として列挙する(本人がボードを直すのではなく、次のasaが反映する前提で残す)。
+- 8:23のdaily-syncで既に同じ内容が反映済みなら何もしない。未反映だけを
+  `{name, stage, nextAction, nextDate, industry, season, position, appointments, ref}` の配列として
+  `sync/sheet-import-asa.json` に書き、`cd sync; npx tsx scripts/db-apply.ts sheet-import-asa.json` で反映する。
+- 書く前に `db-inspect.ts <企業名>` で既存トラックを確認し、positionを具体的に付ける。
+  複数トラックで特定できないもの、名寄せ確認が出たものは推測で書かず、本人確認事項として報告する。
+- DBへ1件でも書いたら、必ず続けて `npx tsx scripts/db-snapshot.ts` を実行し、アプリへ即時反映する。
+  さらに `db-mirror.ts` の writes をSheets MCPでシートへ一方向ミラーする。
+- シートや各アプリのlocalStorageを直接更新しない。ステータス遷移は必ず `db-apply.ts` 経由にする。
 - 反映した企業と内容を「自動で済ませたこと」に1行ずつ載せる。
 
 ### 6. 面接の前日準備(prepパック)

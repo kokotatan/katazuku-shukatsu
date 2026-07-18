@@ -1,0 +1,64 @@
+﻿# katazuku asa — 無人・メール配信版(タスクスケジューラから run-asa.vbs 経由で無音起動する)
+# 対話ターミナルを出さず、asa ルーチンを headless(claude -p)で実行し、
+# 「きょうやること」サマリを本人のGmailに送って終わる。失敗は alert-asa.txt に残し、次のasa/朝の報告で拾う。
+# 手動で会話したいときは従来どおり `katazuku asa`(対話版)を使う。
+$ErrorActionPreference = 'Continue'
+$repo = Split-Path $PSScriptRoot -Parent
+Set-Location $repo
+
+$logDir = Join-Path $repo 'logs'
+if (-not (Test-Path $logDir)) { New-Item -ItemType Directory $logDir | Out-Null }
+$logFile = Join-Path $logDir ("asa-{0}.log" -f (Get-Date -Format 'yyyy-MM-dd_HHmm'))
+
+$base = Get-Content -Raw -Encoding UTF8 -Path (Join-Path $PSScriptRoot 'asa-prompt.md')
+
+# 対話版ルーチンに「無人・メール配信」の締めを追記する(asa-prompt.md 自体は対話版のまま触らない)
+$mailTo = 'okuyama.kotaro.career@gmail.com'
+$tail = @"
+
+---
+【自動実行(メール配信)モード / 無人・対話なし】
+- このセッションは対話できない。最後に「送っていい/直す?」等の問いかけで終わらせない。判断が要るものも下書き作成・カレンダー登録まで済ませ、本人がやる分は下のメール本文にそのまま書く。
+- 全処理が終わったら、出力した「きょうやること / 自動で済ませたこと / きょうはやらなくていい / ノイズ」のサマリ全文を、件名『きょうやること (M/D 曜)』で mcp__google-workspace__send_gmail_message を使って $mailTo 宛に送る(to=$mailTo, body_format=plain, 本文はプレーンテキスト、絵文字禁止)。曜日はJSTで機械確認して書く。
+- **送信ツールはこの"自分宛サマリ"の送信だけに使う**。企業・採用担当への返信/下書きの送信には絶対に使わない(相手宛は下書き作成までに留める)。
+- メール送信に成功したら、出力の最終行に他の文字を付けず単独で半角ASCIIで `=== asa DONE ===` と出力する(この行の有無で正常完了を判定する。日本語を混ぜない)。
+"@
+$prompt = $base + $tail
+
+# headless実行。asa が使う一式(メール読取・下書き・ラベル・カレンダー・ドライブ/シート読取・自分宛送信)を許可。
+# プロンプトは stdin 経由(本文のハイフン語/ダブルクオートが引数誤解釈される事故を避ける。daily-sync と同方針)。
+$prompt | claude -p `
+  --allowedTools 'PowerShell' 'Bash' 'Read' 'Write' 'Glob' 'Grep' `
+    'mcp__google-workspace__search_gmail_messages' 'mcp__google-workspace__get_gmail_message_content' `
+    'mcp__google-workspace__get_gmail_thread_content' `
+    'mcp__google-workspace__get_gmail_threads_content_batch' 'mcp__google-workspace__get_gmail_messages_content_batch' `
+    'mcp__google-workspace__modify_gmail_message_labels' 'mcp__google-workspace__batch_modify_gmail_message_labels' `
+    'mcp__google-workspace__read_sheet_values' 'mcp__google-workspace__draft_gmail_message' `
+    'mcp__google-workspace__send_gmail_message' 'mcp__google-workspace__get_events' `
+    'mcp__google-workspace__list_calendars' 'mcp__google-workspace__manage_event' `
+    'mcp__google-workspace__search_drive_files' `
+    'mcp__claude_ai_Gmail__*' 'mcp__claude_ai_Google_Calendar__*' 'mcp__claude_ai_Google_Drive__*' `
+  2>&1 | Out-File -FilePath $logFile -Encoding utf8
+
+# 完了センチネル方式で正常判定(daily-sync と同じ。ASCIIの `=== asa DONE ===` の有無だけで見る)
+$alertFile = Join-Path $logDir 'alert-asa.txt'
+$failReason = $null
+if (-not (Test-Path $logFile) -or (Get-Item $logFile).Length -lt 200) {
+  $failReason = 'ログが空か極小(claude実行自体が失敗した可能性)'
+} else {
+  $logText = Get-Content -Raw -Encoding UTF8 $logFile
+  if ($logText -notmatch '===\s*asa\s*DONE\s*===') {
+    $failReason = '完了行なし(メール送信まで到達しなかった=きょうやることが届いていない可能性)'
+  }
+}
+if ($failReason) {
+  ("{0} asa 失敗: {1} (詳細: logs/{2})" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $failReason, (Split-Path $logFile -Leaf)) |
+    Out-File -FilePath $alertFile -Append -Encoding utf8
+} elseif (Test-Path $alertFile) {
+  Remove-Item $alertFile -Force
+}
+
+# 30日より古いログは消す
+Get-ChildItem $logDir -Filter 'asa-*.log' |
+  Where-Object { $_.LastWriteTime -lt (Get-Date).AddDays(-30) } |
+  Remove-Item -Force

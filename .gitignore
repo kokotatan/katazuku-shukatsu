@@ -26,6 +26,9 @@ service-account.json
 .env.local
 .env.*.local
 
+# Claude Code の端末固有許可設定
+.claude/settings.local.json
+
 # 自動同期の実行ログ
 logs/
 

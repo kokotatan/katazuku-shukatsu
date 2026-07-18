@@ -15,12 +15,14 @@ $alertFile = Join-Path $logDir 'alert-mail-watch.txt'
 $notifyBefore = 0
 if (Test-Path $notifyFile) { $notifyBefore = @(Get-Content $notifyFile -Encoding UTF8).Count }
 
-$prompt = Get-Content -Raw (Join-Path $PSScriptRoot 'mail-watch-prompt.md')
+$prompt = Get-Content -Raw -Encoding UTF8 -Path (Join-Path $PSScriptRoot 'mail-watch-prompt.md')
 
 ("`n===== {0} mail-watch 開始 =====" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss')) | Out-File $logFile -Append -Encoding utf8
 
-# headless実行。ツールは監視・下書き・カレンダー登録に必要な最小限だけ許可する
-claude -p $prompt `
+# headless実行。ツールは監視・下書き・カレンダー登録に必要な最小限だけ許可する。
+# プロンプトは stdin 経由で渡す。本文中のハイフン語や引用符を PowerShell が引数へ
+# 分割し、claude が未知オプションとして誤認する事故を避ける(daily-sync と同じ方式)。
+$prompt | claude -p `
   --allowedTools 'PowerShell' 'Read' 'Write' 'Glob' `
     'mcp__google-workspace__search_gmail_messages' `
     'mcp__google-workspace__get_gmail_messages_content_batch' `
@@ -29,7 +31,7 @@ claude -p $prompt `
     'mcp__google-workspace__draft_gmail_message' `
     'mcp__google-workspace__get_events' `
     'mcp__google-workspace__manage_event' `
-  *>> $logFile
+  2>&1 | Out-File -FilePath $logFile -Append -Encoding utf8
 
 # ---- 実行後: 新しく増えた通知行をWindowsトーストで出す ----
 function Show-Toast([string]$title, [string]$body) {

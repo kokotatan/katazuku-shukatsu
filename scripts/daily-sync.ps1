@@ -8,28 +8,34 @@ $logDir = Join-Path $repo 'logs'
 if (-not (Test-Path $logDir)) { New-Item -ItemType Directory $logDir | Out-Null }
 $logFile = Join-Path $logDir ("sync-{0}.log" -f (Get-Date -Format 'yyyy-MM-dd_HHmm'))
 
-$prompt = Get-Content -Raw (Join-Path $PSScriptRoot 'daily-sync-prompt.md')
+$prompt = Get-Content -Raw -Encoding UTF8 -Path (Join-Path $PSScriptRoot 'daily-sync-prompt.md')
 
 # headless実行。ツールは同期に必要な最小限だけ許可する
 # Gmail MCP は自前 google-workspace 系と claude.ai 直結コネクタ(mcp__claude_ai_*)の両対応
-claude -p $prompt `
+# プロンプトは -p の引数ではなく stdin 経由で渡す。本文に含まれる `-Why "..."` 等の
+# ハイフン語+ダブルクオートを PowerShell が引数分割し、claude が `-Why` を未知オプションと
+# 誤認して起動失敗する事故が 2026-07-18 に発生したため(引数渡しはこの化けに弱い)。
+$prompt | claude -p `
   --allowedTools 'PowerShell' 'Bash' 'Read' 'Write' 'Glob' 'Grep' `
     'mcp__google-workspace__search_gmail_messages' 'mcp__google-workspace__get_gmail_message_content' `
     'mcp__google-workspace__get_gmail_messages_content_batch' 'mcp__google-workspace__get_gmail_thread_content' `
     'mcp__google-workspace__modify_gmail_message_labels' 'mcp__google-workspace__batch_modify_gmail_message_labels' `
+    'mcp__google-workspace__read_sheet_values' 'mcp__google-workspace__modify_sheet_values' `
     'mcp__claude_ai_Gmail__*' 'mcp__claude_ai_Google_Calendar__*' 'mcp__claude_ai_Google_Drive__*' `
-  *> $logFile
+  2>&1 | Out-File -FilePath $logFile -Encoding utf8
 
 # 実行結果を検査し、失敗の疑いがあれば alert ファイルに残す(asa が翌朝【自動化の故障】として報告する)
-# 正常判定は完了センチネル方式: プロンプトが最後に出力する『=== daily-sync 完了 ===』の有無だけで判定する。
+# 正常判定は完了センチネル方式: プロンプトが最後に出力する『=== daily-sync DONE ===』の有無だけで判定する。
+# センチネルは半角ASCIIにする(日本語「完了」はログの文字コード次第で化け、正常なのに失敗と誤報するため。
+# 実際 2026-07-15/16 は処理成功なのに「完了」が化けて誤報していた)。旧ログ互換で「完了」も許容する。
 # 鍵不在によるシート同期スキップは「正常完了(部分)」であり、完了行が出るので故障扱いしない。
 $alertFile = Join-Path $logDir 'alert-daily-sync.txt'
 $failReason = $null
 if (-not (Test-Path $logFile) -or (Get-Item $logFile).Length -lt 200) {
   $failReason = 'ログが空か極小(claude実行自体が失敗した可能性)'
 } else {
-  $logText = Get-Content -Raw $logFile
-  if ($logText -notmatch '===\s*daily-sync\s*完了\s*===') {
+  $logText = Get-Content -Raw -Encoding UTF8 $logFile
+  if ($logText -notmatch '===\s*daily-sync\s*(DONE|完了)\s*===') {
     $failReason = '完了行なし(Gmail不通・認証エラー・途中終了などで最後まで到達しなかった可能性)'
   }
 }

@@ -1,23 +1,22 @@
 ﻿# katazuku asa — 朝のまとめルーチンをタスクスケジューラに登録する(1回実行すればよい)
-# 毎朝9:00にPowerShellウィンドウを開き、claude対話セッションできょうやることを提示する。
+# 毎朝9:00に無音で asa-auto.ps1 を実行し、きょうやることを本人のGmailへ送る。
 # 9:00にPCが起きていなければ、次に使える時点で実行する(StartWhenAvailable)。
 # 解除: Unregister-ScheduledTask -TaskName 'katazuku-asa' -Confirm:$false
 $ErrorActionPreference = 'Stop'
-$repo = Split-Path $PSScriptRoot -Parent
+$launcher = Join-Path $PSScriptRoot 'run-asa.vbs'
 
-$action = New-ScheduledTaskAction -Execute 'powershell.exe' `
-  -Argument "-NoExit -ExecutionPolicy Bypass -Command `"& '$repo\scripts\katazuku.ps1' asa`""
+$action = New-ScheduledTaskAction -Execute 'wscript.exe' `
+  -Argument ('"{0}"' -f $launcher)
 
 $trigger = New-ScheduledTaskTrigger -Daily -At '09:00'
 
-# 実行時間の上限なし(ウィンドウを開いたままにしてもタスク側から殺さない)
-$settings = New-ScheduledTaskSettingsSet -StartWhenAvailable `
-  -MultipleInstances IgnoreNew -ExecutionTimeLimit ([TimeSpan]::Zero)
+$settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -WakeToRun `
+  -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Hours 2)
 
 Register-ScheduledTask -TaskName 'katazuku-asa' `
   -Action $action -Trigger $trigger -Settings $settings `
-  -Description 'katazuku 朝のまとめルーチン: メール分類・返信下書き・カレンダー登録・シート突合を自動で済ませ、きょうやることだけを提示する' `
+  -Description 'katazuku 朝のまとめルーチン: メール分類・返信下書き・カレンダー登録・DB突合を自動で済ませ、きょうやることを本人のGmailへ送る' `
   -Force | Out-Null
 
-"タスク 'katazuku-asa' を登録しました(毎朝9:00、ログオン中のみウィンドウ表示)。"
-"手動テスト: Start-ScheduledTask -TaskName 'katazuku-asa'"
+"タスク 'katazuku-asa' を登録しました(毎朝9:00、無音実行→本人のGmailへ配信)。"
+"手動テスト: powershell -NoProfile -ExecutionPolicy Bypass -File `"$PSScriptRoot\asa-auto.ps1`""
