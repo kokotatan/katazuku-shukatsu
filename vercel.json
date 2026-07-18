@@ -1,6 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "npm run build",
-  "outputDirectory": "dist",
+  "buildCommand": "npm --prefix board install && npm --prefix board run build",
+  "outputDirectory": "board/dist",
   "cleanUrls": true
 }
