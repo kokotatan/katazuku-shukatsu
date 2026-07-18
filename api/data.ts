@@ -1,7 +1,6 @@
 /**
  * アプリ向けの読み取り口。合言葉(KATAZUKU_READ_SECRET)が合えばスナップショットを返す。
- * サインイン不要 — 初回に合言葉を1回入れるだけ(アプリ側がlocalStorageに記憶)。
- * BlobはPrivateストアなので、SDK経由でのみ読める(URL直アクセス不可)。
+ * BlobはPrivateストア: head()のdownloadUrl(署名付き)経由で読む。SDK差異に備え複数の読み方を試す。
  */
 export const config = { maxDuration: 10 }
 
@@ -9,7 +8,7 @@ export default async function handler(req: { method?: string; query?: Record<str
   status: (n: number) => { json: (b: unknown) => void; send: (b: string) => void }
   setHeader: (k: string, v: string) => void
 }) {
-  res.setHeader('Access-Control-Allow-Origin', '*') // 開発サーバー(localhost)からも読めるように
+  res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Cache-Control', 'no-store')
   const key = String((req.query?.key as string) ?? new URL(req.url ?? '', 'http://x').searchParams.get('key') ?? '')
   const secret = process.env.KATAZUKU_READ_SECRET
@@ -18,27 +17,55 @@ export default async function handler(req: { method?: string; query?: Record<str
     return
   }
 
-  // SDKのバージョン差(get / head+downloadUrl)に両対応で読む
-  const blobMod = (await import('@vercel/blob')) as unknown as {
-    get?: (p: string) => Promise<{ blob: { text: () => Promise<string> } } | null>
-    head?: (p: string) => Promise<{ url?: string; downloadUrl?: string } | null>
+  const blobMod = (await import('@vercel/blob')) as unknown as Record<string, unknown>
+  const tried: string[] = []
+  const attempt = async (label: string, fn: () => Promise<string | null>): Promise<string | null> => {
+    try {
+      const t = await fn()
+      if (t !== null) return t
+      tried.push(`${label}: null`)
+    } catch (e) {
+      tried.push(`${label}: ${e instanceof Error ? e.message.slice(0, 120) : String(e).slice(0, 120)}`)
+    }
+    return null
   }
+
+  type HeadFn = (p: string) => Promise<{ url?: string; downloadUrl?: string } | null>
+  type GetFn = (p: string, o?: unknown) => Promise<{ blob?: { text: () => Promise<string> } } | null>
+  type ListFn = (o?: unknown) => Promise<{ blobs: { pathname: string; url?: string; downloadUrl?: string }[] }>
+
   let text: string | null = null
-  try {
-    if (blobMod.get) {
-      const r = await blobMod.get('snapshot.json')
-      if (r?.blob) text = await r.blob.text()
-    }
-    if (text === null && blobMod.head) {
-      const h = await blobMod.head('snapshot.json')
-      const u = h?.downloadUrl ?? h?.url
-      if (u) text = await (await fetch(u)).text()
-    }
-  } catch {
-    text = null
+
+  if (text === null && typeof blobMod.get === 'function') {
+    text = await attempt('get', async () => {
+      const r = await (blobMod.get as GetFn)('snapshot.json', { access: 'private' })
+      return r?.blob ? await r.blob.text() : null
+    })
   }
+  if (text === null && typeof blobMod.head === 'function') {
+    text = await attempt('head', async () => {
+      const h = await (blobMod.head as HeadFn)('snapshot.json')
+      const u = h?.downloadUrl ?? h?.url
+      if (!u) return null
+      const r = await fetch(u)
+      if (!r.ok) throw new Error(`fetch ${r.status}`)
+      return await r.text()
+    })
+  }
+  if (text === null && typeof blobMod.list === 'function') {
+    text = await attempt('list', async () => {
+      const l = await (blobMod.list as ListFn)({ prefix: 'snapshot', limit: 5 })
+      const b = l.blobs.find((x) => x.pathname.startsWith('snapshot'))
+      const u = b?.downloadUrl ?? b?.url
+      if (!u) return null
+      const r = await fetch(u)
+      if (!r.ok) throw new Error(`fetch ${r.status}`)
+      return await r.text()
+    })
+  }
+
   if (text === null) {
-    res.status(404).json({ error: 'snapshot not found (まだ一度もプッシュされていません)' })
+    res.status(404).json({ error: 'snapshot not found', tried })
     return
   }
   res.setHeader('Content-Type', 'application/json')

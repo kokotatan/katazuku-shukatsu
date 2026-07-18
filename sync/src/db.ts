@@ -140,6 +140,9 @@ export function openDb(path: string): DatabaseSync {
   }
   const ecols = db.prepare('PRAGMA table_info(event)').all() as { name: string }[]
   if (!ecols.some((c) => c.name === 'ref')) db.exec("ALTER TABLE event ADD COLUMN ref TEXT NOT NULL DEFAULT ''")
+  // appointment.end_at: 会議の終了時刻(録画の自動停止に必須。無ければ開始+60分とみなす)
+  const acols = db.prepare('PRAGMA table_info(appointment)').all() as { name: string }[]
+  if (!acols.some((c) => c.name === 'end_at')) db.exec("ALTER TABLE appointment ADD COLUMN end_at TEXT NOT NULL DEFAULT ''")
   return db
 }
 
@@ -297,6 +300,8 @@ export interface Appointment {
   id?: number
   selectionId: number
   at: string
+  /** 終了時刻(ISO)。録画の自動停止に使う。省略時は開始+60分扱い */
+  endAt?: string
   kind: string
   title: string
   url?: string
@@ -317,11 +322,12 @@ export function addAppointment(db: DatabaseSync, a: Appointment): { id: number; 
     fill('url', a.url)
     fill('location', a.location)
     fill('person', a.person)
+    if (a.endAt) db.prepare("UPDATE appointment SET end_at = ? WHERE id = ? AND end_at = ''").run(a.endAt, dup.id)
     return { id: dup.id, created: false }
   }
   const r = db.prepare(
-    'INSERT INTO appointment (selection_id, at, kind, title, url, location, person, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-  ).run(a.selectionId, a.at, a.kind || 'その他', a.title, a.url ?? '', a.location ?? '', a.person ?? '', a.status ?? '予定', now)
+    'INSERT INTO appointment (selection_id, at, end_at, kind, title, url, location, person, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+  ).run(a.selectionId, a.at, a.endAt ?? '', a.kind || 'その他', a.title, a.url ?? '', a.location ?? '', a.person ?? '', a.status ?? '予定', now)
   return { id: Number(r.lastInsertRowid), created: true }
 }
 
@@ -331,7 +337,7 @@ export interface AppointmentRow extends Required<Appointment> {
 
 export function listAppointments(db: DatabaseSync): AppointmentRow[] {
   const rows = db.prepare(`
-    SELECT a.id, a.selection_id, a.at, a.kind, a.title, a.url, a.location, a.person, a.status,
+    SELECT a.id, a.selection_id, a.at, a.end_at, a.kind, a.title, a.url, a.location, a.person, a.status,
            CASE WHEN c.short_name <> '' THEN c.short_name ELSE c.name END AS company
     FROM appointment a
     JOIN selection s ON s.id = a.selection_id
@@ -342,6 +348,7 @@ export function listAppointments(db: DatabaseSync): AppointmentRow[] {
     id: r.id as number,
     selectionId: r.selection_id as number,
     at: r.at as string,
+    endAt: (r.end_at as string) ?? '',
     kind: r.kind as string,
     title: r.title as string,
     url: r.url as string,
