@@ -1,6 +1,21 @@
 # katazuku 開発進捗
 
-最終更新: 2026-07-19
+最終更新: 2026-07-22
+
+
+## データ基盤の見直しと他モデル対応の整備(2026-07-22)
+
+未コミットだった蓄積を機能単位で確定(mobility基盤 / provider非依存agent-runtime spec14 / ローカル資格情報ブローカー spec13 + パスワード非出力化 / daily-sync v2 / チェック配線・gitignore・docs)。その上で2本の批判的レビューを実施し、安全に効く改善だけ実装した。
+
+- **データ基盤(spec08)の評価**: 単一ユーザー・単一書き手・ローカル正本という設計は身の丈に妥当で現状維持でよい、が結論。Postgres/イベントソーシング等は過剰。実装の穴3つのうち2つを修正:
+  - node:sqlite(experimental)に載る正本を守るためNodeを24系へ固定(`.node-version`/`engines`)
+  - db-snapshotのバックアップ前に`PRAGMA integrity_check`で破損を早期検知
+  - openDbが`PRAGMA user_version`へスキーマ版を刻み、将来の破壊的マイグレーションを番号で束ねる土台に(回帰テスト1件)
+- **他モデル対応の評価**: agent-runtime基盤は堅い。ただし常駐/定時ジョブ8本がまだ`claude -p`直呼びで、直呼び禁止lintは2本しか守っていなかった。全`scripts/*.ps1`を走査し、既知の未移行8本以外の直呼びをビルドで止める網を追加(新規debtの混入防止)。
+- **未決(本人判断が要る)**:
+  1. **クラウド露出**: snapshotに面接メモ・人物名・プロフィール等の個人データが入りVercel Blobへ。読み取りは`?key=`合言葉1本(ブラウザ埋め込み・失効なし・CORS `*`)。CLAUDE.mdの「配信物に個人データを含めない」と食い違う。現状維持か、機微データ除外/短命署名URL化か。spec08に実態を明記済み。
+  2. **他モデルの本丸**: Gmail/カレンダー/音声はCodex側にツールマップが無く、runtime経由化だけでは他モデルで動かない。Codex側MCP接続+capability map拡充(L)が必要。8本の直呼びスクリプト(daily-sync/mail-watch/asa/calendar-sync/reconcile/interview-digest/open-meeting-urls/katazuku)の移行は稼働中のため本人が実挙動を確認できる時に段階実施。
+  3. **CLAUDE.md記述の陳腐化**: 「api/ は廃止」とあるが `api/data.ts`・`push.ts`・`photo.ts` は現役(snapshot配信の要)。要更新。
 
 
 ## モデル非依存エージェント基盤: Claude優先化とCodex Sandbox修復(2026-07-19)

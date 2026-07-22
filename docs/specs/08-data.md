@@ -86,6 +86,17 @@ snapshotには表示に必要なデータだけを含める。
 - APIはread/write別の秘密で認証
 - `data/`、`logs/`、`.env`、`*.local.md` はgitignore
 
+### クラウドへ出ている個人データと読み取り認証の現状(2026-07-22 追記・要判断)
+
+「機密の除外」はパスワード・画像・住所・移動履歴に限った話で、**それ以外の個人データはVercel Blobに出ている**のが実態。
+snapshot(listPlatformSnapshot)には profile / people(氏名・会社) / personNotes(人物メモ) / interviews(面接の要約・詳細) /
+submissions / dossiers / mailItems / enrichedEvents が含まれ、これらは Private Blob に保存され、`/api/data` 経由で配信される。
+
+読み取り認証は URLクエリ `?key=<KATAZUKU_READ_SECRET>` の単純一致1本のみ(api/data.ts)。この合言葉は**アプリ(ブラウザ)側に置かれ**、
+失効もスコープもなく、`Access-Control-Allow-Origin: *`。つまり「アプリURL + 埋め込まれた合言葉」を得た者は、面接メモや人物名を含む
+全snapshotを平文で読める。単一ユーザー・本人のみの利用という前提では実害は小さいが、CLAUDE.mdの「配信物に個人データを含めない」という
+自己規定とは食い違っている。**現状維持(利便性優先)か、機微データをsnapshotから外す/読み取りを短命署名URLにする(機能・実装コスト)かは本人判断**。
+
 ## アプリ
 
 共通パッケージ `@katazuku/data` が `/api/data` を読む。
