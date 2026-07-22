@@ -42,6 +42,7 @@ Google Calendar ─────┤       ├─→ snapshot → Private Blob →
 - 個人情報: profile_basic / profile_suggestion
 - 提出・研究・メール: submission / company_dossier / mail_item
 - 応募自動運転: application_run / application_event / application_material / web_assessment
+- 移動を含む日程調整: place / mobility_profile / appointment_mobility / route_estimate / travel_segment
 
 appointmentはカレンダー入力だけでなく、external_idが空の予定をoutboxとして外部カレンダーへ出力する。
 作成成功後にexternal_idをDBへ戻し、二重作成を防ぐ。
@@ -64,6 +65,16 @@ selection.statusの更新は `transition()` に集約する。
 - 怪しい会社名はpending_reviewへ置き、自動マージしない
 - 既存重複は `db-merge-tracks.ts` で関連レコードごと統合する
 
+## 選考トラックの命名規約
+
+- 1トラック=1募集。職種・コース・開催区分が違えば別トラックにする
+  (例: ビジネス職 / エンジニア職 / 1day対面オープン・カンパニー)
+- positionの表記は初出のメール・募集要項の表記に固定し、以後一字一句同じ表記を使う。
+  表記ゆれは新トラックが生えてDBを汚す(resolveSelectionIdはposition不一致で新トラックを作る)
+- 入力前に必ず既存トラック一覧(selection)と突き合わせてから書く
+- 会社は name=登記上の正式名称 / short_name=通称 とし、名寄せはshort_nameと
+  company_aliasで維持する。正式名称化は `db-alias.ts official <通称> <正式名称>`
+
 ## スナップショットと機密
 
 snapshotには表示に必要なデータだけを含める。
@@ -71,6 +82,7 @@ snapshotには表示に必要なデータだけを含める。
 - company.passwordは除外
 - data URL画像は再帰的に除外
 - 写真本体はPrivate Blob、snapshotはstorageKeyだけ
+- 自宅・大学・訪問先の住所、緯度経度、具体的な移動履歴はローカルDBだけ
 - APIはread/write別の秘密で認証
 - `data/`、`logs/`、`.env`、`*.local.md` はgitignore
 

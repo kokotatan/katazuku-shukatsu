@@ -1,5 +1,5 @@
 /**
- * DB正本へ人物・プロフィール・メール・面接・提出・カレンダー・企業研究を集約する。
+ * DB正本へ人物・プロフィール・メール・面接・提出・カレンダー・企業研究・移動を集約する。
  * 写真本体はDB/スナップショットへ入れず、person_photo.storage_keyだけを保持する。
  */
 import { DatabaseSync } from 'node:sqlite'
@@ -36,6 +36,97 @@ export function ensurePlatformSchema(db: DatabaseSync): void {
       status TEXT NOT NULL DEFAULT '候補',
       created_at TEXT NOT NULL,
       UNIQUE(field, value, source_ref)
+    );
+
+    -- 就活予定を「時刻が空いているか」ではなく「実際に移動して参加できるか」で扱う。
+    -- 住所は個人性が高いためDBローカルだけに置き、snapshotへは出さない。
+    CREATE TABLE IF NOT EXISTS place (
+      id INTEGER PRIMARY KEY,
+      place_key TEXT NOT NULL UNIQUE,
+      name TEXT NOT NULL,
+      kind TEXT NOT NULL DEFAULT 'other'
+        CHECK (kind IN ('home', 'campus', 'station', 'office', 'hotel', 'coworking', 'other')),
+      company_id INTEGER REFERENCES company(id),
+      address TEXT NOT NULL DEFAULT '',
+      latitude REAL,
+      longitude REAL,
+      timezone TEXT NOT NULL DEFAULT 'Asia/Tokyo',
+      provider TEXT NOT NULL DEFAULT '',
+      external_id TEXT NOT NULL DEFAULT '',
+      privacy TEXT NOT NULL DEFAULT 'private'
+        CHECK (privacy IN ('private', 'shared', 'public')),
+      source_ref TEXT NOT NULL DEFAULT '',
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS mobility_profile (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      home_place_id INTEGER REFERENCES place(id),
+      campus_place_id INTEGER REFERENCES place(id),
+      online_before_minutes INTEGER NOT NULL DEFAULT 15 CHECK (online_before_minutes >= 0),
+      online_after_minutes INTEGER NOT NULL DEFAULT 15 CHECK (online_after_minutes >= 0),
+      in_person_before_minutes INTEGER NOT NULL DEFAULT 30 CHECK (in_person_before_minutes >= 0),
+      in_person_after_minutes INTEGER NOT NULL DEFAULT 30 CHECK (in_person_after_minutes >= 0),
+      max_in_person_per_day INTEGER NOT NULL DEFAULT 2 CHECK (max_in_person_per_day >= 0),
+      allow_online_in_transit INTEGER NOT NULL DEFAULT 0 CHECK (allow_online_in_transit IN (0, 1)),
+      timezone TEXT NOT NULL DEFAULT 'Asia/Tokyo',
+      updated_at TEXT NOT NULL,
+      updated_by TEXT NOT NULL DEFAULT 'agent'
+    );
+
+    CREATE TABLE IF NOT EXISTS appointment_mobility (
+      appointment_id INTEGER PRIMARY KEY REFERENCES appointment(id),
+      attendance_mode TEXT NOT NULL DEFAULT 'unknown'
+        CHECK (attendance_mode IN ('online', 'in_person', 'hybrid', 'unknown')),
+      place_id INTEGER REFERENCES place(id),
+      arrival_buffer_minutes INTEGER CHECK (arrival_buffer_minutes IS NULL OR arrival_buffer_minutes >= 0),
+      departure_buffer_minutes INTEGER CHECK (departure_buffer_minutes IS NULL OR departure_buffer_minutes >= 0),
+      remote_setup_minutes INTEGER CHECK (remote_setup_minutes IS NULL OR remote_setup_minutes >= 0),
+      mobility_status TEXT NOT NULL DEFAULT 'unreviewed'
+        CHECK (mobility_status IN ('unreviewed', 'feasible', 'tight', 'infeasible', 'confirmed')),
+      decision_reason TEXT NOT NULL DEFAULT '',
+      source_ref TEXT NOT NULL DEFAULT '',
+      updated_at TEXT NOT NULL
+    );
+
+    -- 具体的な切符を取る前の所要時間見積もり。manualから経路APIへ差し替えられる。
+    CREATE TABLE IF NOT EXISTS route_estimate (
+      id INTEGER PRIMARY KEY,
+      from_place_id INTEGER NOT NULL REFERENCES place(id),
+      to_place_id INTEGER NOT NULL REFERENCES place(id),
+      transport_mode TEXT NOT NULL DEFAULT 'public_transit'
+        CHECK (transport_mode IN ('walk', 'public_transit', 'rail', 'flight', 'car', 'taxi', 'other')),
+      duration_minutes INTEGER NOT NULL CHECK (duration_minutes >= 0),
+      buffer_minutes INTEGER NOT NULL DEFAULT 0 CHECK (buffer_minutes >= 0),
+      provider TEXT NOT NULL DEFAULT 'manual',
+      source_ref TEXT NOT NULL DEFAULT '',
+      valid_at TEXT NOT NULL DEFAULT '',
+      updated_at TEXT NOT NULL
+    );
+
+    -- 日時確定後の具体的な移動。前後の予定と結び、カレンダーにも独立ブロックとして出せる。
+    CREATE TABLE IF NOT EXISTS travel_segment (
+      id INTEGER PRIMARY KEY,
+      from_appointment_id INTEGER REFERENCES appointment(id),
+      to_appointment_id INTEGER REFERENCES appointment(id),
+      from_place_id INTEGER NOT NULL REFERENCES place(id),
+      to_place_id INTEGER NOT NULL REFERENCES place(id),
+      depart_at TEXT NOT NULL,
+      arrive_at TEXT NOT NULL,
+      transport_mode TEXT NOT NULL DEFAULT 'public_transit'
+        CHECK (transport_mode IN ('walk', 'public_transit', 'rail', 'flight', 'car', 'taxi', 'other')),
+      provider TEXT NOT NULL DEFAULT '',
+      route_ref TEXT NOT NULL DEFAULT '',
+      duration_minutes INTEGER NOT NULL CHECK (duration_minutes >= 0),
+      buffer_minutes INTEGER NOT NULL DEFAULT 0 CHECK (buffer_minutes >= 0),
+      status TEXT NOT NULL DEFAULT 'planned'
+        CHECK (status IN ('planned', 'reserved', 'ticketed', 'completed', 'cancelled')),
+      cost_amount INTEGER CHECK (cost_amount IS NULL OR cost_amount >= 0),
+      currency TEXT NOT NULL DEFAULT 'JPY',
+      reimbursable INTEGER NOT NULL DEFAULT 0 CHECK (reimbursable IN (0, 1)),
+      calendar_external_id TEXT NOT NULL DEFAULT '',
+      source_ref TEXT NOT NULL DEFAULT '',
+      updated_at TEXT NOT NULL
     );
 
     CREATE TABLE IF NOT EXISTS person (
@@ -143,6 +234,17 @@ export function ensurePlatformSchema(db: DatabaseSync): void {
     CREATE INDEX IF NOT EXISTS idx_interview_selection ON interview_note(selection_id);
     CREATE INDEX IF NOT EXISTS idx_submission_selection ON submission(selection_id);
     CREATE INDEX IF NOT EXISTS idx_mail_received ON mail_item(received_at DESC);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_place_provider_external
+      ON place(provider, external_id) WHERE provider <> '' AND external_id <> '';
+    CREATE INDEX IF NOT EXISTS idx_place_company ON place(company_id);
+    CREATE INDEX IF NOT EXISTS idx_appointment_mobility_place ON appointment_mobility(place_id);
+    CREATE INDEX IF NOT EXISTS idx_route_estimate_pair
+      ON route_estimate(from_place_id, to_place_id, transport_mode, updated_at DESC);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_route_estimate_source
+      ON route_estimate(source_ref) WHERE source_ref <> '';
+    CREATE INDEX IF NOT EXISTS idx_travel_segment_time ON travel_segment(depart_at, arrive_at);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_travel_segment_source
+      ON travel_segment(source_ref) WHERE source_ref <> '';
   `)
 }
 
