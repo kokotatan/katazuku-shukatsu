@@ -4,6 +4,7 @@
 import { readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import type { DatabaseSync } from 'node:sqlite'
 import { addEvent, openDb, outcomeOf, transition, type Stage } from '../src/db'
 import { resolveSelectionId, transaction } from '../src/inputs'
 
@@ -37,8 +38,7 @@ function validate(value: unknown): asserts value is SubmissionInput {
   if (Number.isNaN(Date.parse(input.submittedAt))) throw new Error('submittedAt が不正です')
 }
 
-export function applySubmission(input: SubmissionInput): { created: boolean; selectionId: number } {
-  const db = openDb(DB_PATH)
+export function applySubmission(input: SubmissionInput, db: DatabaseSync = openDb(DB_PATH)): { created: boolean; selectionId: number } {
   return transaction(db, () => {
     const duplicate = db.prepare('SELECT selection_id AS selectionId FROM submission WHERE source_ref = ?')
       .get(input.sourceRef) as { selectionId: number } | undefined

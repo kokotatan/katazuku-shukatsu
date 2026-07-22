@@ -4,6 +4,7 @@
 import { readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import type { DatabaseSync } from 'node:sqlite'
 import { openDb, resolveCompany } from '../src/db'
 import { resolveSelectionId, transaction } from '../src/inputs'
 
@@ -32,8 +33,7 @@ function validate(value: unknown): asserts value is MailInput {
   }
 }
 
-export function applyMail(input: MailInput): { created: number; updated: number } {
-  const db = openDb(DB_PATH)
+export function applyMail(input: MailInput, db: DatabaseSync = openDb(DB_PATH)): { created: number; updated: number } {
   return transaction(db, () => {
     const result = { created: 0, updated: 0 }
     for (const item of input.items) {

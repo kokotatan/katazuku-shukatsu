@@ -1,0 +1,108 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "daily-sync 抽出結果(モデルは抽出のみ・DB反映はしない)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "selections", "mailItems", "submissions"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "generatedAt": { "type": "string" },
+    "selections": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/selection" }
+    },
+    "mailItems": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/mailItem" }
+    },
+    "submissions": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/submission" }
+    },
+    "priorityMails": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/priorityMail" }
+    },
+    "notes": { "type": "string" }
+  },
+  "$defs": {
+    "selection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "stage"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "stage": {
+          "enum": ["scouted", "entried", "task", "interview", "intern", "offer", "rejected", "closed"]
+        },
+        "nextAction": { "type": "string" },
+        "nextDate": { "type": "string" },
+        "industry": { "type": "string" },
+        "season": { "type": "string" },
+        "position": { "type": "string" },
+        "ref": { "type": "string" },
+        "appointments": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/appointment" }
+        }
+      }
+    },
+    "appointment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["at", "title"],
+      "properties": {
+        "at": { "type": "string", "minLength": 1 },
+        "endAt": { "type": "string" },
+        "kind": { "type": "string" },
+        "title": { "type": "string", "minLength": 1 },
+        "url": { "type": "string" },
+        "location": { "type": "string" },
+        "person": { "type": "string" }
+      }
+    },
+    "mailItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "receivedAt", "subject"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "receivedAt": { "type": "string", "minLength": 1 },
+        "subject": { "type": "string", "minLength": 1 },
+        "sender": { "type": "string" },
+        "summary": { "type": "string" },
+        "category": { "type": "string" },
+        "needsAction": { "type": "boolean" },
+        "deadline": { "type": "string" },
+        "status": { "type": "string" },
+        "company": { "type": "string" },
+        "position": { "type": "string" },
+        "sourceRef": { "type": "string" }
+      }
+    },
+    "submission": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceRef", "company", "kind", "submittedAt"],
+      "properties": {
+        "sourceRef": { "type": "string", "minLength": 1 },
+        "company": { "type": "string", "minLength": 1 },
+        "position": { "type": "string" },
+        "kind": { "type": "string", "minLength": 1 },
+        "submittedAt": { "type": "string", "minLength": 1 },
+        "result": { "type": "string" },
+        "detail": { "type": "string" }
+      }
+    },
+    "priorityMail": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["subject", "reason"],
+      "properties": {
+        "id": { "type": "string" },
+        "subject": { "type": "string", "minLength": 1 },
+        "reason": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}
