@@ -19,6 +19,7 @@ data/katazuku.db(正本・SQLite/node:sqlite・gitignore)
   event(+ref=元メールID) / company_alias / pending_review / mail_item / submission / company_dossier /
   interview_note / meeting_run / person / person_note / appointment_person / person_photo / profile_basic / profile_suggestion
   / application_run / application_event / application_material / web_assessment
+  / place / mobility_profile / appointment_mobility / route_estimate / travel_segment
 
 - **DBへの入力は6本(2026-07-18本人定義)**: ①メール(daily-sync/mail-watch) ②会話(本人→agent)
   ③面接の録画・録音(interview-digest) ④提出結果(submit系エージェント) ⑤カレンダー ⑥調査結果(企業研究)。
@@ -38,6 +39,9 @@ data/katazuku.db(正本・SQLite/node:sqlite・gitignore)
 cd sync && npx tsx scripts/check-db.ts     # DB遷移規則・apply・mirror・6入力(75項目)
 cd sync && npx tsx scripts/check-sheet.ts  # 旧シート書込エンジン(40項目・移行完了まで残す)
 cd sync && npx tsx scripts/check-application.ts # 応募の承認・安全境界・冪等化(21項目)
+cd sync && npx tsx scripts/check-mobility.ts # 場所・対面/オンライン・移動・snapshot分離(15項目)
+cd sync && npx tsx scripts/check-agent-runtime.ts # provider切替・副作用境界・schema・CLI版差(22項目)
+cd sync && npx tsx scripts/check-daily-sync-apply.ts # daily-sync決定論executor(schema拒否・冪等・ブレーキ・失敗隔離)
 npm run build                              # board(管理画面)ビルド + sync全チェック
 ```
 
@@ -78,6 +82,18 @@ npm run build                              # board(管理画面)ビルド + sync
 9. **応募自動運転の外部実走**: 状態機械、承認ゲート、適性検査の安全境界、DB→カレンダーoutboxは実装済み。
    次は各社サイトでエントリー・完成済みES転記・本人承認後の送信・面接予約を実走し、
    サイト別アダプターと回帰fixtureを蓄積する。設計はdocs/specs/11、OSS論点はdocs/oss-roadmap.md。
+10. **移動を含む日程調整**: place / mobility_profile / appointment_mobility / route_estimate /
+    travel_segmentのDBとCLIは実装済み。次は候補日時のfeasible判定、経路adapter、
+    移動ブロックのカレンダー反映を実装する。住所・移動履歴はsnapshotへ出さない。設計はdocs/specs/12。
+11. **モデル非依存エージェント実行基盤**: Phase Aの共通runner、Codex/Claude/local OSS adapter、
+    failure分類、fake provider試験、応募・企業研究の共通入口化は完了。自動フォールバックは外部副作用の
+    開始前だけ許可し、開始後は同じrunのcheckpointから再開する。
+    **Phase B着手(2026-07-20)**: daily-syncのDB書込経路を「抽出(read-only厳格JSON)→決定論executor
+    (daily-sync-apply.ts)」へ分割。schemaはsync/schemas/daily-sync-result.schema.json、抽出プロンプトは
+    scripts/daily-sync-extract-prompt.md、オーケストレータはscripts/daily-sync-v2.ps1。既読化・シート
+    ミラー等の副作用は未分離で従来daily-sync.ps1に残す。実走でCodex CLIの版差(--search廃止→
+    tools.web_search config、引数エラーの安全分類)も修正。次はcalendar-sync/mail-watch/asaを同型で移行。
+    設計はdocs/specs/14。
 
 ## 禁止・注意
 

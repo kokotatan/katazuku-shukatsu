@@ -31,9 +31,25 @@
 - `katazuku apply <会社名>`: Codexを既定の実行役として、企業研究、公式応募経路の特定、ブラウザ入力、本人確認後の提出、適性検査準備・面接予定までを一続きで実行
 - `katazuku research <会社名>`: 一次情報中心の企業研究だけを実行してdossierを更新
 - `db-calendar-outbox.ts`: DBで確定した面接・締切を外部カレンダーへ冪等に反映するための送信待ち一覧
+- `mobility.ps1`: オンライン・対面、場所、経路見積もり、確定移動をDBへ記録
+- `invoke-agent.ps1`: Claude、Codex、ローカルOSSモデルを安全境界つきで切り替える共通入口
 
 応募自動運転の設計は `docs/specs/11-application-autopilot.md`、将来の公開範囲と準備は
 `docs/oss-roadmap.md` にまとめています。
+移動を含む日程調整は `docs/specs/12-mobility.md` です。
+Claude、Codex、ローカルOSSモデルを交換可能にする実行基盤は
+`docs/specs/14-provider-independent-agent-runtime.md` です。
+
+providerのCLI・認証状態は次で確認できます。
+
+~~~powershell
+npm --prefix sync run agent:doctor
+$env:KATAZUKU_AGENT_ORDER = 'codex,claude,codex-oss'
+~~~
+
+CodexでGmail、Calendar、既存Chromeなどの外部capabilityを使う場合は、先にCodex側のMCP・
+connectorを認証し、実際に利用可能なものだけを`KATAZUKU_CODEX_CAPABILITIES`へ列挙します。
+未設定の外部capabilityを推測で有効化しません。
 
 DBを書いたら必ず次を実行します。
 

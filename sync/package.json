@@ -6,7 +6,11 @@
   "scripts": {
     "check": "tsx scripts/check-sheet.ts",
     "check:db": "tsx scripts/check-db.ts",
-    "check:application": "tsx scripts/check-application.ts"
+    "check:application": "tsx scripts/check-application.ts",
+    "check:mobility": "tsx scripts/check-mobility.ts",
+    "check:agent-runtime": "tsx scripts/check-agent-runtime.ts",
+    "check:daily-sync": "tsx scripts/check-daily-sync-apply.ts",
+    "agent:doctor": "tsx scripts/agent-doctor.ts"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

@@ -18,6 +18,8 @@ profile-export-*.json
 people-export-*.json
 sync/research-*-loop.json
 sync/application-*-loop.json
+sync/mail-import-*.json
+sync/submission-import-*.json
 prep/seed-example.json
 
 # Googleサービスアカウントの鍵(秘密情報)
@@ -49,3 +51,11 @@ tl-snap-*.md
 tmp/
 
 .vercel
+
+# ローカル資格情報ブローカー（暗号化済みでも機密情報として扱う）
+*.dpapi.json
+credential-store/
+
+# Codexのリポジトリ内個人設定(端末固有の絶対パスを含む)とsandbox setupバイナリ
+.codex/
+codex-windows-sandbox-setup.exe

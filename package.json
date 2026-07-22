@@ -4,7 +4,8 @@
   "version": "0.2.0",
   "scripts": {
     "build": "npm --prefix inbox install && npm --prefix inbox run build && npm --prefix status install && npm --prefix status run build && npm --prefix insight install && npm --prefix insight run build && npm --prefix profile install && npm --prefix profile run build && npm --prefix people install && npm --prefix people run build && npm --prefix prep install && npm --prefix prep run build && npm --prefix impact install && npm --prefix impact run build && npm --prefix board install && npm --prefix board run build && node scripts/assemble.mjs && npm run check",
-    "check": "npm --prefix sync install && npm --prefix sync run check && npm --prefix sync run check:db && npm --prefix sync run check:application"
+    "check": "npm --prefix sync install && npm --prefix sync run check && npm --prefix sync run check:db && npm --prefix sync run check:application && npm --prefix sync run check:mobility && npm --prefix sync run check:agent-runtime && npm --prefix sync run check:daily-sync && npm run check:local-login",
+    "check:local-login": "node scripts/local-login/check.mjs"
   },
   "dependencies": {
     "@vercel/blob": "^2.6.1"

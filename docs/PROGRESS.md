@@ -1,6 +1,25 @@
 # katazuku 開発進捗
 
-最終更新: 2026-07-18
+最終更新: 2026-07-19
+
+
+## モデル非依存エージェント基盤: Claude優先化とCodex Sandbox修復(2026-07-19)
+
+- 共通runnerの既定provider順をClaude優先(`claude,codex,codex-oss`)へ変更。基本運用はClaude Code、Codex/ローカルOSSは代替と位置付け(spec14)。
+- Codex WindowsサンドボックスがCLI 0.144.6単体版で全shell実行不能だった問題を修復:
+  - 原因: 単体インストーラー版codex.exeにsandbox helper(codex-command-runner.exe)が同梱されず、`CreateProcessWithLogonW failed: 2`で失敗
+  - 対策: `resolveProviderCommands`がhelper同梱の実体(デスクトップアプリ同梱版)を自動優先。`agent:doctor`にsandbox実働チェックを追加
+- リポジトリ直下の野良バイナリ(codex-windows-sandbox-setup.exe)を削除し、`.codex/`と同バイナリをgitignoreへ追加。
+- 回帰テスト2件追加(既定順Claude優先/sandbox helper優先解決)。全19件成功、`npm run build`通過。
+
+## パスワードをDBの外へ出さない(2026-07-20)
+
+- 平文パスワードが唯一クラウドへ出ていた経路(DB→シートミラーの企業マスタF列)を遮断:
+  - `db-mirror`に`PASSWORD_MASK`(［保護済］)を導入。設定有無だけをシートに示し、実値はDBとローカル資格情報ブローカー(spec13)のみが持つ
+  - `db-import-sheet`に再取込ガード(保護マークを実パスワードとして取り込まない)
+  - 回帰テスト3件追加(実値がミラーのどこにも出ない/設定済はマスク/未設定は空欄)
+- シートの既存平文5社分をF列上書きで即時消し込み、読み戻しで確認。活動ログ記録済み
+- 残課題: `company.password`列自体のブローカー移行(列廃止)はOSS公開版までに実施
 
 
 ## DB中心化の残り工事を完了(2026-07-18)
