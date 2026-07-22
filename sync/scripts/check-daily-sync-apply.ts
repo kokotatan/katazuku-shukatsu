@@ -102,6 +102,32 @@ const s3 = applyDailySyncResult(ambiguous, base({
 check('曖昧な提出は失敗として隔離される', s3.submissions.errors.length === 1, JSON.stringify(s3.submissions))
 check('提出が失敗してもメールは反映される', s3.mail.created === 1, JSON.stringify(s3.mail))
 
+// --- 曖昧な会社(複数トラック+position無し)のメールで同期全体を止めない ---
+// メールは company_id があれば足りる。selection特定に失敗しても、そのメール1件で
+// 後続の提出反映まで巻き添えにしない(提出物の失敗隔離と対称にする)。
+const ambiMail = openDb(':memory:')
+const ambiCid = upsertCompany(ambiMail, { name: '二股社' })
+insertSelection(ambiMail, ambiCid, { company: '二股社', season: '', position: 'A職', priority: '', status: '選考中', steps: [], nextAction: '', nextDate: '', submitted: false, esUrl: '', memo: '' })
+insertSelection(ambiMail, ambiCid, { company: '二股社', season: '', position: 'B職', priority: '', status: '選考中', steps: [], nextAction: '', nextDate: '', submitted: false, esUrl: '', memo: '' })
+const oneTrackCid = upsertCompany(ambiMail, { name: '一途社' })
+insertSelection(ambiMail, oneTrackCid, { company: '一途社', season: '', position: '総合職', priority: '', status: '選考中', steps: [], nextAction: '', nextDate: '', submitted: false, esUrl: '', memo: '' })
+let ambiThrew = false
+let s4: ReturnType<typeof applyDailySyncResult> | null = null
+try {
+  s4 = applyDailySyncResult(ambiMail, base({
+    mailItems: [{ id: 'mail:amb', receivedAt: '2026-07-20T12:00:00Z', subject: '選考のご案内', company: '二股社' }],
+    submissions: [{ sourceRef: 'sub:one', company: '一途社', kind: 'ES', submittedAt: '2026-07-20T12:00:00Z' }],
+  }))
+} catch {
+  ambiThrew = true
+}
+check('曖昧な会社のメールでも同期は例外を投げない', !ambiThrew)
+check('曖昧なメールも記録される(company_idは付くがselection_idは付かない)', (() => {
+  const row = ambiMail.prepare("SELECT company_id AS c, selection_id AS s FROM mail_item WHERE id = 'mail:amb'").get() as { c: number | null; s: number | null } | undefined
+  return s4?.mail.created === 1 && row?.c === ambiCid && row?.s === null
+})(), JSON.stringify(s4?.mail))
+check('曖昧なメールの後でも提出物は反映される', s4?.submissions.created === 1, JSON.stringify(s4?.submissions))
+
 // --- 暴走ブレーキ ---
 const many = base({
   selections: Array.from({ length: 16 }, (_, i) => ({ name: `暴走${i}`, stage: 'entried' as const })),

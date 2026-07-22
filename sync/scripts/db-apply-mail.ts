@@ -42,9 +42,16 @@ export function applyMail(input: MailInput, db: DatabaseSync = openDb(DB_PATH)):
       if (item.company) {
         const resolution = resolveCompany(db, item.company)
         if (resolution.kind !== 'suspicious') {
-          const resolved = resolveSelectionId(db, item.company, item.position)
-          selectionId = resolved.selectionId
-          companyId = resolved.companyId
+          // メールは company_id があれば足りる。selection_id は一意に特定できた時だけ付ける。
+          // 複数トラックで position が無い等で特定できなくても、そのメール1件で日次同期全体を
+          // 止めない(提出物の失敗隔離と同じ方針)。company_id は hit していれば必ず残す。
+          try {
+            const resolved = resolveSelectionId(db, item.company, item.position)
+            selectionId = resolved.selectionId
+            companyId = resolved.companyId
+          } catch {
+            if (resolution.kind === 'hit') companyId = resolution.companyId
+          }
         }
       }
       const prior = db.prepare('SELECT id FROM mail_item WHERE id = ?').get(item.id)

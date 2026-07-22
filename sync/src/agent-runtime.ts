@@ -257,6 +257,9 @@ export const executeProcess: ProcessExecutor = async (invocation, timeoutMs) => 
     child.stderr.on('data', (chunk) => { stderr += String(chunk) })
     child.on('error', (error: NodeJS.ErrnoException) => finish({ errorCode: error.code }))
     child.on('close', (exitCode, signal) => finish({ exitCode, signal }))
+    // spawn失敗(ENOENT)時、stdinへの書き込みがEPIPE/ENOENTを別途投げ得る。
+    // プロセスの'error'とは別ストリームなので、no-opリスナーで未処理例外化を防ぐ(finishはchild.on('error')が担う)。
+    child.stdin.on('error', () => {})
     if (invocation.stdin !== undefined) child.stdin.end(invocation.stdin)
     else child.stdin.end()
   })
