@@ -55,6 +55,18 @@ function loadActivities(): unknown[] {
   }).filter(Boolean)
 }
 
+/** 正本DBの整合性チェック(2026-07-22)。バックアップ前に1回走らせ、破損を早期に気づけるようにする */
+function checkIntegrity(): boolean {
+  const db = openDb(DB_PATH)
+  const row = db.prepare('PRAGMA integrity_check').get() as { integrity_check?: string } | undefined
+  const result = row?.integrity_check ?? 'unknown'
+  if (result !== 'ok') {
+    console.error(`警告: DB整合性チェックに失敗(${result})。直近のバックアップ(logs/db-backup)で確認してください`)
+    return false
+  }
+  return true
+}
+
 /** DBファイルの日次バックアップ(14日ぶん保持)。スナップショットのたびに確認する */
 function backupDb() {
   const dir = join(root, 'logs', 'db-backup')
@@ -74,6 +86,7 @@ async function main() {
   const outPath = join(root, 'data', 'snapshot.json')
   writeFileSync(outPath, JSON.stringify(snap), 'utf8')
   console.log(`スナップショット生成: 選考${snap.selections.length} / 予定${snap.appointments.length} / 企業${snap.companies.length} -> ${outPath}`)
+  checkIntegrity()
   backupDb()
 
   if (process.argv.includes('--no-push')) return

@@ -145,8 +145,17 @@ export function openDb(path: string): DatabaseSync {
   const acols = db.prepare('PRAGMA table_info(appointment)').all() as { name: string }[]
   if (!acols.some((c) => c.name === 'end_at')) db.exec("ALTER TABLE appointment ADD COLUMN end_at TEXT NOT NULL DEFAULT ''")
   ensurePlatformSchema(db)
+  // スキーマ版の記録(2026-07-22)。上の追加系ALTERは列存在チェックで冪等だが、
+  // 版番号が無いと「いつ何を適用したか」を追えず、次に破壊的マイグレーション(列DROP・データ移送)を
+  // 書くと二重適用・順序事故が起きやすい。ここで版を刻み、将来の破壊的移行は user_version で束ね、
+  // 実行前に日次バックアップ(db-snapshot.ts backupDb)が取れていることを前提にする。
+  const uv = (db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version
+  if (uv < SCHEMA_VERSION) db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`)
   return db
 }
+
+/** 現行スキーマの版。破壊的マイグレーションを足すたびに +1 し、番号で分岐させる */
+export const SCHEMA_VERSION = 1
 
 /** statusの自由文からoutcome(列挙)を機械判定する。書き込み側はstatus更新時に必ずこれも更新する */
 export function outcomeOf(status: string): string {

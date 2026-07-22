@@ -3,7 +3,7 @@
  * インメモリSQLiteで実行。実行: cd sync && npx tsx scripts/check-db.ts
  */
 import { DatabaseSync } from 'node:sqlite'
-import { openDb, upsertCompany, insertSelection, listSelections, listCompanies, listEvents, listAppointments, addAppointment, outcomeOf, transition, sameCompany, samePosition, resolveCompany, addAlias, listPending, setOfficialName } from '../src/db'
+import { openDb, upsertCompany, insertSelection, listSelections, listCompanies, listEvents, listAppointments, addAppointment, outcomeOf, transition, sameCompany, samePosition, resolveCompany, addAlias, listPending, setOfficialName, SCHEMA_VERSION } from '../src/db'
 import { applyDiff } from './db-apply'
 import { renderMirror, PASSWORD_MASK } from './db-mirror'
 import { listPlatformSnapshot } from '../src/platform'
@@ -17,6 +17,10 @@ function check(label: string, cond: boolean, detail = '') {
 
 // openDbは:memory:でも動く(mkdirはdirname='.'で無害)
 const db: DatabaseSync = openDb(':memory:')
+
+// --- スキーマ版(2026-07-22。破壊的マイグレーションを番号で束ねる土台) ---
+const uv = (db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version
+check('openDbが現行スキーマ版をuser_versionへ記録する', uv === SCHEMA_VERSION, `user_version=${uv}`)
 
 // --- transition(遷移規則) ---
 check('八洲問題: 合格でも辞退の根拠があれば確定する', transition('合格', 'closed') === '辞退')
