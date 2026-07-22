@@ -72,7 +72,8 @@ export async function startFixtureServer() {
   })
   await new Promise((resolve, reject) => {
     server.once('error', reject)
-    server.listen(0, '0.0.0.0', resolve)
+    // 合成ログインサイトはloopbackだけに公開する(spec13のloopback限定方針。LAN露出とFW警告を避ける)
+    server.listen(0, '127.0.0.1', resolve)
   })
   const address = server.address()
   return {
