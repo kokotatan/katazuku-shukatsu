@@ -31,6 +31,12 @@ function esc(v: string): string {
   return /^[=+]/.test(v) ? `'${v}` : v
 }
 
+/**
+ * パスワードの実値はDBの外(シート・mirror-out.json)へ出さない(2026-07-20)。
+ * シートには設定有無だけをこの目印で示す。実値はDBとローカル資格情報ブローカー(spec13)が持つ
+ */
+export const PASSWORD_MASK = '［保護済］'
+
 export function renderMirror(db: DatabaseSync): MirrorWrite[] {
   const selHeader = ['企業名', '時期', 'ポジション', '志望度', 'ステータス', '選考①', '選考②', '選考③', '選考④', '次アクション', '締切・選考日', '残り日数', '提出済', 'ES・資料URL', '選考メモ']
   const selRows: string[][] = listSelections(db).map((s, i) => {
@@ -47,7 +53,7 @@ export function renderMirror(db: DatabaseSync): MirrorWrite[] {
 
   // A列=正式名称(正)。パッと見で通称が正に見えないようにする(2026-07-18本人指示)
   const coHeader = ['正式名称', '通称', '業界', 'マイページURL', 'ログインID', 'パスワード', '会社メモ']
-  const coRows: string[][] = listCompanies(db).map((c) => [esc(c.name), esc(c.shortName ?? ''), esc(c.industry), esc(c.mypageUrl), esc(c.loginId), esc(c.password), esc(c.memo)])
+  const coRows: string[][] = listCompanies(db).map((c) => [esc(c.name), esc(c.shortName ?? ''), esc(c.industry), esc(c.mypageUrl), esc(c.loginId), c.password ? PASSWORD_MASK : '', esc(c.memo)])
   while (coRows.length < COMPANY_ROWS) coRows.push(Array(coHeader.length).fill(''))
 
   // MCPの1回の書き込みが巨大になりすぎないよう50行ずつに分割する

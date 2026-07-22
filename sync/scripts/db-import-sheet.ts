@@ -13,6 +13,7 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { openDb, upsertCompany, insertSelection, type Selection, type CompanyInfo } from '../src/db'
+import { PASSWORD_MASK } from './db-mirror'
 
 const DB_PATH = process.env.KATAZUKU_DB ?? join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'data', 'katazuku.db')
 
@@ -68,7 +69,10 @@ function fromGrids(selGrid: string[][], coGrid: string[][]): Seed {
     .filter((r) => get(r, cc.name))
     .map((r) => ({
       name: get(r, cc.name), industry: get(r, cc.industry), mypageUrl: get(r, cc.mypageUrl),
-      loginId: get(r, cc.loginId), password: get(r, cc.password), memo: get(r, cc.memo),
+      loginId: get(r, cc.loginId),
+      // ミラーが出す保護マークを実パスワードとして取り込まない
+      password: get(r, cc.password) === PASSWORD_MASK ? '' : get(r, cc.password),
+      memo: get(r, cc.memo),
     }))
 
   return { selections, companies }

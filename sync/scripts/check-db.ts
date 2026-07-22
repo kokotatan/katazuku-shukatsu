@@ -5,7 +5,7 @@
 import { DatabaseSync } from 'node:sqlite'
 import { openDb, upsertCompany, insertSelection, listSelections, listCompanies, listEvents, listAppointments, addAppointment, outcomeOf, transition, sameCompany, samePosition, resolveCompany, addAlias, listPending, setOfficialName } from '../src/db'
 import { applyDiff } from './db-apply'
-import { renderMirror } from './db-mirror'
+import { renderMirror, PASSWORD_MASK } from './db-mirror'
 import { listPlatformSnapshot } from '../src/platform'
 import { transaction, upsertPerson } from '../src/inputs'
 
@@ -134,6 +134,15 @@ check('mirror: チャンクのrangeが行番号と一致', selChunks.every((w, i
 check('mirror: 企業タブは7列で全社ぶん', coAll[0].length === 7 && coAll.slice(1).filter((r) => r[0]).length === listCompanies(db).length)
 check('mirror: A列が正式名称・B列が通称', coAll[0][0] === '正式名称' && coAll[0][1] === '通称' && coAll.some((r) => r[0] === '株式会社PKSHA Technology' && r[1] === 'PKSHA'))
 check('mirror: 選考管理タブの表示は通称のまま', selAll.some((r) => r[0] === '八洲電機'))
+
+// パスワードの実値はDBの外へ出さない(2026-07-20。実値はDBとspec13ブローカーのみ)
+upsertCompany(db, { name: '秘密境界テスト社', password: 'raw-secret-pw-123' })
+const pwWrites = renderMirror(db)
+const pwFlat = pwWrites.flatMap((w) => w.values.flat())
+check('mirror: パスワード実値がどこにも出ない', !pwFlat.some((v) => v.includes('raw-secret-pw-123')))
+const pwCo = pwWrites.filter((w) => w.tab.includes('企業マスタ')).flatMap((w) => w.values)
+check('mirror: 設定済パスワードは保護マークに置換', pwCo.find((r) => r[0] === '秘密境界テスト社')?.[5] === PASSWORD_MASK)
+check('mirror: 未設定パスワードは空欄のまま', pwCo.find((r) => r[0] === '株式会社PKSHA Technology')?.[5] === '')
 
 // codex反例: データ由来の「=」始まりを数式として書かない(USER_ENTERED注入対策)
 const evilId = upsertCompany(db, { name: '数式注入テスト社' })
