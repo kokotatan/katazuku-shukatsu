@@ -12,10 +12,14 @@
   - db-snapshotのバックアップ前に`PRAGMA integrity_check`で破損を早期検知
   - openDbが`PRAGMA user_version`へスキーマ版を刻み、将来の破壊的マイグレーションを番号で束ねる土台に(回帰テスト1件)
 - **他モデル対応の評価**: agent-runtime基盤は堅い。ただし常駐/定時ジョブ8本がまだ`claude -p`直呼びで、直呼び禁止lintは2本しか守っていなかった。全`scripts/*.ps1`を走査し、既知の未移行8本以外の直呼びをビルドで止める網を追加(新規debtの混入防止)。
+- **新規コードの敵対的レビュー(2本)**: agent-runtime/daily-sync/mobility/db-apply と 資格情報ブローカーを精査。
+  - **実バグ1件を修正**: daily-sync-applyで複数トラック企業のメール(position無し)が`resolveSelectionId`例外→メール処理ごと巻き戻り後続の提出反映まで停止し部分適用になっていた。メールの選考特定失敗を1件隔離(提出物と対称)。回帰テスト3件。ついでにagent-runtimeのstdinエラーガード追加。
+  - **ブローカーはコア健全(重大な隠れバグなし)**: 平文漏洩経路なし・origin検証3層・欄type検証・DPAPIの使い方いずれも健全と確認。fixtureサーバのloopback限定化(0.0.0.0→127.0.0.1)だけ実施。fill評価のisolated world化は低優先の多重防御として保留。
 - **未決(本人判断が要る)**:
   1. **クラウド露出**: snapshotに面接メモ・人物名・プロフィール等の個人データが入りVercel Blobへ。読み取りは`?key=`合言葉1本(ブラウザ埋め込み・失効なし・CORS `*`)。CLAUDE.mdの「配信物に個人データを含めない」と食い違う。現状維持か、機微データ除外/短命署名URL化か。spec08に実態を明記済み。
   2. **他モデルの本丸**: Gmail/カレンダー/音声はCodex側にツールマップが無く、runtime経由化だけでは他モデルで動かない。Codex側MCP接続+capability map拡充(L)が必要。8本の直呼びスクリプト(daily-sync/mail-watch/asa/calendar-sync/reconcile/interview-digest/open-meeting-urls/katazuku)の移行は稼働中のため本人が実挙動を確認できる時に段階実施。
   3. **CLAUDE.md記述の陳腐化**: 「api/ は廃止」とあるが `api/data.ts`・`push.ts`・`photo.ts` は現役(snapshot配信の要)。要更新。
+  4. **ブローカーの共有origin対策(spec13 残作業#3)**: origin一致のみで path を見ないため、`job.axol.jp`等の共有originポータルで企業を取り違え得る。実ポータルへ有効化する前に allowed_path_prefix 対応が必須。照合ポリシーの変更=セキュリティの核なので本人が方針確認のうえ実装する(PoCは未配線のため現状ライブ影響なし)。
 
 
 ## モデル非依存エージェント基盤: Claude優先化とCodex Sandbox修復(2026-07-19)
