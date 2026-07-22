@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { dirname } from 'node:path'
@@ -367,12 +367,35 @@ try {
     assert(!ledger.includes(req.prompt), 'run台帳へpromptが入りました')
   })
 
+  const DIRECT_CALL = /(?:^|[|&\s])codex(?:\s+exec|\s+--)|(?:^|[|&\s])claude(?:\s+-p|\s+\$)/m
+
   await check('移行対象スクリプトからprovider直呼びを除去した', async () => {
     const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
     for (const file of ['scripts/apply-company.ps1', 'scripts/research-company.ps1']) {
       const text = await readFile(join(repoRoot, file), 'utf8')
-      assert(!/(?:^|[|&\s])codex(?:\s+exec|\s+--)|(?:^|[|&\s])claude(?:\s+-p|\s+\$)/m.test(text), file)
+      assert(!DIRECT_CALL.test(text), file)
       assert(text.includes('invoke-agent.ps1'), file + 'が共通runnerを使っていません')
+    }
+  })
+
+  // 新規の直呼びを止める網(2026-07-22)。既知の未移行スクリプト(段階移行の負債)だけを許可し、
+  // それ以外のscripts/*.ps1がclaude/codexを直呼びしたらビルドを止める。ここを migrate したら
+  // KNOWN_DIRECT から外すこと(外し忘れると「まだ直呼びのはず」チェックが落ちて気づける)。
+  await check('未移行スクリプト以外はprovider直呼びしない(直呼びの新規混入を防ぐ)', async () => {
+    const scriptsDir = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'scripts')
+    const KNOWN_DIRECT = new Set([
+      'daily-sync.ps1', 'mail-watch.ps1', 'asa-auto.ps1', 'calendar-sync.ps1',
+      'reconcile-calendar.ps1', 'interview-digest.ps1', 'open-meeting-urls.ps1', 'katazuku.ps1',
+    ])
+    const files = (await readdir(scriptsDir)).filter((f) => f.endsWith('.ps1'))
+    for (const f of files) {
+      const text = await readFile(join(scriptsDir, f), 'utf8')
+      const direct = DIRECT_CALL.test(text)
+      if (KNOWN_DIRECT.has(f)) {
+        assert(direct, `${f} は未移行扱いだが直呼びが見当たらない。移行済みならKNOWN_DIRECTから外す`)
+      } else {
+        assert(!direct, `${f} が新たにclaude/codexを直呼びしている。invoke-agent.ps1(agent-runtime)経由にする`)
+      }
     }
   })
 } finally {
