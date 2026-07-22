@@ -2,7 +2,7 @@
   [Parameter(Mandatory = $true, Position = 0)][ValidateNotNullOrEmpty()][string] $Company,
   [string] $Position = '',
   [string] $Season = '28卒本選考',
-  [ValidateSet('auto', 'codex', 'claude')][string] $Agent = 'auto',
+  [ValidateSet('auto', 'codex', 'claude', 'codex-oss')][string] $Agent = 'auto',
   [switch] $PromptOnly
 )
 
@@ -49,30 +49,18 @@ if ($PromptOnly) {
   exit 0
 }
 
-$runner = $Agent
-if ($runner -eq 'auto') {
-  if (Get-Command codex -ErrorAction SilentlyContinue) {
-    $runner = 'codex'
-  } elseif (Get-Command claude -ErrorAction SilentlyContinue) {
-    $runner = 'claude'
-  } else {
-    throw "Codex CLIとClaude CLIが見つかりません。指示は保存済みです: $promptFile"
-  }
-}
-if (-not (Get-Command $runner -ErrorAction SilentlyContinue)) {
-  throw "$runner CLIが見つかりません。指示は保存済みです: $promptFile"
-}
-
-Write-Output "応募自動運転を開始します: $Company (実行役: $runner)"
+Write-Output "応募自動運転を開始します: $Company (agent: $Agent)"
 Write-Output "最終送信、本人認証、適性検査の受検、選択肢が曖昧な場合だけ確認を求めます。"
-Set-Location $repo
-if ($runner -eq 'codex') {
-  & codex --search -s danger-full-access -a never -C $repo $prompt
-} else {
-  & claude $prompt
+$invokeAgent = Join-Path $PSScriptRoot 'invoke-agent.ps1'
+$invokeArgs = @{
+  Workflow = 'application-company'
+  RunId = $sourceRef
+  PromptFile = $promptFile
+  Risk = 'external-commit'
+  SideEffectMode = 'direct'
+  Agent = $Agent
+  Capability = @('workspace.read', 'workspace.write', 'shell', 'web.search', 'browser.interact')
 }
-if ($LASTEXITCODE -ne 0) {
-  throw "応募自動運転が中断しました。再開用の指示: $promptFile"
-}
+& $invokeAgent @invokeArgs
 
 Write-Output "応募自動運転のセッションを終了しました: $Company"
