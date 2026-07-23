@@ -1,0 +1,15 @@
+{
+  "_comment": "毎日ログインを回すポータルの公開レジストリ。秘密情報は含めない(loginUrlとlabelは公開情報)。allowedOriginは資格情報レコード(credential-store/<id>.json)側が正で、runnerはloginUrlのoriginと突合するだけ。",
+  "portals": {
+    "labbase": {
+      "label": "LabBase(理系スカウト就活)",
+      "loginUrl": "https://compass.labbase.jp/login",
+      "note": "compass.labbase.jp が学生向けアプリ(PWA)のログイン。labbase.jp はマーケ用サイトで別物。"
+    },
+    "gaishishukatsu": {
+      "label": "外資就活ドットコム",
+      "loginUrl": "https://gaishishukatsu.com/login",
+      "note": "SSRのメール+パスワードフォーム。"
+    }
+  }
+}
