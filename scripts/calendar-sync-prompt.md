@@ -17,12 +17,13 @@ Google Calendarを正本DBのappointmentへ同期してください。
      "company":"既存DBと照合できる企業名",
      "position":"分かる場合のみ",
      "kind":"面接|面談|説明会|テスト|締切|その他",
-     "url":"Meet/Zoom等",
+     "url":"会議URL(Meet/Zoom/Teams、または weburl.jp・bit.ly・tinyurl.com・x.gd・cutt.ly・is.gd・t.co・lnkd.in・ur0.cc・urx.nu・buff.ly・rebrand.ly 等の短縮リンクも会議URLとして拾う)",
      "location":"場所",
      "status":"予定|中止",
      "attendees":[{"name":"氏名","role":"分かる場合"}]
    }]}
    externalId、title、startAt、companyは必須です。終了時刻・会議URL・参加者を可能な限り取得します。事実を推測しません。
+   会議URLは location だけでなく description(説明欄)からも拾う。上記の短縮リンク(例 https://weburl.jp/xxx)しか無い場合も、それを url に入れる(実ブラウザで開けばMeet等へリダイレクトされる)。
 3. cd sync; npx tsx scripts/db-apply-calendar.ts calendar-import-loop.json を実行する。
 4. npx tsx scripts/db-snapshot.ts を実行する。
 5. scripts/log-activity.ps1 で By=calendar-sync、Action=カレンダー予定のDB同期、Why=会議自動運転の予定を最新にするため、How=追加/更新/変化なし件数、Result=成功として1行残す。

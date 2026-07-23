@@ -40,8 +40,11 @@ foreach ($a in $agenda) {
 
   if ($run.state -eq 'armed' -and $now -ge $start.AddMinutes(-10) -and $now -lt $end) {
     if ($a.url) {
+      # 短縮リンク(weburl.jp等)も含め、URLがあれば必ず開く。ブラウザが302リダイレクトを解決する。
+      # openable は会議ホスト許可リスト(sync/src/meeting-url.ts)での判定結果。診断用に記録するだけで開閉は止めない。
       Start-Process $a.url
-      Log ("URLを開いた: {0} {1} ({2})" -f $a.company, $a.title, $a.url)
+      $known = if ($a.openable) { '会議ホスト認識' } else { '未知ホスト(短縮リンクの可能性・そのまま開く)' }
+      Log ("URLを開いた[{0}]: {1} {2} ({3})" -f $known, $a.company, $a.title, $a.url)
     } else {
       Log ("URLなしの予定を開始待機にした: {0} {1}" -f $a.company, $a.title)
     }

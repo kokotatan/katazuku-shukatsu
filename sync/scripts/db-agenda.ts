@@ -6,6 +6,7 @@
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { openDb, listAppointments } from '../src/db'
+import { isMeetingUrl } from '../src/meeting-url'
 
 const DB_PATH = process.env.KATAZUKU_DB ?? join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'data', 'katazuku.db')
 const db = openDb(DB_PATH)
@@ -25,6 +26,8 @@ const items = listAppointments(db)
       title: a.title,
       kind: a.kind,
       url: a.url,
+      // 直リンク/短縮リンクなど「開いて録る」対象と判定できたか(短縮リンクは実ブラウザが解決する)
+      openable: isMeetingUrl(a.url),
       person: a.person,
       startIso: new Date(start).toISOString(),
       endIso: new Date(isNaN(end) ? start + H : end).toISOString(),

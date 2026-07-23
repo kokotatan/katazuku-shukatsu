@@ -28,7 +28,9 @@ $prompt = ("現在時刻は {0} (JST) です。この時刻を基準に判断し
 カレンダーMCPツール(mcp__google-workspace__* または mcp__claude_ai_Google_Calendar__* のうち使える方)を使い、
 カレンダー okuyama.kotaro.career@gmail.com の予定のうち、
 「現在時刻から12分以内に開始」する予定で、location・description・会議リンクのいずれかに
-meet.google.com / zoom.us / teams.microsoft.com のいずれかのURLを含むものを探してください。
+meet.google.com / zoom.us / teams.microsoft.com、または短縮リンク
+(weburl.jp / bit.ly / tinyurl.com / x.gd / cutt.ly / is.gd / t.co / lnkd.in / ur0.cc / urx.nu / buff.ly / rebrand.ly)
+のいずれかのURLを含むものを探してください。短縮リンクは実ブラウザで開けばMeet等へリダイレクトされるので、そのまま url にする。
 各予定について {"title": 件名, "start": "YYYY-MM-DD HH:mm", "end": "YYYY-MM-DD HH:mm", "url": 会議URL} を作る。
 
 出力は JSON 配列そのものだけ。表・箇条書き・見出し・コードフェンス・前置き・後書きを一切含めてはならない。

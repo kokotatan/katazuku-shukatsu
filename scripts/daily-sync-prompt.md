@@ -18,8 +18,9 @@ DB→シートの一方向ミラー。書き手はagentのみ。サービスア�
      (同じ会社に複数ポジション・複数コースで応募していることがあり、これがトラックを判別する鍵)
    - name は本文にある表記のままでよい(株式会社/Inc.付きの正式名称でも通称でも、DB側の正規化とエイリアス学習で吸収する)
    - **予定は構造化して取る(最重要)**: 面接・面談・説明会・提出締切は appointments 配列
-     `[{at(ISO・時刻まで), endAt(終了時刻。「15:00-15:30」等から。録画の自動停止に使う), kind(面接/面談/締切/説明会/テスト), title, url(Meet/Zoom/提出ページ), location, person(面接官等)}]`。
-     **会議URLと時刻は必ず拾う**(朝のページに「15:00 面接 [開く]」と出すための核)。ref にGmailメッセージIDを入れる
+     `[{at(ISO・時刻まで), endAt(終了時刻。「15:00-15:30」等から。録画の自動停止に使う), kind(面接/面談/締切/説明会/テスト), title, url(Meet/Zoom/Teams/提出ページ), location, person(面接官等)}]`。
+     **会議URLと時刻は必ず拾う**(朝のページに「15:00 面接 [開く]」と出すための核)。ref にGmailメッセージIDを入れる。
+     会議URLは短縮リンク(weburl.jp・bit.ly・tinyurl.com・x.gd・cutt.ly・is.gd・t.co・lnkd.in・ur0.cc・urx.nu・buff.ly・rebrand.ly 等、例 https://weburl.jp/xxx)で来ることがある。その場合も会議URLとして url に入れる(実ブラウザで開けばMeet等へリダイレクトされ、そのまま自動録画に載る)
 3. 同じメールから次の3ファイルを作る(いずれもgitignore済み。対象なしは空配列):
    - 選考差分を sync/sheet-import-loop.json へ [{name,stage,nextAction,nextDate,industry,position,appointments,ref}]
    - Inbox表示用を sync/mail-import-loop.json へ {items:[{id,receivedAt,sender,subject,summary,category,needsAction,deadline,status,company,position,sourceRef}]}

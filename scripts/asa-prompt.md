@@ -47,7 +47,7 @@ get_events ↔ list_events、batch_modify_gmail_message_labels ↔ label/unlabel
 - **就活・キャリア系は career カレンダー(okuyama.kotaro.career@gmail.com)に登録**。大学・私生活は個人カレンダー(okuyama.kotaro@gmail.com)。個人はcareerに変更権限で共有済みで両方読み書き可。複製せず、就活予定が個人側にあれば career へ移動する。
 - **色**: 面接・面談・選考・カジュアル面談・壁打ち = **トマト(colorId=11)**。辞退済み = **グレー(colorId=8、削除せず残す)**。説明会・座談会・インターン本番・締切・準備ブロック = 通常色。
 - timeZone は `Asia/Tokyo`。**日付の曜日は必ず機械で検算してから登録**(推測しない)。
-- **会議URL(Meet/Zoom/Teams)は description と location の両方に入れる**(会議URL自動オープンが10分前に開くため)。案内メールにURLがあれば必ず紐付ける。後日届く面接(前日送付等)は届いたら該当予定へ追記する。
+- **会議URL(Meet/Zoom/Teams、または weburl.jp・bit.ly 等の短縮リンク)は description と location の両方に入れる**(会議URL自動オープンが10分前に開くため)。短縮リンクでも実ブラウザで開けばMeet等へ解決されるので、そのまま会議URLとして紐付ける。案内メールにURLがあれば必ず紐付ける。後日届く面接(前日送付等)は届いたら該当予定へ追記する。
 - description に参加手順・ID・持ち物(QR等)・服装・合否連絡時期をまとめる。対面は location に会場住所。
 - リマインダー: 前日(1440分)+ 直前(対面120分/オンライン60分)の popup。
 - 複数日のインターンは allDay の複数日イベント。

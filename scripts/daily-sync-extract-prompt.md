@@ -16,6 +16,7 @@ Gmailのラベル/送信/下書きは**一切変更しないでください**。
    - name は本文の表記のままでよい(正規化・別名学習は後段が吸収する)
    - 面接・面談・説明会・提出締切は appointments 配列に構造化して入れる。
      会議URLと時刻(終了時刻も可能なら)は必ず拾う。ref にはGmailメッセージIDを入れる。
+     会議URLは短縮リンク(weburl.jp・bit.ly・tinyurl.com・x.gd・cutt.ly・is.gd・t.co・lnkd.in・ur0.cc・urx.nu・buff.ly・rebrand.ly 等)で来ることがあり、その場合も会議URLとして url に入れる。
 3. Inbox表示用に、判断に必要な短い summary だけを mailItems に入れる(本文全文は入れない)。
    id と sourceRef はGmailメッセージID。needsAction は対応が要るなら true。
 4. 提出完了・提出結果がメールで確定できる場合だけ submissions に入れる(result は 合格/不合格/内定/辞退 等)。

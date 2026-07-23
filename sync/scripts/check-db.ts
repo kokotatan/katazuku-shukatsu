@@ -8,6 +8,7 @@ import { applyDiff } from './db-apply'
 import { renderMirror, PASSWORD_MASK } from './db-mirror'
 import { listPlatformSnapshot } from '../src/platform'
 import { transaction, upsertPerson } from '../src/inputs'
+import { isMeetingUrl } from '../src/meeting-url'
 
 let failed = 0
 function check(label: string, cond: boolean, detail = '') {
@@ -207,6 +208,16 @@ const profileJson = JSON.stringify(platformSnapshot.profile)
 check('profile: 画像本体をsnapshotへ出さない', !profileJson.includes('data:image') && profileJson.includes('profile/basic.jpg'))
 check('people: 写真はstorage keyだけをsnapshotへ出す', platformSnapshot.people.some((person) => person.photoKey === 'people/test.jpg'))
 check('interview: 人物メモとプロフィール候補は根拠付き', platformSnapshot.personNotes.some((note) => note.sourceRef === 'test-run') && platformSnapshot.profileSuggestions.some((suggestion) => suggestion.sourceRef === 'test-run'))
+
+// --- 会議URL許可リスト(直リンク + 短縮リンク。会議自動運転が開いて録る対象の判定) ---
+check('meeting-url: Meet直リンクは会議URL', isMeetingUrl('https://meet.google.com/ibr-kvcs-ffn'))
+check('meeting-url: Zoomサブドメインも会議URL', isMeetingUrl('https://us05web.zoom.us/j/123'))
+check('meeting-url: Teams直リンクは会議URL', isMeetingUrl('https://teams.microsoft.com/l/meetup-join/xxx'))
+check('meeting-url: weburl.jp短縮リンクを会議URLとして受理', isMeetingUrl('https://weburl.jp/sE8jDmR'))
+check('meeting-url: bit.ly等の短縮リンクも受理', isMeetingUrl('https://bit.ly/abc') && isMeetingUrl('https://tinyurl.com/abc') && isMeetingUrl('https://t.co/abc'))
+check('meeting-url: www.付き短縮リンクも受理', isMeetingUrl('https://www.cutt.ly/abc'))
+check('meeting-url: 無関係URL・空・不正は非会議', !isMeetingUrl('https://example.com/x') && !isMeetingUrl('') && !isMeetingUrl('not a url') && !isMeetingUrl(null))
+check('meeting-url: 偽装ホスト(weburl.jp.evil.com)は受理しない', !isMeetingUrl('https://weburl.jp.evil.com/x'))
 
 const requiredTables = ['meeting_run', 'interview_note', 'submission', 'company_dossier', 'mail_item', 'appointment_person']
 const schemaTables = (db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as { name: string }[]).map((row) => row.name)
