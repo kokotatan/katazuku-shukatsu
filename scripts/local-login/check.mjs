@@ -11,9 +11,11 @@ import {
   analyzeDeterministically,
   analyzeWithLocalModel,
   navigateTarget,
+  normalizeAllowedUrlPrefix,
   readPageSummary,
   readSafePageState,
   sanitizePageSummary,
+  urlWithinAllowedScope,
   validateModelDecision
 } from './lib.mjs'
 
@@ -218,6 +220,23 @@ async function main() {
     await delay(200)
     await rm(tempDir, { recursive: true, force: true }).catch(() => {})
   }
+
+  // --- 適用範囲(origin + テナントパス)の判定。共有ATSでの企業取り違えを防ぐ ---
+  // 実データ: www.e2r.jp に日立(/eARTH/)とファーストリテイリング(/ja/fr_newgrad/)が同居、
+  // axol.jp に GS(/bx/s/gs_27/) や EY(/zw/s/ey_28/) が同居している。
+  const frPrefix = normalizeAllowedUrlPrefix('https://www.e2r.jp/ja/fr_newgrad/logon.html')
+  ok(frPrefix === 'https://www.e2r.jp/ja/fr_newgrad/', '許可URLプレフィックスは末尾ファイル名を落としてディレクトリに揃える')
+  ok(normalizeAllowedUrlPrefix('https://axol.jp/zw/s/ey_28/mypage/login') === 'https://axol.jp/zw/s/ey_28/mypage/', '深いテナントパスも保持する')
+  ok(urlWithinAllowedScope('https://www.e2r.jp/ja/fr_newgrad/logon2.html', 'https://www.e2r.jp', frPrefix), '同一テナント配下のログインページは適用範囲内')
+  ok(!urlWithinAllowedScope('https://www.e2r.jp/eARTH/e2r/user/html/PageHtml', 'https://www.e2r.jp', frPrefix), '同一ホストでも別テナント(日立)には適用しない')
+  ok(!urlWithinAllowedScope('https://axol.jp/zw/s/ey_28/mypage/login', 'https://axol.jp', 'https://axol.jp/bx/s/gs_27/mypage/'), '同一ホストの別企業テナントを取り違えない')
+  ok(!urlWithinAllowedScope('https://evil.test/ja/fr_newgrad/logon.html', 'https://www.e2r.jp', frPrefix), 'origin違いはプレフィックス一致でも拒否する')
+  ok(urlWithinAllowedScope('https://compass.labbase.jp/login', 'https://compass.labbase.jp', null), 'プレフィックス未設定(専用ホスト)はorigin一致のみで通す(後方互換)')
+  ok(!urlWithinAllowedScope('https://compass.labbase.jp.evil.test/login', 'https://compass.labbase.jp', null), '偽装ホストは拒否する')
+  assert.throws(() => normalizeAllowedUrlPrefix('https://axol.jp/zw/s/ey_28/login?token=x'), '許可URLプレフィックスにクエリは許さない')
+  checks += 1
+  assert.throws(() => normalizeAllowedUrlPrefix('http://axol.jp/zw/s/ey_28/'), '許可URLプレフィックスはHTTPS必須')
+  checks += 1
 
   process.stdout.write(`ローカル資格情報ブローカー: ${checks}項目成功\n`)
 }

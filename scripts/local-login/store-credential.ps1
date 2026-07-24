@@ -1,6 +1,10 @@
 ﻿param(
   [Parameter(Mandatory = $true)][string]$PortalId,
-  [Parameter(Mandatory = $true)][string]$AllowedOrigin,
+  # 専用ホストのポータル用。パスを含まないorigin(例 https://compass.labbase.jp)
+  [string]$AllowedOrigin = '',
+  # 共有ATS(1ホストに複数企業が同居)用。ログインページの完全URLを渡すと
+  # origin + テナントパスまでを適用範囲として記録する(例 https://axol.jp/zw/s/ey_28/mypage/login)
+  [string]$AllowedUrl = '',
   [Parameter(Mandatory = $true)][string]$OutputPath,
   [switch]$Fixture
 )
@@ -11,12 +15,30 @@ Add-Type -AssemblyName System.Security
 
 if ($PortalId -notmatch '^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$') { throw 'PortalIdが不正です。' }
 
-$originUri = [Uri]$AllowedOrigin
-$isLoopbackFixture = $Fixture -and $originUri.Scheme -eq 'http' -and @('127.0.0.1', 'localhost') -contains $originUri.Host
-if ($originUri.AbsolutePath -ne '/' -or $originUri.Query -or $originUri.Fragment -or ($originUri.Scheme -ne 'https' -and -not $isLoopbackFixture)) {
-  throw 'AllowedOriginはパスを含まないHTTPS originで指定してください。'
+if (-not $AllowedOrigin -and -not $AllowedUrl) { throw 'AllowedOrigin か AllowedUrl のどちらかを指定してください。' }
+if ($AllowedOrigin -and $AllowedUrl) { throw 'AllowedOrigin と AllowedUrl は同時に指定できません。' }
+
+$allowedPathPrefix = ''
+if ($AllowedUrl) {
+  # 共有ATS向け: ログインページURLから origin + テナントパス(ディレクトリ境界まで)を導出する
+  $urlUri = [Uri]$AllowedUrl
+  $isLoopbackFixture = $Fixture -and $urlUri.Scheme -eq 'http' -and @('127.0.0.1', 'localhost') -contains $urlUri.Host
+  if ($urlUri.Query -or $urlUri.Fragment -or ($urlUri.Scheme -ne 'https' -and -not $isLoopbackFixture)) {
+    throw 'AllowedUrlはクエリ・フラグメントを含まないHTTPS URLで指定してください。'
+  }
+  $normalizedOrigin = $urlUri.GetLeftPart([UriPartial]::Authority)
+  $path = $urlUri.AbsolutePath
+  if (-not $path.EndsWith('/')) { $path = $path.Substring(0, $path.LastIndexOf('/') + 1) }
+  $allowedPathPrefix = "$normalizedOrigin$path"
 }
-$normalizedOrigin = $originUri.GetLeftPart([UriPartial]::Authority)
+else {
+  $originUri = [Uri]$AllowedOrigin
+  $isLoopbackFixture = $Fixture -and $originUri.Scheme -eq 'http' -and @('127.0.0.1', 'localhost') -contains $originUri.Host
+  if ($originUri.AbsolutePath -ne '/' -or $originUri.Query -or $originUri.Fragment -or ($originUri.Scheme -ne 'https' -and -not $isLoopbackFixture)) {
+    throw 'AllowedOriginはパスを含まないHTTPS originで指定してください。'
+  }
+  $normalizedOrigin = $originUri.GetLeftPart([UriPartial]::Authority)
+}
 
 function Protect-Text([string]$PlainText, [byte[]]$Entropy) {
   $bytes = [Text.Encoding]::UTF8.GetBytes($PlainText)
@@ -49,6 +71,8 @@ try {
     version = 1
     portalId = $PortalId
     allowedOrigin = $normalizedOrigin
+    # 共有ATSでの取り違え防止。専用ホストなら空文字(=origin一致のみ)。秘密ではないので平文で持つ。
+    allowedPathPrefix = $allowedPathPrefix
     usernameCiphertext = Protect-Text $username $entropy
     passwordCiphertext = Protect-Text $passwordPlain $entropy
     protectedFor = 'CurrentUser'

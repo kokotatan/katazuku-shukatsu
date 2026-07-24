@@ -76,6 +76,36 @@ export function normalizeAllowedOrigin(value, { allowLoopbackHttp = false } = {}
   return url.origin
 }
 
+/**
+ * 許可URLプレフィックス(origin + テナントパス)を正規化する。
+ * 採用ATSは1ホストに複数企業が同居する(例: www.e2r.jp に日立とファーストリテイリング、
+ * axol.jp に GS/EY/ベイン/SHIFT 等)。origin一致だけでは別企業のログイン画面と区別できず、
+ * 誤った企業の資格情報を入力してしまう。そこで適用範囲をパスまで絞る。
+ * 末尾のファイル名は落としてディレクトリ境界にそろえる(/a/b/logon.html -> /a/b/)。
+ * クエリ・ハッシュ・URL内認証情報は許可しない。
+ */
+export function normalizeAllowedUrlPrefix(value, { allowLoopbackHttp = false } = {}) {
+  const url = new URL(value)
+  if (url.search || url.hash || url.username || url.password) {
+    throw new Error('許可URLプレフィックスにクエリ・ハッシュ・認証情報を含めないでください')
+  }
+  const loopbackHttp = allowLoopbackHttp && url.protocol === 'http:' && LOOPBACK_HOSTS.has(url.hostname)
+  if (url.protocol !== 'https:' && !loopbackHttp) throw new Error('許可URLプレフィックスはHTTPSで指定してください')
+  const path = url.pathname.endsWith('/')
+    ? url.pathname
+    : url.pathname.slice(0, url.pathname.lastIndexOf('/') + 1)
+  return url.origin + path
+}
+
+/** 対象URLが許可プレフィックスの配下か。プレフィックス未設定(専用ホスト)ならorigin一致だけで判定する。 */
+export function urlWithinAllowedScope(rawUrl, allowedOrigin, allowedPathPrefix) {
+  let url
+  try { url = new URL(rawUrl) } catch { return false }
+  if (url.origin !== allowedOrigin) return false
+  if (!allowedPathPrefix) return true
+  return `${url.origin}${url.pathname}`.startsWith(allowedPathPrefix)
+}
+
 function boundedText(value, limit) {
   return String(value || '').replace(/\s+/g, ' ').trim().slice(0, limit)
 }
@@ -261,11 +291,11 @@ async function fetchTargets(debugPort) {
   return (await response.json()).filter((target) => target.type === 'page' && target.webSocketDebuggerUrl)
 }
 
-export async function findTargetByOrigin(debugPort, allowedOrigin) {
-  const matches = (await fetchTargets(debugPort)).filter((target) => {
-    try { return new URL(target.url).origin === allowedOrigin } catch { return false }
-  })
-  if (matches.length !== 1) throw new Error(`登録済みoriginのタブが一意ではありません: ${matches.length}`)
+export async function findTargetByOrigin(debugPort, allowedOrigin, allowedPathPrefix = null) {
+  const matches = (await fetchTargets(debugPort)).filter(
+    (target) => urlWithinAllowedScope(target.url, allowedOrigin, allowedPathPrefix)
+  )
+  if (matches.length !== 1) throw new Error(`登録済み適用範囲のタブが一意ではありません: ${matches.length}`)
   return matches[0]
 }
 
@@ -280,10 +310,13 @@ async function evaluateTarget(target, expression) {
   }
 }
 
-export async function readPageSummary(debugPort, allowedOrigin) {
-  const target = await findTargetByOrigin(debugPort, allowedOrigin)
+export async function readPageSummary(debugPort, allowedOrigin, allowedPathPrefix = null) {
+  const target = await findTargetByOrigin(debugPort, allowedOrigin, allowedPathPrefix)
   const summary = sanitizePageSummary(await evaluateTarget(target, PAGE_SUMMARY_EXPRESSION))
   if (summary.origin !== allowedOrigin) throw new Error('ページoriginが登録値と一致しません')
+  if (!urlWithinAllowedScope(target.url, allowedOrigin, allowedPathPrefix)) {
+    throw new Error('ページURLが登録済みの適用範囲外です')
+  }
   return { target, summary }
 }
 
@@ -292,7 +325,14 @@ async function readCredentialRecord(credentialPath, portalId) {
   if (record.version !== 1 || record.portalId !== portalId) throw new Error('資格情報レコードが不正です')
   const allowedOrigin = normalizeAllowedOrigin(record.allowedOrigin, { allowLoopbackHttp: true })
   if (!record.usernameCiphertext || !record.passwordCiphertext) throw new Error('暗号化資格情報がありません')
-  return { allowedOrigin }
+  // 許可URLプレフィックスは秘密ではないので平文フィールド。未設定なら従来どおりorigin一致のみ(後方互換)。
+  const allowedPathPrefix = record.allowedPathPrefix
+    ? normalizeAllowedUrlPrefix(record.allowedPathPrefix, { allowLoopbackHttp: true })
+    : null
+  if (allowedPathPrefix && !allowedPathPrefix.startsWith(allowedOrigin)) {
+    throw new Error('許可URLプレフィックスが許可originと一致しません')
+  }
+  return { allowedOrigin, allowedPathPrefix }
 }
 
 async function unprotectCredential(unprotectScript, credentialPath) {
@@ -308,10 +348,12 @@ async function unprotectCredential(unprotectScript, credentialPath) {
   }
 }
 
-function fillExpression({ allowedOrigin, decision, username, password, submit }) {
+function fillExpression({ allowedOrigin, allowedPathPrefix, decision, username, password, submit }) {
   return String.raw`(() => {
     const expectedOrigin = ${JSON.stringify(allowedOrigin)}
+    const expectedPrefix = ${JSON.stringify(allowedPathPrefix || null)}
     if (location.origin !== expectedOrigin) throw new Error('origin_mismatch')
+    if (expectedPrefix && !(location.origin + location.pathname).startsWith(expectedPrefix)) throw new Error('path_mismatch')
     const visible = (element) => {
       const style = getComputedStyle(element)
       const rect = element.getBoundingClientRect()
@@ -349,18 +391,19 @@ function fillExpression({ allowedOrigin, decision, username, password, submit })
 
 export async function brokerFill({ portalId, credentialPath, decision, debugPort, unprotectScript, submit = false }) {
   validatePortalId(portalId)
-  const { allowedOrigin } = await readCredentialRecord(credentialPath, portalId)
-  const { target, summary } = await readPageSummary(debugPort, allowedOrigin)
+  const { allowedOrigin, allowedPathPrefix } = await readCredentialRecord(credentialPath, portalId)
+  const { target, summary } = await readPageSummary(debugPort, allowedOrigin, allowedPathPrefix)
   if (summary.blockers.length) return { status: 'stopped', portalId, origin: allowedOrigin, reason: summary.blockers.join(',') }
   const checked = validateModelDecision(decision, summary, portalId)
   if (checked.action === 'stop') return { status: 'stopped', portalId, origin: allowedOrigin, reason: checked.reason }
   if (submit && checked.submit_control == null) throw new Error('送信コントロールが指定されていません')
   let credential = await unprotectCredential(unprotectScript, credentialPath)
   try {
-    const currentTarget = await findTargetByOrigin(debugPort, allowedOrigin)
+    const currentTarget = await findTargetByOrigin(debugPort, allowedOrigin, allowedPathPrefix)
     if (currentTarget.id !== target.id) throw new Error('入力前に対象タブが変わりました')
     const result = await evaluateTarget(currentTarget, fillExpression({
       allowedOrigin,
+      allowedPathPrefix,
       decision: checked,
       username: credential.username,
       password: credential.password,
