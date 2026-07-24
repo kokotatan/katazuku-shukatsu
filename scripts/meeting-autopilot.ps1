@@ -1,6 +1,11 @@
 ﻿# meeting-autopilot: DB appointment と meeting_run を正にする会議自動運転。
 # 5分毎に起動し、予定IDごとに armed -> opened -> recording -> stopping -> digesting -> done と進める。
 $ErrorActionPreference = 'Continue'
+# PowerShell 5.1 は既定でネイティブexe(npx/node)の標準出力を端末コードページ(日本語環境はcp932)で
+# 復号するため、db-agenda/db-meeting-run が出すUTF-8のJSON内の日本語が壊れ ConvertFrom-Json が失敗する。
+# 2026-07-24: calendar-sync 復旧で予定に日本語の社名・氏名が入った途端、毎回「JSONが読めない」で
+# autopilot全体が停止し、会議が自動で開かれず録画も起動しなかった。ネイティブ出力をUTF-8で読ませて回避する。
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $repo = Split-Path $PSScriptRoot -Parent
 $log = Join-Path $repo 'logs\meeting-record.log'
 function Log($m) { ("{0} [autopilot] {1}" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $m) | Out-File -FilePath $log -Append -Encoding utf8 }
