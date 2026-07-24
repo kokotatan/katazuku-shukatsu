@@ -6,7 +6,8 @@ import { readFileSync } from 'node:fs'
 import { createHash, randomUUID } from 'node:crypto'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { addEvent, openDb } from '../src/db'
+import type { DatabaseSync } from 'node:sqlite'
+import { addEvent, findAppointmentMatch, openDb } from '../src/db'
 import { resolveSelectionId, transaction, upsertPerson } from '../src/inputs'
 
 interface CalendarEvent {
@@ -43,36 +44,75 @@ function assertInput(value: unknown): asserts value is CalendarInput {
   }
 }
 
-export function applyCalendar(input: CalendarInput): { created: number; updated: number; unchanged: number } {
-  const db = openDb(DB_PATH)
+export function applyCalendar(
+  input: CalendarInput,
+  db: DatabaseSync = openDb(DB_PATH),
+): { created: number; updated: number; unchanged: number; promoted: number } {
   return transaction(db, () => {
-    const result = { created: 0, updated: 0, unchanged: 0 }
+    const result = { created: 0, updated: 0, unchanged: 0, promoted: 0 }
     for (const event of input.events) {
       const { selectionId, companyId } = resolveSelectionId(db, event.company, event.position)
       const sourceHash = event.sourceHash || createHash('sha256').update(JSON.stringify({
         title: event.title, startAt: event.startAt, endAt: event.endAt || '',
         url: event.url || '', location: event.location || '', status: event.status || '予定',
       })).digest('hex')
-      const prior = db.prepare('SELECT id, source_hash FROM appointment WHERE external_id = ?')
-        .get(event.externalId) as { id: number; source_hash: string } | undefined
+      let prior = db.prepare('SELECT id, source_hash, title, person, external_id FROM appointment WHERE external_id = ?')
+        .get(event.externalId) as { id: number; source_hash: string; title: string; person: string; external_id: string } | undefined
+      // external_idで当たらないとき、同じ会議がメール由来(external_id空)で既に入っていないか探す。
+      // 見つかったら新規作成せず、その行にexternal_id/calendar_idを埋めて「昇格」させる。
+      // 昇格させないと、同じ会議がカレンダー由来とメール由来で2行になり、meeting-autopilotが
+      // 同じURLを二重に開いて録音も二重起動する(2026-07-24の実害)。
+      let promoted = false
+      if (!prior) {
+        const matchId = findAppointmentMatch(db, {
+          selectionId,
+          at: event.startAt,
+          title: event.title,
+          url: event.url,
+          kind: event.kind,
+          onlyWithoutExternalId: true,
+        })
+        if (matchId !== undefined) {
+          prior = db.prepare('SELECT id, source_hash, title, person, external_id FROM appointment WHERE id = ?')
+            .get(matchId) as { id: number; source_hash: string; title: string; person: string; external_id: string }
+          promoted = true
+        }
+      }
       let appointmentId: number
       if (prior) {
         appointmentId = prior.id
-        if (prior.source_hash === sourceHash) {
+        if (!promoted && prior.source_hash === sourceHash) {
           result.unchanged += 1
         } else {
+          // どちらを残すか(2026-07-24の方針):
+          // - 時刻・URL・場所・状態・タイトルはカレンダーが正。本人が実際に見て相手と共有している
+          //   予定表の表記に揃える(メール由来はテキスト解析の推測で、敬称・調整担当が混ざる)
+          // - 相手(person)はカレンダー側が空なら既存を残す。出席者未登録の招待で、せっかく
+          //   メールから拾った相手名を空で潰さないため
+          // - 統合で置き換えた旧タイトル・旧相手はイベント台帳に1行残すので情報は失われない
+          const attendees = (event.attendees || []).map((a) => a.name).join('、')
           db.prepare(`
             UPDATE appointment SET selection_id = ?, at = ?, end_at = ?, kind = ?, title = ?,
-              url = ?, location = ?, person = ?, status = ?, calendar_id = ?, source_hash = ?
+              url = ?, location = ?, person = CASE WHEN ? <> '' THEN ? ELSE person END,
+              status = ?, external_id = ?, calendar_id = ?, source_hash = ?
             WHERE id = ?
           `).run(
             selectionId, event.startAt, event.endAt || '', event.kind || 'その他', event.title,
             event.url || '', event.location || '',
-            (event.attendees || []).map((a) => a.name).join('、'),
+            attendees, attendees,
             event.status === 'cancelled' || event.status === '中止' ? '中止' : '予定',
-            event.calendarId || '', sourceHash, appointmentId,
+            event.externalId, event.calendarId || '', sourceHash, appointmentId,
           )
-          addEvent(db, selectionId, '予定更新', `カレンダー更新: ${event.title}`, 'calendar-sync', event.startAt, event.externalId)
+          if (promoted) {
+            addEvent(
+              db, selectionId, '予定統合',
+              `メール由来の予定(タイトル: ${prior.title} / 相手: ${prior.person || '不明'})をカレンダー予定「${event.title}」へ統合`,
+              'calendar-sync', event.startAt, event.externalId,
+            )
+            result.promoted += 1
+          } else {
+            addEvent(db, selectionId, '予定更新', `カレンダー更新: ${event.title}`, 'calendar-sync', event.startAt, event.externalId)
+          }
           result.updated += 1
         }
       } else {

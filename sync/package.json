@@ -10,6 +10,7 @@
     "check:mobility": "tsx scripts/check-mobility.ts",
     "check:agent-runtime": "tsx scripts/check-agent-runtime.ts",
     "check:daily-sync": "tsx scripts/check-daily-sync-apply.ts",
+    "inspect:duplicate-appointments": "tsx scripts/check-duplicate-appointments.ts",
     "agent:doctor": "tsx scripts/agent-doctor.ts"
   },
   "devDependencies": {

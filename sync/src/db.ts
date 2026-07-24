@@ -325,11 +325,124 @@ export interface Appointment {
   status?: string
 }
 
-/** 予定を追加する。同一(トラック×日時×タイトル)は重複させず、空欄だけ補完する */
+/**
+ * 予定の開始時刻を突合用に正規化する。
+ * - カレンダー由来は `2026-07-24T14:00:00+09:00`、メール由来は `2026-07-24T14:00` のように
+ *   同じ瞬間でも表記が違う。文字列一致だけで突合すると同じ会議が2行に割れる(2026-07-24の実害)
+ * - タイムゾーン無しの入力は日本時間として解釈する。実行マシンのTZ設定に判定が左右されると、
+ *   同じデータでも重複判定がぶれるため(本プロジェクトは Asia/Tokyo 固定運用)
+ * - 解釈できない文字列は元のまま返す(壊すより触らない)
+ */
+export function normalizeAppointmentAt(at: string | null | undefined): string {
+  const raw = (at ?? '').trim()
+  if (!raw) return ''
+  const withTime = /^\d{4}-\d{2}-\d{2}$/.test(raw) ? `${raw}T00:00:00` : raw.replace(' ', 'T')
+  const hasZone = /(Z|[+-]\d{2}:?\d{2})$/.test(withTime)
+  const ms = Date.parse(hasZone ? withTime : `${withTime}+09:00`)
+  return Number.isNaN(ms) ? raw : new Date(ms).toISOString()
+}
+
+/** 会議URLを突合用に正規化する(末尾スラッシュ・ホストの大小・フラグメントの揺れを吸収) */
+export function normalizeAppointmentUrl(url: string | null | undefined): string {
+  const raw = (url ?? '').trim()
+  if (!raw) return ''
+  try {
+    const parsed = new URL(raw)
+    return `${parsed.protocol}//${parsed.host.toLowerCase()}${parsed.pathname.replace(/\/+$/, '')}${parsed.search}`
+  } catch {
+    return raw.replace(/\/+$/, '')
+  }
+}
+
+/** 突合に使う予定の最小情報(DBの行でも、これから入れる入力でも同じ形で比べられる) */
+export interface AppointmentLike {
+  at: string
+  title?: string
+  url?: string
+  kind?: string
+}
+
+/** 同じ枠(同じ開始時刻)か。時刻が読めない行は突合対象にしない */
+function sameSlot(a: AppointmentLike, b: AppointmentLike): boolean {
+  const at = normalizeAppointmentAt(a.at)
+  return at !== '' && at === normalizeAppointmentAt(b.at)
+}
+/** 突合1: タイトル一致(従来の突合。URLが両方空でもここで拾える) */
+function matchByTitle(a: AppointmentLike, b: AppointmentLike): boolean {
+  const title = (a.title ?? '').trim()
+  return title !== '' && title === (b.title ?? '').trim()
+}
+/** 突合2: 会議URL一致(タイトルや敬称の揺れ「内田さん/内田様」は無視できる) */
+function matchByUrl(a: AppointmentLike, b: AppointmentLike): boolean {
+  const url = normalizeAppointmentUrl(a.url)
+  return url !== '' && url === normalizeAppointmentUrl(b.url)
+}
+/** 突合3: 片方だけURLが空 かつ 種別一致(締切は除外)。情報量の差だけで別行になるのを防ぐ */
+function matchByBlankUrl(a: AppointmentLike, b: AppointmentLike): boolean {
+  const kind = (a.kind ?? '').trim()
+  if (!kind || kind === '締切' || kind !== (b.kind ?? '').trim()) return false
+  return (normalizeAppointmentUrl(a.url) === '') !== (normalizeAppointmentUrl(b.url) === '')
+}
+
+/**
+ * 2件の予定が同じ会議を指すか(同一トラック=selection_id であることは呼び手が保証する)。
+ * findAppointmentMatch と同じ規則の「対称版」。点検スクリプトが行同士を比べるのに使う。
+ */
+export function sameAppointment(a: AppointmentLike, b: AppointmentLike): boolean {
+  return sameSlot(a, b) && (matchByTitle(a, b) || matchByUrl(a, b) || matchByBlankUrl(a, b))
+}
+
+export interface AppointmentMatch extends AppointmentLike {
+  selectionId: number
+  /** trueならexternal_idが空の行(=メール・手入力由来)だけを突合対象にする。カレンダー側の昇格用 */
+  onlyWithoutExternalId?: boolean
+  /** 自分自身を除外したいとき(点検スクリプトが行同士を比べる用途) */
+  excludeId?: number
+}
+
+/**
+ * 同じ会議を指す既存の appointment を探す(重複作成を防ぐ単一の突合規則)。
+ *
+ * 背景(2026-07-24): 同じグッドパッチ面談が「カレンダー由来(external_idあり)」と
+ * 「メール由来(external_idなし)」で別行になり、meeting-autopilot が同じURLを二重に開き
+ * 録音セッションも二重起動しうる状態になっていた。原因は突合キーが経路ごとにバラバラだったこと。
+ *
+ * 前提: 同一トラック(selection)で「同じ開始時刻」の予定が2つ並ぶことは実際には起きない
+ * (同じ会社の面談を同じ分に2件は受けられない)。だから突合は必ず selection_id × 開始時刻を土台にし、
+ * その中で次の順に同一とみなす。
+ *   1. タイトル一致 …… 従来の突合。URLが両方空でもここで拾える
+ *   2. URL一致 …… 会議URLが同じなら、タイトルや敬称の揺れ(内田さん/内田様)は無視して同一
+ *   3. 片方だけURLが空 かつ 種別(kind)一致 …… メールにURLが載っていない/カレンダーにURLが無い等、
+ *      情報量の差だけで別行になるのを防ぐ。ただし「締切」は同一時刻(23:59等)に複数並ぶのが普通なので
+ *      この緩い規則からは外す(締切はタイトルかURLが一致しない限り別物)
+ * 両方のURLが非空で異なる場合は別会議とみなす(同時刻でも別々のリンクなら統合しない)。
+ */
+export function findAppointmentMatch(db: DatabaseSync, m: AppointmentMatch): number | undefined {
+  if (normalizeAppointmentAt(m.at) === '') return undefined
+  const rows = db.prepare('SELECT id, at, title, url, kind, external_id FROM appointment WHERE selection_id = ? ORDER BY id')
+    .all(m.selectionId) as { id: number; at: string; title: string; url: string; kind: string; external_id: string }[]
+  const slot = rows.filter((r) =>
+    r.id !== m.excludeId &&
+    sameSlot(m, r) &&
+    (!m.onlyWithoutExternalId || !r.external_id))
+  if (slot.length === 0) return undefined
+  // タイトル → URL → 片方だけURL空、の順に確からしい行を選ぶ(複数当たったときの優先順)
+  const hit = slot.find((r) => matchByTitle(m, r))
+    ?? slot.find((r) => matchByUrl(m, r))
+    ?? slot.find((r) => matchByBlankUrl(m, r))
+  return hit?.id
+}
+
+/** 予定を追加する。同一の会議(findAppointmentMatch の規則)は重複させず、空欄だけ補完する */
 export function addAppointment(db: DatabaseSync, a: Appointment): { id: number; created: boolean } {
   const now = new Date().toISOString()
-  const dup = db.prepare('SELECT id, url, location, person FROM appointment WHERE selection_id = ? AND at = ? AND title = ?')
-    .get(a.selectionId, a.at, a.title) as { id: number; url: string; location: string; person: string } | undefined
+  const matchId = findAppointmentMatch(db, {
+    selectionId: a.selectionId, at: a.at, title: a.title, url: a.url, kind: a.kind,
+  })
+  const dup = matchId === undefined
+    ? undefined
+    : db.prepare('SELECT id, url, location, person FROM appointment WHERE id = ?')
+      .get(matchId) as { id: number; url: string; location: string; person: string } | undefined
   if (dup) {
     const fill = (col: string, v?: string) => {
       if (v && !(dup as unknown as Record<string, string>)[col]) db.prepare(`UPDATE appointment SET ${col} = ? WHERE id = ?`).run(v, dup.id)

@@ -3,8 +3,10 @@
  * インメモリSQLiteで実行。実行: cd sync && npx tsx scripts/check-db.ts
  */
 import { DatabaseSync } from 'node:sqlite'
-import { openDb, upsertCompany, insertSelection, listSelections, listCompanies, listEvents, listAppointments, addAppointment, outcomeOf, transition, sameCompany, samePosition, resolveCompany, addAlias, listPending, setOfficialName, SCHEMA_VERSION } from '../src/db'
+import { openDb, upsertCompany, insertSelection, listSelections, listCompanies, listEvents, listAppointments, addAppointment, outcomeOf, transition, sameCompany, samePosition, resolveCompany, addAlias, listPending, setOfficialName, normalizeAppointmentAt, sameAppointment, SCHEMA_VERSION } from '../src/db'
 import { applyDiff } from './db-apply'
+import { applyCalendar } from './db-apply-calendar'
+import { findDuplicates } from './check-duplicate-appointments'
 import { renderMirror, PASSWORD_MASK } from './db-mirror'
 import { listPlatformSnapshot } from '../src/platform'
 import { transaction, upsertPerson } from '../src/inputs'
@@ -176,6 +178,73 @@ check('apply: 予定追加はイベントに残る', listEvents(db).some((e) => 
 const evBefore = listEvents(db).length
 applyDiff(db, [{ name: '予定テスト社', stage: 'interview', appointments: [{ at: '2026-07-25T15:00', kind: '面接', title: '2次面接' }] }])
 check('apply: 同じ予定の再適用でイベントは増えない', listEvents(db).length === evBefore)
+
+// --- 重複予定の防止(2026-07-24の実害: 同じグッドパッチ面談がカレンダー由来とメール由来で2行になり、
+//     meeting-autopilot が同じURLを二重に開き録音も二重起動しうる状態だった) ---
+check('at正規化: TZ無しは日本時間として同じ瞬間に揃う', normalizeAppointmentAt('2026-07-24T14:00') === normalizeAppointmentAt('2026-07-24T14:00:00+09:00'))
+check('at正規化: 日付のみは当日0時(JST)として扱う', normalizeAppointmentAt('2026-07-26') === normalizeAppointmentAt('2026-07-26T00:00:00+09:00'))
+check('at正規化: 解釈できない文字列は元のまま', normalizeAppointmentAt('未定') === '未定')
+check('sameAppointment: 解釈できない時刻は従来どおり文字列一致で突合', sameAppointment({ at: '未定', title: 'X' }, { at: '未定', title: 'X' }) && !sameAppointment({ at: '未定', title: 'X' }, { at: '未定です', title: 'X' }))
+check('sameAppointment: 時刻が空の予定は突合しない(何とでも一致してしまうため)', !sameAppointment({ at: '', title: 'X' }, { at: '', title: 'X' }))
+check('sameAppointment: 同時刻でもURLが両方あって別なら別会議',
+  !sameAppointment({ at: '2026-08-20T14:00', title: 'A', url: 'https://meet.google.com/aaa', kind: '面談' }, { at: '2026-08-20T14:00', title: 'B', url: 'https://meet.google.com/bbb', kind: '面談' }))
+check('sameAppointment: 締切は同時刻でも別タイトルなら別物(23:59に複数並ぶため)',
+  !sameAppointment({ at: '2026-08-20T23:59', title: 'ES提出', url: 'https://example.com/es', kind: '締切' }, { at: '2026-08-20T23:59', title: '証明写真提出', kind: '締切' }))
+
+const dupCoId = upsertCompany(db, { name: 'ダブり検証カンパニー' })
+const MEET_A = 'https://meet.google.com/dup-aaa-bbb'
+const MEET_B = 'https://meet.google.com/dup-ccc-ddd'
+const rowsOf = (selectionId: number) => listAppointments(db).filter((a) => a.selectionId === selectionId)
+
+// 1) メール由来が先 → 後からカレンダー由来が来ても新規作成せず、その行へexternal_idを埋めて昇格する
+const dupSel1 = insertSelection(db, dupCoId, { company: 'ダブり検証カンパニー', season: '本選考', position: 'デザイナー', priority: '', status: '選考中', steps: [], nextAction: '', nextDate: '', submitted: false, esUrl: '', memo: '' })
+addAppointment(db, { selectionId: dupSel1, at: '2026-08-20T14:00', kind: '面談', title: 'カジュアル面談(内田様)', url: MEET_A, person: '内田様(調整:渡辺様)' })
+const calAfterMail = applyCalendar({
+  events: [{
+    externalId: 'dup-ext-1', calendarId: 'cal@example.com', title: 'カジュアル面談(内田さん)',
+    startAt: '2026-08-20T14:00:00+09:00', endAt: '2026-08-20T15:00:00+09:00',
+    company: 'ダブり検証カンパニー', position: 'デザイナー', kind: '面談', url: MEET_A,
+    attendees: [{ name: '内田 啓太' }],
+  }],
+}, db)
+const merged1 = rowsOf(dupSel1)
+check('重複防止: メール由来→カレンダー由来でも1行に収束する', merged1.length === 1, `${merged1.length}行`)
+check('重複防止: 昇格でcreatedは増えずpromotedになる', calAfterMail.created === 0 && calAfterMail.promoted === 1)
+const promotedRow = db.prepare('SELECT external_id, calendar_id, title, end_at FROM appointment WHERE selection_id = ?').get(dupSel1) as { external_id: string; calendar_id: string; title: string; end_at: string }
+check('重複防止: 昇格した行にexternal_id/calendar_idが入る', promotedRow.external_id === 'dup-ext-1' && promotedRow.calendar_id === 'cal@example.com')
+check('重複防止: タイトル・終了時刻はカレンダーが正', promotedRow.title === 'カジュアル面談(内田さん)' && promotedRow.end_at === '2026-08-20T15:00:00+09:00')
+check('重複防止: 統合はイベント台帳に根拠として残る', listEvents(db).some((e) => e.kind === '予定統合' && e.summary.includes('内田様(調整:渡辺様)')))
+
+// 2) カレンダー由来が先 → 後からメール由来が来ても新規作成しない
+const dupSel2 = insertSelection(db, dupCoId, { company: 'ダブり検証カンパニー', season: '本選考', position: 'エンジニア', priority: '', status: '選考中', steps: [], nextAction: '', nextDate: '', submitted: false, esUrl: '', memo: '' })
+applyCalendar({
+  events: [{
+    externalId: 'dup-ext-2', calendarId: 'cal@example.com', title: '2次面接',
+    startAt: '2026-08-21T10:00:00+09:00', endAt: '2026-08-21T11:00:00+09:00',
+    company: 'ダブり検証カンパニー', position: 'エンジニア', kind: '面接', url: MEET_B,
+  }],
+}, db)
+const mailAfterCal = addAppointment(db, { selectionId: dupSel2, at: '2026-08-21T10:00', kind: '面接', title: '2次面接(佐藤様)', url: MEET_B, person: '佐藤様' })
+check('重複防止: カレンダー由来→メール由来でも1行に収束する', rowsOf(dupSel2).length === 1 && !mailAfterCal.created)
+check('重複防止: メール由来は空欄だけ補完する(カレンダーの値は壊さない)', rowsOf(dupSel2)[0].person === '佐藤様' && rowsOf(dupSel2)[0].title === '2次面接')
+
+// 3) 別会議は別行のまま(時刻違い・URL違い)
+addAppointment(db, { selectionId: dupSel2, at: '2026-08-21T11:30', kind: '面接', title: '3次面接', url: MEET_B })
+check('重複防止: 時刻が違えば同じURLでも別行', rowsOf(dupSel2).length === 2)
+addAppointment(db, { selectionId: dupSel2, at: '2026-08-21T10:00', kind: '面接', title: '別部署の面接', url: 'https://meet.google.com/dup-eee-fff' })
+check('重複防止: 同時刻でもURLが違えば別行', rowsOf(dupSel2).length === 3)
+
+// 4) 点検スクリプト: 現行の突合規則で同一になる組を「確定」として拾える
+db.prepare(`
+  INSERT INTO appointment (selection_id, at, end_at, kind, title, url, location, person, status, created_at, external_id, calendar_id, source_hash)
+  VALUES (?, '2026-08-20T14:00:00+09:00', '', '面談', 'カジュアル面談(内田様)', ?, '', '内田様', '予定', '2026-07-19T23:45:14.071Z', '', '', '')
+`).run(dupSel1, MEET_A)
+const calendarRowId = (db.prepare("SELECT id FROM appointment WHERE external_id = 'dup-ext-1'").get() as { id: number }).id
+const dupPairs = findDuplicates(db).filter((p) => p.company === 'ダブり検証カンパニー')
+const confirmed = dupPairs.filter((p) => p.confidence === '確定')
+check('点検: 同一トラック・同一時刻・同一URLの組を確定として検出', confirmed.length === 1 && confirmed[0].reason.includes('同一URL'))
+check('点検: カレンダー由来(external_idあり)を残す側に選ぶ', confirmed[0]?.keepId === calendarRowId && confirmed[0]?.dropId !== calendarRowId)
+check('点検: 別会議(URL違い・時刻違い)は確定重複にしない', !confirmed.some((p) => p.dropId !== confirmed[0].dropId))
 
 
 // --- トラック重複防止 ---
