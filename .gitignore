@@ -20,6 +20,11 @@ sync/research-*-loop.json
 sync/application-*-loop.json
 sync/mail-import-*.json
 sync/submission-import-*.json
+sync/calendar-import-*.json
+# 取り込み系の実行時生成物は個人データを含むので、種別ごとの列挙漏れを防ぐため一括で除外する
+sync/*-loop.json
+sync/*-import-*.json
+notify-state.json
 prep/seed-example.json
 
 # Googleサービスアカウントの鍵(秘密情報)
