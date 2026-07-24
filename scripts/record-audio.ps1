@@ -120,8 +120,15 @@ $mic = $devs | Where-Object { $_.Name -match 'マイク配列|Microphone Array' 
 if (-not $mic) { $mic = $devs | Where-Object { $_.Name -match 'マイク|Microphone|Mic' } | Select-Object -First 1 }
 if (-not $mic) { $mic = $devs | Select-Object -First 1 }
 
-# システム音声(相手の声)= 「ステレオ ミキサー」
-$sys = $devs | Where-Object { $_.Name -match 'ステレオ ?ミキサー|Stereo Mix' } | Select-Object -First 1
+# システム音声(相手の声)。virtual-audio-capturer を最優先にする。
+# 理由(2026-07-24実測): Realtek「ステレオ ミキサー」は Realtek 出力しか映さないため、
+# 面談音声が USB/Bluetooth ヘッドホンに出るこのPCでは常に無音(-91dB)だった。
+# virtual-audio-capturer は既定の再生デバイスをそのままループバックで拾うので、
+# 出力先が何であっても相手の声が録れる。ステレオミキサーは後方互換のフォールバック。
+$sys = $devs | Where-Object { $_.Name -match 'virtual-audio-capturer' } | Select-Object -First 1
+if (-not $sys) {
+  $sys = $devs | Where-Object { $_.Name -match 'ステレオ ?ミキサー|Stereo Mix' } | Select-Object -First 1
+}
 
 if (-not $mic) { Log '!! マイクが見つからない。録音できない'; exit 1 }
 Log ("マイク = {0}" -f $mic.Name)
