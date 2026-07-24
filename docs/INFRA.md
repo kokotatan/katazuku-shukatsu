@@ -13,7 +13,7 @@
 - 人物・証明写真: `data/private/photos` → `photo-sync.ts` → Private Blob `private-photos/*`
   - 配信は `api/photo.ts`、投入は `api/photo-push.ts`
   - 写真本体はDB、snapshot、gitに入れない
-- 日次バックアップ: `data/backups`、14日保持
+- 日次バックアップ: `logs/db-backup`、14日保持
 
 Neon/Postgresは使っていない。新設しない。
 
@@ -46,6 +46,17 @@ Neon/Postgresは使っていない。新設しない。
 
 登録スクリプトは `scripts/register-*.ps1`。タスク登録はOS側権限が必要。
 旧 `katazuku-meeting-opener` はmeeting-autopilotと二重起動するため無効化する。
+
+**この表は実態と一致していること。2026-07-24に台帳と実態のずれが原因で事故が起きた**:
+`katazuku-calendar-sync` は表に載っていたが**実際には未登録**で、7/19以降カレンダーが
+DBのappointmentへ同期されていなかった。meeting-autopilotはDBの予定しか見ないため、
+7/23のリンクアイ面談は自動オープンも自動録画もされなかった。台帳を直したら実機も確認する。
+
+**全タスクにバッテリー起動を許可すること**(`-AllowStartIfOnBatteries -DontStopIfGoingOnBatteries`)。
+`New-ScheduledTaskSettingsSet` の既定は「バッテリー駆動なら起動しない/切替時に停止」で、
+電源を外した瞬間に**無言で全自動処理が止まる**。2026-07-24に全タスクで発覚し解除済み。
+あわせて現行タスクは `LogonType=Interactive` のため**本人がログオン中のセッションでしか走らない**
+(MiniPCへ移す場合は自動ログオンが前提。詳細は `docs/specs/15-minipc-migration.md`)。
 
 ## アプリのローカル保存
 
