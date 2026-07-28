@@ -103,6 +103,12 @@ if ($problems.Count -gt 0) {
   $body = ($problems -join ' / ')
   Show-Toast 'katazuku 自動運転が止まっています' $body
   ('watchdog|{0}|{1}' -f $state.checkedAt, $body) | Out-File $alertFile -Append -Encoding utf8
+  # スマホへもWeb Push(spec16)。ロック画面に出るため件数のみの要約にする。失敗しても続行
+  try {
+    & node (Join-Path $PSScriptRoot 'push-send.mjs') --title 'katazuku 番犬' `
+      --body ('自動運転の異常を{0}件検知しました。PCの通知かログを確認してください' -f $problems.Count) `
+      --url '/insight/' 2>$null | Out-Null
+  } catch {}
   Write-Output ('異常 {0}件: {1}' -f $problems.Count, $body)
 } else {
   Write-Output ('正常(通知なし)。notes: {0}' -f ($(if ($notes.Count) { $notes -join ' / ' } else { 'なし' })))

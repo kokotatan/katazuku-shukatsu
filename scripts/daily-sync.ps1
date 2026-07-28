@@ -21,7 +21,7 @@ try {
   & $invoke -Workflow 'daily-sync-legacy' -RunId $runId `
     -PromptFile (Join-Path $PSScriptRoot 'daily-sync-prompt.md') `
     -Risk 'external-commit' -SideEffectMode 'reconcile' `
-    -Capability @('workspace.read', 'workspace.write', 'shell', 'gmail.read', 'gmail.labels', 'sheets.read', 'sheets.write') `
+    -Capability @('workspace.read', 'workspace.write', 'shell', 'gmail.read', 'gmail.labels', 'gmail.send', 'sheets.read', 'sheets.write') `
     *>&1 | Out-File -FilePath $logFile -Encoding utf8
 } catch {
   $_ | Out-File -FilePath $logFile -Append -Encoding utf8

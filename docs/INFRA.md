@@ -54,6 +54,7 @@ Neon/Postgresは使っていない。新設しない。
 | katazuku-calendar-sync | 30分ごと | `run-calendar-sync.vbs` |
 | katazuku-meeting-autopilot | 5分ごと | `meeting-autopilot.ps1` |
 | katazuku-watchdog | 08:35〜20:35、4時間ごと | `run-watchdog.vbs` |
+| katazuku-evening-brief | 毎晩20:15 | `run-evening-brief.vbs` |
 
 `katazuku-watchdog` は番犬(AI非依存の純PowerShell)。活動ログの by別最終実行時刻と
 provider-health を監視し、定常タスクの停止・Claude/Codex両方の枠切れを検知したときだけ
