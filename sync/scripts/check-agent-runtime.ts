@@ -165,6 +165,14 @@ try {
       stdout: '=== calendar-sync DONE ===',
       stderr: 'tool error: file not found, recovered and completed',
     })) === undefined, '回復済みtool errorを正常終了後も失敗扱いしました')
+    assert(detectProcessFailure(processResult({
+      exitCode: 0,
+      stdout: 'Gmail MCP が使えないため中止します。DBやシートへの変更は一切ありません。',
+    })) === 'capability_missing', '終了コード0のMCP未接続中止を見逃しました')
+    assert(detectProcessFailure(processResult({
+      exitCode: 0,
+      stdout: 'google-workspace MCPが使えないため中止(完了行なし)',
+    })) === 'capability_missing', '表記ゆれ(スペースなし)のMCP中止を見逃しました')
     const reset = parseQuotaResetAt(message, new Date('2026-07-24T05:00:00.000Z'))
     assert(reset?.toISOString() === '2026-07-26T12:00:00.000Z', reset?.toISOString() ?? '日時なし')
     const event = JSON.stringify({ type: 'rate_limit_event', rate_limit_info: { rateLimitType: 'seven_day', resetsAt: 1785067200 } })

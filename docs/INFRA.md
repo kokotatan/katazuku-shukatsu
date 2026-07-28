@@ -43,6 +43,12 @@ Neon/Postgresは使っていない。新設しない。
 | katazuku-asa | 09:00 | `run-asa.vbs` |
 | katazuku-calendar-sync | 30分ごと | `run-calendar-sync.vbs` |
 | katazuku-meeting-autopilot | 5分ごと | `meeting-autopilot.ps1` |
+| katazuku-watchdog | 08:35〜20:35、4時間ごと | `run-watchdog.vbs` |
+
+`katazuku-watchdog` は番犬(AI非依存の純PowerShell)。活動ログの by別最終実行時刻と
+provider-health を監視し、定常タスクの停止・Claude/Codex両方の枠切れを検知したときだけ
+トースト+`logs/alert-daily-sync.txt` 追記(asaが翌朝メールで報告)。正常時は無音。
+状態は `logs/watchdog-last.local.json`。期待周期を変えたら `scripts/watchdog.ps1` の表も直す。
 
 登録スクリプトは `scripts/register-*.ps1`。タスク登録はOS側権限が必要。
 旧 `katazuku-meeting-opener` はmeeting-autopilotと二重起動するため無効化する。

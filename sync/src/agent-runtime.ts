@@ -217,8 +217,16 @@ export function detectProcessFailure(result: ProcessResult): FailureCode | undef
   const known = classifyKnownFailure(result)
   if (result.exitCode === 0 && !result.signal && !result.errorCode) {
     // Codexは途中で回復したtool errorもJSON eventへ残す。最終終了が成功なら、それを
-    // capability/auth失敗へ誤分類しない。終了コード0でも失敗扱いするのは実測済みの利用枠切れだけ。
-    return known === 'quota_exhausted' ? known : undefined
+    // capability/auth失敗へ誤分類しない。終了コード0でも失敗扱いするのは、実測済みの利用枠切れと、
+    // プロンプト規約が定める明示の中止宣言(例: daily-syncの「Gmail MCP が使えないため中止」)だけ。
+    // 後者はagent自身が「何もしていない」と宣言しているため、次のproviderへ安全に回せる
+    // (2026-07-28: Claude headlessのMCP未接続中止が終了コード0で成功扱いになり、
+    //  MCPを持つCodexが居るのに引き継がれず日次同期が無音で止まった)。
+    if (known === 'quota_exhausted') return known
+    if (/MCP\s*が使えないため中止|MCPが使えないため中止/.test(result.stderr + '\n' + result.stdout)) {
+      return 'capability_missing'
+    }
+    return undefined
   }
   if (known) return known
   return 'runtime_error'
