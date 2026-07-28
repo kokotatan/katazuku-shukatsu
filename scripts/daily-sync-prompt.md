@@ -17,6 +17,11 @@ DB→シートの一方向ミラー。書き手はagentのみ。サービスア�
    - 業界が分かれば industry、職種・コース・開催区分(1day/3days等)が特定できれば position に入れる
      (同じ会社に複数ポジション・複数コースで応募していることがあり、これがトラックを判別する鍵)
    - name は本文にある表記のままでよい(株式会社/Inc.付きの正式名称でも通称でも、DB側の正規化とエイリアス学習で吸収する)
+   - **本人にしかできない依頼は完了まで追跡する**: フォーム回答・書類/口座情報の提出・パスワード設定など
+     本人対応が必要な依頼を検知したら、該当トラックの nextAction に「(本人)」を付けて内容を書き、
+     nextDate を当日にする。以後、完了(送信控え・先方の受領連絡)がメールで確認できるまで、毎回の実行で
+     nextDate を当日へ引き直し、サマリ冒頭にも再掲する(一度通知して終わりにしない。2026-07-21のPKSHA
+     フォーム依頼が通知1回きりで7日間滞留し、先方から督促が来た反省)
    - **予定は構造化して取る(最重要)**: 面接・面談・説明会・提出締切は appointments 配列
      `[{at(ISO・時刻まで), endAt(終了時刻。「15:00-15:30」等から。録画の自動停止に使う), kind(面接/面談/締切/説明会/テスト), title, url(Meet/Zoom/Teams/提出ページ), location, person(面接官等)}]`。
      **会議URLと時刻は必ず拾う**(朝のページに「15:00 面接 [開く]」と出すための核)。ref にGmailメッセージIDを入れる。
@@ -50,7 +55,7 @@ DB→シートの一方向ミラー。書き手はagentのみ。サービスア�
    - 就活サービス媒体(slogan.jp / br-campus.jp / typeshukatsu.jp / en-courage.com / labbase.jp / openwork.jp / gaishishukatsu.com / gakujo.ne.jp / ibeck.co.jp / offerbox.jp / mynavi.jp / rikunabi.com)の `is:unread older_than:7d` は batch_modify_gmail_message_labels(claude_ai 系なら label_thread / label_message)で TRASH ラベルを付けてゴミ箱へ
    - それ以外の `is:unread older_than:1d` は batch_modify_gmail_message_labels(claude_ai 系なら unlabel_thread / unlabel_message)で UNREAD ラベルを外す(既読化のみ・削除はしない)。選考情報は手順2〜5でDB・シートに反映済みなので見逃しは起きない
    - 当日(1日以内)の未読はそのまま残す(緊急対応の目印のため)
-   - **最重要の例外**: 件名・本文に「人事面談・面談調整・Slack招待/ワークスペース・インターン事前準備(事前アンケート/セットアップ/持ち物/宿泊/交通費/キックオフ)」が含まれ、かつ未対応に見えるメールは**既読化せず未読のまま残し**、サマリの冒頭で個別に報告する。この種の見逃しは選考辞退扱いに直結するため最優先
+   - **最重要の例外**: 件名・本文に「人事面談・面談調整・Slack招待/ワークスペース・インターン事前準備(事前アンケート/セットアップ/持ち物/宿泊/交通費/キックオフ)・フォーム回答依頼/情報回収フォーム/入社・参加手続き」が含まれ、かつ未対応に見えるメールは**既読化せず未読のまま残し**、サマリの冒頭で個別に報告する。この種の見逃しは選考辞退扱いに直結するため最優先
 7. 活動ログに1行残す(本人が「何を・何のために・どうしたか」を後から確認できる状態にするため)。実際の結果を How/Result に入れて実行する:
    `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/log-activity.ps1 -By daily-sync -Action "毎朝の選考同期" -Why "Gmailの新着から正本DBを最新化し取りこぼしを防ぐため" -How "<更新/追加/保留の企業名・件数、既読化/ゴミ箱の件数を簡潔に>" -Link "選考管理シート(ミラー)" -Result "<成功 等>"`
    (更新も既読化も何も無かった日は Action を「毎朝の選考同期(変化なし)」にする)。
