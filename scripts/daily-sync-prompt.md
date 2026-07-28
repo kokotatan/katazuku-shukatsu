@@ -62,7 +62,9 @@ DB→シートの一方向ミラー。書き手はagentのみ。サービスア�
 7b. スマホ通知: 当日(JST)が期日の締切・「(本人)」付きnextActionが1件以上あるときだけ、
    `node scripts/push-send.mjs --title "katazuku" --body "きょう締切<N>件・要対応<M>件。朝のまとめを確認" --url /inbox/`
    を実行する(ロック画面に出るため企業名・個人名は載せない。失敗しても続行)。
-7c. 日曜(JST)のみ・週次レポート: logs/activity-log.jsonl の直近7日分とDBから、
+7c. 日曜(JST)のみ・週次レポート: まず `cd sync; npx tsx scripts/db-person.ts dupes` で人物マスタの
+   重複疑いを確認し、あればレポートに含める(統合はしない。本人または対話セッションが判断する)。
+   続いて logs/activity-log.jsonl の直近7日分とDBから、
    「今週の進展(選考が進んだ/新規/提出した企業)・終了(不合格/辞退)・来週の予定と締切・判断待ち一覧」を
    まとめ、件名「【週次】M/D週の就活まとめ」で自分宛(okuyama.kotaro.career@gmail.com)にメール送信する。
    事実はログとDBにあるものだけで構成し、創作しない。

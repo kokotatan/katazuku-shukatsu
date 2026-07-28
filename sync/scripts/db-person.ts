@@ -15,7 +15,33 @@ const [cmd, a1, a2] = process.argv.slice(2)
 
 type Row = Record<string, unknown>
 
-if (cmd === 'note') {
+if (cmd === 'dupes') {
+  // upsertPerson と同じ正規化で「同一人物の疑い」を列挙する(統合はせず報告のみ)
+  const normName = (s: string) => s.replace(/(さん|様|氏|先生|くん|君)$/u, '').replace(/[\s　]+/gu, '')
+  const normCompany = (s: string) => s.replace(/[\s　]+/gu, '').replace(/株式会社|合同会社|\(株\)|（株）/gu, '')
+  const all = db.prepare('SELECT p.id, p.name, p.company_id, p.company_text, c.name company FROM person p LEFT JOIN company c ON c.id = p.company_id').all() as
+    { id: number; name: string; company_id: number | null; company_text: string; company: string | null }[]
+  let found = 0
+  for (let i = 0; i < all.length; i++) {
+    for (let j = i + 1; j < all.length; j++) {
+      const a = all[i]
+      const b = all[j]
+      const sameCompany = (a.company_id != null && a.company_id === b.company_id)
+        || (normCompany(a.company ?? a.company_text) !== '' && normCompany(a.company ?? a.company_text) === normCompany(b.company ?? b.company_text))
+      if (!sameCompany) continue
+      const na = normName(a.name)
+      const nb = normName(b.name)
+      if (!na || !nb) continue
+      const shorter = na.length <= nb.length ? na : nb
+      const longer = na.length <= nb.length ? nb : na
+      if (na === nb || (shorter.length >= 2 && longer.includes(shorter))) {
+        console.log(`疑い: #${a.id} ${a.name} / #${b.id} ${b.name} | ${a.company ?? a.company_text}`)
+        found++
+      }
+    }
+  }
+  console.log(found ? `--- ${found}組。統合: npx tsx scripts/db-person.ts merge <from> <to>` : '重複の疑いなし')
+} else if (cmd === 'note') {
   const id = Number(a1)
   if (!Number.isInteger(id) || !a2) {
     console.error('usage: db-person.ts note <id> <follow_upに設定する文>')
