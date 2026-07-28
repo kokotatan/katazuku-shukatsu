@@ -8,7 +8,11 @@ import {
   commandPreview,
   createClaudeAdapter,
   createCodexAdapter,
+  detectCodexExtraCapabilities,
+  detectProcessFailure,
+  executeProcess,
   mayFallback,
+  parseQuotaResetAt,
   parseProviderOrder,
   resolveProviderCommands,
   runAgent,
@@ -152,13 +156,35 @@ try {
     assert(failure === 'quota_exhausted', failure)
   })
 
-  await check('認証切れと接続失敗を分類する', () => {
+  await check('Claudeの実際の週制限文言と復活日時を解釈する', () => {
+    const message = 'You\'ve hit your weekly limit · resets Jul 26, 9pm (Asia/Tokyo)'
+    assert(classifyFailure(processResult({ exitCode: 1, stderr: message })) === 'quota_exhausted', 'weekly limitを認識しません')
+    assert(detectProcessFailure(processResult({ exitCode: 0, stdout: message })) === 'quota_exhausted', '終了コード0のlimitを見逃しました')
+    assert(detectProcessFailure(processResult({
+      exitCode: 0,
+      stdout: '=== calendar-sync DONE ===',
+      stderr: 'tool error: file not found, recovered and completed',
+    })) === undefined, '回復済みtool errorを正常終了後も失敗扱いしました')
+    const reset = parseQuotaResetAt(message, new Date('2026-07-24T05:00:00.000Z'))
+    assert(reset?.toISOString() === '2026-07-26T12:00:00.000Z', reset?.toISOString() ?? '日時なし')
+    const event = JSON.stringify({ type: 'rate_limit_event', rate_limit_info: { rateLimitType: 'seven_day', resetsAt: 1785067200 } })
+    assert(classifyFailure(processResult({ exitCode: 1, stdout: event })) === 'quota_exhausted', '構造化limitを認識しません')
+    assert(parseQuotaResetAt(event, new Date('2026-07-24T05:00:00.000Z'))?.toISOString() === '2026-07-26T12:00:00.000Z', 'resetsAtを解釈できません')
+  })
+
+  await check('認証切れ・接続失敗・spawn失敗を分類する', async () => {
     assert(classifyFailure(processResult({ exitCode: 1, stderr: 'Login required' })) === 'auth_unavailable', 'auth')
     assert(classifyFailure(processResult({ exitCode: 1, stderr: 'Unable to connect to API' })) === 'connection_failed', 'connection')
     assert(classifyFailure(processResult({
       exitCode: 1,
       stderr: 'failed to initialize in-process app-server client: access denied',
     })) === 'connection_failed', 'startup')
+    const spawnFailure = await executeProcess({
+      command: process.execPath,
+      args: ['--version'],
+      cwd: join(workDir, '存在しないcwd'),
+    }, 1_000)
+    assert(Boolean(spawnFailure.errorCode), 'spawn失敗がProcessResultへ変換されません')
   })
 
   await check('CLIの引数エラーは起動前失敗として安全に分類する', () => {
@@ -202,15 +228,22 @@ try {
       sideEffectMode: 'direct',
       possibleSideEffect: true,
     }), '副作用後は切替禁止')
+    assert(mayFallback({
+      failure: 'quota_exhausted',
+      phase: 'running',
+      sideEffectMode: 'reconcile',
+      possibleSideEffect: true,
+    }), '再照合モードは副作用後も切替可能')
   })
 
   await check('Codexは非対話・stdin・安全なsandboxで起動する', () => {
-    const adapter = createCodexAdapter({ command: 'codex' })
-    const preview = commandPreview(adapter, request({ risk: 'db-write', capabilities: ['workspace.read', 'web.search'] }), join(workDir, 'final.txt'))
+    const adapter = createCodexAdapter({ command: 'codex', voiceboxMcpUrl: 'http://127.0.0.1:17493/mcp' })
+    const preview = commandPreview(adapter, request({ risk: 'db-write', capabilities: ['workspace.read', 'web.search', 'voice.transcribe'] }), join(workDir, 'final.txt'))
     assert(preview.args[0] === 'exec', 'codex execではありません')
     assert(preview.args.includes('--json') && preview.args.includes('--output-last-message'), '自動化用出力がありません')
     assert(preview.args.includes('workspace-write'), 'workspace-writeではありません')
     assert(preview.args.includes('tools.web_search=true'), 'web searchがconfig overrideで有効化されていません')
+    assert(preview.args.some((arg) => arg.includes('mcp_servers.voicebox.url=')), 'Voicebox MCP設定がありません')
     assert(!preview.args.includes('--search'), '現行codexが解釈できない--searchを渡しています')
     assert(preview.args.at(-1) === '-', 'promptをstdinから読んでいません')
     assert(!preview.args.some((arg) => /danger|yolo/.test(arg)), '危険なflagがあります')
@@ -223,13 +256,37 @@ try {
     assert(preview.args.includes('lmstudio'), 'local providerがありません')
   })
 
-  await check('Claudeもpromptをコマンドラインへ出さずstdinで渡す', () => {
+  await check('Claudeはstream-jsonで副作用と最終出力を分離する', async () => {
     const adapter = createClaudeAdapter({ command: 'claude' })
     const req = request({ capabilities: ['workspace.read', 'web.search'] })
     const preview = commandPreview(adapter, req, join(workDir, 'unused.txt'))
     assert(preview.args.includes('-p'), 'headless modeではありません')
+    assert(preview.args.includes('stream-json') && preview.args.includes('--verbose'), '構造化event出力ではありません')
     assert(preview.args.includes('WebSearch'), 'capabilityがallowedToolsへ変換されていません')
     assert(!preview.args.includes(req.prompt), 'promptが引数へ漏れています')
+
+    const limited = processResult({
+      exitCode: 1,
+      stdout: [
+        JSON.stringify({ type: 'rate_limit_event', rate_limit_info: { status: 'rejected', rateLimitType: 'seven_day' } }),
+        JSON.stringify({ type: 'result', is_error: true, result: 'weekly limit' }),
+      ].join('\n'),
+    })
+    assert(!adapter.detectPossibleSideEffect(limited), 'tool実行前のlimitを副作用ありと誤判定しました')
+
+    const touched = processResult({
+      exitCode: 1,
+      stdout: JSON.stringify({ type: 'assistant', message: { content: [{ type: 'tool_use', name: 'Edit' }] } }),
+    })
+    assert(adapter.detectPossibleSideEffect(touched), 'tool実行済みを見逃しました')
+
+    const completed = processResult({
+      stdout: [
+        JSON.stringify({ type: 'assistant', message: { content: [{ type: 'text', text: '途中' }] } }),
+        JSON.stringify({ type: 'result', result: '最終結果' }),
+      ].join('\n'),
+    })
+    assert(await adapter.readOutput(completed, { finalOutputPath: join(workDir, 'unused.txt') }) === '最終結果', '最終resultを抽出できません')
   })
 
   await check('共通JSON Schemaで未知項目を拒否する', () => {
@@ -282,15 +339,74 @@ try {
     const result = await runAgent(request({
       runId: 'claude-to-codex',
       risk: 'db-write',
-      sideEffectMode: 'direct',
+      sideEffectMode: 'reconcile',
       providerOrder: ['claude', 'codex'],
     }), {
-      adapters: [fakeAdapter('claude'), fakeAdapter('codex')],
+      adapters: [fakeAdapter('claude', { possibleSideEffect: true }), fakeAdapter('codex')],
       artifactDir: workDir,
       execute,
     })
     assert(result.status === 'succeeded' && result.provider === 'codex', JSON.stringify(result))
     assert(result.attempts[0].failure === 'quota_exhausted', 'Claudeの利用枠切れが記録されていません')
+    assert(calls[1].stdin?.includes('Gmail、Calendar、Drive、DB'), '外部状態の再照合指示が渡っていません')
+  })
+
+  await check('週制限を記録し、復活まではClaudeを飛ばす', async () => {
+    const healthFile = join(workDir, 'provider-health-test.local.json')
+    const limitedAt = new Date('2026-07-24T05:00:00.000Z')
+    const message = 'You\'ve hit your weekly limit · resets Jul 26, 9pm (Asia/Tokyo)'
+    const firstCalls: { command: string; args: string[]; stdin?: string }[] = []
+    const first = await runAgent(request({
+      runId: 'health-first',
+      risk: 'db-write',
+      sideEffectMode: 'workspace',
+      providerOrder: ['claude', 'codex'],
+    }), {
+      adapters: [fakeAdapter('claude', { possibleSideEffect: true }), fakeAdapter('codex')],
+      artifactDir: workDir,
+      healthFile,
+      now: () => limitedAt,
+      execute: queuedExecutor([
+        processResult({ exitCode: 1, stderr: message }),
+        processResult({ stdout: 'Codexで続行完了' }),
+      ], firstCalls),
+    })
+    assert(first.status === 'succeeded' && first.provider === 'codex', JSON.stringify(first))
+    assert(firstCalls[1].stdin?.includes('前のproviderが同じ作業ツリー'), 'Codexへ継続指示が渡っていません')
+    const health = JSON.parse(await readFile(healthFile, 'utf8')) as {
+      providers: { claude?: { unavailableUntil?: string; resetHint?: string } }
+    }
+    assert(health.providers.claude?.unavailableUntil === '2026-07-26T12:02:00.000Z', JSON.stringify(health))
+    assert(health.providers.claude?.resetHint?.includes('Jul 26'), 'reset hintがありません')
+
+    const secondCalls: { command: string; args: string[]; stdin?: string }[] = []
+    const second = await runAgent(request({
+      runId: 'health-second',
+      providerOrder: ['claude', 'codex'],
+    }), {
+      adapters: [fakeAdapter('claude'), fakeAdapter('codex')],
+      artifactDir: workDir,
+      healthFile,
+      now: () => new Date('2026-07-25T00:00:00.000Z'),
+      execute: queuedExecutor([processResult({ stdout: 'Codexで完了' })], secondCalls),
+    })
+    assert(second.provider === 'codex' && secondCalls.length === 1, JSON.stringify(second))
+    assert(second.attempts[0].status === 'skipped' && second.attempts[0].failure === 'quota_exhausted', 'Claudeがskipされません')
+
+    const thirdCalls: { command: string; args: string[]; stdin?: string }[] = []
+    const third = await runAgent(request({
+      runId: 'health-third',
+      providerOrder: ['claude', 'codex'],
+    }), {
+      adapters: [fakeAdapter('claude'), fakeAdapter('codex')],
+      artifactDir: workDir,
+      healthFile,
+      now: () => new Date('2026-07-26T12:03:00.000Z'),
+      execute: queuedExecutor([processResult({ stdout: 'Claude復活' })], thirdCalls),
+    })
+    assert(third.provider === 'claude' && thirdCalls.length === 1, JSON.stringify(third))
+    const recoveredHealth = JSON.parse(await readFile(healthFile, 'utf8')) as { providers: Record<string, unknown> }
+    assert(!recoveredHealth.providers.claude, '復活後もClaudeがcooldownのままです')
   })
 
   await check('副作用の可能性があれば自動切替せずneeds_resumeにする', async () => {
@@ -337,6 +453,23 @@ try {
   })
 
   await check('capability不足は実行前に除外する', async () => {
+    const configRoot = join(workDir, 'codex-capability')
+    const nested = join(configRoot, 'sync')
+    await mkdir(join(configRoot, '.codex'), { recursive: true })
+    await mkdir(nested, { recursive: true })
+    await writeFile(
+      join(configRoot, '.codex', 'config.toml'),
+      '[mcp_servers.google-workspace]\ncommand = \'node\'\n[mcp_servers.voicebox]\nurl = \'http://127.0.0.1:17493/mcp\'\n',
+      'utf8',
+    )
+    const detected = await detectCodexExtraCapabilities(nested)
+    assert(
+      detected.includes('gmail.read') && detected.includes('gmail.send')
+        && detected.includes('calendar.write') && detected.includes('sheets.write')
+        && detected.includes('voice.transcribe'),
+      '設定済みMCP capabilityを検出できません',
+    )
+
     const calls: { command: string; args: string[]; stdin?: string }[] = []
     const execute = queuedExecutor([processResult({ stdout: '完了' })], calls)
     const result = await runAgent(request({
@@ -378,24 +511,14 @@ try {
     }
   })
 
-  // 新規の直呼びを止める網(2026-07-22)。既知の未移行スクリプト(段階移行の負債)だけを許可し、
-  // それ以外のscripts/*.ps1がclaude/codexを直呼びしたらビルドを止める。ここを migrate したら
-  // KNOWN_DIRECT から外すこと(外し忘れると「まだ直呼びのはず」チェックが落ちて気づける)。
-  await check('未移行スクリプト以外はprovider直呼びしない(直呼びの新規混入を防ぐ)', async () => {
+  // scripts/*.ps1がproviderを直呼びしたらビルドを止め、全処理を共通runnerのhealth・引き継ぎ対象に保つ。
+  await check('全PowerShellスクリプトがproviderを直呼びしない', async () => {
     const scriptsDir = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'scripts')
-    const KNOWN_DIRECT = new Set([
-      'daily-sync.ps1', 'mail-watch.ps1', 'asa-auto.ps1', 'calendar-sync.ps1',
-      'reconcile-calendar.ps1', 'interview-digest.ps1', 'open-meeting-urls.ps1', 'katazuku.ps1',
-    ])
     const files = (await readdir(scriptsDir)).filter((f) => f.endsWith('.ps1'))
     for (const f of files) {
       const text = await readFile(join(scriptsDir, f), 'utf8')
-      const direct = DIRECT_CALL.test(text)
-      if (KNOWN_DIRECT.has(f)) {
-        assert(direct, `${f} は未移行扱いだが直呼びが見当たらない。移行済みならKNOWN_DIRECTから外す`)
-      } else {
-        assert(!direct, `${f} が新たにclaude/codexを直呼びしている。invoke-agent.ps1(agent-runtime)経由にする`)
-      }
+      const executableText = text.split(/\r?\n/).filter((line) => !line.trimStart().startsWith('#')).join('\n')
+      assert(!DIRECT_CALL.test(executableText), `${f} がproviderを直呼びしている。invoke-agent.ps1(agent-runtime)経由にする`)
     }
   })
 } finally {

@@ -1,9 +1,10 @@
 ﻿param(
   [Parameter(Mandatory = $true)][ValidateNotNullOrEmpty()][string]$Workflow,
   [Parameter(Mandatory = $true)][ValidateNotNullOrEmpty()][string]$RunId,
-  [Parameter(Mandatory = $true)][ValidateNotNullOrEmpty()][string]$PromptFile,
+  [string]$PromptFile = '',
+  [string]$PromptText = '',
   [ValidateSet('read-only', 'db-write', 'external-draft', 'external-commit')][string]$Risk = 'read-only',
-  [ValidateSet('none', 'direct')][string]$SideEffectMode = 'none',
+  [ValidateSet('none', 'workspace', 'reconcile', 'direct')][string]$SideEffectMode = 'none',
   [ValidateSet('auto', 'codex', 'claude', 'codex-oss')][string]$Agent = 'auto',
   [string[]]$Capability = @('workspace.read'),
   [string]$OutputSchema = '',
@@ -16,8 +17,18 @@ $ErrorActionPreference = 'Stop'
 $repo = Split-Path $PSScriptRoot -Parent
 $sync = Join-Path $repo 'sync'
 $runner = Join-Path $sync 'scripts\agent-runner.ts'
-if (-not (Test-Path -LiteralPath $PromptFile)) {
-  throw "agent promptが見つかりません: $PromptFile"
+$temporaryPrompt = $null
+if ([string]::IsNullOrWhiteSpace($PromptFile) -eq [string]::IsNullOrWhiteSpace($PromptText)) {
+  throw 'PromptFileとPromptTextのどちらか一方だけを指定してください。'
+}
+if ($PromptText) {
+  $promptDir = Join-Path $repo 'logs\agent-prompts'
+  if (-not (Test-Path $promptDir)) { New-Item -ItemType Directory -Path $promptDir | Out-Null }
+  $temporaryPrompt = Join-Path $promptDir (([guid]::NewGuid().ToString('N')) + '.local.md')
+  [IO.File]::WriteAllText($temporaryPrompt, $PromptText, (New-Object Text.UTF8Encoding($false)))
+  $PromptFile = $temporaryPrompt
+} elseif (-not (Test-Path -LiteralPath $PromptFile)) {
+  throw ('agent promptが見つかりません: ' + $PromptFile)
 }
 if (-not (Test-Path -LiteralPath $runner)) {
   throw "agent runnerが見つかりません: $runner"
@@ -53,6 +64,9 @@ try {
   $exitCode = $LASTEXITCODE
 } finally {
   Pop-Location
+  if ($temporaryPrompt -and (Test-Path -LiteralPath $temporaryPrompt)) {
+    Remove-Item -LiteralPath $temporaryPrompt -Force
+  }
 }
 if ($exitCode -ne 0) {
   if ($exitCode -eq 3) {

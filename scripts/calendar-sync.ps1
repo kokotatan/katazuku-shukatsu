@@ -6,7 +6,17 @@ $logDir = Join-Path $repo 'logs'
 if (-not (Test-Path $logDir)) { New-Item -ItemType Directory $logDir | Out-Null }
 $logFile = Join-Path $logDir ("calendar-sync-{0}.log" -f (Get-Date -Format 'yyyy-MM-dd_HHmm'))
 $prompt = Get-Content -Raw -Encoding UTF8 -Path (Join-Path $PSScriptRoot 'calendar-sync-prompt.md')
-$prompt | claude -p --allowedTools 'PowerShell' 'Read' 'Write' 'Glob' 'mcp__claude_ai_Google_Calendar__*' 'mcp__google-workspace__*calendar*' 2>&1 | Out-File -FilePath $logFile -Encoding utf8
+$invoke = Join-Path $PSScriptRoot 'invoke-agent.ps1'
+$runId = 'calendar-sync:' + (Get-Date -Format 'yyyy-MM-dd-HHmm')
+try {
+  & $invoke -Workflow 'calendar-sync' -RunId $runId `
+    -PromptFile (Join-Path $PSScriptRoot 'calendar-sync-prompt.md') `
+    -Risk 'db-write' -SideEffectMode 'reconcile' `
+    -Capability @('workspace.read', 'workspace.write', 'shell', 'calendar.read') `
+    *>&1 | Out-File -FilePath $logFile -Encoding utf8
+} catch {
+  $_ | Out-File -FilePath $logFile -Append -Encoding utf8
+}
 $alertFile = Join-Path $logDir 'alert-calendar-sync.txt'
 $ok = (Test-Path $logFile) -and ((Get-Content -Raw -Encoding UTF8 $logFile) -match '===\s*calendar-sync\s*DONE\s*===')
 if (-not $ok) {

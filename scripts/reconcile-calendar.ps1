@@ -35,17 +35,28 @@ $mode = if ($DryRun) { 'DryRun' } else { 'Apply' }
 ("`n===== {0} reconcile-calendar 開始 ({1}) =====" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $mode) |
   Out-File $logFile -Append -Encoding utf8
 
-# DryRun 時は manage_event を許可ツールから外し、物理的に変更できないようにする
-$tools = @('Read', 'Write',
-  'mcp__google-workspace__read_sheet_values',
-  'mcp__google-workspace__get_events',
-  'mcp__google-workspace__list_calendars')
-if (-not $DryRun) { $tools += 'mcp__google-workspace__manage_event' }
+# DryRun時はcalendar.write capabilityを渡さず、物理的に変更できないようにする。
+$capabilities = @('workspace.read', 'sheets.read', 'calendar.read')
+$risk = 'read-only'
+$sideEffectMode = 'none'
+if (-not $DryRun) {
+  $capabilities += @('workspace.write', 'calendar.write')
+  $risk = 'external-commit'
+  $sideEffectMode = 'reconcile'
+}
 
-# claude 本体の出力は UTF-8。PS5.1 の *>> は既定 UTF-16LE になり文字化けし、下の故障検知(UTF-8読み)が
+# agent本体の出力は UTF-8。PS5.1 の *>> は既定 UTF-16LE になり文字化けし、下の故障検知(UTF-8読み)が
 # 壊れる。OutputEncoding を UTF-8 にしたうえで Out-File -Encoding utf8 に統一する。
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-claude -p $prompt --allowedTools $tools *>&1 | Out-File $logFile -Append -Encoding utf8
+$invoke = Join-Path $PSScriptRoot 'invoke-agent.ps1'
+$runId = 'reconcile-calendar:' + $mode + ':' + (Get-Date -Format 'yyyy-MM-dd')
+try {
+  & $invoke -Workflow 'reconcile-calendar' -RunId $runId -PromptText $prompt `
+    -Risk $risk -SideEffectMode $sideEffectMode -Capability $capabilities `
+    *>&1 | Out-File $logFile -Append -Encoding utf8
+} catch {
+  $_ | Out-File $logFile -Append -Encoding utf8
+}
 
 # ---- 実行後: 新しく増えた通知行を Windows トーストで出す ----
 function Show-Toast([string]$title, [string]$body) {
@@ -76,7 +87,7 @@ $failReason = $null
 $tail = (Get-Content $logFile -Encoding UTF8 | Select-Object -Last 30) -join "`n"
 if ($tail -notmatch '対象|色変更|衝突') {
   if ($tail -match '認証|ログイン|permission|credential') { $failReason = '認証・許可エラーの痕跡' }
-  elseif ($tail.Length -lt 50) { $failReason = '出力が空(claude実行自体が失敗した可能性)' }
+  elseif ($tail.Length -lt 50) { $failReason = '出力が空(agent実行自体が失敗した可能性)' }
 }
 if ($failReason) {
   ("{0} reconcile-calendar 失敗: {1} (詳細: logs/{2})" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $failReason, (Split-Path $logFile -Leaf)) |

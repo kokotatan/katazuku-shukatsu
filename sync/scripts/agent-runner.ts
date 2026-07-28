@@ -26,6 +26,7 @@ interface CliOptions {
   outputSchema?: string
   outputFile?: string
   artifactDir?: string
+  healthFile?: string
   timeoutMs?: number
   dryRun: boolean
 }
@@ -66,6 +67,7 @@ function parseArgs(args: string[]): CliOptions {
     else if (flag === '--output-schema') options.outputSchema = value
     else if (flag === '--output-file') options.outputFile = value
     else if (flag === '--artifact-dir') options.artifactDir = value
+    else if (flag === '--health-file') options.healthFile = value
     else if (flag === '--timeout-ms') options.timeoutMs = Number(value)
     else throw new Error('未知の引数です: ' + flag)
   }
@@ -87,7 +89,7 @@ async function main(): Promise<void> {
   if (!options.runId) throw new Error('--run-id は必須です')
   if (!options.promptFile) throw new Error('--prompt-file は必須です')
   requireChoice(options.risk, ['read-only', 'db-write', 'external-draft', 'external-commit'] as const, '--risk')
-  if (options.sideEffectMode) requireChoice(options.sideEffectMode, ['none', 'direct'] as const, '--side-effect-mode')
+  if (options.sideEffectMode) requireChoice(options.sideEffectMode, ['none', 'workspace', 'reconcile', 'direct'] as const, '--side-effect-mode')
   if (options.provider && options.provider !== 'auto') requireChoice(options.provider, PROVIDER_IDS, '--provider')
   if (options.timeoutMs !== undefined && (!Number.isFinite(options.timeoutMs) || options.timeoutMs <= 0)) {
     throw new Error('--timeout-ms は正の数にしてください')
@@ -111,8 +113,12 @@ async function main(): Promise<void> {
     providerOrder,
     timeoutMs: options.timeoutMs,
   }
-  const adapters = await createDefaultAdapters()
+  const adapters = await createDefaultAdapters(process.env, cwd)
   const artifactDir = absoluteFrom(repoRoot, options.artifactDir) ?? join(repoRoot, 'logs', 'agent-runs')
+  // provider明示は診断・強制実行としてcooldownを迂回する。auto時だけ永続healthを選択へ使う。
+  const healthFile = options.healthFile
+    ? absoluteFrom(repoRoot, options.healthFile)
+    : options.provider && options.provider !== 'auto' ? undefined : join(artifactDir, 'provider-health.local.json')
 
   if (options.dryRun) {
     const byId = new Map(adapters.map((adapter) => [adapter.id, adapter]))
@@ -124,7 +130,7 @@ async function main(): Promise<void> {
     return
   }
 
-  const result = await runAgent(request, { adapters, artifactDir })
+  const result = await runAgent(request, { adapters, artifactDir, healthFile })
   if (result.status === 'succeeded') {
     if (options.outputFile) {
       const outputFile = absoluteFrom(cwd, options.outputFile) as string

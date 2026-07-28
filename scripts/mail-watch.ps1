@@ -21,17 +21,18 @@ $prompt = Get-Content -Raw -Encoding UTF8 -Path (Join-Path $PSScriptRoot 'mail-w
 
 # headless実行。ツールは監視・下書き・カレンダー登録に必要な最小限だけ許可する。
 # プロンプトは stdin 経由で渡す。本文中のハイフン語や引用符を PowerShell が引数へ
-# 分割し、claude が未知オプションとして誤認する事故を避ける(daily-sync と同じ方式)。
-$prompt | claude -p `
-  --allowedTools 'PowerShell' 'Read' 'Write' 'Glob' `
-    'mcp__google-workspace__search_gmail_messages' `
-    'mcp__google-workspace__get_gmail_messages_content_batch' `
-    'mcp__google-workspace__get_gmail_message_content' `
-    'mcp__google-workspace__get_gmail_thread_content' `
-    'mcp__google-workspace__draft_gmail_message' `
-    'mcp__google-workspace__get_events' `
-    'mcp__google-workspace__manage_event' `
-  2>&1 | Out-File -FilePath $logFile -Append -Encoding utf8
+# 分割し、providerが未知オプションとして誤認する事故を避ける(daily-sync と同じ方式)。
+$invoke = Join-Path $PSScriptRoot 'invoke-agent.ps1'
+$runId = 'mail-watch:' + (Get-Date -Format 'yyyy-MM-dd-HH')
+try {
+  & $invoke -Workflow 'mail-watch' -RunId $runId `
+    -PromptFile (Join-Path $PSScriptRoot 'mail-watch-prompt.md') `
+    -Risk 'external-draft' -SideEffectMode 'reconcile' `
+    -Capability @('workspace.read', 'workspace.write', 'shell', 'gmail.read', 'gmail.draft', 'gmail.send', 'calendar.read', 'calendar.write') `
+    *>&1 | Out-File -FilePath $logFile -Append -Encoding utf8
+} catch {
+  $_ | Out-File -FilePath $logFile -Append -Encoding utf8
+}
 
 # ---- 実行後: 新しく増えた通知行をWindowsトーストで出す ----
 function Show-Toast([string]$title, [string]$body) {
@@ -62,7 +63,7 @@ $failReason = $null
 $tail = (Get-Content $logFile -Encoding UTF8 | Select-Object -Last 30) -join "`n"
 if ($tail -notmatch '対応|未読') {
   if ($tail -match '認証|ログイン|permission|credential') { $failReason = '認証・許可エラーの痕跡' }
-  elseif ($tail.Length -lt 50) { $failReason = '出力が空(claude実行自体が失敗した可能性)' }
+  elseif ($tail.Length -lt 50) { $failReason = '出力が空(agent実行自体が失敗した可能性)' }
 }
 if ($failReason) {
   ("{0} mail-watch 失敗: {1} (詳細: logs/{2})" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $failReason, (Split-Path $logFile -Leaf)) |

@@ -40,7 +40,7 @@ cd sync && npx tsx scripts/check-db.ts     # DB遷移規則・apply・mirror・6
 cd sync && npx tsx scripts/check-sheet.ts  # 旧シート書込エンジン(40項目・移行完了まで残す)
 cd sync && npx tsx scripts/check-application.ts # 応募の承認・安全境界・冪等化(21項目)
 cd sync && npx tsx scripts/check-mobility.ts # 場所・対面/オンライン・移動・snapshot分離(15項目)
-cd sync && npx tsx scripts/check-agent-runtime.ts # provider切替・副作用境界・schema・CLI版差(22項目)
+cd sync && npx tsx scripts/check-agent-runtime.ts # provider切替・副作用境界・schema・CLI版差(25項目)
 cd sync && npx tsx scripts/check-daily-sync-apply.ts # daily-sync決定論executor(schema拒否・冪等・ブレーキ・失敗隔離)
 npm run build                              # board(管理画面)ビルド + sync全チェック
 ```
@@ -86,14 +86,20 @@ npm run build                              # board(管理画面)ビルド + sync
     travel_segmentのDBとCLIは実装済み。次は候補日時のfeasible判定、経路adapter、
     移動ブロックのカレンダー反映を実装する。住所・移動履歴はsnapshotへ出さない。設計はdocs/specs/12。
 11. **モデル非依存エージェント実行基盤**: Phase Aの共通runner、Codex/Claude/local OSS adapter、
-    failure分類、fake provider試験、応募・企業研究の共通入口化は完了。自動フォールバックは外部副作用の
-    開始前だけ許可し、開始後は同じrunのcheckpointから再開する。
+    failure分類、fake provider試験、応募・企業研究の共通入口化は完了。外部状態を再取得できるworkflowは
+    `reconcile`で完了済み操作を照合して別providerが続行し、再照合できない操作はcheckpointから再開する。
     **Phase B着手(2026-07-20)**: daily-syncのDB書込経路を「抽出(read-only厳格JSON)→決定論executor
     (daily-sync-apply.ts)」へ分割。schemaはsync/schemas/daily-sync-result.schema.json、抽出プロンプトは
     scripts/daily-sync-extract-prompt.md、オーケストレータはscripts/daily-sync-v2.ps1。既読化・シート
     ミラー等の副作用は未分離で従来daily-sync.ps1に残す。実走でCodex CLIの版差(--search廃止→
     tools.web_search config、引数エラーの安全分類)も修正。次はcalendar-sync/mail-watch/asaを同型で移行。
     設計はdocs/specs/14。
+    **Claude週制限の自動引継ぎ(2026-07-24)**: 実文言`weekly limit · resets ...`を検知し、復活日時を
+    `logs/agent-runs/provider-health.local.json`へ保存。期限まではCodexへ即時切替、期限後の次runでClaudeを
+    再優先する。コード・文書開発は`workspace`、Gmail・Calendar等の運用は`reconcile`でCodexが継続する。
+    Google Workspace MCPをGmail・Calendar・Drive・Sheetsへ対応し、Voiceboxも実行時接続する。
+    scripts配下のprovider直呼びは全廃し、旧daily-sync/mail-watch/asa/calendar-sync等8本も切替対象。
+    開発入口は`scripts/run-agent-task.ps1`、運用説明は`docs/AGENT-FAILOVER.md`。
 
 ## 禁止・注意
 

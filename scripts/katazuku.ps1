@@ -31,16 +31,31 @@ function Copy-Prompt([string] $file, [string] $label) {
   "(個人マスタは submit.local.md の§4〜§11)"
 }
 
+function Invoke-KatazukuAgent(
+  [string] $workflow,
+  [string] $prompt,
+  [string] $risk,
+  [string] $sideEffectMode,
+  [string[]] $capabilities
+) {
+  $runId = ('manual-{0}' -f (Get-Date -Format 'yyyyMMdd-HHmmss'))
+  & (Join-Path $root 'scripts\invoke-agent.ps1') `
+    -Workflow $workflow -RunId $runId -PromptText $prompt `
+    -Risk $risk -SideEffectMode $sideEffectMode -Capability $capabilities
+}
+
 switch ($Command) {
   'asa'     {                                         # けさの3件: メール分類→返信下書き→カレンダー→シート突合→prep
     Set-Location $root
     $prompt = Get-Content (Join-Path $root 'scripts\asa-prompt.md') -Raw -Encoding UTF8
-    claude $prompt
+    Invoke-KatazukuAgent 'asa-manual' $prompt 'external-commit' 'reconcile' `
+      @('workspace.read', 'workspace.write', 'shell', 'gmail.read', 'gmail.draft', 'gmail.labels', 'gmail.send', 'calendar.read', 'calendar.write', 'drive.read', 'sheets.read')
   }
   'inbox'   {                                         # 連絡管理: asa と同じルーチン(旧inbox-triageを吸収)
     Set-Location $root
     $prompt = Get-Content (Join-Path $root 'scripts\asa-prompt.md') -Raw -Encoding UTF8
-    claude $prompt
+    Invoke-KatazukuAgent 'inbox-manual' $prompt 'external-commit' 'reconcile' `
+      @('workspace.read', 'workspace.write', 'shell', 'gmail.read', 'gmail.draft', 'gmail.labels', 'gmail.send', 'calendar.read', 'calendar.write', 'drive.read', 'sheets.read')
   }
   'inbox-web' { Open-App 'inbox' 4173 }               # 旧inbox: 取込メールの仕分けSPA(Web)
   'status'  { Open-App 'status' 4174 }                # 進捗管理: 全社の選考状況ボード
@@ -70,7 +85,9 @@ switch ($Command) {
   }
   'ask'     {                                          # 自分のデータにチャットで質問
     Set-Location $root
-    claude ('就活データへの質問に答えるモード。選考管理シート・Gmail(MCP)・docs/PROGRESS.md を参照して答えて。質問: ' + ($Rest -join ' '))
+    $prompt = '就活データへの質問に答えるモード。選考管理シート・Gmail(MCP)・docs/PROGRESS.md を参照して答えて。質問: ' + ($Rest -join ' ')
+    Invoke-KatazukuAgent 'ask' $prompt 'read-only' 'none' `
+      @('workspace.read', 'gmail.read', 'calendar.read', 'drive.read', 'sheets.read')
   }
   'serve'   { & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $root 'scripts\serve.ps1') }
   'build'   { Set-Location $root; npm run build }
@@ -98,7 +115,7 @@ katazuku <command>
   第二波
   prep [社名] 直前対策    振り返り・想定問答・直前モード (Web)
   insight    当日把握     期限切れ/今日/今週の横断ビュー (Web)
-  ask <質問>  ヘルプデスク 自分の就活データにClaudeで質問
+  ask <質問>  ヘルプデスク 自分の就活データにAIで質問
   status     進捗管理     全社の選考状況ボード (Web)
 
   第三波(未実装、specs/06-07)

@@ -1,5 +1,5 @@
 ﻿# katazuku asa — 無人・メール配信版(タスクスケジューラから run-asa.vbs 経由で無音起動する)
-# 対話ターミナルを出さず、asa ルーチンを headless(claude -p)で実行し、
+# 対話ターミナルを出さず、asa ルーチンを共通runnerで実行し、
 # 「きょうやること」サマリを本人のGmailに送って終わる。失敗は alert-asa.txt に残し、次のasa/朝の報告で拾う。
 # 手動で会話したいときは従来どおり `katazuku asa`(対話版)を使う。
 $ErrorActionPreference = 'Continue'
@@ -27,24 +27,22 @@ $prompt = $base + $tail
 
 # headless実行。asa が使う一式(メール読取・下書き・ラベル・カレンダー・ドライブ/シート読取・自分宛送信)を許可。
 # プロンプトは stdin 経由(本文のハイフン語/ダブルクオートが引数誤解釈される事故を避ける。daily-sync と同方針)。
-$prompt | claude -p `
-  --allowedTools 'PowerShell' 'Bash' 'Read' 'Write' 'Glob' 'Grep' `
-    'mcp__google-workspace__search_gmail_messages' 'mcp__google-workspace__get_gmail_message_content' `
-    'mcp__google-workspace__get_gmail_thread_content' `
-    'mcp__google-workspace__get_gmail_threads_content_batch' 'mcp__google-workspace__get_gmail_messages_content_batch' `
-    'mcp__google-workspace__modify_gmail_message_labels' 'mcp__google-workspace__batch_modify_gmail_message_labels' `
-    'mcp__google-workspace__read_sheet_values' 'mcp__google-workspace__draft_gmail_message' `
-    'mcp__google-workspace__send_gmail_message' 'mcp__google-workspace__get_events' `
-    'mcp__google-workspace__list_calendars' 'mcp__google-workspace__manage_event' `
-    'mcp__google-workspace__search_drive_files' `
-    'mcp__claude_ai_Gmail__*' 'mcp__claude_ai_Google_Calendar__*' 'mcp__claude_ai_Google_Drive__*' `
-  2>&1 | Out-File -FilePath $logFile -Encoding utf8
+$invoke = Join-Path $PSScriptRoot 'invoke-agent.ps1'
+$runId = 'asa:' + (Get-Date -Format 'yyyy-MM-dd')
+try {
+  & $invoke -Workflow 'asa' -RunId $runId -PromptText $prompt `
+    -Risk 'external-commit' -SideEffectMode 'reconcile' `
+    -Capability @('workspace.read', 'workspace.write', 'shell', 'gmail.read', 'gmail.draft', 'gmail.labels', 'gmail.send', 'calendar.read', 'calendar.write', 'drive.read', 'sheets.read') `
+    *>&1 | Out-File -FilePath $logFile -Encoding utf8
+} catch {
+  $_ | Out-File -FilePath $logFile -Append -Encoding utf8
+}
 
 # 完了センチネル方式で正常判定(daily-sync と同じ。ASCIIの `=== asa DONE ===` の有無だけで見る)
 $alertFile = Join-Path $logDir 'alert-asa.txt'
 $failReason = $null
 if (-not (Test-Path $logFile) -or (Get-Item $logFile).Length -lt 200) {
-  $failReason = 'ログが空か極小(claude実行自体が失敗した可能性)'
+  $failReason = 'ログが空か極小(agent実行自体が失敗した可能性)'
 } else {
   $logText = Get-Content -Raw -Encoding UTF8 $logFile
   if ($logText -notmatch '===\s*asa\s*DONE\s*===') {

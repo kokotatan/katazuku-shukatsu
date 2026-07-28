@@ -20,7 +20,7 @@ const request: AgentRunRequest = {
   sideEffectMode: 'none',
 }
 
-const adapters = await createDefaultAdapters()
+const adapters = await createDefaultAdapters(process.env, repoRoot)
 let failed = 0
 for (const adapter of adapters) {
   const preview = commandPreview(adapter, request, join(repoRoot, 'logs', 'agent-runs', 'doctor-final.local.txt'))

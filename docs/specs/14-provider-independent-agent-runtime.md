@@ -18,8 +18,8 @@ Claude、Codex、ローカルOSSモデルのどれか1つを前提にせず、�
 - モデル出力は原則として厳格JSONにし、JSON Schemaで検証してから専用CLIへ渡す
 - DB更新は既存の`db-apply-*`、`transition()`、トランザクションを通す
 - 外部副作用は安定した冪等キーを持つoutboxまたは専用executorからだけ行う
-- 自動フォールバックは副作用開始前だけ許可する
-- 副作用開始後の中断は別providerで最初からやり直さず、同じrunを確定済みcheckpointから再開する
+- 自動フォールバックは副作用開始前、または外部状態を再取得して完了済み操作を照合できる場合に許可する
+- 副作用開始後の中断は別providerで最初からやり直さず、同じrunをcheckpointまたは再照合から再開する
 - provider固有のプロンプト、ツール名、CLI引数はadapter内に閉じ込める
 - 最小公倍数の能力に合わせず、必要capabilityを満たすproviderだけを候補にする
 
@@ -200,9 +200,26 @@ queued
                  -> interrupted/unknown -> needs_resume
 ~~~
 
-`applying`へ入った後はproviderを自動で変えて先頭から実行しない。たとえばClaudeがカレンダーを
-作成した直後に利用枠切れになった可能性がある場合、Codexへ同じプロンプトを渡すと二重作成に
-なり得る。外部ID、sourceRef、runId、outbox状態を照合してから再開点を決める。
+`applying`へ入った後はproviderを変えて先頭から機械的に実行しない。`sideEffectMode=reconcile`では
+第2providerへ、Gmail・Calendar・Drive・DB等の現在状態を再取得し、宛先・件名・予定時刻・外部ID・
+sourceRef・runIdを照合して、完了済み操作を飛ばす指示を付与する。再照合手段のない`direct`は従来どおり
+`needs_resume`で停止する。
+
+### 利用枠状態の永続化と開発継続(2026-07-24)
+
+Claude CLIが実際に返す `You've hit your weekly limit · resets Jul 26, 9pm (Asia/Tokyo)` 形式を
+`quota_exhausted`として検知する。`resets`の日時はタイムゾーン込みでUTCへ変換し、
+gitignore済みの`logs/agent-runs/provider-health.local.json`へ保存する。復活日時まではClaudeを
+preflight前に除外し、復活後の次のrunでClaudeを再び先に試す。成功した時点で制限状態を消す。
+日時を解釈できないCLI版では6時間のcooldown後に再試行する。
+
+CLI起動自体がWindowsの制限トークン等で同期的に`spawn EPERM`を投げる場合も、runner外へ例外を漏らさず
+`ProcessResult`へ正規化する。preflight段階の起動失敗として次providerを試す。
+
+コード・文書開発には`sideEffectMode=workspace`を使う。workspace変更は同じ作業ツリーから観測・継続できるため、
+Claudeが途中終了してもCodexへ切り替えられる。第2providerには作業ツリーと差分を先に確認し、既存変更を
+保持して未完了部分だけを続ける指示を自動付与する。Gmail・Calendar等を再取得できる運用は`reconcile`、
+再照合できない外部操作は`direct`として分離する。標準の開発入口は`scripts/run-agent-task.ps1`とする。
 
 ## 副作用の分離
 
@@ -395,13 +412,15 @@ sandbox内の全shell実行が`CreateProcessWithLogonW failed: 2`で失敗する
 helper同梱のcodex.exeのフルパスを設定する。`--dangerously-bypass-approvals-and-sandbox`での
 回避は行わない。
 
-Codexの既定capabilityはworkspace read/write、shell、web searchだけである。Gmail、Calendar、
-既存Chrome、音声処理は、対応するMCP・connectorを認証したうえで
-`KATAZUKU_CODEX_CAPABILITIES`へ明示したものだけ候補に加える。したがって現時点でCodexへ
-安全に切り替えられる実workflowは企業研究などのworkspace・web中心処理である。
+Codexの既定capabilityはworkspace read/write、shell、web searchだけである。Gmail、Calendar、Drive、Sheetsは
+対応するMCPを認証したうえで、repoまたは親階層の`.codex/config.toml`に
+`[mcp_servers.google-workspace]`があれば論理capabilityを自動検出する。明示的に制御する場合は
+`KATAZUKU_CODEX_CAPABILITIES`で上書きする。interview-digestはローカルVoiceboxのURLを実行時config overrideで
+Codexへ渡し、`voice.transcribe`を利用可能にする。既存Chromeは引き続き個別設定が必要。
 
-daily-syncはDB書込経路を分割済み(上記「Phase B 着手」を参照。既読化・ミラー等の副作用は未分離)。
-calendar-sync、mail-watch、asa、interview-digestはまだClaudeの直接呼び出しとモデルによる直接applyを含む。
-Phase B/Cで厳格JSON生成と決定論的executorへ分割するまで、これらを「モデル非依存化済み」とは扱わない。
+daily-sync-v2はDB書込経路を分割済みで、Google Workspace MCP設定済み端末ではCodexへ切替可能。
+旧daily-sync、calendar-sync、mail-watch、asa、reconcile-calendar、open-meeting-urls、katazuku、interview-digestも
+provider直呼びを除去し、共通runnerへ移行した。未分離の外部副作用は`reconcile`で現状態を再取得して継続するが、
+長期的にはPhase B/Cの厳格JSON生成と決定論的executorへの分割を続ける。
 
 Codex CLIの非対話実行やMCP設定の詳細は実装時点の公式リファレンスを再確認し、adapterへ閉じ込める。

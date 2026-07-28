@@ -1,6 +1,33 @@
 # katazuku 開発進捗
 
-最終更新: 2026-07-22
+最終更新: 2026-07-24
+
+
+## Claude週制限からCodexへの自動引継ぎ(2026-07-24)
+
+- Claude CLIの実制限文言`You've hit your weekly limit · resets Jul 26, 9pm (Asia/Tokyo)`を実測し、
+  従来regexが`weekly limit`を認識せず`runtime_error`にしていた不具合を修正。終了コード0でも高確度の
+  制限文言を失敗として扱う。
+- 復活日時をタイムゾーン込みでUTC化し、gitignore済み`provider-health.local.json`へ保存。
+  期限まではClaudeを起動せずCodexへ回し、期限後の次runでClaudeを再優先、成功時に状態を解除する。
+- コード・文書向け`workspace`副作用モードを追加。Claudeがファイル変更後に急停止しても、Codexへ
+  作業ツリー・差分の先行確認と未完部分だけの継続を指示する。外部送信等の`direct`は従来どおり
+  結果不明時の自動切替を禁止。
+- 開発入口`scripts/run-agent-task.ps1`と運用書`docs/AGENT-FAILOVER.md`を追加。
+- repo/親階層の`.codex/config.toml`からGoogle Workspace MCP設定を検出し、Gmail・Calendarの論理capabilityを
+  Codexへ自動付与。設定済み端末では`daily-sync-v2`等もClaude制限中にCodexへ切替可能。
+- Windows制限環境で`spawn`がeventではなく同期例外`EPERM`を投げてもrunner外へ漏らさず、共通failureとして
+  次providerへ進めるよう補強。doctorもクラッシュせずprovider別の失敗を報告する。
+- 外部操作向け`reconcile`モードを追加。前providerが途中停止しても、次providerがGmail・Calendar・Drive・DBを
+  再取得し、宛先・件名・時刻・sourceRef・runIdで完了済み操作を除外して未完了分を続行する。
+- 残っていたPowerShell 8本のprovider直呼びを全廃。daily-sync、mail-watch、asa、calendar-sync、
+  reconcile-calendar、open-meeting-urls、katazuku、interview-digestを共通runnerへ移行した。
+- Google Workspace capabilityをGmail送信・Drive・Sheetsまで拡張。面接議事録ではVoicebox MCP URLを
+  Codexの実行時configへ渡し、Claude制限中もローカル文字起こしから継続できるようにした。
+- 22:03のWindows定常calendar-syncで実走し、保存済み週制限によりClaudeをskipしてCodexが起動。
+  Calendar 47件を処理し、追加1件・更新5件・変化なし41件、DB snapshotまで完了した。途中で回復した
+  tool errorを終了後も失敗扱いする誤判定を発見し、終了コード0では明示的な週制限だけを失敗扱いするよう修正。
+- agent-runtime回帰試験25件、TypeScript型検査、PowerShell構文検査に成功。
 
 
 ## データ基盤の見直しと他モデル対応の整備(2026-07-22)
@@ -17,7 +44,7 @@
   - **ブローカーはコア健全(重大な隠れバグなし)**: 平文漏洩経路なし・origin検証3層・欄type検証・DPAPIの使い方いずれも健全と確認。fixtureサーバのloopback限定化(0.0.0.0→127.0.0.1)だけ実施。fill評価のisolated world化は低優先の多重防御として保留。
 - **未決(本人判断が要る)**:
   1. **クラウド露出**: snapshotに面接メモ・人物名・プロフィール等の個人データが入りVercel Blobへ。読み取りは`?key=`合言葉1本(ブラウザ埋め込み・失効なし・CORS `*`)。CLAUDE.mdの「配信物に個人データを含めない」と食い違う。現状維持か、機微データ除外/短命署名URL化か。spec08に実態を明記済み。
-  2. **他モデルの本丸**: Gmail/カレンダー/音声はCodex側にツールマップが無く、runtime経由化だけでは他モデルで動かない。Codex側MCP接続+capability map拡充(L)が必要。8本の直呼びスクリプト(daily-sync/mail-watch/asa/calendar-sync/reconcile/interview-digest/open-meeting-urls/katazuku)の移行は稼働中のため本人が実挙動を確認できる時に段階実施。
+  2. **【完了 2026-07-24】他モデルの本丸**: Google Workspace MCPのcapability mapを拡充し、Voiceboxも実行時接続。8本の直呼びスクリプトを共通runnerへ移行した。外部副作用は再照合付きで継続する。
   3. **CLAUDE.md記述の陳腐化**: 「api/ は廃止」とあるが `api/data.ts`・`push.ts`・`photo.ts` は現役(snapshot配信の要)。要更新。
   4. **ブローカーの共有origin対策(spec13 残作業#3)**: origin一致のみで path を見ないため、`job.axol.jp`等の共有originポータルで企業を取り違え得る。実ポータルへ有効化する前に allowed_path_prefix 対応が必須。照合ポリシーの変更=セキュリティの核なので本人が方針確認のうえ実装する(PoCは未配線のため現状ライブ影響なし)。
 

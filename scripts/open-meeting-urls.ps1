@@ -1,7 +1,7 @@
 ﻿# katazuku 会議URL自動オープン + 録画セッション起動
 # careerカレンダーを見て、約12分以内に始まる会議(Meet/Zoom/Teams URL付き)を既定ブラウザで開く。
 # さらに開いた各会議について record-session.ps1 を切り離し起動し、開始時刻ちょうどに録画→終了で議事録化する。
-# タスクスケジューラから5分おきに起動される想定。LLMはHaiku(軽処理・安価)。
+# タスクスケジューラから5分おきに起動される想定。共通runnerが利用可能なproviderを選ぶ。
 # 同じURLは1日1回だけ開く(state file で重複防止=録画セッションも1会議1回だけ起動)。
 
 $ErrorActionPreference = 'Continue'
@@ -38,13 +38,19 @@ meet.google.com / zoom.us / teams.microsoft.com、または短縮リンク
 例: [{"title":"面談","start":"2026-07-15 14:00","end":"2026-07-15 15:00","url":"https://meet.google.com/xxx"}]
 '@
 
-# Haikuが指示に反して表を返すことがあるため、JSON配列が取れるまで最大3回試す
+# モデルが指示に反して表を返すことがあるため、JSON配列が取れるまで最大3回試す
 $out = ''
 $m = $null
 for ($try = 1; $try -le 3; $try++) {
-  $out = & claude -p $prompt --model claude-haiku-4-5-20251001 `
-    --allowedTools 'mcp__google-workspace__get_events' 'mcp__google-workspace__list_calendars' `
-      'mcp__claude_ai_Google_Calendar__*' 2>$null | Out-String
+  try {
+    $meetingRunId = ('lookup-{0}-{1}' -f (Get-Date -Format 'yyyyMMdd-HHmm'), $try)
+    $out = & (Join-Path $PSScriptRoot 'invoke-agent.ps1') `
+      -Workflow 'meeting-url-lookup' -RunId $meetingRunId -PromptText $prompt `
+      -Risk 'read-only' -SideEffectMode 'none' `
+      -Capability @('calendar.read') 2>$null | Out-String
+  } catch {
+    $out = $_.Exception.Message
+  }
   Log ("raw(try {0}): {1}" -f $try, $out.Trim())
   $m = [regex]::Match($out, '\[.*\]', [System.Text.RegularExpressions.RegexOptions]::Singleline)
   if ($m.Success) { break }

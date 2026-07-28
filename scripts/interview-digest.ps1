@@ -1,8 +1,8 @@
 ﻿# interview-digest: turn an interview recording into structured notes + forward-looking insights.
 #
 # Pipeline: (video/audio file) -> [ffmpeg extract audio if needed] -> voicebox local Whisper
-#           -> claude -p structures into chrome-prompts/interview-notes.local.md + writes insights.
-# Free / local / within the Claude subscription. No cloud audio APIs.
+#           -> 共通agent runnerが議事録を構造化し、今後への示唆を書く。
+# 音声処理はローカル。Claude制限中はCodexへ引き継ぐ。
 #
 # Recording the call (both sides) on Windows: use the built-in Game Bar (Win+Alt+R) on the
 # meeting window. In Game Bar settings set "Audio to record = All" and mic ON so the other
@@ -42,7 +42,7 @@ if (-not $ffmpeg) {
 }
 if (-not $ffmpeg) { Write-Error "need ffmpeg. Install: winget install Gyan.FFmpeg"; exit 1 }
 
-# voicebox must already be listening BEFORE claude starts: a claude session binds its MCP servers at
+# voicebox must already be listening BEFORE the agent starts: each provider binds its MCP servers at
 # launch, so starting voicebox afterwards does not give that session the transcribe tool. Without this
 # check the run fails silently in its worst form -- chunking "succeeds", every transcribe call is a
 # no-op, and no transcript is ever written (hit 2026-07-15 and again 2026-07-16; see PROGRESS.md).
@@ -85,21 +85,28 @@ $chunkCount = (Get-ChildItem $chunkDir -Filter 'c-*.wav').Count
 if ($chunkCount -eq 0) { Write-Error "ffmpeg produced no chunks from $audioPath"; exit 1 }
 "split into $chunkCount x 30s chunks -> $chunkDir"
 
-# Feed the base prompt + the (ASCII) chunk dir marker to a single headless claude run.
+# Feed the base prompt + the (ASCII) chunk dir marker to the provider-independent runner.
 $prompt = Get-Content -Raw (Join-Path $PSScriptRoot 'interview-digest-prompt.md')
 $dbJson = Join-Path $intDir ($stem + '-db.json')
 $prompt = $prompt + "`n`nCHUNK_DIR=" + $chunkDir + "`nCHUNK_COUNT=" + $chunkCount + "`nSOURCE_FILE=" + $InputPath + "`nAPPOINTMENT_ID=" + $AppointmentId + "`nDB_JSON=" + $dbJson + "`n"
 
-# PowerShell 5.1 wraps a native exe's stderr lines in NativeCommandError, which $ErrorActionPreference='Stop'
-# turns fatal. claude writes a harmless "no stdin data received" warning to stderr, so relax EAP for this call
-# and judge success by the completion marker below instead.
+# providerの診断出力はstderrにも流れるため、この呼出しだけ継続し、下の完了マーカーで成否を判定する。
 $prevEAP = $ErrorActionPreference
+$previousVoiceboxUrl = $env:KATAZUKU_VOICEBOX_MCP_URL
 $ErrorActionPreference = 'Continue'
-claude -p $prompt `
-  --allowedTools 'Read' 'Write' 'Edit' 'Glob' 'PowerShell' `
-    'mcp__voicebox__voicebox_transcribe' `
-  *> $logFile
-$ErrorActionPreference = $prevEAP
+$env:KATAZUKU_VOICEBOX_MCP_URL = 'http://127.0.0.1:17493/mcp'
+$safeStem = $stem -replace '[^a-zA-Z0-9._-]', '-'
+$digestRunId = if ($AppointmentId -gt 0) { 'appointment-' + $AppointmentId } else { 'recording-' + $safeStem }
+try {
+  & (Join-Path $PSScriptRoot 'invoke-agent.ps1') `
+    -Workflow 'interview-digest' -RunId $digestRunId -PromptText $prompt `
+    -Risk 'db-write' -SideEffectMode 'workspace' `
+    -Capability @('workspace.read', 'workspace.write', 'shell', 'voice.transcribe') `
+    *> $logFile
+} finally {
+  $env:KATAZUKU_VOICEBOX_MCP_URL = $previousVoiceboxUrl
+  $ErrorActionPreference = $prevEAP
+}
 
 $ok = (Test-Path $logFile) -and ((Get-Content -Raw $logFile) -match '===\s*interview-digest\s*完了\s*===')
 if ($ok) {

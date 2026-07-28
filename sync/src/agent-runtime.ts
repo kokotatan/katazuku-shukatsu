@@ -6,7 +6,13 @@ import { delimiter, dirname, join, resolve } from 'node:path'
 export const PROVIDER_IDS = ['codex', 'claude', 'codex-oss'] as const
 export type ProviderId = (typeof PROVIDER_IDS)[number]
 export type AgentRisk = 'read-only' | 'db-write' | 'external-draft' | 'external-commit'
-export type SideEffectMode = 'none' | 'direct'
+/**
+ * none: 読取・構造化だけ。どのproviderでも最初から再実行できる。
+ * workspace: コードや文書を同じ作業ツリーへ書く。途中変更を検査して別providerが続行できる。
+ * reconcile: 外部状態を再読し、完了済み操作を照合して別providerが続行する。
+ * direct: DB・メール・予定・応募など、外部結果を照合しないと再実行できない。
+ */
+export type SideEffectMode = 'none' | 'workspace' | 'reconcile' | 'direct'
 export type FailureCode =
   | 'command_missing'
   | 'auth_unavailable'
@@ -93,7 +99,7 @@ export interface AgentRunResult {
   workflowId: string
   status: 'succeeded' | 'failed' | 'needs_resume'
   provider?: ProviderId
-  sideEffectState: 'none' | 'committed' | 'unknown'
+  sideEffectState: 'none' | 'workspace' | 'committed' | 'unknown'
   safeToFallback: boolean
   output?: string
   outputRef?: string
@@ -104,8 +110,22 @@ export interface AgentRunResult {
 export interface RunAgentOptions {
   adapters: AgentAdapter[]
   artifactDir: string
+  healthFile?: string
+  quotaCooldownMs?: number
   execute?: ProcessExecutor
   now?: () => Date
+}
+
+export interface ProviderHealthEntry {
+  failure: 'quota_exhausted'
+  detectedAt: string
+  unavailableUntil: string
+  resetHint?: string
+}
+
+export interface ProviderHealthDocument {
+  schemaVersion: 1
+  providers: Partial<Record<ProviderId, ProviderHealthEntry>>
 }
 
 const BASE_CAPABILITIES = ['workspace.read', 'workspace.write', 'shell']
@@ -114,8 +134,12 @@ const CLAUDE_EXTRA_CAPABILITIES = [
   'gmail.read',
   'gmail.draft',
   'gmail.labels',
+  'gmail.send',
   'calendar.read',
   'calendar.write',
+  'drive.read',
+  'sheets.read',
+  'sheets.write',
   'browser.interact',
   'voice.transcribe',
 ]
@@ -128,8 +152,12 @@ const CLAUDE_TOOLS: Record<string, string[]> = {
   'gmail.read': ['mcp__claude_ai_Gmail__*', 'mcp__google-workspace__*gmail*'],
   'gmail.draft': ['mcp__claude_ai_Gmail__*', 'mcp__google-workspace__*gmail*'],
   'gmail.labels': ['mcp__claude_ai_Gmail__*', 'mcp__google-workspace__*gmail*'],
+  'gmail.send': ['mcp__claude_ai_Gmail__*', 'mcp__google-workspace__*gmail*'],
   'calendar.read': ['mcp__claude_ai_Google_Calendar__*', 'mcp__google-workspace__*calendar*'],
   'calendar.write': ['mcp__claude_ai_Google_Calendar__*', 'mcp__google-workspace__*calendar*'],
+  'drive.read': ['mcp__claude_ai_Google_Drive__*', 'mcp__google-workspace__*drive*'],
+  'sheets.read': ['mcp__claude_ai_Google_Drive__*', 'mcp__google-workspace__*sheet*'],
+  'sheets.write': ['mcp__claude_ai_Google_Drive__*', 'mcp__google-workspace__*sheet*'],
   'browser.interact': ['mcp__claude-in-chrome__*', 'mcp__claude_ai_Chrome__*'],
   'voice.transcribe': ['mcp__voicebox__*'],
 }
@@ -149,7 +177,7 @@ export function parseProviderOrder(value?: string): ProviderId[] {
   return order.length ? order : ['claude', 'codex', 'codex-oss']
 }
 
-export function classifyFailure(result: ProcessResult): FailureCode {
+function classifyKnownFailure(result: ProcessResult): FailureCode | undefined {
   if (result.errorCode === 'ENOENT') return 'command_missing'
   if (result.timedOut) return 'timeout'
   const text = (result.stderr + '\n' + result.stdout).toLowerCase()
@@ -158,7 +186,7 @@ export function classifyFailure(result: ProcessResult): FailureCode {
   if (/unexpected argument|unrecognized (option|argument|subcommand)|invalid value for|for more information, try '--help'/.test(text)) {
     return 'command_missing'
   }
-  if (/usage limit|quota( has been)? exceeded|credit balance|out of extra usage|maximum.*usage/.test(text)) {
+  if (/weekly limit|usage limit|quota( has been)? exceeded|credit balance|out of extra usage|maximum.*usage|ratelimittype[^\r\n]{0,40}seven_day/.test(text)) {
     return 'quota_exhausted'
   }
   if (/rate.?limit|too many requests|\b429\b/.test(text)) return 'rate_limited'
@@ -174,6 +202,25 @@ export function classifyFailure(result: ProcessResult): FailureCode {
   if (/captcha|multi-factor|two-factor|mfa|required user action|本人確認/.test(text)) {
     return 'user_action_required'
   }
+  return undefined
+}
+
+export function classifyFailure(result: ProcessResult): FailureCode {
+  return classifyKnownFailure(result) ?? 'runtime_error'
+}
+
+/**
+ * 一部CLIは利用枠切れを終了コード0で返すことがある。高確度の既知文言は終了コードに
+ * 関係なく失敗とし、それ以外の正常終了だけを成功として扱う。
+ */
+export function detectProcessFailure(result: ProcessResult): FailureCode | undefined {
+  const known = classifyKnownFailure(result)
+  if (result.exitCode === 0 && !result.signal && !result.errorCode) {
+    // Codexは途中で回復したtool errorもJSON eventへ残す。最終終了が成功なら、それを
+    // capability/auth失敗へ誤分類しない。終了コード0でも失敗扱いするのは実測済みの利用枠切れだけ。
+    return known === 'quota_exhausted' ? known : undefined
+  }
+  if (known) return known
   return 'runtime_error'
 }
 
@@ -194,7 +241,147 @@ export function mayFallback(params: {
 }): boolean {
   if (params.phase === 'preflight') return true
   if (params.sideEffectMode === 'none') return params.failure !== 'user_action_required'
+  if (params.sideEffectMode === 'workspace') {
+    return params.failure !== 'user_action_required' && params.failure !== 'partial_side_effect'
+  }
+  if (params.sideEffectMode === 'reconcile') return params.failure !== 'user_action_required'
   return !params.possibleSideEffect && SAFE_START_FAILURES.has(params.failure)
+}
+
+const MONTHS = new Map([
+  ['jan', 0], ['feb', 1], ['mar', 2], ['apr', 3], ['may', 4], ['jun', 5],
+  ['jul', 6], ['aug', 7], ['sep', 8], ['oct', 9], ['nov', 10], ['dec', 11],
+])
+
+function zonedParts(date: Date, timeZone: string): Record<string, number> {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(date)
+  return Object.fromEntries(parts
+    .filter((part) => part.type !== 'literal')
+    .map((part) => [part.type, Number(part.value)]))
+}
+
+function zonedDateToUtc(
+  year: number,
+  month: number,
+  day: number,
+  hour: number,
+  minute: number,
+  timeZone: string,
+): Date {
+  const desired = Date.UTC(year, month, day, hour, minute)
+  let guess = desired
+  // DST境界でも収束するよう、推定したoffsetを2回補正する。
+  for (let index = 0; index < 2; index += 1) {
+    const parts = zonedParts(new Date(guess), timeZone)
+    const represented = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second)
+    guess = desired - (represented - guess)
+  }
+  return new Date(guess)
+}
+
+function parseClock(hourText: string, minuteText: string | undefined, meridiem: string): {
+  hour: number
+  minute: number
+} {
+  let hour = Number(hourText) % 12
+  if (meridiem.toLowerCase() === 'pm') hour += 12
+  return { hour, minute: Number(minuteText ?? 0) }
+}
+
+/**
+ * Claude CLIの例:
+ *   You've hit your weekly limit · resets Jul 26, 9pm (Asia/Tokyo)
+ * 復活時刻が読めない版ではundefinedを返し、呼出側が保守的なcooldownを使う。
+ */
+export function parseQuotaResetAt(text: string, now: Date = new Date()): Date | undefined {
+  const epoch = text.match(/resetsAt[^0-9]{0,8}(\d{9,13})/i)
+  if (epoch) {
+    const numeric = Number(epoch[1])
+    const parsed = new Date(numeric >= 1_000_000_000_000 ? numeric : numeric * 1000)
+    if (Number.isFinite(parsed.getTime()) && parsed.getTime() > now.getTime()) return parsed
+  }
+  const dated = text.match(
+    /\bresets?\s+([a-z]{3})\s+(\d{1,2}),?\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)(?:\s+\(([^)]+)\))?/i,
+  )
+  if (!dated) return undefined
+  const month = MONTHS.get(dated[1].toLowerCase())
+  if (month === undefined) return undefined
+  const timeZone = dated[6] || Intl.DateTimeFormat().resolvedOptions().timeZone
+  try {
+    const currentYear = zonedParts(now, timeZone).year
+    const clock = parseClock(dated[3], dated[4], dated[5])
+    let candidate = zonedDateToUtc(currentYear, month, Number(dated[2]), clock.hour, clock.minute, timeZone)
+    if (candidate.getTime() <= now.getTime()) {
+      candidate = zonedDateToUtc(currentYear + 1, month, Number(dated[2]), clock.hour, clock.minute, timeZone)
+    }
+    return candidate
+  } catch {
+    return undefined
+  }
+}
+
+function quotaResetHint(text: string): string | undefined {
+  const hint = text.match(/\bresets?\s+[^\r\n]{1,80}/i)?.[0]
+  return hint ? redact(hint) : undefined
+}
+
+async function readProviderHealth(path: string): Promise<ProviderHealthDocument> {
+  try {
+    const parsed = JSON.parse(await readFile(path, 'utf8')) as ProviderHealthDocument
+    if (parsed.schemaVersion === 1 && parsed.providers && typeof parsed.providers === 'object') return parsed
+  } catch {
+    // 初回、または壊れたローカル状態は空として安全側に再生成する。
+  }
+  return { schemaVersion: 1, providers: {} }
+}
+
+async function writeProviderHealth(path: string, health: ProviderHealthDocument): Promise<void> {
+  await mkdir(dirname(path), { recursive: true })
+  await writeFile(path, JSON.stringify(health, null, 2) + '\n', 'utf8')
+}
+
+function continuationRequest(
+  request: AgentRunRequest,
+  attempts: AgentAttempt[],
+): AgentRunRequest {
+  if (request.sideEffectMode !== 'workspace' && request.sideEffectMode !== 'reconcile') return request
+  const interrupted = attempts.filter((attempt) =>
+    (attempt.phase === 'running' || attempt.phase === 'validating') && attempt.status === 'failed')
+  if (!interrupted.length) return request
+  const summary = interrupted
+    .map((attempt) => `${attempt.provider}:${attempt.failure ?? 'runtime_error'}`)
+    .join(', ')
+  const guidance = request.sideEffectMode === 'workspace'
+    ? [
+        '前のproviderが同じ作業ツリーで途中まで作業した可能性があります。',
+        '既存変更はユーザーまたは前のproviderの成果として保持し、まず作業ツリー、差分、関連ファイル、テスト結果を確認してください。',
+        '最初から機械的にやり直さず、未完了部分だけを続行して、元の完了条件まで仕上げてください。',
+      ]
+    : [
+        '前のproviderが外部操作を途中まで実行した可能性があります。',
+        '最初にGmail、Calendar、Drive、DB、作業ファイルなど依頼対象の現在状態を再取得してください。',
+        '同じ宛先・件名・予定時刻・sourceRef・runId等で完了済みの操作は繰り返さず、未完了部分だけを続行してください。',
+        '送信・作成結果が判別できない場合も、履歴・下書き・予定一覧を検索してから判断してください。',
+      ]
+  return {
+    ...request,
+    prompt: [
+      ...guidance,
+      `中断記録: ${summary}`,
+      '',
+      '元の依頼:',
+      request.prompt,
+    ].join('\n'),
+  }
 }
 
 function safeSegment(value: string): string {
@@ -229,16 +416,11 @@ export const executeProcess: ProcessExecutor = async (invocation, timeoutMs) => 
     let stderr = ''
     let settled = false
     let timedOut = false
-    const child = spawn(command, args, {
-      cwd: invocation.cwd,
-      env: { ...process.env, ...invocation.env },
-      windowsHide: true,
-      stdio: ['pipe', 'pipe', 'pipe'],
-    })
+    let timer: NodeJS.Timeout | undefined
     const finish = (partial: Partial<ProcessResult>) => {
       if (settled) return
       settled = true
-      clearTimeout(timer)
+      if (timer) clearTimeout(timer)
       done({
         exitCode: partial.exitCode ?? null,
         signal: partial.signal ?? null,
@@ -249,7 +431,19 @@ export const executeProcess: ProcessExecutor = async (invocation, timeoutMs) => 
         durationMs: Date.now() - started,
       })
     }
-    const timer = setTimeout(() => {
+    let child: ReturnType<typeof spawn>
+    try {
+      child = spawn(command, args, {
+        cwd: invocation.cwd,
+        env: { ...process.env, ...invocation.env },
+        windowsHide: true,
+        stdio: ['pipe', 'pipe', 'pipe'],
+      })
+    } catch (error) {
+      finish({ errorCode: (error as NodeJS.ErrnoException).code })
+      return
+    }
+    timer = setTimeout(() => {
       timedOut = true
       child.kill()
     }, timeoutMs)
@@ -391,11 +585,101 @@ function codexPossibleSideEffect(result: ProcessResult): boolean {
 }
 
 function claudePossibleSideEffect(result: ProcessResult): boolean {
-  return result.stdout.trim().length > 0
+  for (const line of result.stdout.split(/\r?\n/).filter(Boolean)) {
+    try {
+      const event = JSON.parse(line) as {
+        type?: string
+        message?: { content?: { type?: string }[] }
+      }
+      if (event.type === 'assistant' && event.message?.content?.some((item) => item.type === 'tool_use')) return true
+      // tool_resultがある時点で対応するtoolは既に実行済み。結果が途中で欠けても安全側に倒す。
+      if (event.type === 'user' && event.message?.content?.some((item) => item.type === 'tool_result')) return true
+    } catch {
+      // 旧CLIのtext出力は副作用有無を構造的に判定できない。
+      return result.stdout.trim().length > 0
+    }
+  }
+  return false
+}
+
+function readClaudeResult(stdout: string): string {
+  const events: unknown[] = []
+  for (const line of stdout.split(/\r?\n/).filter(Boolean)) {
+    try {
+      events.push(JSON.parse(line))
+    } catch {
+      return stdout
+    }
+  }
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    const event = events[index] as {
+      type?: string
+      result?: unknown
+      message?: { content?: { type?: string; text?: unknown }[] }
+    }
+    if (event.type === 'result' && typeof event.result === 'string') return event.result
+    if (event.type === 'assistant' && Array.isArray(event.message?.content)) {
+      const text = event.message.content
+        .filter((item) => item.type === 'text' && typeof item.text === 'string')
+        .map((item) => item.text as string)
+        .join('')
+      if (text) return text
+    }
+  }
+  return stdout
 }
 
 function capabilitySet(base: string[], extra?: string): Set<string> {
   return new Set([...base, ...(extra ?? '').split(',').map((value) => value.trim()).filter(Boolean)])
+}
+
+const GOOGLE_WORKSPACE_CAPABILITIES = [
+  'gmail.read',
+  'gmail.draft',
+  'gmail.labels',
+  'gmail.send',
+  'calendar.read',
+  'calendar.write',
+  'drive.read',
+  'sheets.read',
+  'sheets.write',
+]
+
+async function findProjectCodexConfig(start: string): Promise<string | undefined> {
+  let current = resolve(start)
+  while (true) {
+    const candidate = join(current, '.codex', 'config.toml')
+    try {
+      await access(candidate)
+      return candidate
+    } catch {
+      const parent = dirname(current)
+      if (parent === current) return undefined
+      current = parent
+    }
+  }
+}
+
+/**
+ * provider capabilityは実接続設定から保守的に推定する。秘密値やtool名は読まず、
+ * MCP server sectionの存在だけを見る。実際の起動・認証失敗はadapterが分類する。
+ */
+export async function detectCodexExtraCapabilities(cwd: string): Promise<string[]> {
+  const configPath = await findProjectCodexConfig(cwd)
+  if (!configPath) return []
+  try {
+    const config = await readFile(configPath, 'utf8')
+    const capabilities: string[] = []
+    if (/^\s*\[mcp_servers\.google-workspace\]\s*$/m.test(config)) {
+      capabilities.push(...GOOGLE_WORKSPACE_CAPABILITIES)
+    }
+    if (/^\s*\[mcp_servers\.voicebox\]\s*$/m.test(config)) {
+      capabilities.push('voice.transcribe')
+    }
+    return unique(capabilities)
+  } catch {
+    return []
+  }
 }
 
 function missingCapability(adapter: AgentAdapter, request: AgentRunRequest): string | undefined {
@@ -412,6 +696,7 @@ export interface AdapterOptions {
   localProvider?: 'ollama' | 'lmstudio'
   /** web.search capability要求時にcodex execへ渡す引数。CLI版差を吸収するためadapter内に閉じ込める */
   webSearchArgs?: string[]
+  voiceboxMcpUrl?: string
 }
 
 // 現行のcodex execは`--search`を持たず、web検索はconfig override(tools.web_search)で有効化する。
@@ -425,7 +710,10 @@ export function parseWebSearchArgs(value?: string): string[] | undefined {
 }
 
 export function createCodexAdapter(options: AdapterOptions, id: 'codex' | 'codex-oss' = 'codex'): AgentAdapter {
-  const capabilities = capabilitySet([...BASE_CAPABILITIES, 'web.search'], options.extraCapabilities)
+  const capabilities = capabilitySet(
+    [...BASE_CAPABILITIES, 'web.search', ...(options.voiceboxMcpUrl ? ['voice.transcribe'] : [])],
+    options.extraCapabilities,
+  )
   const webSearchArgs = options.webSearchArgs ?? DEFAULT_CODEX_WEB_SEARCH_ARGS
   return {
     id,
@@ -443,6 +731,10 @@ export function createCodexAdapter(options: AdapterOptions, id: 'codex' | 'codex
       const args = ['exec', '-C', request.cwd, '--color', 'never', '--json', '--output-last-message', paths.finalOutputPath]
       args.push('--sandbox', request.risk === 'read-only' ? 'read-only' : 'workspace-write')
       if (request.capabilities.includes('web.search')) args.push(...webSearchArgs)
+      if (request.capabilities.includes('voice.transcribe') && options.voiceboxMcpUrl) {
+        args.push('-c', `mcp_servers.voicebox.url=${JSON.stringify(options.voiceboxMcpUrl)}`)
+        args.push('-c', 'mcp_servers.voicebox.http_headers={"X-Voicebox-Client-Id"="codex"}')
+      }
       if (request.outputSchemaPath) args.push('--output-schema', resolve(request.outputSchemaPath))
       if (options.profile) args.push('--profile', options.profile)
       if (options.model) args.push('--model', options.model)
@@ -476,13 +768,15 @@ export function createClaudeAdapter(options: AdapterOptions): AgentAdapter {
     },
     buildInvocation(request) {
       const tools = unique(request.capabilities.flatMap((capability) => CLAUDE_TOOLS[capability] ?? []))
-      const args = ['-p']
+      // stream-jsonにはtool_useとrate_limit_eventが含まれる。週制限がtool実行前か後かを
+      // text出力の有無で推測せず、外部副作用後の誤フォールバックを防ぐ。
+      const args = ['-p', '--output-format', 'stream-json', '--verbose']
       if (tools.length) args.push('--allowedTools', ...tools)
       if (options.model) args.push('--model', options.model)
       return { command: options.command, args, stdin: request.prompt, cwd: request.cwd }
     },
     async readOutput(result) {
-      return result.stdout
+      return readClaudeResult(result.stdout)
     },
     detectPossibleSideEffect: claudePossibleSideEffect,
   }
@@ -569,15 +863,23 @@ export async function resolveProviderCommands(env: NodeJS.ProcessEnv = process.e
   return { codex, claude, 'codex-oss': codex }
 }
 
-export async function createDefaultAdapters(env: NodeJS.ProcessEnv = process.env): Promise<AgentAdapter[]> {
+export async function createDefaultAdapters(
+  env: NodeJS.ProcessEnv = process.env,
+  cwd: string = process.cwd(),
+): Promise<AgentAdapter[]> {
   const commands = await resolveProviderCommands(env)
+  const detectedCodexCapabilities = await detectCodexExtraCapabilities(cwd)
+  const codexExtraCapabilities = env.KATAZUKU_CODEX_CAPABILITIES !== undefined
+    ? env.KATAZUKU_CODEX_CAPABILITIES
+    : detectedCodexCapabilities.join(',')
   return [
     createCodexAdapter({
       command: commands.codex,
       profile: env.KATAZUKU_CODEX_PROFILE,
       model: env.KATAZUKU_CODEX_MODEL,
-      extraCapabilities: env.KATAZUKU_CODEX_CAPABILITIES,
+      extraCapabilities: codexExtraCapabilities,
       webSearchArgs: parseWebSearchArgs(env.KATAZUKU_CODEX_WEB_SEARCH),
+      voiceboxMcpUrl: env.KATAZUKU_VOICEBOX_MCP_URL,
     }),
     createClaudeAdapter({
       command: commands.claude,
@@ -622,6 +924,10 @@ export async function runAgent(request: AgentRunRequest, options: RunAgentOption
   await mkdir(runDir, { recursive: true })
   const attempts: AgentAttempt[] = []
   let lastFailure: FailureCode = 'runtime_error'
+  const health: ProviderHealthDocument = options.healthFile
+    ? await readProviderHealth(options.healthFile)
+    : { schemaVersion: 1, providers: {} }
+  const quotaCooldownMs = options.quotaCooldownMs ?? 6 * 60 * 60_000
 
   for (let index = 0; index < order.length; index += 1) {
     const provider = order[index]
@@ -644,9 +950,40 @@ export async function runAgent(request: AgentRunRequest, options: RunAgentOption
       continue
     }
 
-    const preflight = await adapter.preflight(request, execute)
+    const healthEntry = health.providers[provider]
+    if (healthEntry?.failure === 'quota_exhausted') {
+      const unavailableUntil = Date.parse(healthEntry.unavailableUntil)
+      if (Number.isFinite(unavailableUntil) && unavailableUntil > now().getTime()) {
+        attempts.push({
+          attemptId,
+          provider,
+          phase: 'preflight',
+          status: 'skipped',
+          failure: 'quota_exhausted',
+          safeToFallback: true,
+          startedAt,
+          finishedAt: now().toISOString(),
+        })
+        lastFailure = 'quota_exhausted'
+        continue
+      }
+      delete health.providers[provider]
+      if (options.healthFile) await writeProviderHealth(options.healthFile, health)
+    }
+
+    const attemptRequest = continuationRequest(request, attempts)
+    const preflight = await adapter.preflight(attemptRequest, execute)
     if (!preflight.ok) {
       const failure = preflight.failure ?? 'runtime_error'
+      if (failure === 'quota_exhausted') {
+        health.providers[provider] = {
+          failure,
+          detectedAt: now().toISOString(),
+          unavailableUntil: new Date(now().getTime() + quotaCooldownMs).toISOString(),
+          resetHint: preflight.detail ? quotaResetHint(preflight.detail) : undefined,
+        }
+        if (options.healthFile) await writeProviderHealth(options.healthFile, health)
+      }
       attempts.push({
         attemptId,
         provider,
@@ -662,9 +999,9 @@ export async function runAgent(request: AgentRunRequest, options: RunAgentOption
     }
 
     const finalOutputPath = join(runDir, attemptId + '-final.local.txt')
-    const invocation = adapter.buildInvocation(request, { finalOutputPath })
-    const processResult = await execute(invocation, request.timeoutMs ?? 30 * 60_000)
-    const failure = processResult.exitCode === 0 ? undefined : classifyFailure(processResult)
+    const invocation = adapter.buildInvocation(attemptRequest, { finalOutputPath })
+    const processResult = await execute(invocation, attemptRequest.timeoutMs ?? 30 * 60_000)
+    const failure = detectProcessFailure(processResult)
     if (failure) {
       const possibleSideEffect = adapter.detectPossibleSideEffect(processResult)
       const safeToFallback = mayFallback({
@@ -674,6 +1011,21 @@ export async function runAgent(request: AgentRunRequest, options: RunAgentOption
         possibleSideEffect,
       })
       const refs = await writeAttemptArtifacts(runDir, attemptId, processResult)
+      if (failure === 'quota_exhausted') {
+        const combined = processResult.stderr + '\n' + processResult.stdout
+        const parsedReset = parseQuotaResetAt(combined, now())
+        // 復活直後の時計差・反映遅延で再度失敗しないよう2分だけ猶予を置く。
+        const unavailableUntil = parsedReset
+          ? new Date(parsedReset.getTime() + 2 * 60_000)
+          : new Date(now().getTime() + quotaCooldownMs)
+        health.providers[provider] = {
+          failure,
+          detectedAt: now().toISOString(),
+          unavailableUntil: unavailableUntil.toISOString(),
+          resetHint: quotaResetHint(combined),
+        }
+        if (options.healthFile) await writeProviderHealth(options.healthFile, health)
+      }
       attempts.push({
         attemptId,
         provider,
@@ -691,9 +1043,11 @@ export async function runAgent(request: AgentRunRequest, options: RunAgentOption
       const blocked: AgentRunResult = {
         runId: request.runId,
         workflowId: request.workflowId,
-        status: request.sideEffectMode === 'direct' ? 'needs_resume' : 'failed',
+        status: request.sideEffectMode === 'direct' || request.sideEffectMode === 'reconcile' ? 'needs_resume' : 'failed',
         provider,
-        sideEffectState: request.sideEffectMode === 'direct' ? 'unknown' : 'none',
+        sideEffectState: request.sideEffectMode === 'direct' || request.sideEffectMode === 'reconcile'
+          ? 'unknown'
+          : request.sideEffectMode === 'workspace' ? 'workspace' : 'none',
         safeToFallback: false,
         failure,
         attempts,
@@ -730,9 +1084,11 @@ export async function runAgent(request: AgentRunRequest, options: RunAgentOption
       const invalid: AgentRunResult = {
         runId: request.runId,
         workflowId: request.workflowId,
-        status: request.sideEffectMode === 'direct' ? 'needs_resume' : 'failed',
+        status: request.sideEffectMode === 'direct' || request.sideEffectMode === 'reconcile' ? 'needs_resume' : 'failed',
         provider,
-        sideEffectState: request.sideEffectMode === 'direct' ? 'unknown' : 'none',
+        sideEffectState: request.sideEffectMode === 'direct' || request.sideEffectMode === 'reconcile'
+          ? 'unknown'
+          : request.sideEffectMode === 'workspace' ? 'workspace' : 'none',
         safeToFallback: false,
         failure: validationFailure,
         attempts,
@@ -752,12 +1108,18 @@ export async function runAgent(request: AgentRunRequest, options: RunAgentOption
       exitCode: processResult.exitCode,
       ...refs,
     })
+    if (health.providers[provider]) {
+      delete health.providers[provider]
+      if (options.healthFile) await writeProviderHealth(options.healthFile, health)
+    }
     const succeeded: AgentRunResult = {
       runId: request.runId,
       workflowId: request.workflowId,
       status: 'succeeded',
       provider,
-      sideEffectState: request.sideEffectMode === 'direct' ? 'committed' : 'none',
+      sideEffectState: request.sideEffectMode === 'direct' || request.sideEffectMode === 'reconcile'
+        ? 'committed'
+        : request.sideEffectMode === 'workspace' ? 'workspace' : 'none',
       safeToFallback: false,
       output,
       outputRef: refs.outputRef,
@@ -771,7 +1133,9 @@ export async function runAgent(request: AgentRunRequest, options: RunAgentOption
     runId: request.runId,
     workflowId: request.workflowId,
     status: 'failed',
-    sideEffectState: 'none',
+    sideEffectState: request.sideEffectMode === 'reconcile'
+      ? 'unknown'
+      : request.sideEffectMode === 'workspace' ? 'workspace' : 'none',
     safeToFallback: false,
     failure: lastFailure,
     attempts,
