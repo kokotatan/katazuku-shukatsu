@@ -1,6 +1,20 @@
 # katazuku 開発進捗
 
-最終更新: 2026-07-24
+最終更新: 2026-07-28
+
+
+## PWA化とWeb Push(spec16 スライス1・2、2026-07-28)
+
+- landingをPWA化: `manifest.webmanifest`+最小Service Worker(シェルキャッシュ+Push受信のみ、/api/は素通し)。
+  manifestにstart_urlを書かず、ホーム画面追加時のURL`?key=合言葉`をそのまま起動URLにすることで、
+  合言葉が公開ファイルに載らないまま初回起動時にlocalStorageへ保存され、以後の入力が不要になる。
+- Web Push基盤: 購読の保存口`api/push-subscribe`(合言葉認証→Private Blob `push-subscriptions.json`)、
+  送信口`api/push-send`(write secret認証、web-push/VAPID、失効購読の自動掃除)、
+  手動送信`scripts/push-send.mjs`。VAPID鍵は`.env`とVercel env(production/preview)に登録。
+  landingに「通知を有効にする」ボタンを追加(iOSはホーム画面起動時のみPush可)。
+- アイコン: codex CLI経由の画像生成は動作確認できたがAI生成の「片」は字形が崩れるため、
+  フォント描画(Yu Gothic UI Bold・teal #00C4CC)の`tools/gen-icon-fallback.ps1`を採用。180/192/512を生成。
+- 残り: iPhone実機でのホーム画面追加+通知1通の受信確認(本人)→asa連携(毎朝自動送信)→全アプリ展開。
 
 
 ## Claude週制限からCodexへの自動引継ぎ(2026-07-24)

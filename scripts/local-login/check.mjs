@@ -25,6 +25,13 @@ const repoRoot = fileURLToPath(new URL('../..', import.meta.url))
 const chromePath = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
 let checks = 0
 
+// 資格情報ブローカーはDPAPI(powershell.exe)前提のWindows専用。
+// VercelのLinuxビルド機ではテスト自体が成立しないためスキップする(2026-07-28 プレビュー失敗の修正)
+if (process.platform !== 'win32') {
+  console.log('ローカル資格情報ブローカー: Windows以外のためスキップ')
+  process.exit(0)
+}
+
 function ok(value, message) {
   assert.ok(value, message)
   checks += 1

@@ -6,6 +6,15 @@
   <meta name="robots" content="noindex, nofollow" />
   <meta name="description" content="katazuku — 就活を、ぜんぶ片付ける。散らかった就活のタスクを片付けるプロダクト群。" />
   <title>katazuku — 就活を、ぜんぶ片付ける。</title>
+  <!-- PWA(spec16)。manifestにstart_urlは書かない: ホーム画面追加時のURL(?key=合言葉)を
+       そのまま起動URLにするため。合言葉は公開ファイルのmanifestに載せない -->
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <meta name="theme-color" content="#0077c7" />
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="katazuku" />
   <style>
     /*
       デザイン言語: SmartHR Design System 準拠。
@@ -139,6 +148,25 @@
     .card-cta { margin-top: 4px; font-size: 14px; font-weight: 700; color: var(--primary); }
     .card:hover .card-cta { color: var(--primary-hover); }
 
+    /* ---- スマホの通知(PWA/Web Push) ---- */
+    .push-label { margin-top: 40px; }
+    .push-card {
+      display: flex; flex-direction: column; gap: 12px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 24px;
+    }
+    .push-desc { font-size: 14px; color: var(--text-sub); line-height: 1.8; }
+    .push-btn {
+      align-self: flex-start;
+      font-family: var(--font); font-size: 14px; font-weight: 700; color: #fff;
+      background: var(--primary); border: 1px solid var(--primary); border-radius: 6px;
+      padding: 8px 16px; cursor: pointer;
+      transition: background-color 0.15s ease;
+    }
+    .push-btn:hover { background: var(--primary-hover); border-color: var(--primary-hover); }
+    .push-btn:disabled { background: var(--text-disabled); border-color: var(--text-disabled); cursor: default; }
+    .push-status { font-size: 13px; color: var(--text-sub); }
+
     footer {
       border-top: 1px solid var(--border); padding: 24px 0 48px;
       display: flex; justify-content: space-between; align-items: center;
@@ -270,6 +298,13 @@
             <span class="card-cta">ひらく</span>
           </a>
         </div>
+
+        <p class="section-label push-label">スマホの通知</p>
+        <div class="push-card">
+          <p class="push-desc" id="push-desc">読み込み中…</p>
+          <button class="push-btn" id="push-btn" type="button" hidden>通知を有効にする</button>
+          <p class="push-status" id="push-status" hidden></p>
+        </div>
       </main>
 
       <footer class="wrap">
@@ -289,5 +324,83 @@
     <a class="tab-item" href="/prep/"><svg aria-hidden="true"><use href="#i-comments"/></svg>面接</a>
     <a class="tab-item" href="/impact/"><svg aria-hidden="true"><use href="#i-chart"/></svg>効果</a>
   </nav>
+
+  <script>
+    // PWA(spec16): 合言葉の取り込み・Service Worker登録・Web Push購読
+    (function () {
+      var READ_KEY_STORAGE = 'katazuku/read-key' // shared/src/index.ts と同一キー
+      var VAPID_PUBLIC_KEY = 'BIK8F7SPwhI83rapi2bgN7yewaKuKwYaYd0db7ZbLxQ5571qOG28mNIhRDqFBVRaV38IMffgiodnC-3iqNgoFKM'
+
+      // 1) ?key=合言葉 を保存する。ホーム画面追加時のURLに埋め込まれた合言葉が
+      //    初回起動でこのPWAのlocalStorageに入り、以後どのアプリでも入力不要になる
+      function readKey() {
+        try { return localStorage.getItem(READ_KEY_STORAGE) || '' } catch { return '' }
+      }
+      try {
+        var urlKey = new URLSearchParams(location.search).get('key')
+        if (urlKey && urlKey.trim()) localStorage.setItem(READ_KEY_STORAGE, urlKey.trim())
+      } catch { /* プライベートモード等でlocalStorage不可でも他機能は動かす */ }
+
+      // 2) Service Worker(インストール可能要件+Push受信)
+      if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js')
+
+      // 3) 通知セクション
+      var desc = document.getElementById('push-desc')
+      var btn = document.getElementById('push-btn')
+      var status = document.getElementById('push-status')
+      function say(text) { status.hidden = !text; status.textContent = text }
+
+      var supported = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window
+      if (!supported) {
+        desc.textContent = 'この画面をSafariの共有メニューから「ホーム画面に追加」すると、アプリとして開けるようになります。通知(毎朝の「きょうやること」)はホーム画面から起動したときに有効化できます。'
+        return
+      }
+
+      desc.textContent = '毎朝の「きょうやること」をプッシュ通知で受け取れます。'
+      btn.hidden = false
+
+      navigator.serviceWorker.ready.then(function (reg) {
+        return reg.pushManager.getSubscription()
+      }).then(function (sub) {
+        if (sub) { btn.textContent = '通知は有効です(再登録する)'; say('この端末は通知登録済みです。') }
+      }).catch(function () { /* 未対応環境は何もしない */ })
+
+      function base64UrlToUint8Array(base64) {
+        var padding = '='.repeat((4 - (base64.length % 4)) % 4)
+        var raw = atob((base64 + padding).replace(/-/g, '+').replace(/_/g, '/'))
+        var arr = new Uint8Array(raw.length)
+        for (var i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i)
+        return arr
+      }
+
+      btn.addEventListener('click', function () {
+        var key = readKey()
+        if (!key) { say('合言葉が未設定です。合言葉付きのURL(?key=)からもう一度開いてください。'); return }
+        btn.disabled = true
+        say('登録中…')
+        Notification.requestPermission().then(function (perm) {
+          if (perm !== 'granted') throw new Error('通知が許可されませんでした。端末の設定から許可してください。')
+          return navigator.serviceWorker.ready
+        }).then(function (reg) {
+          return reg.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: base64UrlToUint8Array(VAPID_PUBLIC_KEY),
+          })
+        }).then(function (sub) {
+          return fetch('/api/push-subscribe?key=' + encodeURIComponent(key), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(sub),
+          })
+        }).then(function (res) {
+          if (!res.ok) throw new Error('登録に失敗しました(' + res.status + ')')
+          btn.textContent = '通知は有効です(再登録する)'
+          say('登録しました。毎朝「きょうやること」が届きます。')
+        }).catch(function (err) {
+          say(err && err.message ? err.message : '登録に失敗しました。')
+        }).finally(function () { btn.disabled = false })
+      })
+    })()
+  </script>
 </body>
 </html>

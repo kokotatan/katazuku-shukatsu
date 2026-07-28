@@ -21,8 +21,18 @@ Neon/Postgresは使っていない。新設しない。
 
 - 本番: `katazuku.kotalabo.com`
 - ホスティング: Vercel（Cloudflare CNAME）
-- Functions: `api/data`、`api/push`、`api/photo`、`api/photo-push`
+- Functions: `api/data`、`api/push`、`api/photo`、`api/photo-push`、`api/push-subscribe`、`api/push-send`
 - Blobはprivate。署名なしURLを公開しない
+  - `snapshot.json`（正本のスナップショット）、`private-photos/*`、`push-subscriptions.json`（Web Push購読・個人データ）
+
+## PWA / Web Push（spec16、2026-07-28）
+
+- landing配下: `manifest.webmanifest`（start_urlは書かない。ホーム画面追加時のURL `?key=合言葉` を起動URLにするため）、
+  `sw.js`（シェルキャッシュ+Push受信のみ。/api/ はキャッシュしない）、`icons/`（teal「片」PNG。`tools/gen-icon-fallback.ps1` で再生成）
+- VAPID鍵: ローカルは `.env`（`KATAZUKU_VAPID_PUBLIC_KEY` / `KATAZUKU_VAPID_PRIVATE_KEY` / `KATAZUKU_VAPID_SUBJECT`）、
+  Vercelは production / preview 両環境に登録済み。再生成すると全端末の購読が無効になるので原則再生成しない
+- 手動送信: `node scripts/push-send.mjs --body "..."`（認証は `.env` の `KATAZUKU_WRITE_SECRET`）
+- 通知本文はロック画面に出るため要約レベル（企業名・個人名を細かく載せない）
 
 ## Google
 
