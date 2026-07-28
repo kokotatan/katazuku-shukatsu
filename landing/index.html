@@ -9,6 +9,7 @@
   <!-- PWA(spec16)。manifestにstart_urlは書かない: ホーム画面追加時のURL(?key=合言葉)を
        そのまま起動URLにするため。合言葉は公開ファイルのmanifestに載せない -->
   <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="icon" href="/icons/icon-192.png" type="image/png" />
   <meta name="theme-color" content="#0077c7" />
   <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
   <meta name="mobile-web-app-capable" content="yes" />
@@ -166,6 +167,14 @@
     .push-btn:hover { background: var(--primary-hover); border-color: var(--primary-hover); }
     .push-btn:disabled { background: var(--text-disabled); border-color: var(--text-disabled); cursor: default; }
     .push-status { font-size: 13px; color: var(--text-sub); }
+    .key-row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .key-input {
+      flex: 1; min-width: 200px;
+      font-family: var(--font); font-size: 14px; color: var(--text);
+      background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+      padding: 8px 12px;
+    }
+    .key-input::placeholder { color: var(--text-disabled); }
 
     footer {
       border-top: 1px solid var(--border); padding: 24px 0 48px;
@@ -299,6 +308,16 @@
           </a>
         </div>
 
+        <p class="section-label push-label">スマホで使う</p>
+        <div class="push-card">
+          <p class="push-desc" id="key-desc">合言葉を確認しています…</p>
+          <div class="key-row" id="key-row" hidden>
+            <input class="key-input" id="key-input" type="password" autocomplete="off" placeholder="閲覧用の合言葉" />
+            <button class="push-btn" id="key-btn" type="button">保存</button>
+          </div>
+          <p class="push-status" id="key-status" hidden></p>
+        </div>
+
         <p class="section-label push-label">スマホの通知</p>
         <div class="push-card">
           <p class="push-desc" id="push-desc">読み込み中…</p>
@@ -331,15 +350,65 @@
       var READ_KEY_STORAGE = 'katazuku/read-key' // shared/src/index.ts と同一キー
       var VAPID_PUBLIC_KEY = 'BIK8F7SPwhI83rapi2bgN7yewaKuKwYaYd0db7ZbLxQ5571qOG28mNIhRDqFBVRaV38IMffgiodnC-3iqNgoFKM'
 
-      // 1) ?key=合言葉 を保存する。ホーム画面追加時のURLに埋め込まれた合言葉が
-      //    初回起動でこのPWAのlocalStorageに入り、以後どのアプリでも入力不要になる
+      // 1) 合言葉の取り込み。経路は2つ: URLの ?key= と、このページの入力欄。
+      //    どちらで設定してもURLに ?key= を埋め戻す。iOSはSafariとホーム画面アプリで保存領域が
+      //    別なので、「ホーム画面に追加」した瞬間のURLに合言葉が入っていることが唯一の引き継ぎ手段
       function readKey() {
         try { return localStorage.getItem(READ_KEY_STORAGE) || '' } catch { return '' }
       }
+      function writeKey(k) {
+        try { localStorage.setItem(READ_KEY_STORAGE, k) } catch { /* プライベートモード等 */ }
+      }
+      function embedKeyInUrl(k) {
+        try {
+          var u = new URL(location.href)
+          if (u.searchParams.get('key') !== k) {
+            u.searchParams.set('key', k)
+            history.replaceState(null, '', u)
+          }
+        } catch { /* 埋め戻し失敗は致命的でない */ }
+      }
       try {
         var urlKey = new URLSearchParams(location.search).get('key')
-        if (urlKey && urlKey.trim()) localStorage.setItem(READ_KEY_STORAGE, urlKey.trim())
-      } catch { /* プライベートモード等でlocalStorage不可でも他機能は動かす */ }
+        if (urlKey && urlKey.trim()) writeKey(urlKey.trim())
+      } catch { /* localStorage不可でも他機能は動かす */ }
+
+      // 合言葉カード
+      var keyDesc = document.getElementById('key-desc')
+      var keyRow = document.getElementById('key-row')
+      var keyInput = document.getElementById('key-input')
+      var keyBtn = document.getElementById('key-btn')
+      var keyStatus = document.getElementById('key-status')
+      function sayKey(text) { keyStatus.hidden = !text; keyStatus.textContent = text }
+      function refreshKeyCard() {
+        var k = readKey()
+        if (k) {
+          keyDesc.textContent = '合言葉は設定済みです。このままSafariの共有メニューから「ホーム画面に追加」すると、以後は入力なしで開けます。'
+          keyRow.hidden = true
+          embedKeyInUrl(k)
+        } else {
+          keyDesc.textContent = '閲覧用の合言葉をここで一度だけ保存してください。保存するとこのページのURLにも埋め込まれ、そのまま「ホーム画面に追加」すれば以後の入力は不要になります。'
+          keyRow.hidden = false
+        }
+      }
+      refreshKeyCard()
+      keyBtn.addEventListener('click', function () {
+        var k = (keyInput.value || '').trim()
+        if (!k) { sayKey('合言葉を入力してください。'); return }
+        keyBtn.disabled = true
+        sayKey('確認中…')
+        fetch('/api/data?key=' + encodeURIComponent(k), { cache: 'no-store' }).then(function (res) {
+          if (res.body && res.body.cancel) res.body.cancel() // 中身は不要(合否だけ見る)
+          if (res.status === 401) { sayKey('合言葉が違います。'); return }
+          if (!res.ok) { sayKey('確認に失敗しました(' + res.status + ')。通信環境を確認してください。'); return }
+          writeKey(k)
+          keyInput.value = ''
+          sayKey('保存しました。')
+          refreshKeyCard()
+        }).catch(function () {
+          sayKey('確認に失敗しました。通信環境を確認してください。')
+        }).finally(function () { keyBtn.disabled = false })
+      })
 
       // 2) Service Worker(インストール可能要件+Push受信)
       if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js')
