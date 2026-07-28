@@ -1,0 +1,17 @@
+# ローカルからの vercel deploy で個人データを絶対に上げない(2026-07-28 誤デプロイ未遂を受けて追加)
+# 通常のデプロイはGit連携(=git追跡ファイルのみ)だが、CLI直デプロイは.gitignoreを見ないため明示する
+data/
+logs/
+tmp/
+credentials/
+*.local.md
+mirror-out.json
+sheet-import-*.json
+gmail-import-*.json
+service-account.json
+.env
+.env.*
+node_modules/
+.codex/
+*.wav
+*.mp4
