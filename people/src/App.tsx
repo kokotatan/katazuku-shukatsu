@@ -34,7 +34,7 @@ export default function App() {
                     </div>
                     <dl className="mt-4 grid gap-2 border-t border-slate-200 pt-4 text-sm">
                       <div><dt className="inline text-slate-500">出会い: </dt><dd className="inline">{person.howMet || '未設定'}</dd></div>
-                      <div><dt className="inline text-slate-500">日付: </dt><dd className="inline">{person.metAt ? formatDate(person.metAt, false) : '未設定'}</dd></div>
+                      <div><dt className="inline text-slate-500">会った日: </dt><dd className="inline">{person.metAt ? formatDate(person.metAt, false) : '未設定'}</dd></div>
                       <div><dt className="inline text-slate-500">フォロー: </dt><dd className="inline">{person.followUp || '未設定'}</dd></div>
                     </dl>
                     {personNotes.length > 0 && <div className="mt-4 space-y-2 rounded-lg bg-slate-50 p-3">{personNotes.slice(0, 3).map((note) => <p key={note.id} className="text-sm leading-6">{note.note}</p>)}</div>}

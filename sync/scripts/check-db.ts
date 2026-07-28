@@ -261,6 +261,14 @@ check('calendar: external_id/end_at/source_hashを保持', ['external_id', 'end_
 const personId1 = upsertPerson(db, { name: '面接 テスト', company: '予定テスト社', role: '採用担当' })
 const personId2 = upsertPerson(db, { name: '面接 テスト', company: '予定テスト社', role: '別表記' })
 check('people: 同じ氏名×会社は重複しない', personId1 === personId2)
+const personId3 = upsertPerson(db, { name: '面接テストさん', company: '株式会社予定テスト社' })
+check('people: 敬称・空白・社名表記の違いでも同一人物に名寄せする', personId3 === personId1)
+const personId4 = upsertPerson(db, { name: '面接 テスト太郎', company: '予定テスト社' })
+check('people: 姓だけ登録済みでもフルネームを同一人物に名寄せし名前を昇格する',
+  personId4 === personId1
+  && (db.prepare('SELECT name FROM person WHERE id = ?').get(personId1) as { name: string }).name === '面接 テスト太郎')
+const personId5 = upsertPerson(db, { name: '別人 サンプル', company: '予定テスト社' })
+check('people: 別名の人物は新規作成する', personId5 !== personId1)
 db.prepare("INSERT INTO person_note (person_id, at, note, source_ref, confidence) VALUES (?, '2026-07-18', '顧客志向を重視', 'test-run', 0.9)")
   .run(personId1)
 db.prepare("INSERT INTO person_photo (person_id, storage_key, sha256, verified_at) VALUES (?, 'people/test.jpg', 'abc', '2026-07-18')")
