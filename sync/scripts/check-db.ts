@@ -3,8 +3,12 @@
  * インメモリSQLiteで実行。実行: cd sync && npx tsx scripts/check-db.ts
  */
 import { DatabaseSync } from 'node:sqlite'
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { openDb, upsertCompany, insertSelection, listSelections, listCompanies, listEvents, listAppointments, addAppointment, outcomeOf, transition, sameCompany, samePosition, resolveCompany, addAlias, listPending, setOfficialName, normalizeAppointmentAt, sameAppointment, SCHEMA_VERSION } from '../src/db'
 import { applyDiff } from './db-apply'
+import { savePersonPhoto } from './db-apply-interview'
 import { applyCalendar } from './db-apply-calendar'
 import { findDuplicates } from './check-duplicate-appointments'
 import { renderMirror, PASSWORD_MASK } from './db-mirror'
@@ -273,6 +277,22 @@ db.prepare("INSERT INTO person_note (person_id, at, note, source_ref, confidence
   .run(personId1)
 db.prepare("INSERT INTO person_photo (person_id, storage_key, sha256, verified_at) VALUES (?, 'people/test.jpg', 'abc', '2026-07-18')")
   .run(personId1)
+
+// --- 面談スクショからの顔写真登録(db-apply-interview.savePersonPhoto) ---
+const photoRoot = mkdtempSync(join(tmpdir(), 'katazuku-photo-'))
+const facePng = join(photoRoot, 'face-1.png')
+writeFileSync(facePng, Buffer.from([0x89, 0x50, 0x4e, 0x47]))
+const photoPersonId = upsertPerson(db, { name: '写真 テスト', company: '予定テスト社' })
+const savedKey = savePersonPhoto(db, photoPersonId, facePng, photoRoot)
+check('photo: storage_keyだけをDBへ記録し実体はphotos配下へ複製する',
+  savedKey === `people/person-${photoPersonId}.png`
+  && existsSync(join(photoRoot, savedKey))
+  && !!db.prepare('SELECT 1 FROM person_photo WHERE person_id = ? AND storage_key = ?').get(photoPersonId, savedKey))
+check('photo: 既に写真がある人物は上書きしない', savePersonPhoto(db, photoPersonId, facePng, photoRoot) === '')
+let photoExtError = ''
+try { savePersonPhoto(db, photoPersonId, join(photoRoot, 'x.gif'), photoRoot) } catch (e) { photoExtError = (e as Error).message }
+check('photo: 未対応の画像形式は拒否する', photoExtError.includes('未対応'))
+rmSync(photoRoot, { recursive: true, force: true })
 
 transaction(db, () => {
   db.prepare("INSERT INTO profile_basic (id, data_json, updated_at, updated_by) VALUES (1, ?, '2026-07-18', 'test')")

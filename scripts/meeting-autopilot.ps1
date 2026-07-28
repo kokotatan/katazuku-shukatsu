@@ -76,6 +76,21 @@ foreach ($a in $agenda) {
       '-AppointmentId', ([int]$a.id))
     Move-Run ([int]$a.id) 'recording'
     Log ("録音を開始した: {0} (予定ID {1})" -f $title, $a.id)
+    # 面談スクショ(面接官の顔写真取得の元データ。tasks/people-ui-and-face-capture.md §2)。
+    # 録音ファイル(record-audio.ps1: タイトル+開始時刻)と同じスラッグの -shots フォルダへ、
+    # 録音開始の約3分後と約10分後に全画面を1枚ずつ撮る。別プロセスで動かし、撮影の失敗が
+    # 会議進行・録音を絶対に妨げないようにする(起動失敗もログだけ残して続行)。
+    try {
+      $slug = (($title -replace '[\\/:*?"<>|]', '_') + '-' + $now.ToString('yyyy-MM-dd_HHmm'))
+      $shotsDir = Join-Path $repo ("logs\interviews\{0}-shots" -f $slug)
+      Start-Process powershell.exe -WindowStyle Hidden -ArgumentList @(
+        '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ('"{0}"' -f (Join-Path $PSScriptRoot 'capture-meeting-shots.ps1')),
+        '-OutDir', ('"{0}"' -f $shotsDir),
+        '-EndTime', ('"{0}"' -f $end.ToString('yyyy-MM-dd HH:mm:ss')))
+      Log ("スクショ撮影を予約した: {0}" -f $shotsDir)
+    } catch {
+      Log ("スクショ撮影の起動に失敗(会議進行は継続): {0}" -f $_.Exception.Message)
+    }
     $recordArgs = @{
       By = 'meeting-autopilot'
       Action = ("会議の録音を自動開始: {0}" -f $title)

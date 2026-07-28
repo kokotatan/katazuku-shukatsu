@@ -122,6 +122,10 @@ if ($ok) {
     }
     npx tsx scripts/db-apply-interview.ts $dbJson 2>&1 | Out-File -FilePath $logFile -Append -Encoding utf8
     if ($LASTEXITCODE -ne 0) { throw '面接JSONをDBへ反映できませんでした' }
+    # 面談スクショから顔写真が登録された場合(people[].photoPath)に備え、Private Blobへ同期する。
+    # secret が無ければ photo-sync 側がスキップする。失敗しても議事録反映は成功扱い(後で再実行できる)。
+    npx tsx scripts/photo-sync.ts 2>&1 | Out-File -FilePath $logFile -Append -Encoding utf8
+    if ($LASTEXITCODE -ne 0) { Write-Warning '写真のBlob同期に失敗した(議事録反映は成功。cd sync; npx tsx scripts/photo-sync.ts で再実行できる)' }
     npx tsx scripts/db-snapshot.ts 2>&1 | Out-File -FilePath $logFile -Append -Encoding utf8
   } finally { Pop-Location }
   "interview-digest OK. notes appended to chrome-prompts/interview-notes.local.md (log: logs/$(Split-Path $logFile -Leaf))"

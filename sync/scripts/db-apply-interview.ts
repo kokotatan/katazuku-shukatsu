@@ -1,10 +1,13 @@
 /**
- * 面接議事録の厳格JSONを、面接・人物・人物メモ・プロフィール候補へ1トランザクションで反映する。
+ * 面接議事録の厳格JSONを、面接・人物・人物メモ・顔写真・プロフィール候補へ1トランザクションで反映する。
  * runId/sourceRef を一意キーにし、再実行しても重複しない。
+ * 顔写真(people[].photoPath)は data/private/photos へ複製し、DBには storage_key と sha256 だけを持つ。
  */
-import { readFileSync } from 'node:fs'
-import { dirname, join, resolve } from 'node:path'
+import { createHash } from 'node:crypto'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { dirname, extname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import type { DatabaseSync } from 'node:sqlite'
 import { addEvent, openDb } from '../src/db'
 import { resolveSelectionId, transaction, upsertPerson } from '../src/inputs'
 
@@ -15,6 +18,8 @@ interface InterviewPerson {
   category?: string
   notes?: string[]
   confidence?: number
+  /** 面談スクショから切り出した顔写真の絶対パス(interview-digest-prompt.md 手順7。本人には付けない) */
+  photoPath?: string
 }
 
 interface ProfileSuggestion {
@@ -38,8 +43,32 @@ interface InterviewInput {
   followUps?: string[]
 }
 
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 const dbArgIndex = process.argv.indexOf('--db')
-const DB_PATH = dbArgIndex >= 0 ? resolve(process.argv[dbArgIndex + 1]) : (process.env.KATAZUKU_DB_PATH || join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'data', 'katazuku.db'))
+const DB_PATH = dbArgIndex >= 0 ? resolve(process.argv[dbArgIndex + 1]) : (process.env.KATAZUKU_DB_PATH || join(ROOT, 'data', 'katazuku.db'))
+const PHOTO_ROOT = join(ROOT, 'data', 'private', 'photos')
+
+/**
+ * 顔写真を data/private/photos へ複製し、DBには person_photo.storage_key と sha256 だけを記録する
+ * (写真本体をDB/snapshot/gitへ入れない規約。db-import-private.ts と同じ方式)。
+ * 既に写真がある人物は上書きせず ''(未登録)を返す。公開情報から手動取得した写真を
+ * 面談スクショの切り出しで潰さないため。Blobへの反映は photo-sync.ts が別途行う。
+ */
+export function savePersonPhoto(db: DatabaseSync, personId: number, imagePath: string, photoRoot = PHOTO_ROOT): string {
+  const extension = extname(imagePath).toLowerCase()
+  if (!['.png', '.jpg', '.jpeg', '.webp'].includes(extension)) throw new Error(`未対応の画像形式です: ${imagePath}`)
+  if (db.prepare('SELECT 1 FROM person_photo WHERE person_id = ?').get(personId)) return ''
+  const buffer = readFileSync(imagePath)
+  const storageKey = `people/person-${personId}${extension === '.jpeg' ? '.jpg' : extension}`
+  const target = join(photoRoot, storageKey)
+  mkdirSync(dirname(target), { recursive: true })
+  writeFileSync(target, buffer)
+  db.prepare(`
+    INSERT INTO person_photo (person_id, storage_key, sha256, verified_at)
+    VALUES (?, ?, ?, ?)
+  `).run(personId, storageKey, createHash('sha256').update(buffer).digest('hex'), new Date().toISOString())
+  return storageKey
+}
 
 function validate(input: unknown): asserts input is InterviewInput {
   if (!input || typeof input !== 'object') throw new Error('入力はオブジェクトです')
@@ -52,12 +81,13 @@ function validate(input: unknown): asserts input is InterviewInput {
   if (value.profileSuggestions && !Array.isArray(value.profileSuggestions)) throw new Error('profileSuggestions は配列です')
 }
 
-export function applyInterview(input: InterviewInput): { created: boolean; interviewId: number } {
+export function applyInterview(input: InterviewInput): { created: boolean; interviewId: number; photos: number } {
   const db = openDb(DB_PATH)
   return transaction(db, () => {
+    let photos = 0
     const duplicate = db.prepare('SELECT id FROM interview_note WHERE source_ref = ?')
       .get(input.runId) as { id: number } | undefined
-    if (duplicate) return { created: false, interviewId: duplicate.id }
+    if (duplicate) return { created: false, interviewId: duplicate.id, photos }
 
     let selectionId: number
     let companyId: number
@@ -112,6 +142,16 @@ export function applyInterview(input: InterviewInput): { created: boolean; inter
           VALUES (?, ?, ?, ?, ?)
         `).run(personId, input.occurredAt, note, input.runId, person.confidence ?? 0.8)
       }
+      // 面談スクショからの顔写真(あれば)。写真の失敗で議事録反映を止めない。
+      if (person.photoPath) {
+        try {
+          const imagePath = resolve(person.photoPath)
+          if (!existsSync(imagePath)) throw new Error('画像ファイルが見つかりません')
+          if (savePersonPhoto(db, personId, imagePath)) photos += 1
+        } catch (error) {
+          console.warn(`顔写真の登録に失敗(議事録反映は続行): ${person.name}: ${error instanceof Error ? error.message : error}`)
+        }
+      }
     }
 
     for (const suggestion of input.profileSuggestions || []) {
@@ -134,7 +174,7 @@ export function applyInterview(input: InterviewInput): { created: boolean; inter
           digest_applied_at = ?, last_error = '', updated_at = ? WHERE appointment_id = ?
       `).run(input.occurredAt, new Date().toISOString(), new Date().toISOString(), input.appointmentId)
     }
-    return { created: true, interviewId }
+    return { created: true, interviewId, photos }
   })
 }
 

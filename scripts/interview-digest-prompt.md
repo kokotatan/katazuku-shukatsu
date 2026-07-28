@@ -30,18 +30,31 @@
    4. 懸念・違和感フラグ(相手の反応や自分の発言で引っかかった点)
    5. self-wiki / submit.local.md への更新提案(新しく言語化できた強み・エピソード等。反映は本人判断)
 6. **追記**: 作った節を `chrome-prompts/interview-notes.local.md` の「## 自己分析素材」の直前に Edit で挿入する。既存の内容は絶対に壊さない(挿入のみ)。
-7. **DB反映JSONの作成**: 末尾の `DB_JSON` へ、次のキーだけを持つ厳格JSONを Write で新規作成する。Markdownやコメントを混ぜない。
+7. **面接官の顔写真の切り出し(スクショがあるときだけ)**: `SOURCE_FILE` の拡張子を除いたファイル名を `<スラッグ>` として、`logs/interviews/<スラッグ>-shots/` に `shot-*.png`(meeting-autopilot が面談中に撮ったプライマリ画面のスクリーンショット)があるか確認する。無ければこの手順は丸ごと飛ばす。あれば:
+   - 各 png を Read で見て、面接官の顔が明瞭に写るフレームを選ぶ(ぼけ・小さすぎ・資料で隠れているものは避ける)。
+   - 顔部分の矩形(顔の周囲に2〜3割の余白)を見積もり、ffmpeg で切り出す:
+     `ffmpeg -y -i <shotのpng> -vf "crop=w:h:x:y" <同じ-shotsフォルダ>/face-<連番>.png`
+     切り出した png は必ず同じ `-shots` フォルダ内に置く(logs/ の外・git管理下・data/ 配下へは置かない)。
+   - 切り出した顔が手順8の `people` のどの人物かを対応づけ、該当人物の要素に `photoPath`(切り出した png の絶対パス)を入れる。登録の実体は後段(interview-digest.ps1 → db-apply-interview.ts → photo-sync.ts)が既存の写真パイプライン(data/private/photos への複製 + person_photo.storage_key + bearer認証付き /api/photo-push)で行う。写真の実体は DB・snapshot・git へは入らない。
+   - **本人(奥山彪太郎)の顔・自分のカメラ映像(セルフビュー)は絶対に登録しない**(`photoPath` を付けない)。画面共有の資料に写り込んだ顔写真も対象外。
+   - どの人物の顔か特定できないとき(複数人で判別不能・名乗りと顔が対応づかない等)は `photoPath` を付けず登録は保留し、手順9のサマリで「顔写真は保留(理由)」と報告する。
+   - 既に写真が登録済みの人物には後段が自動で登録をスキップする(上書きしない)ので、明瞭に撮れていれば付けてよい。
+8. **DB反映JSONの作成**: 末尾の `DB_JSON` へ、次のキーだけを持つ厳格JSONを Write で新規作成する。Markdownやコメントを混ぜない。
    - `runId`: `APPOINTMENT_ID` が1以上なら `meeting-<予定ID>`。0なら元ファイル名と日付から再実行しても同じになるID
    - `appointmentId`: `APPOINTMENT_ID` が1以上のときだけ数値で入れる
    - `company`, `position`(分かる場合), `occurredAt`(ISO 8601), `title`, `summary`, `transcriptPath`
    - `questions`: `[{question, answer?, feedback?}]`
-   - `people`: `[{name, company?, role?, category?, notes: string[], confidence: 0..1}]`
+   - `people`: `[{name, company?, role?, category?, notes: string[], confidence: 0..1, photoPath?}]`。`photoPath` は手順7で切り出した顔写真の絶対パス(該当者だけに付ける。本人には絶対に付けない)
+   - **氏名の表記確認(2026-07-28本人指示)**: 新しく登場した人物の氏名は、可能ならWeb検索(「会社名 氏名 採用」等)で
+     漢字表記を確認する。文字起こしは同音異字を間違えやすい(実例: 彩子/綾子)。検索で確証が得られないときは
+     聞こえたままの表記を使い、`notes` に「氏名の漢字は要確認」と1行残す。名の分からない人は「姓のみ」でよい
+     (後からフルネームが判明すれば自動で名寄せ・昇格される)
    - `profileSuggestions`: `[{field, value, confidence: 0..1}]`。fieldは strengths / weaknesses / careerAxis / desiredRole / desiredIndustry のいずれか。確定個人情報は入れない
    - `followUps`: 文字列配列
    発言から確認できない値は作らず、省略または空配列にする。人物メモは追記専用、プロフィールは候補追加であり、確定情報を上書きしない。
 
-8. **サマリ出力**: 企業名・日付・保存先・示唆の要点(特にフォローアップで急ぐもの)を簡潔に出力し、最終行に単独で `=== interview-digest 完了 ===` と出力する。
+9. **サマリ出力**: 企業名・日付・保存先・示唆の要点(特にフォローアップで急ぐもの)・顔写真の扱い(登録候補にした人物/保留とその理由。スクショが無ければ省略)を簡潔に出力し、最終行に単独で `=== interview-digest 完了 ===` と出力する。
 
 注意:
-- 全処理はローカル(voicebox)とローカルファイルのみ。外部送信はしない。
+- 全処理はローカル(voicebox)とローカルファイルのみ。外部送信はしない(顔写真のBlob同期は後段の interview-digest.ps1 が行う。このプロンプト内では行わない)。
 - 面談内容は機密。文字起こし・ノートは gitignore 済みの場所にのみ書く(logs/ と *.local.md)。
