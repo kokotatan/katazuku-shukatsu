@@ -66,7 +66,10 @@ foreach ($a in $agenda) {
     $run = Get-RunState ([int]$a.id)
   }
 
-  if ($run.state -eq 'opened' -and $now -ge $start.AddMinutes(5) -and $now -lt $end) {
+  # 録音は開始5分前から待機する(本人指示 2026-07-29: 冒頭から録る)。タスクは5分毎なので、
+  # 開始「5分後」条件だと最悪で冒頭9分が欠けていた。5分前解禁なら、どの巡回タイミングでも
+  # 会議開始時刻までに録音が立ち上がる(録音前の無音は文字起こしで[無音]になるだけで害がない)。
+  if ($run.state -eq 'opened' -and $now -ge $start.AddMinutes(-5) -and $now -lt $end) {
     $title = ("{0}-{1}" -f $a.company, $a.title)
     Start-Process powershell.exe -WindowStyle Hidden -ArgumentList @(
       '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ('"{0}"' -f (Join-Path $PSScriptRoot 'record-audio.ps1')),
@@ -95,7 +98,7 @@ foreach ($a in $agenda) {
       By = 'meeting-autopilot'
       Action = ("会議の録音を自動開始: {0}" -f $title)
       Why = '議事録・面接改善・人物記録の元データを漏らさないため'
-      How = '開始5分後に録音し、予定IDを付けて厳格JSON反映へ連鎖'
+      How = '開始5分前から録音し、予定IDを付けて厳格JSON反映へ連鎖'
       Link = 'logs/meeting-record.log'
       Result = '録音中'
     }
