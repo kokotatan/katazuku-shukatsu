@@ -35,6 +35,14 @@ $intDir = Join-Path $logDir 'interviews'
 foreach ($d in @($logDir, $intDir)) { if (-not (Test-Path $d)) { New-Item -ItemType Directory $d | Out-Null } }
 $logFile = Join-Path $logDir ("interview-digest-{0}.log" -f (Get-Date -Format 'yyyy-MM-dd_HHmm'))
 
+# 想定外の致命的エラーで痕跡ゼロのまま死なない(隠しウィンドウ起動のため標準エラーは失われる)。
+# 実害 2026-07-29: EAP=Stop下で npx の stderr 1行が NativeCommandError になり、文字起こし直後に無言死した。
+trap {
+  ('[FATAL] {0} {1}' -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $_) | Out-File -FilePath $logFile -Append -Encoding utf8
+  if ($_.ScriptStackTrace) { $_.ScriptStackTrace | Out-File -FilePath $logFile -Append -Encoding utf8 }
+  exit 1
+}
+
 # Locate ffmpeg (PATH may not be refreshed yet after a winget install, so also check the WinGet Links shim).
 # Needed both to extract audio from video and to split audio into Whisper-sized chunks.
 $ffmpeg = (Get-Command ffmpeg -ErrorAction SilentlyContinue).Source
@@ -96,11 +104,15 @@ if (-not (Test-Path $rawTxt)) {
   $env:KATAZUKU_VOICEBOX_MCP_URL = 'http://127.0.0.1:17493/mcp'
   try {
     Push-Location (Join-Path $repo 'sync')
+    # EAP=Stopのままnativeコマンドを2>&1でパイプすると、stderrに1行出ただけ(npmの更新通知等)で
+    # NativeCommandErrorとして即死する。native実行中だけContinueへ落とし、成否は終了コードと成果物で判定する。
+    $ErrorActionPreference = 'Continue'
     npx tsx scripts/voicebox-transcribe.ts $chunkDir $rawTxt 2>&1 | Out-File -FilePath $logFile -Append -Encoding utf8
+    $ErrorActionPreference = 'Stop'
     if ($LASTEXITCODE -ne 0 -or -not (Test-Path $rawTxt)) {
       Write-Error "voicebox文字起こしに失敗した。ログ: $logFile"; exit 1
     }
-  } finally { Pop-Location; $env:KATAZUKU_VOICEBOX_MCP_URL = $prevUrl }
+  } finally { Pop-Location; $env:KATAZUKU_VOICEBOX_MCP_URL = $prevUrl; $ErrorActionPreference = 'Stop' }
 }
 "transcribed -> $rawTxt"
 
@@ -135,6 +147,8 @@ if ($ok) {
   }
   try {
     Push-Location (Join-Path $repo 'sync')
+    # 上の文字起こしと同じ理由: native 2>&1 パイプの間はEAPをContinueにする(失敗判定は$LASTEXITCODE)
+    $ErrorActionPreference = 'Continue'
     if ($AppointmentId -gt 0) {
       npx tsx scripts/db-meeting-run.ts transition $AppointmentId digesting 2>&1 | Out-File -FilePath $logFile -Append -Encoding utf8
       if ($LASTEXITCODE -ne 0) { throw 'meeting_runをdigestingへ進められませんでした' }
@@ -146,7 +160,7 @@ if ($ok) {
     npx tsx scripts/photo-sync.ts 2>&1 | Out-File -FilePath $logFile -Append -Encoding utf8
     if ($LASTEXITCODE -ne 0) { Write-Warning '写真のBlob同期に失敗した(議事録反映は成功。cd sync; npx tsx scripts/photo-sync.ts で再実行できる)' }
     npx tsx scripts/db-snapshot.ts 2>&1 | Out-File -FilePath $logFile -Append -Encoding utf8
-  } finally { Pop-Location }
+  } finally { Pop-Location; $ErrorActionPreference = 'Stop' }
   "interview-digest OK. notes appended to chrome-prompts/interview-notes.local.md (log: logs/$(Split-Path $logFile -Leaf))"
 
   # 活動ログに「何を/何のために/どうしたか」を1行残す(本人が後から確認できる状態のため)
