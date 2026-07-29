@@ -66,6 +66,22 @@ if (-not (Test-Path $activityLog)) {
   }
 }
 
+# ---- 1.5 定常タスク自体の健康(2026-07-29: autopilotが72h設定+ハングで22時間無音停止した反省) ----
+# LastTaskResult 0x41301(267009)=実行中、0x41303(267011)=未実行 は正常扱い
+foreach ($tn in @('katazuku-daily-sync', 'katazuku-mail-watch', 'katazuku-asa', 'katazuku-calendar-sync', 'katazuku-meeting-autopilot', 'katazuku-evening-brief')) {
+  try {
+    $task = Get-ScheduledTask -TaskName $tn -ErrorAction Stop
+    $info = Get-ScheduledTaskInfo -TaskName $tn -ErrorAction Stop
+    if ($task.State -eq 'Running' -and $info.LastRunTime -lt $now.AddHours(-2)) {
+      $problems += ('{0}: {1}から実行しっぱなし(ハングの疑い)' -f $tn, $info.LastRunTime.ToString('MM/dd HH:mm'))
+    } elseif ($info.LastTaskResult -ne 0 -and $info.LastTaskResult -ne 267009 -and $info.LastTaskResult -ne 267011) {
+      $problems += ('{0}: 最終実行がエラー(0x{1:X})' -f $tn, $info.LastTaskResult)
+    }
+  } catch {
+    $notes += ('{0}: タスク未登録または取得失敗' -f $tn)
+  }
+}
+
 # ---- 2. プロバイダ健康状態(Claude/Codex両方停止だけが異常。片方停止は正常な引継ぎ中) ----
 if (Test-Path $healthFile) {
   try {
