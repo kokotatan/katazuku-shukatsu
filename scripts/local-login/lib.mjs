@@ -156,6 +156,31 @@ function credentialCandidates(summary) {
   return { usernames, passwords, submits }
 }
 
+/**
+ * SSOポータル(Googleログイン等)のセッション状態を現在URLだけで判定する。
+ * 自前のパスワード欄が存在しないため、フォームの有無では既ログインを判定できない。
+ * セッションが生きていればログインページはアプリ本体へ抜ける、という挙動だけを根拠にする。
+ * - active: ログインページから離れた(セッション有効)
+ * - needs_login: ログインページに留まっている(本人の再ログインが必要)
+ * - offsite: 別originへ出た(IdPへ飛ばされた等。入力はせず停止する)
+ */
+export function classifySsoSessionState(currentUrl, loginUrl) {
+  let current
+  let login
+  try {
+    current = new URL(currentUrl)
+    login = new URL(loginUrl)
+  } catch {
+    return 'offsite'
+  }
+  if (current.origin !== login.origin) return 'offsite'
+  const stripTrailingSlash = (path) => path.replace(/\/+$/, '')
+  const loginPath = stripTrailingSlash(login.pathname)
+  const currentPath = stripTrailingSlash(current.pathname)
+  if (currentPath === loginPath || currentPath.startsWith(`${loginPath}/`)) return 'needs_login'
+  return 'active'
+}
+
 export function analyzeDeterministically(summary, portalId) {
   if (summary.blockers.length) return { action: 'stop', portal_id: portalId, reason: summary.blockers.join(',') }
   const { usernames, passwords, submits } = credentialCandidates(summary)

@@ -6,10 +6,14 @@
 
 対象ポータル(`portals.json`):
 
-| portal_id | ポータル | ログインURL | allowed_origin |
+| portal_id | ポータル | ログインURL | 認証方式 |
 | --- | --- | --- | --- |
-| `labbase` | LabBase(理系スカウト就活) | https://compass.labbase.jp/login | `https://compass.labbase.jp` |
-| `gaishishukatsu` | 外資就活ドットコム | https://gaishishukatsu.com/login | `https://gaishishukatsu.com` |
+| `labbase` | LabBase(理系スカウト就活) | https://compass.labbase.jp/login | `authMode: sso`(Googleアカウント) |
+| `gaishishukatsu` | 外資就活ドットコム | https://gaishishukatsu.com/login | ID+パスワード(資格情報レコード) |
+
+**認証方式で手順が分かれる。** LabBaseは本人がGoogleアカウントでログインしており自前のパスワードが
+存在しない。よって資格情報レコードは作らず(ブローカーも通さず)、隔離プロファイルに残ったセッションを
+毎日温めるだけにする。セッションが切れた日は入力を試みず `stopped` で知らせ、本人が再ログインする。
 
 ## 前提
 
@@ -19,25 +23,33 @@
 
 ## 有効化手順
 
-### 1. 資格情報を登録する(本人が手動で1回だけ)
+### 1a. SSOポータル(LabBase): 本人が1回だけサインインする
+
+資格情報の登録は不要。専用プロファイルの素のChromeを開き、本人がGoogleアカウント
+(`okuyama.kotaro.career@gmail.com`)でサインインする。ウィンドウを閉じればセッションは
+プロファイルに残り、以後は毎日温めるだけになる。
+
+```powershell
+node scripts\local-login\daily-login.mjs --portal labbase --manual
+```
+
+`--manual` は remote-debugging を付けずに起動する。IdP(Google)は自動化フラグの付いた
+ブラウザからのサインインを拒むことがあるため、この入口だけは素のブラウザとして開く。
+
+### 1b. ID+パスワードのポータル(外資就活): 資格情報を登録する(本人が手動で1回だけ)
 
 パスワードは SecureString で本人が入力する。エージェントは値に一切触れない。
 
 ```powershell
-# LabBase
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\local-login\store-credential.ps1 `
-  -PortalId labbase -AllowedOrigin https://compass.labbase.jp -OutputPath credential-store\labbase.json
-
-# 外資就活ドットコム
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\local-login\store-credential.ps1 `
   -PortalId gaishishukatsu -AllowedOrigin https://gaishishukatsu.com -OutputPath credential-store\gaishishukatsu.json
 ```
 
-アカウントはいずれも `okuyama.kotaro.career@gmail.com`。`credential-store\` はDPAPI暗号化済みでも機密扱いでgitignore。
+アカウントは `okuyama.kotaro.career@gmail.com`。`credential-store\` はDPAPI暗号化済みでも機密扱いでgitignore。
 
-### 2. 初回だけ画面ありでログインする(MFA/CAPTCHAを通す)
+### 2. 初回だけ画面ありで動作確認する(MFA/CAPTCHAを通す)
 
-隔離プロファイルにセッションを作る。初回はMFAやCAPTCHAが出やすいので画面ありで実行し、必要なら本人が対応する。
+隔離プロファイルにセッションができたかを画面ありで確かめる。必要なら本人がその場で対応する。
 
 ```powershell
 node scripts\local-login\daily-login.mjs --portal labbase --headful
@@ -61,9 +73,12 @@ PCが寝ていれば次に使える時点で実行(StartWhenAvailable)。解除�
 ## 毎日の挙動
 
 1. ポータルごとに専用プロファイルの Chrome を loopback限定の remote-debugging で起動しログインURLを開く。
-2. 既にログイン済み(フォーム無し)なら `no_login_form` として完了。セッションを温めるだけで終わる。
-3. フォームがあればブローカーが origin と欄type を再検証し、DPAPI復号→入力→送信を自プロセスで完結。
-4. MFA/CAPTCHA/origin不一致/欄が一意でない等は入力せず停止し、理由を記録する。
+2. `authMode: sso` のポータルはここで分岐する。ログインページから抜けていればセッション有効として
+   `no_login_form`(reason `sso_session_active`)で完了。留まっていれば入力を試みず
+   `stopped`(reason `sso_session_expired_manual_login_required`)で止め、本人の再サインインを促す。
+3. それ以外は、既にログイン済み(フォーム無し)なら `no_login_form` として完了。
+4. フォームがあればブローカーが origin と欄type を再検証し、DPAPI復号→入力→送信を自プロセスで完結。
+5. MFA/CAPTCHA/origin不一致/欄が一意でない等は入力せず停止し、理由を記録する。
 
 ## ログ
 
@@ -75,9 +90,10 @@ status の意味:
 | status | 意味 |
 | --- | --- |
 | `submitted` | ログインフォームに入力し送信した |
-| `no_login_form` | フォームが無い(概ねログイン済み。セッション有効) |
-| `stopped` | 入力せず停止(reason: `mfa` / `captcha` / `credential_fields_not_unique` 等) |
-| `skipped` | 資格情報レコードが未登録(reason: `no_credential_record`) |
+| `no_login_form` | フォームが無い(概ねログイン済み。セッション有効)。SSOは reason `sso_session_active` |
+| `stopped` | 入力せず停止(reason: `mfa` / `captcha` / `credential_fields_not_unique` / `sso_session_expired_manual_login_required` / `sso_redirected_offsite`) |
+| `skipped` | 資格情報レコードが未登録(reason: `no_credential_record`)。SSOポータルでは出ない |
+| `manual_launched` | `--manual` で本人サインイン用のChromeを開いた |
 | `error` | 起動失敗・origin不一致等(reason参照) |
 
 ## 既知の残課題

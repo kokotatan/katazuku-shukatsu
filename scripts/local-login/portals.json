@@ -4,7 +4,8 @@
     "labbase": {
       "label": "LabBase(理系スカウト就活)",
       "loginUrl": "https://compass.labbase.jp/login",
-      "note": "compass.labbase.jp が学生向けアプリ(PWA)のログイン。labbase.jp はマーケ用サイトで別物。"
+      "authMode": "sso",
+      "note": "compass.labbase.jp が学生向けアプリ(PWA)のログイン。labbase.jp はマーケ用サイトで別物。本人はGoogleアカウント(career)でログインしており自前のパスワードが無いため authMode=sso。資格情報レコードは作らず、隔離プロファイルのセッションを温めるだけにする。"
     },
     "gaishishukatsu": {
       "label": "外資就活ドットコム",

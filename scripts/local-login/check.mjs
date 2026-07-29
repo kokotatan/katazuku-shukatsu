@@ -10,6 +10,7 @@ import { startFixtureServer } from './fixture-server.mjs'
 import {
   analyzeDeterministically,
   analyzeWithLocalModel,
+  classifySsoSessionState,
   navigateTarget,
   normalizeAllowedUrlPrefix,
   readPageSummary,
@@ -244,6 +245,17 @@ async function main() {
   checks += 1
   assert.throws(() => normalizeAllowedUrlPrefix('http://axol.jp/zw/s/ey_28/'), '許可URLプレフィックスはHTTPS必須')
   checks += 1
+
+  // SSOポータル(LabBase=Googleログイン)のセッション判定。パスワード欄が無いためURLだけで見る。
+  const labbaseLogin = 'https://compass.labbase.jp/login'
+  ok(classifySsoSessionState('https://compass.labbase.jp/home', labbaseLogin) === 'active', 'ログインページから抜けていればセッション有効')
+  ok(classifySsoSessionState('https://compass.labbase.jp/', labbaseLogin) === 'active', 'ルートへ戻された場合もセッション有効とみなす')
+  ok(classifySsoSessionState(labbaseLogin, labbaseLogin) === 'needs_login', 'ログインページに留まっていれば本人の再ログインが必要')
+  ok(classifySsoSessionState('https://compass.labbase.jp/login?next=%2Fhome', labbaseLogin) === 'needs_login', 'クエリ付きでもログインページはneeds_login')
+  ok(classifySsoSessionState('https://compass.labbase.jp/login/callback', labbaseLogin) === 'needs_login', 'ログインページ配下も認証未完了として扱う')
+  ok(classifySsoSessionState('https://accounts.google.com/signin', labbaseLogin) === 'offsite', 'IdPへ出たらoffsiteとして停止させる')
+  ok(classifySsoSessionState('not-a-url', labbaseLogin) === 'offsite', '解釈できないURLは安全側(offsite)に倒す')
+  checks += 7
 
   process.stdout.write(`ローカル資格情報ブローカー: ${checks}項目成功\n`)
 }

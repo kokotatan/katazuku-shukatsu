@@ -8,8 +8,10 @@
 // - MFA / CAPTCHA / origin不一致 / 欄が一意でない場合は入力せず停止する。
 // - ログに残すのは status / reason / portal_id / origin と時刻だけ。ID・パスワードは残さない。
 //
-// 使い方: node scripts/local-login/daily-login.mjs --portal <id> [--headful] [--timeout-ms N]
+// 使い方: node scripts/local-login/daily-login.mjs --portal <id> [--headful] [--manual] [--timeout-ms N]
 // 既定はheadless。初回はMFA等を本人が通すため --headful を推奨(READMEを参照)。
+// --manual は authMode=sso のポータル専用で、remote-debuggingを付けない素のChromeを開いて
+// 本人がIdP(Google等)でサインインするための入口(セッションは隔離プロファイルに残る)。
 
 import { spawn } from 'node:child_process'
 import { access, mkdir, readFile, appendFile, constants } from 'node:fs/promises'
@@ -19,6 +21,7 @@ import { fileURLToPath } from 'node:url'
 import {
   analyzeDeterministically,
   brokerFill,
+  classifySsoSessionState,
   normalizeAllowedOrigin,
   readPageSummary,
   validatePortalId
@@ -33,6 +36,7 @@ function parseArgs(argv) {
   for (let index = 0; index < argv.length; index += 1) {
     const key = argv[index]
     if (key === '--headful') { result.headful = true; continue }
+    if (key === '--manual') { result.manual = true; continue }
     if (!key.startsWith('--') || index + 1 >= argv.length) throw new Error(`引数が不正です: ${key}`)
     result[key.slice(2)] = argv[index + 1]
     index += 1
@@ -62,7 +66,12 @@ async function findChrome() {
 async function readDebugPort(userDataDir, chromeProcess) {
   const portFile = join(userDataDir, 'DevToolsActivePort')
   for (let attempt = 0; attempt < 120; attempt += 1) {
-    if (chromeProcess.exitCode != null) throw new Error(`Chromeが終了しました: ${chromeProcess.exitCode}`)
+    if (chromeProcess.exitCode != null) {
+      // 21 = ProcessSingleton。同じプロファイルを別のChrome(--manualで開いた窓の閉じ忘れ等)が掴んでいる。
+      // 理由が分からないと毎朝同じ失敗を繰り返すため、原因を名前で残す。
+      if (chromeProcess.exitCode === 21) throw new Error('profile_locked_by_another_chrome')
+      throw new Error(`Chromeが終了しました: ${chromeProcess.exitCode}`)
+    }
     try {
       const contents = await readFile(portFile, 'utf8')
       const port = Number(contents.split('\n')[0].trim())
@@ -93,6 +102,24 @@ async function waitForLoginState(debugPort, allowedOrigin, timeoutMs) {
   return { summary: lastSummary }
 }
 
+// SSOポータル用。パスワード欄が無いため、ログインページから抜けたかどうかでセッションの生死を見る。
+async function waitForSsoState(debugPort, allowedOrigin, loginUrl, timeoutMs) {
+  const deadline = Date.now() + timeoutMs
+  let last = null
+  while (Date.now() < deadline) {
+    try {
+      const { target, summary } = await readPageSummary(debugPort, allowedOrigin)
+      last = { url: target.url, blockers: summary.blockers }
+      if (summary.blockers.length) return last
+      if (classifySsoSessionState(target.url, loginUrl) === 'active') return last
+    } catch {
+      // originのタブがまだ無い/一意でない等。SPAの描画待ちのためリトライ。
+    }
+    await delay(500)
+  }
+  return last
+}
+
 async function writeLog(entry) {
   const logDir = join(repoRoot, 'logs')
   await mkdir(logDir, { recursive: true })
@@ -101,7 +128,66 @@ async function writeLog(entry) {
   await appendFile(join(logDir, `local-login-${day}.log`), line, 'utf8')
 }
 
-async function run(portalId, { headful, timeoutMs }) {
+// SSOポータルの毎日ログイン。パスワードを持たないのでブローカーは呼ばず、
+// 隔離プロファイルに残ったセッションが生きているかを確かめて温めるだけにする。
+async function runSso(portalId, portal, { headful, timeoutMs, manual }) {
+  const loginUrl = portal.loginUrl
+  const allowedOrigin = normalizeAllowedOrigin(new URL(loginUrl).origin)
+  const chrome = await findChrome()
+  const userDataDir = join(repoRoot, 'logs', 'local-login-profiles', portalId)
+  await mkdir(userDataDir, { recursive: true })
+
+  const baseArgs = [
+    `--user-data-dir=${userDataDir}`,
+    '--no-first-run',
+    '--no-default-browser-check',
+    '--no-service-autorun',
+    '--disable-features=Translate,MediaRouter',
+    '--disable-sync'
+  ]
+
+  // 初回の本人ログイン専用。IdP(Google等)は自動化フラグ付きのブラウザからのサインインを拒む
+  // ことがあるため、remote-debuggingを付けずに素のChromeとして開き、操作は本人に委ねる。
+  if (manual) {
+    const chromeProcess = spawn(chrome, [...baseArgs, loginUrl], { detached: true, stdio: 'ignore' })
+    chromeProcess.unref()
+    return { status: 'manual_launched', portalId, origin: allowedOrigin, reason: 'sign_in_then_close_window' }
+  }
+
+  const args = [...baseArgs, '--remote-debugging-port=0', '--remote-debugging-address=127.0.0.1']
+  if (!headful) args.push('--headless=new')
+  args.push(loginUrl)
+
+  const chromeProcess = spawn(chrome, args, { windowsHide: true, stdio: 'ignore' })
+  try {
+    const debugPort = await readDebugPort(userDataDir, chromeProcess)
+    const state = await waitForSsoState(debugPort, allowedOrigin, loginUrl, timeoutMs)
+    if (!state) return { status: 'error', portalId, origin: allowedOrigin, reason: 'login_page_not_reached' }
+    if (state.blockers.length) {
+      return { status: 'stopped', portalId, origin: allowedOrigin, reason: state.blockers.join(',') }
+    }
+    const classification = classifySsoSessionState(state.url, loginUrl)
+    if (classification === 'active') {
+      return { status: 'no_login_form', portalId, origin: allowedOrigin, reason: 'sso_session_active' }
+    }
+    // セッション切れ。SSOは本人がIdPで認証するしかないので、入力は試みず停止して知らせる。
+    return {
+      status: 'stopped',
+      portalId,
+      origin: allowedOrigin,
+      reason: classification === 'offsite' ? 'sso_redirected_offsite' : 'sso_session_expired_manual_login_required'
+    }
+  } finally {
+    chromeProcess.kill()
+  }
+}
+
+async function run(portalId, { headful, timeoutMs, manual }) {
+  const registry = JSON.parse(await readFile(join(scriptDir, 'portals.json'), 'utf8'))
+  const portalEntry = registry.portals?.[portalId]
+  if (!portalEntry) return { status: 'error', portalId, origin: null, reason: 'portal_not_in_registry' }
+  if (portalEntry.authMode === 'sso') return runSso(portalId, portalEntry, { headful, timeoutMs, manual })
+
   const credentialPath = join(repoRoot, 'credential-store', `${portalId}.json`)
   if (!(await exists(credentialPath))) {
     return { status: 'skipped', portalId, origin: null, reason: 'no_credential_record' }
@@ -110,10 +196,7 @@ async function run(portalId, { headful, timeoutMs }) {
   const record = JSON.parse((await readFile(credentialPath, 'utf8')).replace(/^\uFEFF/, ''))
   const allowedOrigin = normalizeAllowedOrigin(record.allowedOrigin, { allowLoopbackHttp: true })
 
-  const registry = JSON.parse(await readFile(join(scriptDir, 'portals.json'), 'utf8'))
-  const portal = registry.portals?.[portalId]
-  if (!portal) return { status: 'error', portalId, origin: allowedOrigin, reason: 'portal_not_in_registry' }
-  const loginUrl = portal.loginUrl
+  const loginUrl = portalEntry.loginUrl
   if (new URL(loginUrl).origin !== allowedOrigin) {
     return { status: 'error', portalId, origin: allowedOrigin, reason: 'login_url_origin_mismatch' }
   }
@@ -172,11 +255,12 @@ async function main() {
   const args = parseArgs(process.argv.slice(2))
   const portalId = validatePortalId(args.portal)
   const headful = Boolean(args.headful) || process.env.LOCAL_LOGIN_HEADFUL === '1'
+  const manual = Boolean(args.manual)
   const timeoutMs = Number.isInteger(Number(args['timeout-ms'])) ? Number(args['timeout-ms']) : 30000
 
   let outcome
   try {
-    outcome = await run(portalId, { headful, timeoutMs })
+    outcome = await run(portalId, { headful, timeoutMs, manual })
   } catch (error) {
     outcome = { status: 'error', portalId, origin: null, reason: error.message }
   }
