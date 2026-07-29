@@ -1,8 +1,11 @@
 ﻿# interview-digest: turn an interview recording into structured notes + forward-looking insights.
 #
-# Pipeline: (video/audio file) -> [ffmpeg extract audio if needed] -> voicebox local Whisper
-#           -> 共通agent runnerが議事録を構造化し、今後への示唆を書く。
+# Pipeline: (video/audio file) -> [ffmpeg extract audio if needed] -> 30秒チャンク分割
+#           -> voicebox-transcribe.ts が決定的に全文文字起こし(ローカルWhisper・MCP直叩き)
+#           -> 共通agent runnerが話者ラベル付け・議事録構造化・今後への示唆を書く。
 # 音声処理はローカル。Claude制限中はCodexへ引き継ぐ。
+# 文字起こしをLLMのMCP呼び出しにやらせない理由(2026-07-29): codex execは非対話でMCPツール
+# 呼び出しを「user cancelled」で自動拒否するため、フォールバック時に議事録が丸ごと止まった。
 #
 # Recording the call (both sides) on Windows: use the built-in Game Bar (Win+Alt+R) on the
 # meeting window. In Game Bar settings set "Audio to record = All" and mic ON so the other
@@ -85,10 +88,26 @@ $chunkCount = (Get-ChildItem $chunkDir -Filter 'c-*.wav').Count
 if ($chunkCount -eq 0) { Write-Error "ffmpeg produced no chunks from $audioPath"; exit 1 }
 "split into $chunkCount x 30s chunks -> $chunkDir"
 
-# Feed the base prompt + the (ASCII) chunk dir marker to the provider-independent runner.
+# 文字起こしはLLMに任せず、ここで決定的に済ませる(providerが何でも壊れない)。
+# 再実行時は既存のrawがあれば再利用する(文字起こしは高くつく処理のため)。
+$rawTxt = Join-Path $intDir ($stem + '-raw.txt')
+if (-not (Test-Path $rawTxt)) {
+  $prevUrl = $env:KATAZUKU_VOICEBOX_MCP_URL
+  $env:KATAZUKU_VOICEBOX_MCP_URL = 'http://127.0.0.1:17493/mcp'
+  try {
+    Push-Location (Join-Path $repo 'sync')
+    npx tsx scripts/voicebox-transcribe.ts $chunkDir $rawTxt 2>&1 | Out-File -FilePath $logFile -Append -Encoding utf8
+    if ($LASTEXITCODE -ne 0 -or -not (Test-Path $rawTxt)) {
+      Write-Error "voicebox文字起こしに失敗した。ログ: $logFile"; exit 1
+    }
+  } finally { Pop-Location; $env:KATAZUKU_VOICEBOX_MCP_URL = $prevUrl }
+}
+"transcribed -> $rawTxt"
+
+# Feed the base prompt + the (ASCII) transcript marker to the provider-independent runner.
 $prompt = Get-Content -Raw (Join-Path $PSScriptRoot 'interview-digest-prompt.md')
 $dbJson = Join-Path $intDir ($stem + '-db.json')
-$prompt = $prompt + "`n`nCHUNK_DIR=" + $chunkDir + "`nCHUNK_COUNT=" + $chunkCount + "`nSOURCE_FILE=" + $InputPath + "`nAPPOINTMENT_ID=" + $AppointmentId + "`nDB_JSON=" + $dbJson + "`n"
+$prompt = $prompt + "`n`nTRANSCRIPT_RAW=" + $rawTxt + "`nCHUNK_COUNT=" + $chunkCount + "`nSOURCE_FILE=" + $InputPath + "`nAPPOINTMENT_ID=" + $AppointmentId + "`nDB_JSON=" + $dbJson + "`n"
 
 # providerの診断出力はstderrにも流れるため、この呼出しだけ継続し、下の完了マーカーで成否を判定する。
 $prevEAP = $ErrorActionPreference
@@ -101,7 +120,7 @@ try {
   & (Join-Path $PSScriptRoot 'invoke-agent.ps1') `
     -Workflow 'interview-digest' -RunId $digestRunId -PromptText $prompt `
     -Risk 'db-write' -SideEffectMode 'workspace' `
-    -Capability @('workspace.read', 'workspace.write', 'shell', 'voice.transcribe') `
+    -Capability @('workspace.read', 'workspace.write', 'shell') `
     *> $logFile
 } finally {
   $env:KATAZUKU_VOICEBOX_MCP_URL = $previousVoiceboxUrl
@@ -146,6 +165,11 @@ if ($ok) {
   if (Test-Path $chunkDir) {
     Remove-Item $chunkDir -Recurse -Force -ErrorAction SilentlyContinue
     "  cleanup: 中間チャンクを削除 ($chunkDir)"
+  }
+  if (Test-Path $rawTxt) {
+    # 話者ラベル付きの全文が logs/interviews/<企業>-<日付>.txt に保存済みなので、生の中間txtは消す
+    Remove-Item $rawTxt -Force -ErrorAction SilentlyContinue
+    "  cleanup: 中間の生文字起こしを削除 ($rawTxt)"
   }
   $extractedFromVideo = ($audioPath -ne $InputPath)   # 動画等から wav を別途抽出した場合に true
   if ($extractedFromVideo -and -not $KeepSource -and (Test-Path $InputPath)) {
