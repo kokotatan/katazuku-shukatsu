@@ -180,6 +180,37 @@ try {
     assert(parseQuotaResetAt(event, new Date('2026-07-24T05:00:00.000Z'))?.toISOString() === '2026-07-26T12:00:00.000Z', 'resetsAtを解釈できません')
   })
 
+  await check('週制限の「まだ使える」警告を枠切れ扱いしない', () => {
+    // 2026-07-30 実測: 使用率0.82の警告(status=allowed_warning)だけでClaudeを8/2まで締め出し、
+    // asa/daily-syncが3日間停止した。allowed系は停止ではないので失敗にしてはいけない。
+    const warning = JSON.stringify({
+      type: 'rate_limit_event',
+      rate_limit_info: { status: 'allowed_warning', resetsAt: 1785672000, rateLimitType: 'seven_day', utilization: 0.82 },
+    })
+    assert(
+      detectProcessFailure(processResult({ exitCode: 0, stdout: '=== asa 完了 ===\n' + warning })) === undefined,
+      '使用率警告だけで正常終了を失敗扱いしました',
+    )
+    assert(
+      classifyFailure(processResult({ exitCode: 1, stdout: warning })) !== 'quota_exhausted',
+      '使用率警告を枠切れに分類しました',
+    )
+    // 実際に止められた場合は従来どおり枠切れとして扱う
+    const blocked = JSON.stringify({
+      type: 'rate_limit_event',
+      rate_limit_info: { status: 'blocked', resetsAt: 1785672000, rateLimitType: 'seven_day' },
+    })
+    assert(
+      detectProcessFailure(processResult({ exitCode: 0, stdout: blocked })) === 'quota_exhausted',
+      '実際の停止を見逃しました',
+    )
+    // 警告の後に停止が来る混在ログでも、停止を優先して検知する
+    assert(
+      classifyFailure(processResult({ exitCode: 1, stdout: warning + '\n' + blocked })) === 'quota_exhausted',
+      '警告と停止が混在するログで停止を見逃しました',
+    )
+  })
+
   await check('認証切れ・接続失敗・spawn失敗を分類する', async () => {
     assert(classifyFailure(processResult({ exitCode: 1, stderr: 'Login required' })) === 'auth_unavailable', 'auth')
     assert(classifyFailure(processResult({ exitCode: 1, stderr: 'Unable to connect to API' })) === 'connection_failed', 'connection')

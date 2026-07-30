@@ -177,6 +177,25 @@ export function parseProviderOrder(value?: string): ProviderId[] {
   return order.length ? order : ['claude', 'codex', 'codex-oss']
 }
 
+/**
+ * Claude CLIは週制限の使用率が閾値を超えた時点で rate_limit_event を出すが、これは
+ * `status: "allowed_warning"`(まだ使える警告)と実際の停止の両方に使われる。
+ * 警告を停止と読むと、枠が残っているのにproviderを復活日まで締め出してしまう
+ * (2026-07-30: utilization 0.82 の警告だけでClaudeを8/2まで遮断し、asa/daily-syncが3日間停止した)。
+ * よって seven_day の rate limit は status が allowed 系でないときだけ枠切れと見なす。
+ * textは小文字化済み(JSONのキー・値も小文字)である前提。
+ */
+function hasBlockingRateLimitEvent(text: string): boolean {
+  const events = text.matchAll(/"rate_limit_info"\s*:\s*\{([^}]*)\}/g)
+  for (const event of events) {
+    const body = event[1]
+    if (!/seven_day/.test(body)) continue
+    const status = body.match(/"status"\s*:\s*"([^"]*)"/)?.[1] ?? ''
+    if (!status.startsWith('allowed')) return true
+  }
+  return false
+}
+
 function classifyKnownFailure(result: ProcessResult): FailureCode | undefined {
   if (result.errorCode === 'ENOENT') return 'command_missing'
   if (result.timedOut) return 'timeout'
@@ -186,7 +205,10 @@ function classifyKnownFailure(result: ProcessResult): FailureCode | undefined {
   if (/unexpected argument|unrecognized (option|argument|subcommand)|invalid value for|for more information, try '--help'/.test(text)) {
     return 'command_missing'
   }
-  if (/weekly limit|usage limit|quota( has been)? exceeded|credit balance|out of extra usage|maximum.*usage|ratelimittype[^\r\n]{0,40}seven_day/.test(text)) {
+  if (
+    /weekly limit|usage limit|quota( has been)? exceeded|credit balance|out of extra usage|maximum.*usage/.test(text) ||
+    hasBlockingRateLimitEvent(text)
+  ) {
     return 'quota_exhausted'
   }
   if (/rate.?limit|too many requests|\b429\b/.test(text)) return 'rate_limited'
