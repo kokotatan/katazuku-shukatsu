@@ -62,6 +62,9 @@ check('トヨタ≠トヨタ・コニック・プロ(3文字は完全一致の�
 check('sameCompany: タイミーの表記ゆれは同一視のまま', sameCompany('株式会社タイミー', 'タイミー'))
 check('samePosition: 長い職種名の包含を同一視', samePosition('アルゴリズム', 'アルゴリズムエンジニア サマーインターン'))
 check('samePosition: 短い名称の包含は誤統合しない', !samePosition('AI', 'AIエンジニア'))
+check('samePosition: 一般語だけの職種は包含一致で誤統合しない',
+  !samePosition('コンサル', 'Autumn Internship(ビジネスコンサルタント職)') && !samePosition('エンジニア', 'ソフトウェアエンジニア(夏)'))
+check('samePosition: 一般語でも完全一致なら同一トラック', samePosition('コンサル', 'コンサル'))
 
 // --- 正式名称(株式会社/海外表記対応。2026-07-18本人指示) ---
 check('海外表記: Inc.の有無は同一視', sameCompany('Mujin Inc.', 'Mujin'))

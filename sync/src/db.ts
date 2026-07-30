@@ -205,11 +205,20 @@ export const STATUS_FOR: Record<Stage, string> = {
 }
 
 /** ポジション(トラック)の同一判定。完全一致に加え、両方4文字以上なら包含も許容する */
+/**
+ * 単独では選考トラックを特定できない一般語。包含一致を許すと別トラックを誤って統合する。
+ * 2026-07-30: PwCの「コンサル(夏・不合格)」に「Autumn Internship(ビジネスコンサルタント職)」が
+ * 包含一致で吸い込まれ、終了済みトラックへ新規案内の次アクションが書き込まれた。
+ */
+const GENERIC_POSITION = /^(コンサル|コンサルタント|エンジニア|営業|技術|技術職|総合職|事務|本選考)$/
+
 export function samePosition(a: string, b: string): boolean {
   const na = normalize(a)
   const nb = normalize(b)
   if (!na || !nb) return na === nb
   if (na === nb) return true
+  // 片方が一般語だけのときは完全一致のみ同一トラックとみなす
+  if (GENERIC_POSITION.test(na) || GENERIC_POSITION.test(nb)) return false
   return na.length >= 4 && nb.length >= 4 && (na.includes(nb) || nb.includes(na))
 }
 
