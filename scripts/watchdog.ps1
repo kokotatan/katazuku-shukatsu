@@ -34,6 +34,16 @@ $now = Get-Date
 $problems = @()
 $notes = @()
 
+# 電源状態を先に見る。このPCは Modern Standby(S0低電力アイドル)のため、バッテリー駆動や
+# 蓋を閉じた状態では定時タスクが抑制され、ジョブが壊れていなくても実行が飛ぶ
+# (2026-08-01: 21:33〜05:20の約8時間、全タスクが動かなかった)。
+# 「壊れている」と「動ける状態になかった」は対処が違うので、番犬は区別して報告する。
+$onBattery = $false
+try {
+  $bat = Get-CimInstance Win32_Battery -ErrorAction Stop | Select-Object -First 1
+  if ($bat -and $bat.BatteryStatus -eq 1) { $onBattery = $true }
+} catch {}
+
 # ---- 1. 活動ログの新鮮さ ----
 # 期待周期(INFRA.mdの定常タスク表に合わせる。変更したらここも直す)
 $expected = @(
@@ -61,7 +71,8 @@ if (-not (Test-Path $activityLog)) {
     }
     $ageH = [math]::Round(($now - $lastSeen[$job.by]).TotalHours, 1)
     if ($ageH -gt $job.maxHours) {
-      $problems += ('{0}: 最終実行が{1}時間前(期待は{2}時間以内)' -f $job.label, $ageH, $job.maxHours)
+      $reason = if ($onBattery) { '(バッテリー駆動のためタスクが抑制されている。ACに繋ぐか常駐機へ移すのが対処)' } else { '' }
+      $problems += ('{0}: 最終実行が{1}時間前(期待は{2}時間以内){3}' -f $job.label, $ageH, $job.maxHours, $reason)
     }
   }
 }
