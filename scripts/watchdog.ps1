@@ -129,26 +129,58 @@ if (Test-Path $healthFile) {
   }
 }
 
-# ---- 3. 結果 ----
+# ---- 3. 同じ異常を鳴らし続けない ----
+# 2026-07-31: 実行間隔を4時間→30分に上げた結果、1つの居座る異常(daily-syncの失敗など、
+# 翌朝の定時実行までどうやっても解消しないもの)が1日48回通知されるようになった。
+# 「番犬がすぐ止まったと言ってくる」の正体はこれ。狼少年になると本当の異常を見落とす。
+# 同一の問題集合(fingerprint)は6時間に1回だけ鳴らす。内容が変われば即座に鳴らす。
+$fingerprint = ($problems | Sort-Object) -join '||'
+$muteHours = 6
+$shouldNotify = $problems.Count -gt 0
+if ($shouldNotify -and (Test-Path $stateFile)) {
+  try {
+    $prev = Get-Content $stateFile -Raw -Encoding UTF8 | ConvertFrom-Json
+    if ($prev.fingerprint -eq $fingerprint -and $prev.notifiedAt) {
+      $since = ($now - [DateTimeOffset]::Parse($prev.notifiedAt).LocalDateTime).TotalHours
+      if ($since -lt $muteHours) { $shouldNotify = $false }
+    }
+  } catch {}
+}
+
+# 直前の通知時刻は、鳴らさなかった場合は引き継ぐ(引き継がないと毎回鳴ってしまう)
+$notifiedAt = $now.ToString('yyyy-MM-ddTHH:mm:sszzz')
+if (-not $shouldNotify -and (Test-Path $stateFile)) {
+  try {
+    $prev = Get-Content $stateFile -Raw -Encoding UTF8 | ConvertFrom-Json
+    if ($prev.fingerprint -eq $fingerprint -and $prev.notifiedAt) { $notifiedAt = $prev.notifiedAt }
+  } catch {}
+}
+
 $state = [ordered]@{
-  checkedAt = $now.ToString('yyyy-MM-ddTHH:mm:sszzz')
-  ok        = ($problems.Count -eq 0)
-  problems  = $problems
-  notes     = $notes
+  checkedAt   = $now.ToString('yyyy-MM-ddTHH:mm:sszzz')
+  ok          = ($problems.Count -eq 0)
+  problems    = $problems
+  notes       = $notes
+  fingerprint = $fingerprint
+  notifiedAt  = $(if ($problems.Count -gt 0) { $notifiedAt } else { $null })
 }
 $state | ConvertTo-Json -Depth 4 | Out-File $stateFile -Encoding utf8
 
 if ($problems.Count -gt 0) {
   $body = ($problems -join ' / ')
-  Show-Toast 'katazuku 自動運転が止まっています' $body
-  ('watchdog|{0}|{1}' -f $state.checkedAt, $body) | Out-File $alertFile -Append -Encoding utf8
-  # スマホへもWeb Push(spec16)。ロック画面に出るため件数のみの要約にする。失敗しても続行
-  try {
-    & node (Join-Path $PSScriptRoot 'push-send.mjs') --title 'katazuku 番犬' `
-      --body ('自動運転の異常を{0}件検知しました。PCの通知かログを確認してください' -f $problems.Count) `
-      --url '/insight/' 2>$null | Out-Null
-  } catch {}
-  Write-Output ('異常 {0}件: {1}' -f $problems.Count, $body)
+  if ($shouldNotify) {
+    Show-Toast 'katazuku 自動運転が止まっています' $body
+    ('watchdog|{0}|{1}' -f $state.checkedAt, $body) | Out-File $alertFile -Append -Encoding utf8
+    # スマホへもWeb Push(spec16)。ロック画面に出るため件数のみの要約にする。失敗しても続行
+    try {
+      & node (Join-Path $PSScriptRoot 'push-send.mjs') --title 'katazuku 番犬' `
+        --body ('自動運転の異常を{0}件検知しました。PCの通知かログを確認してください' -f $problems.Count) `
+        --url '/insight/' 2>$null | Out-Null
+    } catch {}
+    Write-Output ('異常 {0}件: {1}' -f $problems.Count, $body)
+  } else {
+    Write-Output ('異常 {0}件(通知済みと同内容のため{1}時間は再通知しない): {2}' -f $problems.Count, $muteHours, $body)
+  }
 } else {
   Write-Output ('正常(通知なし)。notes: {0}' -f ($(if ($notes.Count) { $notes -join ' / ' } else { 'なし' })))
 }
