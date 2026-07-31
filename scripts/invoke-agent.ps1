@@ -77,6 +77,9 @@ Push-Location $sync
 try {
   $proc = Start-Process -FilePath $npx -ArgumentList $argsList -NoNewWindow -PassThru `
     -RedirectStandardOutput $stdoutFile -RedirectStandardError $stderrFile
+  # Start-Process -PassThru が返す Process は ExitCode を保持しないことがある(実害 2026-07-31:
+  # 成功したrunがexit空で失敗扱いになった)。ハンドルを開いておくとOSが終了情報を保持する。
+  $handle = $proc.Handle
   $hardMs = $TimeoutMs + $GraceMs
   if (-not $proc.WaitForExit($hardMs)) {
     $killed = $true
@@ -84,7 +87,11 @@ try {
     & taskkill.exe /PID $proc.Id /T /F 2>&1 | Out-Null
     try { $proc.WaitForExit(15000) | Out-Null } catch {}
   }
-  try { $exitCode = $proc.ExitCode } catch { $exitCode = -1 }
+  # 引数なしのWaitForExitで終了処理を確定させてからExitCodeを読む(引数ありだけでは未確定のことがある)
+  try { $proc.WaitForExit() } catch {}
+  try { $proc.Refresh() } catch {}
+  try { $exitCode = [int]$proc.ExitCode } catch { $exitCode = -1 }
+  if ($null -eq $exitCode) { $exitCode = -1 }
 } finally {
   Pop-Location
   foreach ($f in @($stdoutFile, $stderrFile)) {
