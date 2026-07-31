@@ -68,12 +68,35 @@ if (-not (Test-Path $activityLog)) {
 
 # ---- 1.5 定常タスク自体の健康(2026-07-29: autopilotが72h設定+ハングで22時間無音停止した反省) ----
 # LastTaskResult 0x41301(267009)=実行中、0x41303(267011)=未実行 は正常扱い
+# ハング時の許容時間(分)。これを超えて Running のままなら、番犬が回収する。
+# MultipleInstances=IgnoreNew のため、1つ固まると以降の定期実行が全部飛ぶ。検知だけでは
+# 止まったままなので、ここで能動的に殺して次の周期から復帰させる(2026-07-31の実害対応)。
+$hangLimitMin = @{
+  'katazuku-daily-sync' = 70; 'katazuku-mail-watch' = 25; 'katazuku-asa' = 130
+  'katazuku-calendar-sync' = 30; 'katazuku-meeting-autopilot' = 10; 'katazuku-evening-brief' = 35
+}
 foreach ($tn in @('katazuku-daily-sync', 'katazuku-mail-watch', 'katazuku-asa', 'katazuku-calendar-sync', 'katazuku-meeting-autopilot', 'katazuku-evening-brief')) {
   try {
     $task = Get-ScheduledTask -TaskName $tn -ErrorAction Stop
     $info = Get-ScheduledTaskInfo -TaskName $tn -ErrorAction Stop
-    if ($task.State -eq 'Running' -and $info.LastRunTime -lt $now.AddHours(-2)) {
-      $problems += ('{0}: {1}から実行しっぱなし(ハングの疑い)' -f $tn, $info.LastRunTime.ToString('MM/dd HH:mm'))
+    $limit = if ($hangLimitMin.ContainsKey($tn)) { $hangLimitMin[$tn] } else { 120 }
+    if ($task.State -eq 'Running' -and $info.LastRunTime -lt $now.AddMinutes(-$limit)) {
+      $runMin = [math]::Round(($now - $info.LastRunTime).TotalMinutes)
+      # 回収: Stop-ScheduledTask だけでは孫プロセス(node/claude/codex)が孤児として残るため、
+      # このタスクが起点のプロセスツリーを taskkill /T /F で確実に落とす。
+      $killed = 0
+      try {
+        foreach ($p in (Get-CimInstance Win32_Process -Filter "Name='wscript.exe' or Name='powershell.exe'" -ErrorAction Stop |
+                        Where-Object { $_.CommandLine -match 'katazuku' -and $_.CommandLine -match ($tn -replace '^katazuku-', '') })) {
+          $started = $null
+          try { $started = (Get-Process -Id $p.ProcessId -ErrorAction Stop).StartTime } catch { continue }
+          if ($started -gt $now.AddMinutes(-$limit)) { continue }   # 新しい正常な実行は触らない
+          & taskkill.exe /PID $p.ProcessId /T /F 2>&1 | Out-Null
+          $killed++
+        }
+        Stop-ScheduledTask -TaskName $tn -ErrorAction SilentlyContinue
+      } catch {}
+      $problems += ('{0}: {1}分間ハング(制限{2}分)→ プロセス{3}件を強制終了し次の周期へ復帰させた' -f $tn, $runMin, $limit, $killed)
     } elseif ($info.LastTaskResult -ne 0 -and $info.LastTaskResult -ne 267009 -and $info.LastTaskResult -ne 267011) {
       $problems += ('{0}: 最終実行がエラー(0x{1:X})' -f $tn, $info.LastTaskResult)
     }

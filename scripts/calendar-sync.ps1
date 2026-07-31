@@ -13,6 +13,7 @@ try {
     -PromptFile (Join-Path $PSScriptRoot 'calendar-sync-prompt.md') `
     -Risk 'db-write' -SideEffectMode 'reconcile' `
     -Capability @('workspace.read', 'workspace.write', 'shell', 'calendar.read') `
+    -TimeoutMs 600000 `
     *>&1 | Out-File -FilePath $logFile -Encoding utf8
 } catch {
   $_ | Out-File -FilePath $logFile -Append -Encoding utf8

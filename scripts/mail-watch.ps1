@@ -29,6 +29,7 @@ try {
     -PromptFile (Join-Path $PSScriptRoot 'mail-watch-prompt.md') `
     -Risk 'external-draft' -SideEffectMode 'reconcile' `
     -Capability @('workspace.read', 'workspace.write', 'shell', 'gmail.read', 'gmail.draft', 'gmail.send', 'calendar.read', 'calendar.write') `
+    -TimeoutMs 600000 `
     *>&1 | Out-File -FilePath $logFile -Append -Encoding utf8
 } catch {
   $_ | Out-File -FilePath $logFile -Append -Encoding utf8

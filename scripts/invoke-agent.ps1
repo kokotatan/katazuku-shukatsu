@@ -10,10 +10,19 @@
   [string]$OutputSchema = '',
   [string]$OutputFile = '',
   [int]$TimeoutMs = 1800000,
+  # runnerのsoft deadlineを過ぎても親が返らないときに、プロセスツリーごと強制終了するまでの猶予。
+  # 2026-07-31: provider CLIがMCPコネクタの承認待ちで無限に固まり、PowerShellが返らず、
+  # タスクが数時間Runningのまま → MultipleInstances=IgnoreNew で以降の定期実行が全部飛ぶ、
+  # という「自動運転が静かに止まる」連鎖の実害があった(calendar-syncが07:33-13:29の6時間ブロック)。
+  [int]$GraceMs = 120000,
   [switch]$DryRun
 )
 
 $ErrorActionPreference = 'Stop'
+# google-workspace MCP(uvx workspace-mcp)の起動が既定30秒に収まらず接続失敗する事故があったため、
+# 子プロセス(claude/codex)へ引き継ぐMCPタイムアウトを延ばす。ここが全ワークフロー共通の入口。
+if (-not $env:MCP_TIMEOUT) { $env:MCP_TIMEOUT = '180000' }
+if (-not $env:MCP_TOOL_TIMEOUT) { $env:MCP_TOOL_TIMEOUT = '180000' }
 $repo = Split-Path $PSScriptRoot -Parent
 $sync = Join-Path $repo 'sync'
 $runner = Join-Path $sync 'scripts\agent-runner.ts'
@@ -57,16 +66,39 @@ $npx = if ($IsWindows -or $env:OS -eq 'Windows_NT') { 'npx.cmd' } else { 'npx' }
 if (-not (Get-Command $npx -ErrorAction SilentlyContinue)) {
   throw "npxが見つかりません。Node.jsをセットアップしてください。"
 }
+# runnerを子プロセスとして起動し、ハードデッドラインで「プロセスツリーごと」殺す。
+# `& $npx` の直接呼び出しでは親が返るまで待ち続けるしかなく、provider CLIが固まると
+# 呼び出し元(タスク)が永久にRunningのままになる。taskkill /T で孫(node/claude/codex)まで落とす。
+$stdoutFile = [IO.Path]::GetTempFileName()
+$stderrFile = [IO.Path]::GetTempFileName()
 $exitCode = -1
+$killed = $false
 Push-Location $sync
 try {
-  & $npx @argsList
-  $exitCode = $LASTEXITCODE
+  $proc = Start-Process -FilePath $npx -ArgumentList $argsList -NoNewWindow -PassThru `
+    -RedirectStandardOutput $stdoutFile -RedirectStandardError $stderrFile
+  $hardMs = $TimeoutMs + $GraceMs
+  if (-not $proc.WaitForExit($hardMs)) {
+    $killed = $true
+    # /T = 子孫ごと、/F = 強制。これをしないと node や provider CLI が孤児として残り続ける。
+    & taskkill.exe /PID $proc.Id /T /F 2>&1 | Out-Null
+    try { $proc.WaitForExit(15000) | Out-Null } catch {}
+  }
+  try { $exitCode = $proc.ExitCode } catch { $exitCode = -1 }
 } finally {
   Pop-Location
+  foreach ($f in @($stdoutFile, $stderrFile)) {
+    if (Test-Path -LiteralPath $f) {
+      Get-Content -LiteralPath $f -Encoding UTF8 -ErrorAction SilentlyContinue | Write-Output
+      Remove-Item -LiteralPath $f -Force -ErrorAction SilentlyContinue
+    }
+  }
   if ($temporaryPrompt -and (Test-Path -LiteralPath $temporaryPrompt)) {
     Remove-Item -LiteralPath $temporaryPrompt -Force
   }
+}
+if ($killed) {
+  throw "agent実行がハードデッドライン($([math]::Round(($TimeoutMs + $GraceMs)/1000))秒)を超えたためプロセスツリーごと強制終了しました: workflow=$Workflow run=$RunId"
 }
 if ($exitCode -ne 0) {
   if ($exitCode -eq 3) {

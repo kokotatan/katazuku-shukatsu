@@ -15,6 +15,7 @@ try {
     -PromptFile (Join-Path $PSScriptRoot 'evening-brief-prompt.md') `
     -Risk 'external-commit' -SideEffectMode 'reconcile' `
     -Capability @('workspace.read', 'shell', 'gmail.read', 'gmail.send') `
+    -TimeoutMs 1200000 `
     *>&1 | Out-File -FilePath $logFile -Encoding utf8
 } catch {
   $_ | Out-File -FilePath $logFile -Append -Encoding utf8
