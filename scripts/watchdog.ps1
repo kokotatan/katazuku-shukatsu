@@ -98,7 +98,19 @@ foreach ($tn in @('katazuku-daily-sync', 'katazuku-mail-watch', 'katazuku-asa', 
       } catch {}
       $problems += ('{0}: {1}分間ハング(制限{2}分)→ プロセス{3}件を強制終了し次の周期へ復帰させた' -f $tn, $runMin, $limit, $killed)
     } elseif ($info.LastTaskResult -ne 0 -and $info.LastTaskResult -ne 267009 -and $info.LastTaskResult -ne 267011) {
-      $problems += ('{0}: 最終実行がエラー(0x{1:X})' -f $tn, $info.LastTaskResult)
+      # タスクの終了コードは「前回の起動の残骸」でしかない。手動実行や次の周期で仕事が
+      # 済んでいれば異常ではないので、活動ログ(=実際に仕事をした証拠)の方を信じる。
+      # 2026-07-31: 失敗の残骸が残り、実際は成功しているのに鳴り続けた。
+      $job = $tn -replace '^katazuku-', ''
+      $doneAfter = $false
+      if ($lastSeen -and $lastSeen.ContainsKey($job)) {
+        $doneAfter = ($lastSeen[$job] -gt $info.LastRunTime) -or ($lastSeen[$job] -gt $now.AddHours(-3))
+      }
+      if (-not $doneAfter) {
+        $problems += ('{0}: 最終実行がエラー(0x{1:X})' -f $tn, $info.LastTaskResult)
+      } else {
+        $notes += ('{0}: タスクの終了コードは0x{1:X}だが、その後に実際の実行記録があるため正常扱い' -f $tn, $info.LastTaskResult)
+      }
     }
   } catch {
     $notes += ('{0}: タスク未登録または取得失敗' -f $tn)
