@@ -65,3 +65,4 @@ credential-store/
 # Codexのリポジトリ内個人設定(端末固有の絶対パスを含む)とsandbox setupバイナリ
 .codex/
 codex-windows-sandbox-setup.exe
+.katazuku-satellite

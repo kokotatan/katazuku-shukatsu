@@ -38,8 +38,15 @@ try {
   Push-Location (Join-Path $repo 'sync')
   npx tsx scripts/db-apply-calendar.ts $importJson 2>&1 | Out-File -FilePath $logFile -Append -Encoding utf8
   if ($LASTEXITCODE -eq 0) {
-    npx tsx scripts/db-snapshot.ts 2>&1 | Out-File -FilePath $logFile -Append -Encoding utf8
-    $applyOk = ($LASTEXITCODE -eq 0)
+    if (Test-Path (Join-Path $repo '.katazuku-satellite')) {
+      # 衛星機(note-pc録音担当)のDBは正本ではないため、snapshotを本番Blobへ押し込まない。
+      # 実害(2026-08-14発見): minipcとnote-pcが交互にsnapshotを上書きし、アプリ表示が二重状態になっていた。
+      "衛星機マーカーによりsnapshotプッシュをスキップ" | Out-File -FilePath $logFile -Append -Encoding utf8
+      $applyOk = $true
+    } else {
+      npx tsx scripts/db-snapshot.ts 2>&1 | Out-File -FilePath $logFile -Append -Encoding utf8
+      $applyOk = ($LASTEXITCODE -eq 0)
+    }
   }
 } finally { Pop-Location }
 if (-not $applyOk) { Fail 'DBへ反映できず(db-apply-calendar / db-snapshot)' }

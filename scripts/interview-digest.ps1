@@ -21,11 +21,19 @@ param(
   [int]$AppointmentId = 0,
   # 既定では議事録が取れたら中間ファイル(チャンク)と巨大な元録画を消してディスクを節約する。
   # 元動画を残したいときだけ -KeepSource を付ける。聞き直し用の16kHz wavと文字起こしtxtは常に残る。
-  [switch]$KeepSource
+  [switch]$KeepSource,
+  # note-pc(録音担当機)用: 正本DBはminipcにあるため、文字起こし・構造化はこのマシンで行い、
+  # 成果物(db.json/文字起こし/顔写真)をminipcへ転送してDB反映だけ向こうで実行する(2026-08-14)。
+  # 前提: ssh minipc が鍵で通ること・両機のリポジトリパスが同一(C:\Users\okuya\katazuku-shukatsu)。
+  [switch]$RemoteApply
 )
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path $PSScriptRoot -Parent
 Set-Location $repo
+
+# 衛星機マーカー: このマシンの data/katazuku.db は正本ではない(正本はminipc)。
+# マーカーファイルがあれば、明示指定がなくてもDB反映はminipcへ送る(record-audio経由の自動呼出しを含む)。
+if (-not $RemoteApply -and (Test-Path (Join-Path $repo '.katazuku-satellite'))) { $RemoteApply = $true }
 
 if (-not (Test-Path $InputPath)) { Write-Error "input file not found: $InputPath"; exit 1 }
 $InputPath = (Resolve-Path $InputPath).Path
@@ -145,6 +153,66 @@ if ($ok) {
     Write-Warning "interview-digest FAILED (DB JSONが無い): $dbJson"
     exit 1
   }
+  if ($RemoteApply) {
+    # --- note-pc → minipc 転送とリモートDB反映(2026-08-14 機体分担) --------------------------------
+    # 転送物: db.json / 話者ラベル付き文字起こし(transcriptPathが指す) / スクショ+切出顔写真(-shots)。
+    # 文字起こしのファイル名は日本語を含み得るため、scpの文字化けを避けてzip(UTF-8エントリ名)で運ぶ。
+    $prevEAPr = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+      $meta = Get-Content -Raw $dbJson -Encoding UTF8 | ConvertFrom-Json
+      Add-Type -AssemblyName System.IO.Compression, System.IO.Compression.FileSystem
+      $zipName = ('bridge-' + $safeStem + '.zip')
+      $zipPath = Join-Path ([System.IO.Path]::GetTempPath()) $zipName
+      if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
+      $zip = [System.IO.Compression.ZipFile]::Open($zipPath, 'Create')
+      try {
+        $addFile = {
+          param($abs)
+          if (-not (Test-Path -LiteralPath $abs)) { return }
+          $rel = ([IO.Path]::GetFullPath($abs)).Substring($repo.Length + 1) -replace '\\', '/'
+          [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $abs, $rel) | Out-Null
+        }
+        & $addFile $dbJson
+        if ($meta.transcriptPath) {
+          $tp = $meta.transcriptPath
+          if (-not [IO.Path]::IsPathRooted($tp)) { $tp = Join-Path $repo $tp }
+          & $addFile $tp
+        }
+        # スクショと顔写真(SOURCE_FILEのスラッグ規約: <stem>-shots)。photoPathの絶対パスは両機で同一。
+        $shotsDir = Join-Path $intDir ($stem + '-shots')
+        if (Test-Path -LiteralPath $shotsDir) {
+          Get-ChildItem -LiteralPath $shotsDir -File | ForEach-Object { & $addFile $_.FullName }
+        }
+      } finally { $zip.Dispose() }
+
+      scp -o BatchMode=yes -q $zipPath ("minipc:katazuku-shukatsu/logs/" + $zipName) 2>&1 | Out-File -FilePath $logFile -Append -Encoding utf8
+      if ($LASTEXITCODE -ne 0) { throw 'minipcへの成果物転送(scp)に失敗しました' }
+      Remove-Item $zipPath -Force -ErrorAction SilentlyContinue
+
+      # 展開はWindows標準のtar.exe(bsdtar・zip対応・UTF-8エントリ名対応)。
+      # powershellの入れ子クォートはssh越しに壊れるため使わない(2026-08-14実測: バックスラッシュが消える)。
+      $expand = 'tar -xf %USERPROFILE%\katazuku-shukatsu\logs\' + $zipName + ' -C %USERPROFILE%\katazuku-shukatsu && del %USERPROFILE%\katazuku-shukatsu\logs\' + $zipName
+      ssh -o BatchMode=yes minipc $expand 2>&1 | Out-File -FilePath $logFile -Append -Encoding utf8
+      if ($LASTEXITCODE -ne 0) { throw 'minipc側でのzip展開に失敗しました' }
+
+      if ($AppointmentId -gt 0) {
+        # minipc側のmeeting_runは(録音がこの機で完結するため)armedのまま。遷移規則は1段ずつ厳格なので
+        # digestingまで寛容に歩かせる。cmdの `&` 連結は途中失敗(既に先へ進んでいる等)でも続行される。
+        $walk = 'cd %USERPROFILE%\katazuku-shukatsu\sync && ' +
+          "(npx tsx scripts/db-meeting-run.ts transition $AppointmentId opened & " +
+          "npx tsx scripts/db-meeting-run.ts transition $AppointmentId recording & " +
+          "npx tsx scripts/db-meeting-run.ts transition $AppointmentId stopping & " +
+          "npx tsx scripts/db-meeting-run.ts transition $AppointmentId digesting)"
+        ssh -o BatchMode=yes minipc $walk 2>&1 | Out-File -FilePath $logFile -Append -Encoding utf8
+      }
+      $remoteDbJson = 'C:\Users\okuya\katazuku-shukatsu\logs\interviews\' + (Split-Path $dbJson -Leaf)
+      $applyCmd = 'cd %USERPROFILE%\katazuku-shukatsu\sync && ' +
+        ('npx tsx scripts/db-apply-interview.ts "' + $remoteDbJson + '" && npx tsx scripts/photo-sync.ts && npx tsx scripts/db-snapshot.ts')
+      ssh -o BatchMode=yes minipc $applyCmd 2>&1 | Out-File -FilePath $logFile -Append -Encoding utf8
+      if ($LASTEXITCODE -ne 0) { throw 'minipc側でのDB反映に失敗しました' }
+    } finally { $ErrorActionPreference = $prevEAPr }
+  } else {
   try {
     Push-Location (Join-Path $repo 'sync')
     # 上の文字起こしと同じ理由: native 2>&1 パイプの間はEAPをContinueにする(失敗判定は$LASTEXITCODE)
@@ -161,6 +229,7 @@ if ($ok) {
     if ($LASTEXITCODE -ne 0) { Write-Warning '写真のBlob同期に失敗した(議事録反映は成功。cd sync; npx tsx scripts/photo-sync.ts で再実行できる)' }
     npx tsx scripts/db-snapshot.ts 2>&1 | Out-File -FilePath $logFile -Append -Encoding utf8
   } finally { Pop-Location; $ErrorActionPreference = 'Stop' }
+  }
   "interview-digest OK. notes appended to chrome-prompts/interview-notes.local.md (log: logs/$(Split-Path $logFile -Leaf))"
 
   # 活動ログに「何を/何のために/どうしたか」を1行残す(本人が後から確認できる状態のため)

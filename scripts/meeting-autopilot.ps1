@@ -10,6 +10,17 @@ $repo = Split-Path $PSScriptRoot -Parent
 $log = Join-Path $repo 'logs\meeting-record.log'
 function Log($m) { ("{0} [autopilot] {1}" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $m) | Out-File -FilePath $log -Append -Encoding utf8 }
 
+# 多重起動ガード(2026-08-10): npx呼び出しが遅く1回の実行が数分かかるため、5分毎のタスクが
+# 追い越して同一予定のstate読み取りが競合し、同じ会議URLを2回開いた(17:46と17:47の実害)。
+# ロックファイルが10分未満なら後発は何もせず終了。10分超の残骸は前回の異常終了とみなして上書き。
+$lockFile = Join-Path $repo 'logs\meeting-autopilot.lock'
+if (Test-Path $lockFile) {
+  $lockAge = (Get-Date) - (Get-Item $lockFile).LastWriteTime
+  if ($lockAge.TotalMinutes -lt 10) { Log '別のautopilotが実行中のためスキップ(多重起動ガード)'; return }
+}
+Set-Content -Path $lockFile -Value $PID -Encoding ascii
+try {
+
 function Get-RunState([int]$appointmentId) {
   $json = ''
   try {
@@ -44,6 +55,16 @@ foreach ($a in $agenda) {
   if (-not $run -or $run.state -eq 'done') { continue }
 
   if ($run.state -eq 'armed' -and $now -ge $start.AddMinutes(-10) -and $now -lt $end) {
+    # 連続面談ガード(2026-08-10 本人指摘「Meetのリンク開きすぎ」): 別の会議がいま進行中なら
+    # URLを開かない。面談中に次のMeetが開くとフォーカスを奪い実害があるため。armedのまま次巡回へ。
+    # 進行中の会議が終わった時点でまだ次の会議の時間内なら、その巡回で開く。
+    $concurrent = $agenda | Where-Object {
+      $_.id -ne $a.id -and (([datetime]$_.startIso).ToLocalTime()) -le $now -and $now -lt (([datetime]$_.endIso).ToLocalTime())
+    }
+    if ($concurrent) {
+      Log ("別会議が進行中のためURLを開かず待機: {0} {1}" -f $a.company, $a.title)
+      continue
+    }
     if ($a.url) {
       # 短縮リンク(weburl.jp等)も含め、URLがあれば必ず開く。ブラウザが302リダイレクトを解決する。
       # openable は会議ホスト許可リスト(sync/src/meeting-url.ts)での判定結果。診断用に記録するだけで開閉は止めない。
@@ -111,11 +132,18 @@ foreach ($a in $agenda) {
     try {
       Push-Location (Join-Path $repo 'sync')
       npx tsx scripts/db-meeting-done.ts $a.id 2>&1 | Out-File -FilePath $log -Append -Encoding utf8
-      npx tsx scripts/db-snapshot.ts 2>&1 | Out-File -FilePath $log -Append -Encoding utf8
+      if (-not (Test-Path (Join-Path $repo '.katazuku-satellite'))) {
+        # 衛星機のsnapshotは正本ではないので押し込まない(押すのはminipcのみ。2026-08-14)
+        npx tsx scripts/db-snapshot.ts 2>&1 | Out-File -FilePath $log -Append -Encoding utf8
+      }
     } finally { Pop-Location }
     Log ("録音終了待ちへ進めた: {0} {1}" -f $a.company, $a.title)
   } elseif ($run.state -eq 'opened' -and $now -ge $end) {
     Move-Run ([int]$a.id) 'failed' '予定終了までに録音を開始できなかった'
     Log ("録音開始を逃した: {0} {1}" -f $a.company, $a.title)
   }
+}
+
+} finally {
+  Remove-Item $lockFile -ErrorAction SilentlyContinue
 }
