@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://katazuku.dev/schemas/application-start.schema.json",
+  "title": "応募自動運転の開始",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["company", "materialsRef", "sourceRef"],
+  "properties": {
+    "runId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "company": {
+      "type": "string",
+      "minLength": 1,
+      "description": "正式企業名"
+    },
+    "position": {
+      "type": "string"
+    },
+    "season": {
+      "type": "string",
+      "default": "本選考"
+    },
+    "entryUrl": {
+      "type": "string",
+      "format": "uri"
+    },
+    "materialsRef": {
+      "type": "string",
+      "minLength": 1,
+      "description": "完成済みESなど、git管理外の転記元"
+    },
+    "sourceRef": {
+      "type": "string",
+      "minLength": 1,
+      "description": "開始根拠の冪等キー"
+    },
+    "startedAt": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

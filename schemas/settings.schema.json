@@ -1,0 +1,192 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "katazuku/settings.schema.json",
+  "title": "katazuku settings",
+  "type": "object",
+  "properties": {
+    "profile": {
+      "title": "本人設定",
+      "description": "就活の前提。ここは人によって変わる値です。",
+      "type": "object",
+      "required": [
+        "graduation_year"
+      ],
+      "properties": {
+        "graduation_year": {
+          "title": "卒業年コホート",
+          "description": "一括採用の年次。プレエントリー期限や募集要項の判定に使います。",
+          "type": "integer",
+          "enum": [
+            2026,
+            2027,
+            2028,
+            2029
+          ],
+          "default": 2028,
+          "x-display": "select"
+        },
+        "display_name": {
+          "title": "表示名",
+          "description": "画面表示だけに使います。",
+          "type": "string",
+          "default": "",
+          "maxLength": 40,
+          "format": "name",
+          "placeholder": "例: 就活 太郎"
+        }
+      }
+    },
+    "agent": {
+      "title": "エージェント実行",
+      "description": "自動運転の実行役と、その慎重さ。",
+      "type": "object",
+      "properties": {
+        "provider_order": {
+          "title": "プロバイダ優先順位",
+          "description": "利用枠切れ・認証切れのとき、副作用を始めていない場合だけ次へ切り替えます。",
+          "type": "array",
+          "items": {
+            "enum": [
+              "claude",
+              "codex",
+              "codex-oss"
+            ]
+          },
+          "minItems": 1,
+          "default": [
+            "codex",
+            "claude",
+            "codex-oss"
+          ],
+          "x-display": "ranked"
+        },
+        "approval": {
+          "title": "承認ゲートの厳しさ",
+          "type": "string",
+          "enum": [
+            "standard",
+            "strict"
+          ],
+          "enumTitles": [
+            "standard（送信・辞退で確認）",
+            "strict（外部操作すべてで確認）"
+          ],
+          "default": "strict",
+          "x-display": "radio"
+        },
+        "dry_run": {
+          "title": "ドライラン",
+          "description": "外部への確定操作をせず、計画だけ出します。初回はONを推奨します。",
+          "type": "boolean",
+          "default": true
+        }
+      }
+    },
+    "connectors": {
+      "title": "接続",
+      "description": "接続がなくてもICS/CSVの手動取り込みで動きます。使う口だけONにしてください。",
+      "type": "object",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "calendar": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "calendar_account"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "gmail": {
+          "title": "Gmail",
+          "type": "boolean",
+          "default": false
+        },
+        "calendar": {
+          "title": "Google カレンダー",
+          "type": "boolean",
+          "default": false
+        },
+        "calendar_account": {
+          "title": "カレンダー用アカウント",
+          "description": "接続に使うメールアドレス。カレンダー接続をONにしたときだけ必要です。",
+          "type": "string",
+          "format": "email",
+          "default": "",
+          "placeholder": "you@example.com"
+        }
+      }
+    },
+    "browser": {
+      "title": "ブラウザ操作",
+      "description": "応募フォームの入力補助に使います。サイト別の対応は個別にON/OFFできます。",
+      "type": "object",
+      "properties": {
+        "engine": {
+          "title": "ブラウザ",
+          "type": "string",
+          "enum": [
+            "chrome",
+            "edge",
+            "firefox"
+          ],
+          "enumTitles": [
+            "Chrome",
+            "Edge",
+            "Firefox"
+          ],
+          "default": "chrome",
+          "x-display": "radio"
+        },
+        "site_adapters": {
+          "title": "自動入力を有効にするサイト",
+          "description": "ONにしたサイトだけ入力補助の対象になります。",
+          "type": "array",
+          "items": {
+            "enum": [
+              "ats-a",
+              "ats-b",
+              "portal",
+              "generic-form"
+            ]
+          },
+          "enumTitles": [
+            "ATS-A",
+            "ATS-B",
+            "就活ポータル型",
+            "汎用フォーム"
+          ],
+          "default": [
+            "generic-form"
+          ],
+          "x-display": "checkboxes"
+        }
+      }
+    },
+    "safety": {
+      "title": "安全境界",
+      "description": "本人の代わりに越えてはいけない一線です。この画面からは変更できません。",
+      "type": "object",
+      "properties": {
+        "require_manual_approval_for_submit": {
+          "title": "ES・エントリーの送信は本人の承認が必須",
+          "type": "boolean",
+          "default": true,
+          "readOnly": true
+        },
+        "never_take_assessments": {
+          "title": "Web適性検査・コーディングテストの代理受験をしない",
+          "type": "boolean",
+          "default": true,
+          "readOnly": true
+        }
+      }
+    }
+  }
+}

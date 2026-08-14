@@ -1,0 +1,24 @@
+{
+  "name": "katazuku-shukatsu",
+  "version": "0.1.0",
+  "description": "Local-first, human-in-the-loop automation core for Japanese shukatsu (new-grad job hunting). SQLite single-writer data model, semantic layer, and a schema-driven settings UI.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "scripts": {
+    "test": "npm run test:core && npm run test:application && npm run test:mobility && npm run test:agent-runtime",
+    "test:core": "tsx tests/check-core.ts",
+    "test:application": "tsx tests/check-application.ts",
+    "test:mobility": "tsx tests/check-mobility.ts",
+    "test:agent-runtime": "tsx tests/check-agent-runtime.ts",
+    "seed": "tsx examples/seed.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.20.0",
+    "typescript": "~5.8.3"
+  }
+}

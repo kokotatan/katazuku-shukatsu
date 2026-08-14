@@ -1,0 +1,264 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://katazuku.dev/schemas/application-event.schema.json",
+  "title": "応募自動運転イベント",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["eventId", "runId", "type"],
+  "properties": {
+    "eventId": {
+      "type": "string",
+      "minLength": 1,
+      "description": "イベントの冪等キー"
+    },
+    "runId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "type": {
+      "enum": [
+        "entry_filled",
+        "entry_submitted",
+        "es_filled",
+        "es_submitted",
+        "entry_es_submitted",
+        "assessment_detected",
+        "assessment_ready",
+        "assessment_completed",
+        "awaiting_interview",
+        "interview_scheduled",
+        "paused",
+        "resumed",
+        "failed",
+        "note"
+      ]
+    },
+    "at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "summary": {
+      "type": "string",
+      "maxLength": 500
+    },
+    "sourceRef": {
+      "type": "string"
+    },
+    "approvedByUser": {
+      "type": "boolean"
+    },
+    "materials": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100,
+      "items": {
+        "$ref": "#/$defs/material"
+      }
+    },
+    "assessment": {
+      "$ref": "#/$defs/assessment"
+    },
+    "appointment": {
+      "$ref": "#/$defs/appointment"
+    },
+    "error": {
+      "type": "string",
+      "maxLength": 500
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "enum": [
+              "entry_submitted",
+              "es_submitted",
+              "entry_es_submitted",
+              "assessment_completed"
+            ]
+          }
+        },
+        "required": ["type"]
+      },
+      "then": {
+        "required": ["approvedByUser"],
+        "properties": {
+          "approvedByUser": {
+            "const": true
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "es_filled"
+          }
+        },
+        "required": ["type"]
+      },
+      "then": {
+        "required": ["materials"]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "enum": [
+              "assessment_detected",
+              "assessment_ready",
+              "assessment_completed"
+            ]
+          }
+        },
+        "required": ["type"]
+      },
+      "then": {
+        "required": ["assessment"]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "interview_scheduled"
+          }
+        },
+        "required": ["type"]
+      },
+      "then": {
+        "required": ["appointment"]
+      }
+    }
+  ],
+  "$defs": {
+    "material": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "key",
+        "question",
+        "sourceRef",
+        "contentHash",
+        "charCount"
+      ],
+      "properties": {
+        "key": {
+          "type": "string",
+          "minLength": 1
+        },
+        "question": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sourceRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "contentHash": {
+          "type": "string",
+          "pattern": "^[A-Fa-f0-9]{64}$"
+        },
+        "charCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "charLimit": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "status": {
+          "type": "string"
+        }
+      }
+    },
+    "assessment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["testType"],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "testType": {
+          "type": "string",
+          "minLength": 1
+        },
+        "provider": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "deadline": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "durationMinutes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "reservationAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "allowedItems": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "environmentStatus": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 500,
+          "description": "受検環境や持ち物などの事務情報だけ。問題や解答は禁止"
+        },
+        "sourceRef": {
+          "type": "string"
+        }
+      }
+    },
+    "appointment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["at", "title"],
+      "properties": {
+        "at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "endAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "location": {
+          "type": "string"
+        },
+        "person": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

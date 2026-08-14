@@ -1,0 +1,657 @@
+<title>katazuku 設定</title>
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f2f4f6;
+    --surface: #ffffff;
+    --surface-2: #f7f9fa;
+    --ink: #1f2529;
+    --ink-2: #545f66;      /* 補助文。白背景で 4.5:1 以上 */
+    --ink-3: #6b767d;      /* 最も控えめ。ここより薄くしない */
+    --line: #d3d9dd;
+    --line-strong: #9aa4ab;
+    --action: #0077c7;
+    --action-hover: #0064a8;
+    --action-ink: #0064a8;
+    --action-wash: #e6f1fa;
+    --brand: #12ab8f;       /* ブランドマーク「片」専用 */
+    --danger: #d3455b;      /* DANGER・エラー専用 */
+    --danger-wash: #fbecef;
+    --mono: ui-monospace, "Cascadia Code", "Consolas", "SFMono-Regular", monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif;
+    /* spacing scale: 4 8 12 16 24 32 */
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --bg: #10151a;
+      --surface: #1a2128;
+      --surface-2: #141a20;
+      --ink: #e7ecef;
+      --ink-2: #b3bdc4;
+      --ink-3: #93a0a8;
+      --line: #2b353d;
+      --line-strong: #56646d;
+      --action: #2f92d6;
+      --action-hover: #57a8e0;
+      --action-ink: #7cc2ee;
+      --action-wash: #16303f;
+      --brand: #35c9ac;
+      --danger: #e8677c;
+      --danger-wash: #35222a;
+    }
+  }
+  :root[data-theme="light"] { color-scheme: light;
+    --bg:#f2f4f6; --surface:#fff; --surface-2:#f7f9fa; --ink:#1f2529; --ink-2:#545f66; --ink-3:#6b767d;
+    --line:#d3d9dd; --line-strong:#9aa4ab; --action:#0077c7; --action-hover:#0064a8; --action-ink:#0064a8;
+    --action-wash:#e6f1fa; --brand:#12ab8f; --danger:#d3455b; --danger-wash:#fbecef; }
+  :root[data-theme="dark"] { color-scheme: dark;
+    --bg:#10151a; --surface:#1a2128; --surface-2:#141a20; --ink:#e7ecef; --ink-2:#b3bdc4; --ink-3:#93a0a8;
+    --line:#2b353d; --line-strong:#56646d; --action:#2f92d6; --action-hover:#57a8e0; --action-ink:#7cc2ee;
+    --action-wash:#16303f; --brand:#35c9ac; --danger:#e8677c; --danger-wash:#35222a; }
+
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: var(--sans); background: var(--bg); color: var(--ink);
+    font-size: 16px; line-height: 1.6; -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 32px 20px 64px; transition: max-width .2s; }
+  body.dev .wrap { max-width: 1200px; }
+
+  a { color: var(--action-ink); }
+
+  /* header */
+  header.top { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 24px; }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .mark { width: 36px; height: 36px; border-radius: 8px; background: var(--brand); color: #fff;
+    display: grid; place-items: center; font-weight: 700; font-size: 20px; flex: none; }
+  h1 { font-size: 22px; margin: 0; letter-spacing: .01em; }
+  .sub { color: var(--ink-2); font-size: 14px; margin: 2px 0 0; }
+  .devbtn { font: inherit; font-size: 13px; font-weight: 600; padding: 7px 14px; border-radius: 6px; cursor: pointer;
+    border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink-2); }
+  .devbtn:hover { border-color: var(--action); color: var(--action-ink); }
+  .devbtn:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--action-wash); border-color: var(--action); }
+  .devbtn[aria-pressed="true"] { background: var(--action-wash); border-color: var(--action); color: var(--action-ink); }
+
+  /* layout: default single column; dev = two columns */
+  .layout { display: grid; grid-template-columns: minmax(0,1fr); gap: 20px; align-items: start; }
+  body.dev .layout { grid-template-columns: minmax(0,7fr) minmax(0,5fr); }
+  @media (max-width: 860px) { body.dev .layout { grid-template-columns: minmax(0,1fr); } }
+
+  .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; }
+  .panel > .head { display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    padding: 16px; border-bottom: 1px solid var(--line); background: var(--surface-2); border-radius: 8px 8px 0 0; }
+  .panel > .head .label { font-size: 13px; font-weight: 700; letter-spacing: .04em; color: var(--ink-2); }
+  .panel .body { padding: 16px; }
+
+  /* form */
+  form { margin: 0; }
+  fieldset { border: none; margin: 0; padding: 0; min-width: 0; }
+  .group + .group { margin-top: 32px; padding-top: 24px; border-top: 1px solid var(--line); }
+  .group > legend, .group-title { font-size: 15px; font-weight: 700; color: var(--ink); padding: 0; margin: 0 0 4px; }
+  .group-desc { color: var(--ink-2); font-size: 14px; margin: 0 0 16px; }
+
+  .field + .field { margin-top: 24px; }
+  .field > .flabel { display: block; font-weight: 600; font-size: 15px; margin-bottom: 6px; }
+  .field .fdesc { color: var(--ink-2); font-size: 14px; margin: 0 0 8px; }
+  .req { color: var(--danger); font-size: 13px; margin-left: 6px; font-weight: 600; }
+
+  input[type="text"], input[type="email"], input[type="number"], select {
+    font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--line-strong);
+    border-radius: 6px; padding: 9px 12px; width: 100%; transition: border-color .12s, box-shadow .12s; }
+  input:focus, select:focus { outline: none; border-color: var(--action); box-shadow: 0 0 0 3px var(--action-wash); }
+  input[aria-invalid="true"] { border-color: var(--danger); }
+  .ferror { color: var(--danger); font-size: 13px; margin-top: 6px; display: flex; align-items: center; gap: 6px; }
+  .ferror::before { content: ""; width: 14px; height: 14px; border-radius: 50%; background: var(--danger); color: #fff;
+    display: inline-grid; place-items: center; font-size: 10px; font-weight: 700; }
+  .ferror[data-mark]::before { content: attr(data-mark); }
+
+  /* switch (boolean) */
+  .switch { display: inline-flex; align-items: center; gap: 12px; cursor: pointer; }
+  .switch input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+  .track { width: 42px; height: 24px; border-radius: 100px; background: var(--line-strong); position: relative; transition: background .15s; flex: none; }
+  .track::after { content: ""; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: transform .15s; }
+  .switch input:checked + .track { background: var(--action); }
+  .switch input:checked + .track::after { transform: translateX(18px); }
+  .switch input:focus-visible + .track { box-shadow: 0 0 0 3px var(--action-wash); }
+  .switch .sw-label { font-weight: 600; font-size: 15px; }
+  .switch .sw-val { font-size: 13px; color: var(--ink-2); min-width: 26px; }
+
+  /* locked safety row (static, not a control) */
+  .locked { display: flex; align-items: flex-start; gap: 10px; padding: 12px; border: 1px solid var(--line);
+    border-radius: 6px; background: var(--surface-2); }
+  .locked .state { font-size: 12px; font-weight: 700; letter-spacing: .04em; color: var(--ink-2);
+    border: 1px solid var(--line-strong); border-radius: 4px; padding: 2px 8px; white-space: nowrap; }
+  .locked .txt { font-weight: 600; font-size: 14px; }
+  .locked .note { color: var(--ink-2); font-size: 13px; margin: 2px 0 0; }
+
+  /* choice pills (radio/checkbox) */
+  .choices { display: flex; flex-wrap: wrap; gap: 8px; }
+  .choice { display: inline-flex; align-items: center; gap: 8px; padding: 9px 14px; border: 1px solid var(--line-strong);
+    border-radius: 6px; cursor: pointer; font-size: 14px; background: var(--surface); transition: all .12s; }
+  .choice:hover { border-color: var(--action); }
+  .choice:focus-within { box-shadow: 0 0 0 3px var(--action-wash); border-color: var(--action); }
+  .choice input { accent-color: var(--action); margin: 0; }
+  .choice.on { border-color: var(--action); background: var(--action-wash); color: var(--action-ink); font-weight: 600; }
+
+  /* ranked list */
+  .ranked { display: flex; flex-direction: column; gap: 8px; }
+  .rank-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--line-strong);
+    border-radius: 6px; background: var(--surface-2); font-size: 14px; }
+  .rank-item .idx { width: 22px; height: 22px; border-radius: 4px; background: var(--action); color: #fff;
+    font-size: 12px; font-weight: 700; display: grid; place-items: center; flex: none; }
+  .rank-item .name { flex: 1; font-family: var(--mono); }
+  .rank-item .mvs { display: flex; gap: 6px; }
+  .rank-item .mv { border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink-2);
+    border-radius: 6px; min-width: 32px; height: 32px; cursor: pointer; font-size: 13px; font-weight: 600; }
+  .rank-item .mv:hover:not(:disabled) { border-color: var(--action); color: var(--action-ink); }
+  .rank-item .mv:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--action-wash); border-color: var(--action); }
+  .rank-item .mv:disabled { opacity: .4; cursor: default; }
+
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+  /* action bar */
+  .bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 28px;
+    padding-top: 20px; border-top: 1px solid var(--line); }
+  .btn { font: inherit; font-size: 14px; font-weight: 600; padding: 9px 18px; border-radius: 6px; cursor: pointer;
+    border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink); }
+  .btn:hover { border-color: var(--action); color: var(--action-ink); }
+  .btn:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--action-wash); border-color: var(--action); }
+  .btn.primary { background: var(--action); border-color: var(--action); color: #fff; }
+  .btn.primary:hover { background: var(--action-hover); border-color: var(--action-hover); color: #fff; }
+  .btn:disabled { opacity: .5; cursor: not-allowed; border-color: var(--line-strong); color: var(--ink-2); background: var(--surface); }
+  .status { font-size: 13px; }
+  .status.ok { color: var(--ink-2); }
+  .status.bad { color: var(--danger); font-weight: 600; }
+  .saved-chip { font-size: 12px; color: var(--ink-2); border: 1px solid var(--line); border-radius: 100px; padding: 3px 10px; }
+  .spacer { margin-left: auto; }
+
+  /* dev output panel */
+  .output-panel { display: none; position: sticky; top: 16px; }
+  body.dev .output-panel { display: block; }
+  .tabs { display: flex; gap: 4px; }
+  .tab { font: inherit; font-size: 13px; font-weight: 600; padding: 6px 12px; border: 1px solid transparent;
+    border-radius: 6px 6px 0 0; background: transparent; color: var(--ink-2); cursor: pointer; border-bottom: 2px solid transparent; }
+  .tab[aria-selected="true"] { color: var(--action-ink); background: var(--action-wash); border-bottom-color: var(--action); }
+  .tab:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--action-wash); }
+  pre { margin: 0; padding: 16px; font-family: var(--mono); font-size: 13.5px; line-height: 1.7; color: var(--ink);
+    overflow-x: auto; background: var(--surface-2); max-height: 560px; border-radius: 0 0 8px 8px; }
+  .dev-note { font-size: 13px; color: var(--ink-2); padding: 0 16px 12px; }
+  /* syntax colors: 役割ルール順守。teal/red は使わない */
+  .ykey { color: var(--action-ink); }
+  .ystr, .ynum { color: var(--ink); }
+  .ybool { color: var(--ink); font-weight: 700; }
+  .ycom { color: var(--ink-3); }
+
+  .foot { margin-top: 28px; color: var(--ink-2); font-size: 13px; }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <div class="mark" aria-hidden="true">片</div>
+      <div>
+        <h1>katazuku 設定</h1>
+        <p class="sub">応募支援で使う接続先と、自動操作の範囲を設定します</p>
+      </div>
+    </div>
+    <button class="devbtn" id="devToggle" type="button" aria-pressed="false">開発者ビュー</button>
+  </header>
+
+  <div class="layout">
+    <section class="panel">
+      <div class="head"><span class="label">設定</span></div>
+      <div class="body">
+        <form id="form" novalidate></form>
+        <div class="bar">
+          <span class="status" id="status" role="status" aria-live="polite">設定に問題はありません</span>
+          <span class="spacer"></span>
+          <span class="saved-chip" id="saved">未保存</span>
+          <button class="btn" id="resetBtn" type="button" disabled>既定値に戻す</button>
+          <button class="btn primary" id="saveBtn" type="button">保存</button>
+        </div>
+      </div>
+    </section>
+
+    <aside class="output-panel panel" aria-label="生成される設定（開発者ビュー）">
+      <div class="head">
+        <div class="tabs" role="tablist" aria-label="出力形式">
+          <button class="tab" role="tab" id="tab-yaml" aria-selected="true" aria-controls="outPanel" tabindex="0" type="button">config.yaml</button>
+          <button class="tab" role="tab" id="tab-json" aria-selected="false" aria-controls="outPanel" tabindex="-1" type="button">config.json</button>
+          <button class="tab" role="tab" id="tab-schema" aria-selected="false" aria-controls="outPanel" tabindex="-1" type="button">settings.schema.json</button>
+        </div>
+        <button class="btn" id="copyBtn" type="button" style="padding:6px 12px;font-size:13px">コピー</button>
+      </div>
+      <p class="dev-note">この画面は <code>settings.schema.json</code> から生成されています。フォーム・検証・下の出力はすべてこの1枚に追従します。</p>
+      <pre id="outPanel" role="tabpanel" aria-labelledby="tab-yaml" tabindex="0"></pre>
+    </aside>
+  </div>
+
+  <p class="foot">設定はこの端末にのみ保存されます。「安全境界」の項目は変更できません。</p>
+</div>
+
+<script>
+const SCHEMA = {
+  title: "katazuku settings", type: "object",
+  properties: {
+    profile: {
+      title: "本人設定", description: "就活の前提。ここは人によって変わる値です。",
+      type: "object", required: ["graduation_year"], properties: {
+        graduation_year: { title: "卒業年コホート", description: "一括採用の年次。プレエントリー期限や募集要項の判定に使います。",
+          type: "integer", enum: [2026, 2027, 2028, 2029], default: 2028, "x-display": "select" },
+        display_name: { title: "表示名", description: "画面表示だけに使います。",
+          type: "string", default: "", maxLength: 40, format: "name", placeholder: "例: 就活 太郎" }
+      }
+    },
+    agent: {
+      title: "エージェント実行", description: "自動運転の実行役と、その慎重さ。",
+      type: "object", properties: {
+        provider_order: { title: "プロバイダ優先順位", description: "利用枠切れ・認証切れのとき、副作用を始めていない場合だけ次へ切り替えます。",
+          type: "array", items: { enum: ["claude", "codex", "codex-oss"] }, minItems: 1,
+          default: ["codex", "claude", "codex-oss"], "x-display": "ranked" },
+        approval: { title: "承認ゲートの厳しさ", type: "string",
+          enum: ["standard", "strict"], enumTitles: ["standard（送信・辞退で確認）", "strict（外部操作すべてで確認）"],
+          default: "strict", "x-display": "radio" },
+        dry_run: { title: "ドライラン", description: "外部への確定操作をせず、計画だけ出します。初回はONを推奨します。",
+          type: "boolean", default: true }
+      }
+    },
+    connectors: {
+      title: "接続", description: "接続がなくてもICS/CSVの手動取り込みで動きます。使う口だけONにしてください。",
+      type: "object",
+      allOf: [{ if: { properties: { calendar: { const: true } } }, then: { required: ["calendar_account"] } }],
+      properties: {
+        gmail: { title: "Gmail", type: "boolean", default: false },
+        calendar: { title: "Google カレンダー", type: "boolean", default: false },
+        calendar_account: { title: "カレンダー用アカウント", description: "接続に使うメールアドレス。カレンダー接続をONにしたときだけ必要です。",
+          type: "string", format: "email", default: "", placeholder: "you@example.com" }
+      }
+    },
+    browser: {
+      title: "ブラウザ操作", description: "応募フォームの入力補助に使います。サイト別の対応は個別にON/OFFできます。",
+      type: "object", properties: {
+        engine: { title: "ブラウザ", type: "string", enum: ["chrome", "edge", "firefox"],
+          enumTitles: ["Chrome", "Edge", "Firefox"], default: "chrome", "x-display": "radio" },
+        site_adapters: { title: "自動入力を有効にするサイト", description: "ONにしたサイトだけ入力補助の対象になります。",
+          type: "array", items: { enum: ["ats-a", "ats-b", "portal", "generic-form"] },
+          enumTitles: ["ATS-A", "ATS-B", "就活ポータル型", "汎用フォーム"],
+          default: ["generic-form"], "x-display": "checkboxes" }
+      }
+    },
+    safety: {
+      title: "安全境界", description: "本人の代わりに越えてはいけない一線です。この画面からは変更できません。",
+      type: "object", properties: {
+        require_manual_approval_for_submit: { title: "ES・エントリーの送信は本人の承認が必須", type: "boolean", default: true, readOnly: true },
+        never_take_assessments: { title: "Web適性検査・コーディングテストの代理受験をしない", type: "boolean", default: true, readOnly: true }
+      }
+    }
+  }
+};
+const FORMATS = { email: { re: /^[^@\s]+@[^@\s]+\.[^@\s]+$/, msg: "メールアドレスの形式が正しくありません" } };
+const STORAGE_KEY = "katazuku.settings.v1";
+
+let config = {};
+const errors = new Map();
+const touched = new Set();
+let submitAttempted = false;
+
+// ---- defaults / load / save ----
+function defaultsFrom(schema) {
+  const out = {};
+  for (const [k, p] of Object.entries(schema.properties || {})) {
+    out[k] = p.type === "object" ? defaultsFrom(p) : (Array.isArray(p.default) ? p.default.slice() : p.default);
+  }
+  return out;
+}
+function deepMerge(base, over) {
+  const out = Array.isArray(base) ? base.slice() : { ...base };
+  if (!over || typeof over !== "object") return out;
+  for (const [k, v] of Object.entries(over)) {
+    if (!(k in out)) continue;
+    if (out[k] && typeof out[k] === "object" && !Array.isArray(out[k]) && v && typeof v === "object" && !Array.isArray(v)) out[k] = deepMerge(out[k], v);
+    else out[k] = Array.isArray(v) ? v.slice() : v;
+  }
+  return out;
+}
+function loadConfig() {
+  const base = defaultsFrom(SCHEMA);
+  try { const raw = localStorage.getItem(STORAGE_KEY); if (raw) return deepMerge(base, JSON.parse(raw)); } catch (e) {}
+  return base;
+}
+function isDirty() { return JSON.stringify(config) !== JSON.stringify(savedSnapshot()); }
+function savedSnapshot() {
+  const base = defaultsFrom(SCHEMA);
+  try { const raw = localStorage.getItem(STORAGE_KEY); if (raw) return deepMerge(base, JSON.parse(raw)); } catch (e) {}
+  return base;
+}
+
+// ---- validation (fully schema-driven) ----
+function isBlank(v) { return v == null || (typeof v === "string" && v.trim() === ""); }
+function matchesCond(schema, data) {
+  for (const [k, cond] of Object.entries(schema.properties || {})) if ("const" in cond && data[k] !== cond.const) return false;
+  return true;
+}
+function validateObject(schema, data, path) {
+  const required = new Set(schema.required || []);
+  for (const branch of schema.allOf || []) if (branch.if && branch.then && matchesCond(branch.if, data)) (branch.then.required || []).forEach(r => required.add(r));
+  for (const [k, prop] of Object.entries(schema.properties || {})) {
+    const p = path ? path + "." + k : k, v = data[k];
+    if (prop.type === "object") { validateObject(prop, v || {}, p); continue; }
+    if (Array.isArray(v)) { if (prop.minItems && v.length < prop.minItems) errors.set(p, `${prop.minItems}件以上選んでください`); continue; }
+    if (required.has(k) && isBlank(v)) { errors.set(p, "必須項目です"); continue; }
+    if (isBlank(v)) continue;
+    if (prop.format && FORMATS[prop.format] && !FORMATS[prop.format].re.test(v)) { errors.set(p, FORMATS[prop.format].msg); continue; }
+    if (prop.pattern && !new RegExp(prop.pattern).test(v)) { errors.set(p, "形式が正しくありません"); continue; }
+    if (typeof v === "string") {
+      if (prop.minLength && v.length < prop.minLength) errors.set(p, `${prop.minLength}文字以上で入力してください`);
+      if (prop.maxLength && v.length > prop.maxLength) errors.set(p, `${prop.maxLength}文字以内で入力してください`);
+    }
+    if (typeof v === "number") {
+      if (prop.minimum != null && v < prop.minimum) errors.set(p, `${prop.minimum}以上にしてください`);
+      if (prop.maximum != null && v > prop.maximum) errors.set(p, `${prop.maximum}以下にしてください`);
+    }
+  }
+}
+function requiredNow(gk, fk) {
+  const group = SCHEMA.properties[gk];
+  const req = new Set(group.required || []);
+  for (const b of group.allOf || []) if (b.if && b.then && matchesCond(b.if, config[gk])) (b.then.required || []).forEach(r => req.add(r));
+  return req.has(fk);
+}
+
+// ---- form generation ----
+const form = document.getElementById("form");
+function idOf(gk, fk) { return `f-${gk}-${fk}`; }
+
+function buildForm() {
+  form.innerHTML = "";
+  for (const [gk, group] of Object.entries(SCHEMA.properties)) {
+    const fs = document.createElement("fieldset"); fs.className = "group";
+    const lg = document.createElement("legend"); lg.textContent = group.title; fs.appendChild(lg);
+    if (group.description) { const d = document.createElement("p"); d.className = "group-desc"; d.textContent = group.description; fs.appendChild(d); }
+    for (const [fk, prop] of Object.entries(group.properties)) fs.appendChild(buildField(gk, fk, prop));
+    form.appendChild(fs);
+  }
+}
+
+function buildField(gk, fk, prop) {
+  const wrap = document.createElement("div"); wrap.className = "field"; wrap.dataset.field = gk + "." + fk;
+  const disp = prop["x-display"] || inferDisplay(prop);
+
+  if (prop.type === "boolean" && prop.readOnly) return buildLocked(gk, fk, prop, wrap);
+  if (prop.type === "boolean") return buildSwitch(gk, fk, prop, wrap);
+
+  // group-type controls (radio/checkboxes/ranked) use fieldset+legend for semantics
+  if (disp === "radio" || disp === "checkboxes" || disp === "ranked") {
+    const fs = document.createElement("fieldset");
+    const lg = document.createElement("legend"); lg.className = "flabel"; lg.style.marginBottom = "6px";
+    lg.appendChild(document.createTextNode(prop.title));
+    if (requiredNow(gk, fk)) lg.appendChild(reqMark());
+    fs.appendChild(lg);
+    if (prop.description) { const d = document.createElement("p"); d.className = "fdesc"; d.textContent = prop.description; fs.appendChild(d); }
+    const control = disp === "radio" ? buildRadio(gk, fk, prop) : disp === "checkboxes" ? buildCheckboxes(gk, fk, prop) : buildRanked(gk, fk, prop);
+    fs.appendChild(control);
+    wrap.appendChild(fs);
+    wrap.appendChild(errorSlot(gk, fk));
+    return wrap;
+  }
+
+  // single input (select / text / email / number)
+  const id = idOf(gk, fk);
+  const lab = document.createElement("label"); lab.className = "flabel"; lab.htmlFor = id;
+  lab.appendChild(document.createTextNode(prop.title));
+  if (requiredNow(gk, fk)) lab.appendChild(reqMark());
+  wrap.appendChild(lab);
+  if (prop.description) { const d = document.createElement("p"); d.className = "fdesc"; d.id = id + "-desc"; d.textContent = prop.description; wrap.appendChild(d); }
+  const control = disp === "select" ? buildSelect(gk, fk, prop, id) : buildText(gk, fk, prop, id);
+  const describedBy = [prop.description ? id + "-desc" : null, id + "-error"].filter(Boolean).join(" ");
+  control.setAttribute("aria-describedby", describedBy);
+  if (requiredNow(gk, fk)) control.setAttribute("aria-required", "true");
+  wrap.appendChild(control);
+  wrap.appendChild(errorSlot(gk, fk));
+  return wrap;
+}
+
+function reqMark() { const s = document.createElement("span"); s.className = "req"; s.textContent = "必須"; return s; }
+function errorSlot(gk, fk) { const e = document.createElement("p"); e.className = "ferror"; e.id = idOf(gk, fk) + "-error"; e.dataset.err = gk + "." + fk; e.hidden = true; return e; }
+function inferDisplay(prop) {
+  if (prop.type === "array") return "checkboxes";
+  if (prop.enum) return "select";
+  return "text";
+}
+function optTitle(prop, val) {
+  if (prop.enumTitles && prop.enum) { const i = prop.enum.indexOf(val); if (i >= 0) return prop.enumTitles[i]; }
+  if (prop.items && prop.items.enum && prop.enumTitles) { const i = prop.items.enum.indexOf(val); if (i >= 0) return prop.enumTitles[i]; }
+  return String(val);
+}
+
+function buildSelect(gk, fk, prop, id) {
+  const sel = document.createElement("select"); sel.id = id;
+  for (const v of prop.enum) { const o = document.createElement("option"); o.value = String(v); o.textContent = optTitle(prop, v); if (config[gk][fk] === v) o.selected = true; sel.appendChild(o); }
+  sel.addEventListener("change", () => { config[gk][fk] = prop.type === "integer" ? parseInt(sel.value, 10) : sel.value; onChange(); });
+  return sel;
+}
+function buildText(gk, fk, prop, id) {
+  const inp = document.createElement("input");
+  inp.id = id;
+  inp.type = prop.format === "email" ? "email" : (prop.type === "integer" || prop.type === "number") ? "number" : "text";
+  if (prop.format === "email") inp.autocomplete = "email";
+  else if (prop.format === "name") inp.autocomplete = "name";
+  inp.value = config[gk][fk] ?? "";
+  if (prop.placeholder) inp.placeholder = prop.placeholder;
+  inp.addEventListener("input", () => {
+    let v = inp.value; if (prop.type === "integer") v = v === "" ? "" : parseInt(v, 10);
+    config[gk][fk] = v; recompute(); renderOutput(); syncBar();
+  });
+  inp.addEventListener("blur", () => { touched.add(gk + "." + fk); paintErrors(); });
+  return inp;
+}
+function buildRadio(gk, fk, prop) {
+  const box = document.createElement("div"); box.className = "choices";
+  for (const v of prop.enum) {
+    const lab = document.createElement("label"); lab.className = "choice" + (config[gk][fk] === v ? " on" : "");
+    const inp = document.createElement("input"); inp.type = "radio"; inp.name = gk + "_" + fk; inp.value = v; inp.checked = config[gk][fk] === v;
+    inp.addEventListener("change", () => {
+      config[gk][fk] = v; touched.add(gk + "." + fk);
+      box.querySelectorAll(".choice").forEach((c, i) => c.classList.toggle("on", prop.enum[i] === v));
+      onChange();
+    });
+    lab.append(inp, document.createTextNode(optTitle(prop, v))); box.appendChild(lab);
+  }
+  return box;
+}
+function buildCheckboxes(gk, fk, prop) {
+  const box = document.createElement("div"); box.className = "choices";
+  for (const v of prop.items.enum) {
+    const on = (config[gk][fk] || []).includes(v);
+    const lab = document.createElement("label"); lab.className = "choice" + (on ? " on" : "");
+    const inp = document.createElement("input"); inp.type = "checkbox"; inp.checked = on;
+    inp.addEventListener("change", () => {
+      const arr = config[gk][fk];
+      if (inp.checked) { if (!arr.includes(v)) arr.push(v); } else config[gk][fk] = arr.filter(x => x !== v);
+      touched.add(gk + "." + fk); lab.classList.toggle("on", inp.checked); onChange();
+    });
+    lab.append(inp, document.createTextNode(optTitle(prop, v))); box.appendChild(lab);
+  }
+  return box;
+}
+function buildRanked(gk, fk, prop) {
+  const box = document.createElement("div"); box.className = "ranked";
+  box.dataset.rank = gk + "." + fk;
+  paintRanked(box, gk, fk, prop);
+  return box;
+}
+function paintRanked(box, gk, fk, prop, focusName) {
+  const arr = config[gk][fk]; box.innerHTML = "";
+  arr.forEach((v, i) => {
+    const row = document.createElement("div"); row.className = "rank-item";
+    const idx = document.createElement("span"); idx.className = "idx"; idx.textContent = String(i + 1);
+    const name = document.createElement("span"); name.className = "name"; name.textContent = v;
+    const mvs = document.createElement("div"); mvs.className = "mvs";
+    const up = mvBtn("上へ", `${v}を上へ移動`, i === 0, () => move(gk, fk, prop, box, i, -1));
+    const dn = mvBtn("下へ", `${v}を下へ移動`, i === arr.length - 1, () => move(gk, fk, prop, box, i, +1));
+    up.dataset.for = v + ":up"; dn.dataset.for = v + ":down";
+    mvs.append(up, dn); row.append(idx, name, mvs); box.appendChild(row);
+  });
+  if (focusName) { const btn = box.querySelector(`[data-for="${focusName}"]`); if (btn && !btn.disabled) btn.focus(); }
+}
+function mvBtn(text, aria, disabled, fn) {
+  const b = document.createElement("button"); b.type = "button"; b.className = "mv"; b.textContent = text;
+  b.setAttribute("aria-label", aria); b.disabled = disabled; b.addEventListener("click", fn); return b;
+}
+function move(gk, fk, prop, box, i, dir) {
+  const arr = config[gk][fk], j = i + dir; if (j < 0 || j >= arr.length) return;
+  const moved = arr[i]; [arr[j], arr[i]] = [arr[i], arr[j]]; touched.add(gk + "." + fk);
+  const newIdx = arr.indexOf(moved);
+  paintRanked(box, gk, fk, prop, moved + ":" + (dir < 0 ? "up" : "down"));
+  announce(`${moved}を${newIdx + 1}番目に移動しました`);
+  onChange();
+}
+function buildSwitch(gk, fk, prop, wrap) {
+  const id = idOf(gk, fk);
+  const row = document.createElement("label"); row.className = "switch"; row.htmlFor = id;
+  const inp = document.createElement("input"); inp.type = "checkbox"; inp.id = id; inp.checked = !!config[gk][fk];
+  const track = document.createElement("span"); track.className = "track"; track.setAttribute("aria-hidden", "true");
+  const labtxt = document.createElement("span"); labtxt.className = "sw-label"; labtxt.textContent = prop.title;
+  const val = document.createElement("span"); val.className = "sw-val"; val.textContent = inp.checked ? "ON" : "OFF";
+  if (prop.description) inp.setAttribute("aria-describedby", id + "-desc");
+  inp.addEventListener("change", () => { config[gk][fk] = inp.checked; val.textContent = inp.checked ? "ON" : "OFF"; touched.add(gk + "." + fk); rebuildDependents(gk); onChange(); });
+  row.append(inp, track, labtxt, val); wrap.appendChild(row);
+  if (prop.description) { const d = document.createElement("p"); d.className = "fdesc"; d.id = id + "-desc"; d.style.margin = "6px 0 0"; d.textContent = prop.description; wrap.appendChild(d); }
+  return wrap;
+}
+function buildLocked(gk, fk, prop, wrap) {
+  const box = document.createElement("div"); box.className = "locked";
+  const state = document.createElement("span"); state.className = "state"; state.textContent = "固定・有効";
+  const body = document.createElement("div");
+  const t = document.createElement("div"); t.className = "txt"; t.textContent = prop.title;
+  const n = document.createElement("p"); n.className = "note"; n.textContent = "安全上の理由で、この画面からは変更できません。";
+  body.append(t, n); box.append(state, body); wrap.appendChild(box);
+  return wrap;
+}
+
+// toggling a boolean can change required-state of siblings (calendar → account): rebuild that group only
+function rebuildDependents(gk) {
+  const group = SCHEMA.properties[gk];
+  if (!(group.allOf && group.allOf.length)) return;
+  const fs = [...form.querySelectorAll("fieldset.group")].find(el => el.querySelector("legend")?.textContent === group.title);
+  if (!fs) return;
+  const scrollY = window.scrollY;
+  const rebuilt = document.createElement("fieldset"); rebuilt.className = "group";
+  const lg = document.createElement("legend"); lg.textContent = group.title; rebuilt.appendChild(lg);
+  if (group.description) { const d = document.createElement("p"); d.className = "group-desc"; d.textContent = group.description; rebuilt.appendChild(d); }
+  for (const [fk, prop] of Object.entries(group.properties)) rebuilt.appendChild(buildField(gk, fk, prop));
+  fs.replaceWith(rebuilt); window.scrollTo(0, scrollY);
+}
+
+// ---- state → paint ----
+function recompute() { errors.clear(); validateObject(SCHEMA, config, ""); }
+function paintErrors() {
+  document.querySelectorAll("[data-err]").forEach(el => {
+    const key = el.dataset.err, msg = errors.get(key);
+    const show = !!msg && (submitAttempted || touched.has(key));
+    el.hidden = !show; el.textContent = show ? msg : "";
+    const field = el.closest("[data-field]");
+    const input = field && field.querySelector("input[type=text],input[type=email],input[type=number],select");
+    if (input) input.setAttribute("aria-invalid", show ? "true" : "false");
+  });
+  syncBar();
+}
+function syncBar() {
+  const s = document.getElementById("status");
+  const shown = [...errors.keys()].filter(k => submitAttempted || touched.has(k)).length;
+  if (errors.size === 0) { s.textContent = "設定に問題はありません"; s.className = "status ok"; }
+  else if (shown > 0) { s.textContent = `${shown}件の入力を確認してください`; s.className = "status bad"; }
+  else { s.textContent = ""; s.className = "status ok"; }
+  document.getElementById("saved").textContent = localStorage.getItem(STORAGE_KEY) ? (isDirty() ? "未保存の変更あり" : "保存済み") : "未保存";
+  document.getElementById("resetBtn").disabled = !isDirty();
+  const copyBtn = document.getElementById("copyBtn"); if (copyBtn) copyBtn.disabled = errors.size > 0;
+}
+function onChange() { recompute(); paintErrors(); renderOutput(); }
+
+// ---- output (dev view) ----
+let view = "yaml";
+function renderOutput() {
+  if (!document.body.classList.contains("dev")) return;
+  const out = document.getElementById("outPanel");
+  if (view === "schema") out.innerHTML = highlight(JSON.stringify(SCHEMA, null, 2));
+  else if (view === "json") out.innerHTML = highlight(JSON.stringify(config, null, 2));
+  else out.innerHTML = toYaml(config);
+}
+const LOCKED_KEYS = new Set();
+(function collect(props) { for (const [k, p] of Object.entries(props)) { if (p.readOnly) LOCKED_KEYS.add(k); if (p.properties) collect(p.properties); } })(SCHEMA.properties);
+function toYaml(obj, indent = 0) {
+  let s = ""; const pad = "  ".repeat(indent);
+  for (const [k, v] of Object.entries(obj)) {
+    const note = LOCKED_KEYS.has(k) ? '  <span class="ycom"># 固定（安全境界）</span>' : "";
+    if (v && typeof v === "object" && !Array.isArray(v)) { s += `${pad}<span class="ykey">${k}</span>:\n` + toYaml(v, indent + 1); }
+    else if (Array.isArray(v)) { s += `${pad}<span class="ykey">${k}</span>:${v.length ? "" : " []"}\n`; for (const it of v) s += `${pad}  - <span class="ystr">${esc(it)}</span>\n`; }
+    else s += `${pad}<span class="ykey">${k}</span>: ${scalar(v)}${note}\n`;
+  }
+  return s;
+}
+function scalar(v) {
+  if (typeof v === "boolean") return `<span class="ybool">${v}</span>`;
+  if (typeof v === "number") return `<span class="ynum">${v}</span>`;
+  if (v === "" || v == null) return `<span class="ycom">""</span>`;
+  return `<span class="ystr">${esc(v)}</span>`;
+}
+function highlight(json) {
+  return esc(json)
+    .replace(/&quot;([^&]+?)&quot;(\s*:)/g, '<span class="ykey">&quot;$1&quot;</span>$2')
+    .replace(/:\s*&quot;([^&]*?)&quot;/g, ': <span class="ystr">&quot;$1&quot;</span>')
+    .replace(/:\s*(-?\d+\.?\d*)/g, ': <span class="ynum">$1</span>')
+    .replace(/:\s*(true|false)/g, ': <span class="ybool">$1</span>');
+}
+function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+
+// ---- announcements ----
+let liveEl;
+function announce(msg) { if (!liveEl) { liveEl = document.createElement("div"); liveEl.className = "sr-only"; liveEl.setAttribute("aria-live", "polite"); document.body.appendChild(liveEl); } liveEl.textContent = ""; setTimeout(() => liveEl.textContent = msg, 30); }
+
+// ---- actions ----
+function saveConfig() {
+  submitAttempted = true; recompute(); paintErrors();
+  if (errors.size > 0) { const s = document.getElementById("status"); s.textContent = `${errors.size}件の入力を確認してください`; s.className = "status bad"; announce("保存できません。入力を確認してください"); return; }
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(config)); announce("設定を保存しました"); } catch (e) {}
+  submitAttempted = false; syncBar();
+}
+document.getElementById("saveBtn").addEventListener("click", saveConfig);
+document.getElementById("resetBtn").addEventListener("click", () => {
+  if (isDirty() && !confirm("入力内容を既定値に戻します。よろしいですか?")) return;
+  config = defaultsFrom(SCHEMA); touched.clear(); submitAttempted = false; buildForm(); onChange(); announce("既定値に戻しました");
+});
+document.getElementById("copyBtn").addEventListener("click", async () => {
+  const text = view === "schema" ? JSON.stringify(SCHEMA, null, 2) : view === "json" ? JSON.stringify(config, null, 2) : document.getElementById("outPanel").textContent;
+  try { await navigator.clipboard.writeText(text); announce("コピーしました"); } catch (e) { announce("コピーできませんでした"); }
+});
+
+// dev toggle
+const devToggle = document.getElementById("devToggle");
+devToggle.addEventListener("click", () => {
+  const on = devToggle.getAttribute("aria-pressed") !== "true";
+  devToggle.setAttribute("aria-pressed", on ? "true" : "false");
+  document.body.classList.toggle("dev", on); renderOutput();
+});
+
+// tabs (roving tabindex + arrow keys)
+const tabs = [...document.querySelectorAll('[role="tab"]')];
+tabs.forEach((tab, i) => {
+  tab.addEventListener("click", () => selectTab(i));
+  tab.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowRight" || e.key === "ArrowLeft") { e.preventDefault(); selectTab((i + (e.key === "ArrowRight" ? 1 : tabs.length - 1)) % tabs.length, true); }
+    else if (e.key === "Home") { e.preventDefault(); selectTab(0, true); }
+    else if (e.key === "End") { e.preventDefault(); selectTab(tabs.length - 1, true); }
+  });
+});
+function selectTab(i, focus) {
+  tabs.forEach((t, j) => { const on = i === j; t.setAttribute("aria-selected", on ? "true" : "false"); t.tabIndex = on ? 0 : -1; });
+  view = ["yaml", "json", "schema"][i];
+  document.getElementById("outPanel").setAttribute("aria-labelledby", tabs[i].id);
+  if (focus) tabs[i].focus();
+  renderOutput();
+}
+
+// ---- init ----
+config = loadConfig();
+buildForm();
+onChange();
+</script>
