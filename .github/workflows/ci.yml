@@ -1,0 +1,21 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm ci
+      # 個人情報・秘密情報の混入検査(形ベース)。固有名詞の遮断は private 側の SCAN_BLOCKLIST で行う。
+      - run: npm run scan
+      # 依存ゼロの自前assertテスト(core / application / mobility / agent-runtime)
+      - run: npm test

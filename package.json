@@ -8,6 +8,8 @@
     "node": ">=22.5.0"
   },
   "scripts": {
+    "check": "npm run scan && npm test",
+    "scan": "node tools/scan-secrets.mjs",
     "test": "npm run test:core && npm run test:application && npm run test:mobility && npm run test:agent-runtime",
     "test:core": "tsx tests/check-core.ts",
     "test:application": "tsx tests/check-application.ts",
