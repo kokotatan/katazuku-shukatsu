@@ -207,8 +207,13 @@ if ($ok) {
         ssh -o BatchMode=yes minipc $walk 2>&1 | Out-File -FilePath $logFile -Append -Encoding utf8
       }
       $remoteDbJson = 'C:\Users\okuya\katazuku-shukatsu\logs\interviews\' + (Split-Path $dbJson -Leaf)
+      # db.json のファイル名には空白が入る(例 kubell-kubell 面接 澤井さん(...)-db.json)ので引用符が要るが、
+      # PowerShell 5.1 はネイティブexe(ssh)へ渡す引数から素の " を落とす。
+      # 2026-08-14の実害: 引用符なしでリモートに届き、cmdが空白で切って 'kubell-kubell' を開こうとし
+      # ENOENT でDB反映が丸ごと止まった(文字起こしとdb.json生成は成功済みだった)。
+      # \" と書けば ssh の向こうに " として届く(同日 dir で実測: 素の"はC:\Users\okuyaを列挙、\"は当該ファイルに命中)。
       $applyCmd = 'cd %USERPROFILE%\katazuku-shukatsu\sync && ' +
-        ('npx tsx scripts/db-apply-interview.ts "' + $remoteDbJson + '" && npx tsx scripts/photo-sync.ts && npx tsx scripts/db-snapshot.ts')
+        ('npx tsx scripts/db-apply-interview.ts \"' + $remoteDbJson + '\" && npx tsx scripts/photo-sync.ts && npx tsx scripts/db-snapshot.ts')
       ssh -o BatchMode=yes minipc $applyCmd 2>&1 | Out-File -FilePath $logFile -Append -Encoding utf8
       if ($LASTEXITCODE -ne 0) { throw 'minipc側でのDB反映に失敗しました' }
     } finally { $ErrorActionPreference = $prevEAPr }
