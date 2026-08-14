@@ -477,15 +477,16 @@ export const executeProcess: ProcessExecutor = async (invocation, timeoutMs) => 
       timedOut = true
       child.kill()
     }, timeoutMs)
-    child.stdout.on('data', (chunk) => { stdout += String(chunk) })
-    child.stderr.on('data', (chunk) => { stderr += String(chunk) })
+    // stdio は 'pipe' で spawn しているため各ストリームは非nullだが、型上は null 許容なので明示する。
+    child.stdout?.on('data', (chunk) => { stdout += String(chunk) })
+    child.stderr?.on('data', (chunk) => { stderr += String(chunk) })
     child.on('error', (error: NodeJS.ErrnoException) => finish({ errorCode: error.code }))
     child.on('close', (exitCode, signal) => finish({ exitCode, signal }))
     // spawn失敗(ENOENT)時、stdinへの書き込みがEPIPE/ENOENTを別途投げ得る。
     // プロセスの'error'とは別ストリームなので、no-opリスナーで未処理例外化を防ぐ(finishはchild.on('error')が担う)。
-    child.stdin.on('error', () => {})
-    if (invocation.stdin !== undefined) child.stdin.end(invocation.stdin)
-    else child.stdin.end()
+    child.stdin?.on('error', () => {})
+    if (invocation.stdin !== undefined) child.stdin?.end(invocation.stdin)
+    else child.stdin?.end()
   })
 }
 

@@ -155,3 +155,8 @@ credential-store/
 mirror-out.json
 *-import-*.json
 *-export-*.json
+
+# SQLite WAL副産物(クラウド同期FSで破損しうる。コミットもしない)
+*.db-wal
+*.db-shm
+*.db-journal

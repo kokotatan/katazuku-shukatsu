@@ -48,6 +48,10 @@ export function applyDiff(db: DatabaseSync, items: DiffItem[], by = 'daily-sync'
     const name = (it.name ?? '').trim()
     if (!name) continue
 
+    // stage を実行時に検証する。未知のstage(タイポ・将来値・外部LLMの誤り)1件で
+    // バッチ全体がロールバックしないよう、その1件だけ skip する。
+    if (!(it.stage in STATUS_FOR)) { res.skipped.push(name); continue }
+
     // 名寄せ(2026-07-18本人方針): 正式名称・学習済み別名だけ自動。似ているだけなら本人確認に積んで触らない
     const r = resolveCompany(db, name)
     if (r.kind === 'suspicious') {
@@ -151,7 +155,7 @@ const invokedDirectly =
   resolve(process.argv[1]).toLowerCase() === fileURLToPath(import.meta.url).toLowerCase()
 
 if (invokedDirectly) {
-  const DB_PATH = process.env.KATAZUKU_DB ?? join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'data', 'katazuku.db')
+  const DB_PATH = (process.env.KATAZUKU_DB || process.env.KATAZUKU_DB_PATH) ?? join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'data', 'katazuku.db')
   const args = process.argv.slice(2)
   const diffPath = args.find((a) => !a.startsWith('--'))
   if (!diffPath) {

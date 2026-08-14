@@ -6,8 +6,16 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   check:
+    # 正のゲート: Node 24(node:sqlite 安定)で scan + typecheck + test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -17,5 +25,20 @@ jobs:
       - run: npm ci
       # 個人情報・秘密情報の混入検査(形ベース)。固有名詞の遮断は private 側の SCAN_BLOCKLIST で行う。
       - run: npm run scan
-      # 依存ゼロの自前assertテスト(core / application / mobility / agent-runtime)
+      - run: npm run typecheck
+      - run: npm test
+
+  compat-node22:
+    # 互換確認: engines の下限 Node 22。node:sqlite は 22 系では experimental フラグが要る。
+    # 情報提供目的で非ブロッキング(continue-on-error)。
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    env:
+      NODE_OPTIONS: --experimental-sqlite
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
       - run: npm test

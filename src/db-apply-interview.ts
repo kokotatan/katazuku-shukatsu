@@ -45,7 +45,7 @@ interface InterviewInput {
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 const dbArgIndex = process.argv.indexOf('--db')
-const DB_PATH = dbArgIndex >= 0 ? resolve(process.argv[dbArgIndex + 1]) : (process.env.KATAZUKU_DB_PATH || join(ROOT, 'data', 'katazuku.db'))
+const DB_PATH = dbArgIndex >= 0 ? resolve(process.argv[dbArgIndex + 1]) : ((process.env.KATAZUKU_DB || process.env.KATAZUKU_DB_PATH) || join(ROOT, 'data', 'katazuku.db'))
 const PHOTO_ROOT = join(ROOT, 'data', 'private', 'photos')
 
 /**

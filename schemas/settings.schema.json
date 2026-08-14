@@ -54,8 +54,8 @@
           },
           "minItems": 1,
           "default": [
-            "codex",
             "claude",
+            "codex",
             "codex-oss"
           ],
           "x-display": "ranked"

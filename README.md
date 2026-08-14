@@ -30,7 +30,10 @@
 
 ## Requirements
 
-- **Node.js 22.5+**(推奨 24)。標準モジュール `node:sqlite` を使うため。Node 24 では警告なしで動作します。
+- **Node.js 22.5+**(推奨 24)。標準モジュール `node:sqlite` を使うため。
+  - Node 24: そのまま動作します(experimental 機能のため実行時に `ExperimentalWarning` が出ます。抑止するなら `--disable-warning=ExperimentalWarning`)。
+  - Node 22 系: `node:sqlite` に `--experimental-sqlite` が必要な場合があります(`NODE_OPTIONS=--experimental-sqlite`)。可能なら 24 を使ってください。
+- ランタイム依存はゼロです。開発時のみ `tsx` / `typescript`(devDependencies)を使います。
 
 ## Quickstart
 
@@ -38,11 +41,23 @@
 git clone https://github.com/kokotatan/katazuku-shukatsu.git
 cd katazuku-shukatsu
 npm install
+npm run doctor    # 環境が動かせるか診断(OS・Node・node:sqlite)
 npm test          # 架空データでコア・応募・移動・agent-runtime を検証
-npm run seed      # 架空企業だけで正本DBを組み立てて表示
+npm run seed      # スキーマの1例で正本DBを組み立てて表示
 ```
 
 設定GUIを見る場合は `examples/config-gui.html` をブラウザで開いてください。
+公開APIの入口は `src/index.ts`(現状は clone して TypeScript から import する形。npm 配布は今後)。
+
+## データの保管・複数デバイス
+
+正本は単一のローカルSQLite(`data/katazuku.db`、WALモード)です。**単一デバイス前提**で、
+同じ正本を複数デバイスから同時に書かないでください。
+
+- バックアップ・移送: `npm run backup`(`VACUUM INTO` で WAL を畳んだ1ファイルを作成)。
+  別デバイスへ移すときはこの1ファイルを運びます。
+- 正本を **Dropbox/OneDrive 等の同期フォルダ直下に置かない**でください(WAL がネットワークFSで破損しうる)。
+- 正本DBのパスは環境変数 `KATAZUKU_DB` で指定します。
 
 ## License
 

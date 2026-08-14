@@ -3,6 +3,11 @@
   "version": "0.1.0",
   "description": "Local-first, human-in-the-loop automation core for Japanese shukatsu (new-grad job hunting). SQLite single-writer data model, semantic layer, and a schema-driven settings UI.",
   "license": "Apache-2.0",
+  "author": "kokotatan",
+  "keywords": ["shukatsu", "job-hunting", "sqlite", "agent", "human-in-the-loop", "local-first", "automation"],
+  "repository": { "type": "git", "url": "git+https://github.com/kokotatan/katazuku-shukatsu.git" },
+  "bugs": { "url": "https://github.com/kokotatan/katazuku-shukatsu/issues" },
+  "homepage": "https://github.com/kokotatan/katazuku-shukatsu#readme",
   "type": "module",
   "engines": {
     "node": ">=22.5.0"
@@ -16,6 +21,8 @@
     "test:mobility": "tsx tests/check-mobility.ts",
     "test:agent-runtime": "tsx tests/check-agent-runtime.ts",
     "seed": "tsx examples/seed.ts",
+    "doctor": "node tools/doctor.mjs",
+    "backup": "node tools/backup.mjs",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {

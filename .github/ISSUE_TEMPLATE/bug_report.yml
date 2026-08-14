@@ -1,0 +1,35 @@
+name: バグ報告 / Bug report
+description: 動かない・想定と違う挙動を報告する
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: 何が起きたか
+      description: 期待した挙動と、実際の挙動。
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: 再現手順
+      description: できれば最小の手順で。実データ・個人情報は貼らないでください。
+      placeholder: |
+        1. ...
+        2. ...
+    validations:
+      required: true
+  - type: textarea
+    id: env
+    attributes:
+      label: 環境
+      description: "`npm run doctor` の出力を貼ると確実です(OS・Nodeバージョン・node:sqliteの可否)。"
+    validations:
+      required: true
+  - type: checkboxes
+    id: no-pii
+    attributes:
+      label: 確認
+      options:
+        - label: 実データ・氏名・企業名・トークンなどの個人情報/秘密情報を含んでいません
+          required: true

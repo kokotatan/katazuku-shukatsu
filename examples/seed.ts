@@ -48,4 +48,5 @@ for (const s of listSelections(db)) {
   console.log(`  状態: ${s.status}`)
   console.log(`  次の行動: ${s.nextAction}（${s.nextDate}）`)
 }
+db.close()
 if (path !== ':memory:') console.log(`\n${path} に書き出しました。`)

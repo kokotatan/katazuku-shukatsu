@@ -53,8 +53,9 @@ const officialId = upsertCompany(db, { name: 'Example' })
 setOfficialName(db, 'Example', '株式会社Example Technology')
 check('正式名称が「正」(name)・通称はshortNameに残る',
   listCompanies(db).some((c) => c.name === '株式会社Example Technology' && c.shortName === 'Example'))
+const officialResolved = resolveCompany(db, 'Example Technology, Inc.')
 check('正式名称の英語表記(Inc.付き)でも確定できる',
-  resolveCompany(db, 'Example Technology, Inc.').companyId === officialId)
+  officialResolved.kind === 'hit' && officialResolved.companyId === officialId)
 
 // --- applyDiff(日次反映) ---
 const companyX = upsertCompany(db, { name: '会社X' })

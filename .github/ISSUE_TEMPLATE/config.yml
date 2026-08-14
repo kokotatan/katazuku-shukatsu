@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: セキュリティ・個人情報の懸念
+    url: https://github.com/kokotatan/katazuku-shukatsu/blob/main/SECURITY.md
+    about: 脆弱性や個人情報の混入は公開Issueにせず、SECURITY.md の手順で非公開に連絡してください。

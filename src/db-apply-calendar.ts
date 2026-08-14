@@ -29,7 +29,7 @@ interface CalendarEvent {
 interface CalendarInput { events: CalendarEvent[] }
 
 const dbArgIndex = process.argv.indexOf('--db')
-const DB_PATH = dbArgIndex >= 0 ? resolve(process.argv[dbArgIndex + 1]) : (process.env.KATAZUKU_DB_PATH || join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'data', 'katazuku.db'))
+const DB_PATH = dbArgIndex >= 0 ? resolve(process.argv[dbArgIndex + 1]) : ((process.env.KATAZUKU_DB || process.env.KATAZUKU_DB_PATH) || join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'data', 'katazuku.db'))
 
 function assertInput(value: unknown): asserts value is CalendarInput {
   if (!value || typeof value !== 'object' || !Array.isArray((value as CalendarInput).events)) {
@@ -94,12 +94,15 @@ export function applyCalendar(
           db.prepare(`
             UPDATE appointment SET selection_id = ?, at = ?, end_at = ?, kind = ?, title = ?,
               url = ?, location = ?, person = CASE WHEN ? <> '' THEN ? ELSE person END,
-              status = ?, external_id = ?, calendar_id = ?, source_hash = ?
+              status = CASE WHEN ? = '中止' THEN '中止' WHEN status = '完了' THEN '完了' ELSE ? END,
+              external_id = ?, calendar_id = ?, source_hash = ?
             WHERE id = ?
           `).run(
             selectionId, event.startAt, event.endAt || '', event.kind || 'その他', event.title,
             event.url || '', event.location || '',
             attendees, attendees,
+            // 済んだ予定(完了)を再同期で「予定」へ巻き戻さない。中止だけは反映する。
+            event.status === 'cancelled' || event.status === '中止' ? '中止' : '予定',
             event.status === 'cancelled' || event.status === '中止' ? '中止' : '予定',
             event.externalId, event.calendarId || '', sourceHash, appointmentId,
           )

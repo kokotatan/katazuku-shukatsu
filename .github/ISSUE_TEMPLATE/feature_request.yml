@@ -1,0 +1,24 @@
+name: 機能提案 / Feature request
+description: 追加・変更してほしい機能を提案する
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: 解決したい課題
+      description: どんな場面で困っているか。機能そのものより「困りごと」から書いてください。
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: 提案する解決策
+    validations:
+      required: false
+  - type: textarea
+    id: scope
+    attributes:
+      label: スコープの確認
+      description: このプロジェクトはローカルファースト・単一ユーザー・human-in-the-loop を前提とします。提案がこの範囲に収まるか一言。
+    validations:
+      required: false
