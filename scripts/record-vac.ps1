@@ -30,13 +30,32 @@ $repo = Split-Path $PSScriptRoot -Parent
 $intDir = Join-Path $repo 'logs\interviews'
 if (-not (Test-Path $intDir)) { New-Item -ItemType Directory $intDir -Force | Out-Null }
 $log = Join-Path $repo 'logs\meeting-record.log'
-function Log($m) { ("{0} [record-vac] {1}" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $m) | Out-File -FilePath $log -Append -Encoding utf8 }
+# ログ書き込みは絶対に録音を巻き添えにしない。meeting-record.log は autopilot・shots・digest が
+# 同時に開くため、EAP=Stop のまま Out-File すると「使用中」で録音起動ごと落ちる(2026-08-14に実際に発生)。
+# 数回だけ譲って待ち、それでも書けなければ黙って捨てる。
+function Log($m) {
+  $line = "{0} [record-vac] {1}" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $m
+  for ($i = 0; $i -lt 5; $i++) {
+    try { Add-Content -LiteralPath $log -Value $line -Encoding utf8 -ErrorAction Stop; return }
+    catch { Start-Sleep -Milliseconds 200 }
+  }
+}
 
-$endAt = [datetime]::Parse($EndIso).ToLocalTime()
+# ISO文字列をローカル時刻として正しく読む。
+# 罠(2026-08-14に踏んだ): [datetime]::Parse("2026-08-14T19:27:45") は Kind=Unspecified になり、
+# そこへ .ToLocalTime() を呼ぶと「UTCだった」とみなされて +9時間される。
+# 結果、1分のはずの録音長が541分と算出された。オフセット付き("+09:00")のときだけ変換する。
+function ConvertTo-LocalTime([string]$iso) {
+  $parsed = [datetime]::Parse($iso, [Globalization.CultureInfo]::InvariantCulture, [Globalization.DateTimeStyles]::None)
+  if ($parsed.Kind -eq [DateTimeKind]::Utc) { return $parsed.ToLocalTime() }
+  return $parsed  # Unspecified はそのままローカルとして扱う / Local は変換済み
+}
+
+$endAt = ConvertTo-LocalTime $EndIso
 
 # 開始時刻が渡されていれば、開始 LeadMinutes 前まで待つ。無駄な前録りを避ける。
 if ($StartIso) {
-  $startAt = [datetime]::Parse($StartIso).ToLocalTime()
+  $startAt = ConvertTo-LocalTime $StartIso
   $beginAt = $startAt.AddMinutes(-$LeadMinutes)
   $wait = [int]($beginAt - (Get-Date)).TotalSeconds
   if ($wait -gt 0) {
@@ -56,7 +75,9 @@ if ($durSec -le 0) { Log '終了時刻を過ぎている'; exit 1 }
 # 出力名は空白なしにする。PowerShell 5.1 の Start-Process -ArgumentList は空白で引数を割ってしまい、
 # 実際に 2026-08-14 に出力パスとスクリプト引数の両方が壊れた。
 if (-not $Slug) { $Slug = 'meeting-' + $AppointmentId }
-$Slug = ($Slug -replace '[^A-Za-z0-9\-_]', '-')
+# 日本語は残す。壊すのは「空白」と、ファイル名に使えない文字だけ。
+# 空白を必ず落とすのは、呼び出し側の Start-Process -ArgumentList が空白で引数を割るため。
+$Slug = ($Slug -replace '[\\/:*?"<>|\s]', '') -replace '-+', '-'
 $stem = "{0}-{1}" -f $Slug, (Get-Date -Format 'yyyy-MM-dd_HHmm')
 $outWav = Join-Path $intDir ($stem + '.wav')
 $shotsDir = Join-Path $intDir ($stem + '-shots')

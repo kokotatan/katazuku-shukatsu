@@ -92,29 +92,25 @@ foreach ($a in $agenda) {
   # 会議開始時刻までに録音が立ち上がる(録音前の無音は文字起こしで[無音]になるだけで害がない)。
   if ($run.state -eq 'opened' -and $now -ge $start.AddMinutes(-5) -and $now -lt $end) {
     $title = ("{0}-{1}" -f $a.company, $a.title)
+    # record-vac.ps1 に付け替えた(2026-08-14)。理由は2つ。
+    # (1) 旧 record-audio.ps1 は内蔵マイクだけを掴むため相手の声が入らず、さらに0バイトで死ぬ事象が続いた。
+    #     record-vac は virtual-audio-capturer(既定の再生デバイスのループバック)と内蔵マイクを混ぜるので、
+    #     ヘッドセットでも相手の声が録れる([[interview-recording-setup]])。
+    # (2) 旧呼び出しは -StartTime "2026-08-14 17:16:30" のように空白入りの値を
+    #     Start-Process -ArgumentList へ渡していた。PowerShell 5.1 はここで空白ごとに引数を割り、
+    #     埋め込んだ " も落とすため、record-audio 側は壊れた引数を受け取って起動に失敗していた。
+    #     これが「自動録音が動かない」の真因。渡す値は空白なし(ISOのTつなぎ・スラッグ)に統一する。
+    # スクショも record-vac が録音と同じスラッグで面倒を見るため、ここでは起動しない
+    # (digest が <録音ファイル名>-shots を探す規約に自動で揃う)。
+    $slug = (($a.company -replace '[\\/:*?"<>|\s]', '') + '-' + $a.id)
     Start-Process powershell.exe -WindowStyle Hidden -ArgumentList @(
-      '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ('"{0}"' -f (Join-Path $PSScriptRoot 'record-audio.ps1')),
-      '-StartTime', ('"{0}"' -f $now.ToString('yyyy-MM-dd HH:mm:ss')),
-      '-EndTime', ('"{0}"' -f $end.ToString('yyyy-MM-dd HH:mm:ss')),
-      '-Title', ('"{0}"' -f $title),
-      '-AppointmentId', ([int]$a.id))
+      '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ('"{0}"' -f (Join-Path $PSScriptRoot 'record-vac.ps1')),
+      '-AppointmentId', ([int]$a.id),
+      '-StartIso', $start.ToString('yyyy-MM-ddTHH:mm:ss'),
+      '-EndIso', $end.ToString('yyyy-MM-ddTHH:mm:ss'),
+      '-Slug', $slug)
     Move-Run ([int]$a.id) 'recording'
-    Log ("録音を開始した: {0} (予定ID {1})" -f $title, $a.id)
-    # 面談スクショ(面接官の顔写真取得の元データ。tasks/people-ui-and-face-capture.md §2)。
-    # 録音ファイル(record-audio.ps1: タイトル+開始時刻)と同じスラッグの -shots フォルダへ、
-    # 録音開始の約3分後と約10分後に全画面を1枚ずつ撮る。別プロセスで動かし、撮影の失敗が
-    # 会議進行・録音を絶対に妨げないようにする(起動失敗もログだけ残して続行)。
-    try {
-      $slug = (($title -replace '[\\/:*?"<>|]', '_') + '-' + $now.ToString('yyyy-MM-dd_HHmm'))
-      $shotsDir = Join-Path $repo ("logs\interviews\{0}-shots" -f $slug)
-      Start-Process powershell.exe -WindowStyle Hidden -ArgumentList @(
-        '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ('"{0}"' -f (Join-Path $PSScriptRoot 'capture-meeting-shots.ps1')),
-        '-OutDir', ('"{0}"' -f $shotsDir),
-        '-EndTime', ('"{0}"' -f $end.ToString('yyyy-MM-dd HH:mm:ss')))
-      Log ("スクショ撮影を予約した: {0}" -f $shotsDir)
-    } catch {
-      Log ("スクショ撮影の起動に失敗(会議進行は継続): {0}" -f $_.Exception.Message)
-    }
+    Log ("録音を開始した(record-vac): {0} / slug={1} (予定ID {2})" -f $title, $slug, $a.id)
     $recordArgs = @{
       By = 'meeting-autopilot'
       Action = ("会議の録音を自動開始: {0}" -f $title)
