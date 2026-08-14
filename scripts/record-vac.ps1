@@ -51,6 +51,21 @@ function ConvertTo-LocalTime([string]$iso) {
   return $parsed  # Unspecified はそのままローカルとして扱う / Local は変換済み
 }
 
+# 二重録音ガード(2026-08-14の実害): 同じLightblue説明選考会を autopilot と手動起動で
+# 2本録ってしまい、178MBと235MBの重複ができた。予定IDごとにロックを持ち、
+# 記録されたPIDがまだ生きていれば後発は何もせず抜ける。
+$lock = Join-Path $repo ("logs\record-vac-{0}.lock" -f $AppointmentId)
+if (Test-Path $lock) {
+  $oldPid = 0
+  if ([int]::TryParse(((Get-Content -LiteralPath $lock -ErrorAction SilentlyContinue | Select-Object -First 1)), [ref]$oldPid)) {
+    if (Get-Process -Id $oldPid -ErrorAction SilentlyContinue) {
+      Log ("予定{0}は既に録音中(PID {1})。二重起動を回避して終了する" -f $AppointmentId, $oldPid)
+      exit 0
+    }
+  }
+}
+Set-Content -LiteralPath $lock -Value $PID -Encoding ascii
+
 $endAt = ConvertTo-LocalTime $EndIso
 
 # 開始時刻が渡されていれば、開始 LeadMinutes 前まで待つ。無駄な前録りを避ける。
@@ -122,6 +137,8 @@ if ($loopAlt -and $micAlt) {
 $a += @('-ac','1','-ar','16000','-t',"$durSec", $outWav)
 
 $p = Start-Process -FilePath $ffmpeg -ArgumentList $a -WindowStyle Hidden -PassThru
+# ロックの持ち主を ffmpeg 本体に移す(この待機用スクリプトはすぐ終了するため)
+Set-Content -LiteralPath $lock -Value $p.Id -Encoding ascii
 Log ("録音開始 PID={0} 予定ID={1} 終了{2}+{3}分 = {4}秒 -> {5}" -f $p.Id, $AppointmentId, $endAt.ToString('HH:mm'), $BufferMinutes, $durSec, $outWav)
 
 # ショットは録音と同じ stem にする(digest が <stem>-shots を探して顔写真を同梱する規約)

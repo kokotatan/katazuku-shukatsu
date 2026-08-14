@@ -181,6 +181,21 @@ if ($ok) {
         }
         # スクショと顔写真(SOURCE_FILEのスラッグ規約: <stem>-shots)。photoPathの絶対パスは両機で同一。
         $shotsDir = Join-Path $intDir ($stem + '-shots')
+        # 規約名が一致しないときの救済(2026-08-14の実害): kubellの議事録を手動で回した際、
+        # 音声ファイル名の時刻(1200)とショットのフォルダ名(1156)がずれていたため
+        # ショットが同梱されず、面接官の顔写真がDBに入らなかった。
+        # 見つからなければ、録音時刻の前後2時間に更新された -shots を新しい順で1つ拾う。
+        if (-not (Test-Path -LiteralPath $shotsDir)) {
+          $srcTime = (Get-Item -LiteralPath $InputPath).LastWriteTime
+          $cand = Get-ChildItem -LiteralPath $intDir -Directory -Filter '*-shots' -ErrorAction SilentlyContinue |
+            Where-Object { [math]::Abs(($_.LastWriteTime - $srcTime).TotalHours) -le 2 } |
+            Sort-Object LastWriteTime -Descending | Select-Object -First 1
+          if ($cand) {
+            $shotsDir = $cand.FullName
+            ('[shots] 規約名の -shots が無いため、時刻が近いフォルダを使う: {0}' -f $cand.Name) |
+              Out-File -FilePath $logFile -Append -Encoding utf8
+          }
+        }
         if (Test-Path -LiteralPath $shotsDir) {
           Get-ChildItem -LiteralPath $shotsDir -File | ForEach-Object { & $addFile $_.FullName }
         }

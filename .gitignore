@@ -66,3 +66,6 @@ credential-store/
 .codex/
 codex-windows-sandbox-setup.exe
 .katazuku-satellite
+
+# record-vac の二重起動ガード用ロック(実行時の一時ファイル)
+logs/record-vac-*.lock
