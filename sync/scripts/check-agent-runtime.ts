@@ -448,6 +448,38 @@ try {
     assert(!recoveredHealth.providers.claude, '復活後もClaudeがcooldownのままです')
   })
 
+  await check('復活日が過去に見えても、cooldownは7日を超えない', async () => {
+    // 2026-08-14に判明した実害の回帰テスト。codexが "resets Jul 26" を返した時点で
+    // すでにJul 26を過ぎていたため、年跨ぎと解釈されて 2027-07-26 が書き込まれ、
+    // 8/9から11か月以上codexがpreflightでskipされ続けていた(誰も気づかない静かな締め出し)。
+    const healthFile = join(workDir, 'provider-health-cap.local.json')
+    const limitedAt = new Date('2026-08-09T00:09:02.053Z')
+    const message = 'You\'ve hit your weekly limit · resets Jul 26, 9pm (Asia/Tokyo)'
+    const result = await runAgent(request({
+      runId: 'health-cap',
+      risk: 'db-write',
+      sideEffectMode: 'workspace',
+      providerOrder: ['claude', 'codex'],
+    }), {
+      adapters: [fakeAdapter('claude', { possibleSideEffect: true }), fakeAdapter('codex')],
+      artifactDir: workDir,
+      healthFile,
+      now: () => limitedAt,
+      execute: queuedExecutor([
+        processResult({ exitCode: 1, stderr: message }),
+        processResult({ stdout: 'Codexで続行完了' }),
+      ], []),
+    })
+    assert(result.status === 'succeeded', JSON.stringify(result))
+    const capped = JSON.parse(await readFile(healthFile, 'utf8')) as {
+      providers: { claude?: { unavailableUntil?: string } }
+    }
+    const until = Date.parse(capped.providers.claude?.unavailableUntil ?? '')
+    const limit = limitedAt.getTime() + 7 * 24 * 60 * 60_000
+    assert(Number.isFinite(until), 'unavailableUntilが記録されていません')
+    assert(until <= limit, 'cooldownが7日を超えています: ' + (capped.providers.claude?.unavailableUntil ?? ''))
+  })
+
   await check('副作用の可能性があれば自動切替せずneeds_resumeにする', async () => {
     const calls: { command: string; args: string[]; stdin?: string }[] = []
     const execute = queuedExecutor([processResult({ exitCode: 1, stderr: 'quota exceeded', stdout: 'tool started' })], calls)

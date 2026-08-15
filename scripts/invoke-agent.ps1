@@ -9,7 +9,10 @@
   [string[]]$Capability = @('workspace.read'),
   [string]$OutputSchema = '',
   [string]$OutputFile = '',
-  [int]$TimeoutMs = 1800000,
+  # 30分では長い面談の議事録化が終わらない。2026-08-14のLightblue説明選考会(89分)は
+  # claudeが21:24開始→21:52に「文字起こし全文を保存します」まで進んだところで、
+  # 30分の締切に当たって強制終了された(あと2分で完了だった)。60分に延ばす。
+  [int]$TimeoutMs = 3600000,
   # runnerのsoft deadlineを過ぎても親が返らないときに、プロセスツリーごと強制終了するまでの猶予。
   # 2026-07-31: provider CLIがMCPコネクタの承認待ちで無限に固まり、PowerShellが返らず、
   # タスクが数時間Runningのまま → MultipleInstances=IgnoreNew で以降の定期実行が全部飛ぶ、

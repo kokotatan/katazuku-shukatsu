@@ -958,6 +958,12 @@ export async function runAgent(request: AgentRunRequest, options: RunAgentOption
     ? await readProviderHealth(options.healthFile)
     : { schemaVersion: 1, providers: {} }
   const quotaCooldownMs = options.quotaCooldownMs ?? 6 * 60 * 60_000
+  // クォータ復活予定の上限。これを超える cooldown は書かない。
+  // 2026-08-14に判明した実害: codex の "You've hit your weekly limit · resets Jul 26" を
+  // parseQuotaResetAt が年跨ぎと解釈して 2027-07-26 を書き込み、8/9から11か月以上
+  // codex が preflight で skip され続けていた(誰も気づかない静かな締め出し)。
+  // 週次・月次のクォータで1週間を超える停止はあり得ないので、ここで頭を押さえる。
+  const quotaCooldownCapMs = 7 * 24 * 60 * 60_000
 
   for (let index = 0; index < order.length; index += 1) {
     const provider = order[index]
@@ -1045,9 +1051,13 @@ export async function runAgent(request: AgentRunRequest, options: RunAgentOption
         const combined = processResult.stderr + '\n' + processResult.stdout
         const parsedReset = parseQuotaResetAt(combined, now())
         // 復活直後の時計差・反映遅延で再度失敗しないよう2分だけ猶予を置く。
-        const unavailableUntil = parsedReset
+        const proposedUntil = parsedReset
           ? new Date(parsedReset.getTime() + 2 * 60_000)
           : new Date(now().getTime() + quotaCooldownMs)
+        // 解析結果が遠すぎるときは頭を押さえる(年跨ぎ誤読でプロバイダを1年殺さない)
+        const unavailableUntil = new Date(
+          Math.min(proposedUntil.getTime(), now().getTime() + quotaCooldownCapMs),
+        )
         health.providers[provider] = {
           failure,
           detectedAt: now().toISOString(),
