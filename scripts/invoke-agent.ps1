@@ -61,6 +61,29 @@ foreach ($item in $Capability) {
   if ($item) { $argsList += @('--capability', $item) }
 }
 if ($Agent -ne 'auto') { $argsList += @('--provider', $Agent) }
+
+# ワークフローごとのprovider順。ここが唯一の置き場で、呼び出し側は意識しない。
+#
+# 既定は claude,codex の2系統。ローカルモデル(codex-oss)は「そこに任せても壊れない」と
+# 判断したワークフローだけに、明示的に許可する形にしている。
+# 逆(既定で全部許可し、危ないものを除外)にすると、新しいワークフローを足したときに
+# 黙ってローカルモデルへ流れてしまう。止まって気づく方が、間違った結果が正本DBへ入るより良い。
+#
+# interview-digest を外している理由(2026-08-14): 89分の面談の文字起こしから話者を推定し、
+# 質問と回答を対応づけ、人物を抽出する作業をローカルの8Bに任せると、
+# もっともらしいが誤った議事録が interview_note へ入る。同日、音源を取り違えた議事録を
+# 作って気づかなかった実例があり、この種の誤りは後から検出しにくい。
+$ossAllowedWorkflows = @(
+  'mail-watch',        # 未読メールの分類。取りこぼしても次の巡回で拾える
+  'calendar-sync',     # 予定の突合。冪等で、結果はDB遷移規則が受け止める
+  'calendar-residue',  # 取り込み残りの掃除
+  'asa',               # 朝のまとめ。読み物で、誤りがあっても本人がその場で気づく
+  'evening-brief'      # 前夜ブリーフ。同上
+)
+if ($Agent -eq 'auto' -and -not $env:KATAZUKU_AGENT_ORDER) {
+  $order = if ($ossAllowedWorkflows -contains $Workflow) { 'claude,codex,codex-oss' } else { 'claude,codex' }
+  $argsList += @('--provider-order', $order)
+}
 if ($OutputSchema) { $argsList += @('--output-schema', $OutputSchema) }
 if ($OutputFile) { $argsList += @('--output-file', $OutputFile) }
 if ($DryRun) { $argsList += '--dry-run' }

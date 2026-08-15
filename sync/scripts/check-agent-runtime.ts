@@ -592,6 +592,21 @@ try {
       assert(!DIRECT_CALL.test(executableText), `${f} がproviderを直呼びしている。invoke-agent.ps1(agent-runtime)経由にする`)
     }
   })
+
+  await check('重い議事録化はローカルモデルへ落ちない', async () => {
+    // 2026-08-14にminipcへOllamaを入れて codex-oss を3系統目のフォールバックにしたが、
+    // interview-digest だけは対象外にしている。89分の文字起こしから話者を推定し
+    // 質問と回答を対応づける作業をローカルの8Bに任せると、もっともらしいが誤った議事録が
+    // interview_note へ入り、後から気づけない。許可リストへ足されていないことを固定する。
+    const invokeAgent = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'scripts', 'invoke-agent.ps1')
+    const text = await readFile(invokeAgent, 'utf8')
+    const block = text.match(/\$ossAllowedWorkflows\s*=\s*@\(([\s\S]*?)\)/)
+    assert(block !== null, 'invoke-agent.ps1 に $ossAllowedWorkflows がありません')
+    const allowed = [...block![1].matchAll(/'([^']+)'/g)].map((m) => m[1])
+    assert(allowed.length > 0, '許可リストが空です')
+    assert(!allowed.includes('interview-digest'), 'interview-digest がローカルモデル許可リストに入っています')
+    assert(/--provider-order/.test(text), 'provider順がrunnerへ渡されていません')
+  })
 } finally {
   await rm(workDir, { recursive: true, force: true })
 }
