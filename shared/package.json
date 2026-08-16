@@ -1,0 +1,9 @@
+{
+  "name": "@katazuku/data",
+  "version": "0.1.0",
+  "private": true,
+  "description": "アプリ群(board/status/inbox/...)が共有する、正本DBスナップショットの読み口と型。",
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "types": "./src/index.ts"
+}

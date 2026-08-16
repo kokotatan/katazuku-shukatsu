@@ -1,0 +1,51 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "types": [
+      "vite/client",
+      "node"
+    ],
+    "baseUrl": ".",
+    "paths": {
+      "@katazuku/data": [
+        "../shared/src/index.ts"
+      ],
+      "@katazuku/ui": [
+        "../shared/src/ui.tsx"
+      ],
+      "react": [
+        "./node_modules/@types/react"
+      ],
+      "react/jsx-runtime": [
+        "./node_modules/@types/react/jsx-runtime"
+      ],
+      "react-dom": [
+        "./node_modules/@types/react-dom"
+      ],
+      "react-dom/client": [
+        "./node_modules/@types/react-dom/client"
+      ],
+      "smarthr-ui": [
+        "./node_modules/smarthr-ui"
+      ]
+    }
+  },
+  "include": [
+    "src",
+    "vite.config.ts",
+    "../shared/src"
+  ]
+}
