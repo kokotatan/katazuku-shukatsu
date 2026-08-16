@@ -170,15 +170,58 @@ export function outcomeOf(status: string): string {
 
 // ---- 名寄せ(エンティティ解決) ----
 
-/** 法人格の揺れを吸収する正規化。日本語(株式会社等)と海外表記(Inc./Ltd./Corp.等)の両対応 */
+/**
+ * 法人格(法的な種類)の表記。トレードネームではないので、名寄せの「芯」からは落としてよい。
+ *
+ * ここに入れてよいのは「法人の種類」だけ。`holdings` `group` `company` のような
+ * トレードネームの一部になりうる語を入れてはいけない(「X Holdings」と「X」は別法人)。
+ */
+const DESIGNATOR_JP =
+  /株式会社|合同会社|合資会社|合名会社|有限会社|一般社団法人|一般財団法人|公益社団法人|公益財団法人|学校法人|医療法人|独立行政法人|国立大学法人|特定非営利活動法人|\(株\)|\(有\)|\(同\)/g
+const DESIGNATOR_EN = /\b(inc|incorporated|corp|corporation|co|ltd|limited|llc|llp|lp|kk|gk|gmbh|plc|pte|pty)\b/g
+
+/** 表記揺れ(全半角・大小・句読点)だけを畳む。法人格は落とさない */
+function normalizeSurface(name: string): string {
+  return name
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/[.,、。]/g, ' ')
+    .replace(/[()\s　]/g, '')
+}
+
+/** 法人格の揺れも吸収した「芯」。日本語(株式会社等)と海外表記(Inc./Ltd./Corp.等)の両対応 */
 function normalize(name: string): string {
   return name
     .normalize('NFKC')
     .toLowerCase()
     .replace(/[.,、。]/g, ' ')
-    .replace(/株式会社|合同会社|有限会社|\(株\)/g, '')
-    .replace(/\b(inc|corp|corporation|co|ltd|llc|kk|gk|gmbh|holdings|company)\b/g, '')
+    .replace(DESIGNATOR_JP, ' ')
+    .replace(DESIGNATOR_EN, ' ')
     .replace(/[()\s　]/g, '')
+}
+
+/** 同義の法人格表記を1つに寄せる(Co.,Ltd. と Ltd. を別物にしないため) */
+const DESIGNATOR_CANON: Record<string, string> = {
+  incorporated: 'inc', corporation: 'corp', limited: 'ltd', '(株)': '株式会社', '(有)': '有限会社', '(同)': '合同会社',
+}
+
+/** 名前が担っている法人格の集合を返す(例: "Sample Co., Ltd." → {co, ltd}) */
+function designatorsOf(name: string): Set<string> {
+  const s = name.normalize('NFKC').toLowerCase().replace(/[.,、。]/g, ' ')
+  const found = [...(s.match(DESIGNATOR_JP) ?? []), ...(s.match(DESIGNATOR_EN) ?? [])]
+  return new Set(found.map((d) => DESIGNATOR_CANON[d] ?? d))
+}
+
+/**
+ * 法人格が矛盾しているか。片方が無印、または一方が他方の部分集合なら矛盾しない。
+ * 「株式会社X」と「合同会社X」、「X K.K.」と「X Corp」のような別法人だけを弾く。
+ */
+function designatorsConflict(a: string, b: string): boolean {
+  const da = designatorsOf(a)
+  const db_ = designatorsOf(b)
+  if (da.size === 0 || db_.size === 0) return false
+  const subset = (x: Set<string>, y: Set<string>) => [...x].every((v) => y.has(v))
+  return !subset(da, db_) && !subset(db_, da)
 }
 
 export function sameCompany(a: string, b: string): boolean {
@@ -268,21 +311,46 @@ export type Resolution =
 
 /**
  * 企業名の解決(本人方針 2026-07-18「基本は正式名称。怪しいものは確認して学習」):
- * 1. 正式名称と正規化一致(株式会社・全半角・カッコの揺れは吸収) → 確定
+ * 1. 表記揺れ(全半角・大小・カッコ)だけの違い → 確定
  * 2. 学習済みエイリアス → 確定
- * 3. 部分一致で似た企業がある → 「怪しい」。勝手にマージせず suspicious を返す(呼び手が要確認に積む)
- * 4. どれにも当たらない → 新企業
+ * 3. 法人格を落とすと一致する → 法人格が矛盾しなければ確定、矛盾するなら「怪しい」
+ * 4. 部分一致で似た企業がある → 「怪しい」。勝手にマージせず suspicious を返す(呼び手が要確認に積む)
+ * 5. どれにも当たらない → 新企業
+ *
+ * 3 の分岐が要点。`normalize` は法人格を落とすので「株式会社X」と「合同会社X」、
+ * 「X K.K.」と「X Corp」が同じ芯に潰れる。これらは別法人でありうるので自動マージせず、
+ * 本人の確認(=alias 学習)を1回だけ挟む。
  */
 export function resolveCompany(db: DatabaseSync, name: string): Resolution {
   const n = normalize(name)
+  const surface = normalizeSurface(name)
   const all = db.prepare('SELECT id, name, short_name FROM company').all() as { id: number; name: string; short_name: string }[]
-  // 正式名称(=name)でも通称(short_name)でも確定できる
-  const exact = all.find((r) => normalize(r.name) === n || (r.short_name && normalize(r.short_name) === n))
+
+  // 1. 法人格まで含めて表記揺れだけの違い → 無条件に確定(正式名称でも通称でも当たる)
+  const exact = all.find(
+    (r) => normalizeSurface(r.name) === surface || (r.short_name && normalizeSurface(r.short_name) === surface),
+  )
   if (exact) return { kind: 'hit', companyId: exact.id }
+
+  // 2. 本人が確認済みのエイリアス
   const alias = db.prepare('SELECT company_id FROM company_alias WHERE alias_norm = ?').get(n) as
     | { company_id: number }
     | undefined
   if (alias) return { kind: 'hit', companyId: alias.company_id }
+
+  // 芯が空(名前が法人格だけ)や1文字は、一致とみなすには弱すぎる
+  if (n.length < 2) return { kind: 'new' }
+
+  // 3. 法人格を落とすと一致する
+  const stem = all.find((r) => normalize(r.name) === n || (r.short_name && normalize(r.short_name) === n))
+  if (stem) {
+    const against = normalize(stem.name) === n ? stem.name : stem.short_name
+    return designatorsConflict(against, name)
+      ? { kind: 'suspicious', suggestId: stem.id, suggestName: stem.name }
+      : { kind: 'hit', companyId: stem.id }
+  }
+
+  // 4. 部分一致どまり
   const fuzzy = all.find((r) => sameCompany(r.name, name))
   if (fuzzy) return { kind: 'suspicious', suggestId: fuzzy.id, suggestName: fuzzy.name }
   return { kind: 'new' }
@@ -528,6 +596,11 @@ export function upsertCompany(db: DatabaseSync, info: Partial<CompanyInfo> & { n
     fill('password', info.password)
     fill('memo', info.memo)
     return hit.id
+  }
+  // 怪しい(法人格違い・部分一致)ものは黙って別法人を作らず、要確認に積んでから作る。
+  // 同一だった場合は本人が addAlias で寄せられる。
+  if (reso.kind === 'suspicious') {
+    addPending(db, info.name, `既存「${reso.suggestName}」と紛らわしい。同一なら別名として学習、別会社ならこのままでよい`)
   }
   const r = db.prepare(
     'INSERT INTO company (name, short_name, industry, mypage_url, login_id, password, memo, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',

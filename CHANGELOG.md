@@ -5,6 +5,19 @@
 
 ## [Unreleased]
 
+### Fixed
+- **名寄せが別法人を無確認でマージしうる問題** (#7)。`normalize()` が法人格を落とすため
+  「株式会社X」と「合同会社X」、「X K.K.」と「X Corp」が同じ芯に潰れ、`resolveCompany` の
+  完全一致経路がそれを自動マージしていた。法人格が矛盾する組み合わせは `suspicious` を返し、
+  本人確認(=`addAlias` 学習)を1回挟むようにした。
+
+### Changed
+- `normalize()` の除去語を「法人の種類」だけに限定。`holdings` / `company` はトレードネームの
+  一部になりうるため除去しない(「X Holdings」と「X」は別法人)。代わりに `limited` / `plc` /
+  `pte` / `pty` / `llp` と、`一般社団法人` などの日本の法人形態を追加した。
+- `upsertCompany()` は紛らわしい名前で新規作成するとき、要確認(`pending_review`)に積むようになった。
+  黙って重複法人が増えるのを防ぐ。
+
 ## [0.1.0] - 2026-08-15
 
 ### Added
