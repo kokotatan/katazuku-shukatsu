@@ -1,6 +1,6 @@
 {
   "name": "katazuku-shukatsu",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Local-first, human-in-the-loop automation core for Japanese shukatsu (new-grad job hunting). SQLite single-writer data model, semantic layer, and a schema-driven settings UI.",
   "license": "Apache-2.0",
   "author": "kokotatan",
