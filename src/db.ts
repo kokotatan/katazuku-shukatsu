@@ -7,7 +7,7 @@
  * - だから「上書きしない」ではなく「遷移規則で堂々と更新する」(transition() に集約)
  */
 import { DatabaseSync } from 'node:sqlite'
-import { mkdirSync } from 'node:fs'
+import { mkdirSync, rmSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { ensurePlatformSchema } from './platform.js'
 
@@ -116,46 +116,107 @@ export function openDb(path: string): DatabaseSync {
       created_at TEXT NOT NULL
     );
   `)
-  // マイグレーション(2026-07-18本人指示):
-  // name = 正式名称(株式会社/Inc.付き)が「正」。short_name = 通称(表示用)。
-  // 旧official_name列があれば name と入れ替えて廃止する。正式名称が未判明の会社は
-  // 現在の最良の名称が name に残り、企業研究で順次正式名称へ昇格させる(db-alias official)
-  const cols = db.prepare('PRAGMA table_info(company)').all() as { name: string }[]
-  const has = (c: string) => cols.some((x) => x.name === c)
-  if (!has('short_name')) db.exec("ALTER TABLE company ADD COLUMN short_name TEXT NOT NULL DEFAULT ''")
-  db.exec("UPDATE company SET short_name = name WHERE short_name = ''")
-  if (has('official_name')) {
-    db.exec("UPDATE company SET name = official_name WHERE official_name <> ''")
-    db.exec('ALTER TABLE company DROP COLUMN official_name')
+  // マイグレーションに失敗したら開きっぱなしにしない。
+  // 呼び手は例外で気づくが、ハンドルが残るとファイルを掴んだままになる。
+  try {
+    migrate(db, path)
+  } catch (error) {
+    db.close()
+    throw error
   }
-  // selection.outcome: 状態の機械判定用の列挙(進行中/合格/不合格/辞退/内定/終了)。statusは人間可読の自由文のまま
-  const scols = db.prepare('PRAGMA table_info(selection)').all() as { name: string }[]
-  if (!scols.some((c) => c.name === 'outcome')) {
-    db.exec("ALTER TABLE selection ADD COLUMN outcome TEXT NOT NULL DEFAULT ''")
-    db.exec(`UPDATE selection SET outcome = CASE
-      WHEN status GLOB '*不合格*' OR status GLOB '*欠席*' OR status GLOB '*振替不可*' OR status GLOB '*見送り*' OR status GLOB '*実質終了*' THEN '不合格'
-      WHEN status GLOB '*辞退*' THEN '辞退'
-      WHEN status GLOB '*内定*' THEN '内定'
-      WHEN REPLACE(status,'不合格','') GLOB '*合格*' OR status GLOB '*参加*' OR status GLOB '*通過*' THEN '合格'
-      ELSE '進行中' END`)
-  }
-  const ecols = db.prepare('PRAGMA table_info(event)').all() as { name: string }[]
-  if (!ecols.some((c) => c.name === 'ref')) db.exec("ALTER TABLE event ADD COLUMN ref TEXT NOT NULL DEFAULT ''")
-  // appointment.end_at: 会議の終了時刻(録画の自動停止に必須。無ければ開始+60分とみなす)
-  const acols = db.prepare('PRAGMA table_info(appointment)').all() as { name: string }[]
-  if (!acols.some((c) => c.name === 'end_at')) db.exec("ALTER TABLE appointment ADD COLUMN end_at TEXT NOT NULL DEFAULT ''")
-  ensurePlatformSchema(db)
-  // スキーマ版の記録(2026-07-22)。上の追加系ALTERは列存在チェックで冪等だが、
-  // 版番号が無いと「いつ何を適用したか」を追えず、次に破壊的マイグレーション(列DROP・データ移送)を
-  // 書くと二重適用・順序事故が起きやすい。ここで版を刻み、将来の破壊的移行は user_version で束ね、
-  // 実行前に日次バックアップ(db-snapshot.ts backupDb)が取れていることを前提にする。
-  const uv = (db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version
-  if (uv < SCHEMA_VERSION) db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`)
   return db
 }
 
-/** 現行スキーマの版。破壊的マイグレーションを足すたびに +1 し、番号で分岐させる */
-export const SCHEMA_VERSION = 1
+/** 現行スキーマの版。マイグレーションを足すたびに +1 し、`MIGRATIONS` に1本足す */
+export const SCHEMA_VERSION = 2
+
+/**
+ * 版ゲート方式のマイグレーション(#10)。
+ *
+ * 以前は `PRAGMA table_info` の存在チェックを毎回舐める場当たり方式で、`user_version` は
+ * 実質未使用だった。列の追加だけなら冪等に見えるが、列DROP・データ移送が混ざった瞬間に
+ * 「どこまで適用済みか」を誰も知らない状態になる。版で束ねて、番号でしか進まないようにする。
+ *
+ * `destructive: true` の版は、適用前に自動でスナップショット(`VACUUM INTO`)を取る。
+ * 取れなければ**適用しない**。壊れてから気づく事故より、進まない方がましなので。
+ */
+interface Migration {
+  version: number
+  description: string
+  /** 列DROP・データ移送を含むか。含むなら適用前にバックアップを取る */
+  destructive: boolean
+  up: (db: DatabaseSync) => void
+}
+
+const MIGRATIONS: Migration[] = [
+  {
+    version: 1,
+    description: '正式名称を name へ、通称を short_name へ。outcome・event.ref・appointment.end_at を追加',
+    // 旧 official_name 列を DROP するため破壊的
+    destructive: true,
+    up: (db) => {
+      const cols = db.prepare('PRAGMA table_info(company)').all() as { name: string }[]
+      const has = (c: string) => cols.some((x) => x.name === c)
+      if (!has('short_name')) db.exec("ALTER TABLE company ADD COLUMN short_name TEXT NOT NULL DEFAULT ''")
+      db.exec("UPDATE company SET short_name = name WHERE short_name = ''")
+      if (has('official_name')) {
+        db.exec("UPDATE company SET name = official_name WHERE official_name <> ''")
+        db.exec('ALTER TABLE company DROP COLUMN official_name')
+      }
+      // selection.outcome: 状態の機械判定用の列挙。status は人間可読の自由文のまま
+      const scols = db.prepare('PRAGMA table_info(selection)').all() as { name: string }[]
+      if (!scols.some((c) => c.name === 'outcome')) {
+        db.exec("ALTER TABLE selection ADD COLUMN outcome TEXT NOT NULL DEFAULT ''")
+        db.exec(`UPDATE selection SET outcome = CASE
+          WHEN status GLOB '*不合格*' OR status GLOB '*欠席*' OR status GLOB '*振替不可*' OR status GLOB '*見送り*' OR status GLOB '*実質終了*' THEN '不合格'
+          WHEN status GLOB '*辞退*' THEN '辞退'
+          WHEN status GLOB '*内定*' THEN '内定'
+          WHEN REPLACE(status,'不合格','') GLOB '*合格*' OR status GLOB '*参加*' OR status GLOB '*通過*' THEN '合格'
+          ELSE '進行中' END`)
+      }
+      const ecols = db.prepare('PRAGMA table_info(event)').all() as { name: string }[]
+      if (!ecols.some((c) => c.name === 'ref')) db.exec("ALTER TABLE event ADD COLUMN ref TEXT NOT NULL DEFAULT ''")
+      // appointment.end_at: 会議の終了時刻(無ければ開始+60分とみなす)
+      const acols = db.prepare('PRAGMA table_info(appointment)').all() as { name: string }[]
+      if (!acols.some((c) => c.name === 'end_at')) db.exec("ALTER TABLE appointment ADD COLUMN end_at TEXT NOT NULL DEFAULT ''")
+    },
+  },
+  {
+    version: 2,
+    description: '人物・プロフィール・移動などの拡張スキーマ(platform)を版の管理下に入れる',
+    destructive: false,
+    up: (db) => ensurePlatformSchema(db),
+  },
+]
+
+/** 適用前のスナップショット。`VACUUM INTO` で WAL を畳んだ1ファイルを隣に置く */
+function snapshotBeforeMigration(db: DatabaseSync, path: string, version: number): string {
+  const target = `${path}.v${version}.bak`
+  rmSync(target, { force: true })
+  db.exec(`VACUUM INTO '${target.replace(/'/g, "''")}'`)
+  return target
+}
+
+function migrate(db: DatabaseSync, path: string): void {
+  const current = (db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version
+  for (const migration of MIGRATIONS) {
+    if (migration.version <= current) continue
+    // インメモリDBはバックアップの取りようが無い(消えて困るデータも無い)ので飛ばす
+    if (migration.destructive && path !== ':memory:') {
+      const target = snapshotBeforeMigration(db, path, migration.version)
+      console.warn(`スキーマ v${migration.version} を適用します。適用前のスナップショット: ${target}`)
+    }
+    migration.up(db)
+    db.exec(`PRAGMA user_version = ${migration.version}`)
+  }
+  const after = (db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version
+  if (after > SCHEMA_VERSION) {
+    throw new Error(
+      `このDBはスキーマ v${after} です。コードが知っているのは v${SCHEMA_VERSION} まで。` +
+      '新しい版で書かれたDBを古いコードで開くとデータを壊すので、コードを更新してください。',
+    )
+  }
+}
 
 /** statusの自由文からoutcome(列挙)を機械判定する。書き込み側はstatus更新時に必ずこれも更新する */
 export function outcomeOf(status: string): string {

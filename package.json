@@ -51,7 +51,7 @@
     "build": "npm run clean && tsc -p tsconfig.build.json",
     "prepack": "npm run build",
     "scan": "node tools/scan-secrets.mjs",
-    "test": "npm run test:core && npm run test:application && npm run test:mobility && npm run test:agent-runtime && npm run test:platform && npm run test:api",
+    "test": "npm run test:core && npm run test:application && npm run test:mobility && npm run test:agent-runtime && npm run test:platform && npm run test:migration && npm run test:write-layer && npm run test:api",
     "test:core": "tsx tests/check-core.ts",
     "test:platform": "tsx tests/check-platform.ts",
     "test:api": "tsx tests/check-api.ts",
@@ -62,7 +62,9 @@
     "doctor": "node tools/doctor.mjs",
     "backup": "node tools/backup.mjs",
     "typecheck": "tsc --noEmit",
-    "snapshot": "tsx scripts/snapshot.ts"
+    "snapshot": "tsx scripts/snapshot.ts",
+    "test:write-layer": "tsx tests/check-write-layer.ts",
+    "test:migration": "tsx tests/check-migration.ts"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
