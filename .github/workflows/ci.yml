@@ -26,6 +26,10 @@ jobs:
       # 個人情報・秘密情報の混入検査(形ベース)。固有名詞の遮断は private 側の SCAN_BLOCKLIST で行う。
       - run: npm run scan
       - run: npm run typecheck
+      # 配布物(dist)が実際にビルドでき、公開エントリから読み込めることまで確認する
+      - run: npm run build
+      - run: node -e "import('./dist/index.js').then(m => { if (typeof m.openDb !== 'function') { throw new Error('dist の公開エントリが壊れています') } })"
+      - run: npm pack --dry-run
       - run: npm test
 
   compat-node22:

@@ -8,8 +8,8 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, extname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { DatabaseSync } from 'node:sqlite'
-import { addEvent, openDb } from '../src/db'
-import { resolveSelectionId, transaction, upsertPerson } from '../src/inputs'
+import { addEvent, openDb } from './db.js'
+import { resolveSelectionId, transaction, upsertPerson } from './inputs.js'
 
 interface InterviewPerson {
   name: string

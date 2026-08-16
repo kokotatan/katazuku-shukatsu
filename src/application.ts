@@ -13,8 +13,8 @@ import {
   samePosition,
   transition,
   upsertCompany,
-} from './db'
-import { transaction } from './inputs'
+} from './db.js'
+import { transaction } from './inputs.js'
 
 export type ApplicationState =
   | 'started'

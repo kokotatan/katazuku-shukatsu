@@ -12,7 +12,7 @@
 import { DatabaseSync } from 'node:sqlite'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { normalizeAppointmentAt, normalizeAppointmentUrl, sameAppointment } from '../src/db'
+import { normalizeAppointmentAt, normalizeAppointmentUrl, sameAppointment } from './db.js'
 
 const argv = process.argv.slice(2)
 const dbArgIndex = argv.indexOf('--db')

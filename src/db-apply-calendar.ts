@@ -7,8 +7,8 @@ import { createHash, randomUUID } from 'node:crypto'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { DatabaseSync } from 'node:sqlite'
-import { addEvent, findAppointmentMatch, openDb } from '../src/db'
-import { resolveSelectionId, transaction, upsertPerson } from '../src/inputs'
+import { addEvent, findAppointmentMatch, openDb } from './db.js'
+import { resolveSelectionId, transaction, upsertPerson } from './inputs.js'
 
 interface CalendarEvent {
   externalId: string

@@ -3,8 +3,8 @@
  * 住所や移動履歴は個人性が高いため、platform snapshotには含めない。
  */
 import type { DatabaseSync } from 'node:sqlite'
-import { ensurePlatformSchema } from './platform'
-import { transaction } from './inputs'
+import { ensurePlatformSchema } from './platform.js'
+import { transaction } from './inputs.js'
 
 export type PlaceKind = 'home' | 'campus' | 'station' | 'office' | 'hotel' | 'coworking' | 'other'
 export type PlacePrivacy = 'private' | 'shared' | 'public'

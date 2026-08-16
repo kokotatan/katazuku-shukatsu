@@ -49,7 +49,22 @@ npm run seed      # スキーマの1例で正本DBを組み立てて表示
 ```
 
 設定GUIを見る場合は `examples/config-gui.html` をブラウザで開いてください。
-公開APIの入口は `src/index.ts`(現状は clone して TypeScript から import する形。npm 配布は今後)。
+
+## 公開API
+
+入口は **`src/index.ts` の1つだけ**です。ここに出ている名前が公開契約で、SemVer はこの面にかかります。
+`src/db.js` のような内部モジュールを直接 import すると、パッチ更新で壊れます。
+
+```ts
+import { openDb, transition, resolveCompany, applyDiff } from 'katazuku-shukatsu'
+```
+
+`npm run build` で `dist/`(JS + 型定義 + sourcemap)を出力します。`package.json` の `exports` は
+このビルド成果物だけを指すので、公開していない内部モジュールへは到達できません。
+JSON Schema は `katazuku-shukatsu/schemas/*.json` として別途参照できます。
+
+公開面は `tests/check-api.ts` が固定しています。export を増やしたらこのテストの `EXPECTED` にも
+足してください(=「意図して公開した」という記録になります)。
 
 ## データの保管・複数デバイス
 

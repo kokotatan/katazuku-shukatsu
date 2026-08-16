@@ -9,7 +9,7 @@
 import { DatabaseSync } from 'node:sqlite'
 import { mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
-import { ensurePlatformSchema } from './platform'
+import { ensurePlatformSchema } from './platform.js'
 
 export interface Selection {
   id?: number
