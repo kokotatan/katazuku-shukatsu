@@ -144,7 +144,14 @@ const CLAUDE_EXTRA_CAPABILITIES = [
   'voice.transcribe',
 ]
 
-const CLAUDE_TOOLS: Record<string, string[]> = {
+/**
+ * capability を Claude CLI の `--allowedTools` へ写す既定の対応表。
+ *
+ * MCPサーバ名(`mcp__google-workspace__*` など)は**どのMCPを入れているかという環境の話**で、
+ * core が知っているべきことではない。既定として持つが、`AdapterOptions.capabilityTools` で
+ * 丸ごと差し替えられる。自分の環境の名前に読み替えるときはそちらを使うこと。
+ */
+export const DEFAULT_CAPABILITY_TOOLS: Record<string, string[]> = {
   'workspace.read': ['Read', 'Glob', 'Grep'],
   'workspace.write': ['Write', 'Edit'],
   shell: ['PowerShell'],
@@ -235,7 +242,19 @@ export function classifyFailure(result: ProcessResult): FailureCode {
  * 一部CLIは利用枠切れを終了コード0で返すことがある。高確度の既知文言は終了コードに
  * 関係なく失敗とし、それ以外の正常終了だけを成功として扱う。
  */
-export function detectProcessFailure(result: ProcessResult): FailureCode | undefined {
+/**
+ * 「副作用を起こす前に、agent自身が中止を宣言した」と読み取るパターンの既定値。
+ *
+ * これはプロンプト規約の話であって、provider契約の話ではない(#8)。日本語の文言を
+ * core に焼き込みたくないので、既定として持ちつつ `detectProcessFailure` の第2引数で
+ * 差し替えられるようにしてある。自分のプロンプト規約に合わせて置き換えること。
+ */
+export const DEFAULT_ABORT_PATTERNS: RegExp[] = [/MCP\s*が使えないため中止|MCPが使えないため中止/]
+
+export function detectProcessFailure(
+  result: ProcessResult,
+  abortPatterns: RegExp[] = DEFAULT_ABORT_PATTERNS,
+): FailureCode | undefined {
   const known = classifyKnownFailure(result)
   if (result.exitCode === 0 && !result.signal && !result.errorCode) {
     // Codexは途中で回復したtool errorもJSON eventへ残す。最終終了が成功なら、それを
@@ -245,7 +264,8 @@ export function detectProcessFailure(result: ProcessResult): FailureCode | undef
     // (2026-07-28: Claude headlessのMCP未接続中止が終了コード0で成功扱いになり、
     //  MCPを持つCodexが居るのに引き継がれず日次同期が無音で止まった)。
     if (known === 'quota_exhausted') return known
-    if (/MCP\s*が使えないため中止|MCPが使えないため中止/.test(result.stderr + '\n' + result.stdout)) {
+    const output = `${result.stderr}\n${result.stdout}`
+    if (abortPatterns.some((pattern) => pattern.test(output))) {
       return 'capability_missing'
     }
     return undefined
@@ -728,6 +748,11 @@ export interface AdapterOptions {
   /** web.search capability要求時にcodex execへ渡す引数。CLI版差を吸収するためadapter内に閉じ込める */
   webSearchArgs?: string[]
   voiceboxMcpUrl?: string
+  /**
+   * capability → CLIツール名の対応表。省略時は `DEFAULT_CAPABILITY_TOOLS`。
+   * どのMCPサーバを入れているかは環境ごとに違うので、ここで差し替える(#8)。
+   */
+  capabilityTools?: Record<string, string[]>
 }
 
 // 現行のcodex execは`--search`を持たず、web検索はconfig override(tools.web_search)で有効化する。
@@ -798,7 +823,8 @@ export function createClaudeAdapter(options: AdapterOptions): AgentAdapter {
       return { ok: false, failure: classifyFailure(result) }
     },
     buildInvocation(request) {
-      const tools = unique(request.capabilities.flatMap((capability) => CLAUDE_TOOLS[capability] ?? []))
+      const capabilityTools = options.capabilityTools ?? DEFAULT_CAPABILITY_TOOLS
+      const tools = unique(request.capabilities.flatMap((capability) => capabilityTools[capability] ?? []))
       // stream-jsonにはtool_useとrate_limit_eventが含まれる。週制限がtool実行前か後かを
       // text出力の有無で推測せず、外部副作用後の誤フォールバックを防ぐ。
       const args = ['-p', '--output-format', 'stream-json', '--verbose']

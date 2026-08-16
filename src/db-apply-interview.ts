@@ -11,7 +11,7 @@ import type { DatabaseSync } from 'node:sqlite'
 import { addEvent, openDb } from './db.js'
 import { resolveSelectionId, transaction, upsertPerson } from './inputs.js'
 
-interface InterviewPerson {
+export interface InterviewPerson {
   name: string
   company?: string
   role?: string
@@ -22,13 +22,13 @@ interface InterviewPerson {
   photoPath?: string
 }
 
-interface ProfileSuggestion {
+export interface ProfileSuggestion {
   field: string
   value: unknown
   confidence?: number
 }
 
-interface InterviewInput {
+export interface InterviewInput {
   runId: string
   appointmentId?: number
   company: string
@@ -81,8 +81,15 @@ function validate(input: unknown): asserts input is InterviewInput {
   if (value.profileSuggestions && !Array.isArray(value.profileSuggestions)) throw new Error('profileSuggestions は配列です')
 }
 
-export function applyInterview(input: InterviewInput): { created: boolean; interviewId: number; photos: number } {
-  const db = openDb(DB_PATH)
+/**
+ * 議事録をDBへ反映する。`db` を渡せる(applyCalendar と同じ)。
+ * 渡さなければ既定の正本DBを開く。テストと呼び出し側の合成が効くように注入可にしてある。
+ */
+export function applyInterview(
+  input: InterviewInput,
+  db: DatabaseSync = openDb(DB_PATH),
+  photoRoot = PHOTO_ROOT,
+): { created: boolean; interviewId: number; photos: number } {
   return transaction(db, () => {
     let photos = 0
     const duplicate = db.prepare('SELECT id FROM interview_note WHERE source_ref = ?')
@@ -147,7 +154,7 @@ export function applyInterview(input: InterviewInput): { created: boolean; inter
         try {
           const imagePath = resolve(person.photoPath)
           if (!existsSync(imagePath)) throw new Error('画像ファイルが見つかりません')
-          if (savePersonPhoto(db, personId, imagePath)) photos += 1
+          if (savePersonPhoto(db, personId, imagePath, photoRoot)) photos += 1
         } catch (error) {
           console.warn(`顔写真の登録に失敗(議事録反映は続行): ${person.name}: ${error instanceof Error ? error.message : error}`)
         }

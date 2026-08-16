@@ -35,6 +35,7 @@ const EXPECTED = [
   'runAgent', 'createDefaultAdapters', 'createCodexAdapter', 'createClaudeAdapter',
   'parseProviderOrder', 'classifyFailure', 'mayFallback', 'parseQuotaResetAt', 'validateJsonSchema',
   'executeProcess', 'PROVIDER_IDS', 'DEFAULT_CODEX_WEB_SEARCH_ARGS',
+  'DEFAULT_CAPABILITY_TOOLS', 'DEFAULT_ABORT_PATTERNS',
   // 会議URL
   'isMeetingUrl', 'MEETING_HOSTS', 'SHORTENER_HOSTS',
   // platform
