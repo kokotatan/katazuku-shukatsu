@@ -20,8 +20,8 @@
 | `schemas/` | 入出力の JSON Schema。`settings.schema.json` は設定UIを生成する唯一の真実 |
 | `examples/config-gui.html` | JSON Schema から設定フォーム・検証・出力を自動生成する設定GUI(単一HTML) |
 | `examples/seed.ts` | 架空企業だけで正本DBを組み立てるデモ |
-| `shared/` | アプリ群が共有するスナップショットの型と読み口(`@katazuku/data`) |
-| `board/` | 正本DBの状態を見る**読み取り専用ボード**([SmartHR Design System](https://smarthr.design/) 準拠) |
+| `shared/` | アプリ群が共有する型・読み口・共通UI(`@katazuku/data` / `@katazuku/ui`) |
+| `board/` ほか8本 | 正本DBを見る**読み取り専用アプリ群**([SmartHR Design System](https://smarthr.design/) 準拠) |
 
 ## 設計の芯
 
@@ -50,15 +50,29 @@ npm run seed      # スキーマの1例で正本DBを組み立てて表示
 
 設定GUIを見る場合は `examples/config-gui.html` をブラウザで開いてください。
 
-ボード(読み取り専用の「見る窓」)を見る場合:
+## アプリ群（読み取り専用の「見る窓」）
+
+正本DBの状態を見るためのUIです。**どのアプリもDBへ書き込みません**。状態を変えるのは
+エージェントと本人だけ、という原則をUIの構造で守っています。
+
+| アプリ | 中身 |
+|---|---|
+| [`board/`](./board/) | きょう / 選考 / 企業 / ログ の4タブ。まずここ |
+| [`insight/`](./insight/) | 今日やること。期限切れ・今日〜あさって・今週・待ち |
+| [`status/`](./status/) | 選考管理。トラックごとの現在地と次の一手 |
+| [`inbox/`](./inbox/) | メールと更新。要約とカテゴリだけ(本文は保存しない) |
+| [`people/`](./people/) | 面接官・社員・OBOG。出会った根拠とメモ |
+| [`prep/`](./prep/) | 面接準備。予定・企業研究・過去面接を会社ごとに束ねる |
+| [`profile/`](./profile/) | 個人マスタ。確定情報と、面接由来の「候補」を分ける |
+| [`impact/`](./impact/) | 自動運転の効果。推定時間ではなくDBに残った件数 |
 
 ```sh
 npm run snapshot -- --demo    # 架空データのスナップショットを書き出す
-cd board && npm install && npm run dev
+cd insight && npm install && npm run dev
 ```
 
 自分のデータで見るなら `npm run snapshot`(書き出した `snapshot.json` は gitignore 済み)。
-詳細は [board/README.md](./board/README.md)。
+共通の設計は [shared/README.md](./shared/README.md)、各アプリの詳細は [board/README.md](./board/README.md)。
 
 ## 公開API
 

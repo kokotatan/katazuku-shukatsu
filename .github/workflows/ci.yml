@@ -32,13 +32,17 @@ jobs:
       - run: npm pack --dry-run
       - run: npm test
 
-  board:
+  apps:
     # アプリ群が腐らないように、型検査とビルドまで通す。
     # コアの依存ゼロは保ったまま、UIは各アプリに閉じた package.json を持つ。
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [board, status, inbox, insight, profile, people, prep, impact]
     defaults:
       run:
-        working-directory: board
+        working-directory: ${{ matrix.app }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

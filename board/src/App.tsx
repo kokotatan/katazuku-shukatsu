@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import {
-  AnchorButton, Base, Button, Center, Cluster, Heading, InformationPanel, LineClamp,
-  Loader, Section, SegmentedControl, Stack, StatusLabel, Text,
+  AnchorButton, Base, Button, Cluster, Heading, InformationPanel, LineClamp,
+  Section, SegmentedControl, Stack, StatusLabel, Text,
 } from 'smarthr-ui'
 import {
   daysLeft, isClosed, parseDate,
   type Appointment, type KatazukuData, type Selection,
 } from '@katazuku/data'
+import { AppHeading, AppShell, DataState } from '@katazuku/ui'
 import { useKatazukuData } from './lib/useKatazukuData'
 
 /**
@@ -259,66 +260,44 @@ export default function App() {
   ]
 
   return (
-    <>
-      <header className="board-header">
-        <div className="board-header-inner">
-          <Cluster align="center" gap={0.75}>
-            <span className="board-mark" aria-hidden="true">片</span>
-            <Text weight="bold">katazuku</Text>
-            <Text size="S" color="TEXT_GREY">正本DBを見るための、読み取り専用の窓</Text>
-            <span className="board-header-spacer" />
-            {data?.generatedAt && (
-              <Text size="S" color="TEXT_GREY">
-                DB {new Date(data.generatedAt).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })} 時点
-              </Text>
-            )}
-            <Button size="S" variant="secondary" onClick={() => reload()} disabled={loading}>
-              {loading ? '読込中…' : '更新'}
-            </Button>
-          </Cluster>
-        </div>
-      </header>
+    <AppShell current="board">
+      <AppHeading
+        caption="BOARD"
+        title="ボード"
+        description="正本DBの状態を見るための、読み取り専用の窓。"
+        generatedAt={data?.generatedAt}
+        onReload={reload}
+        loading={loading}
+      />
 
-      <main className="board-shell">
-        <Stack gap={1}>
-          {error && (
-            <InformationPanel type="error" heading="読み込めません" toggleable={false}>
-              <Text>{error}</Text>
-            </InformationPanel>
-          )}
-
-          {data?.demo && (
+      {!data ? <DataState loading={loading} error={error} /> : (
+        <>
+          {data.demo && (
             <InformationPanel type="warning" heading="デモデータを表示しています" toggleable={false}>
               <Text>
                 架空の企業・予定・ログです。自分のデータを見るには、リポジトリのルートで
                 <code> npm run snapshot </code>
-                を実行してから「更新」を押してください(書き出した snapshot.json はコミットされません)。
+                を実行してから「再読込」を押してください(書き出した snapshot.json はコミットされません)。
               </Text>
             </InformationPanel>
           )}
 
-          {!data && !error && <Center><Loader text="読み込んでいます" /></Center>}
+          <SegmentedControl
+            options={options}
+            value={tab}
+            onClickOption={(v) => setTab(v as Tab)}
+            aria-label="表示する一覧"
+          />
+          {tab === 'today' && <TodayTab data={data} />}
+          {tab === 'tracks' && <TracksTab data={data} />}
+          {tab === 'companies' && <CompaniesTab data={data} />}
+          {tab === 'log' && <LogTab data={data} />}
 
-          {data && (
-            <>
-              <SegmentedControl
-                options={options}
-                value={tab}
-                onClickOption={(v) => setTab(v as Tab)}
-                aria-label="表示する一覧"
-              />
-              {tab === 'today' && <TodayTab data={data} />}
-              {tab === 'tracks' && <TracksTab data={data} />}
-              {tab === 'companies' && <CompaniesTab data={data} />}
-              {tab === 'log' && <LogTab data={data} />}
-
-              <Text size="S" color="TEXT_GREY">
-                このボードは正本DBへ書き込みません。状態を変えるのはエージェントと本人だけです。
-              </Text>
-            </>
-          )}
-        </Stack>
-      </main>
-    </>
+          <Text size="S" color="TEXT_GREY">
+            このボードは正本DBへ書き込みません。状態を変えるのはエージェントと本人だけです。
+          </Text>
+        </>
+      )}
+    </AppShell>
   )
 }

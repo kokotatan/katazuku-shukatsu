@@ -18,14 +18,14 @@ import {
   openDb, upsertCompany, insertSelection, addAppointment, addEvent, addPending,
   listSelections, listAppointments, listCompanies, listEvents, listPending, outcomeOf,
 } from '../src/db.js'
-import { listPlatformSnapshot, upsertCompanyDossier, upsertMailItem } from '../src/platform.js'
+import { listPlatformSnapshot, saveBasicProfile, upsertCompanyDossier, upsertMailItem } from '../src/platform.js'
 import { upsertPerson } from '../src/inputs.js'
 import type { DatabaseSync } from 'node:sqlite'
 
 const here = dirname(fileURLToPath(import.meta.url))
 
 /** アプリが読む配置先。アプリを増やしたらここに足す */
-const TARGETS = ['board']
+const TARGETS = ['board', 'status', 'inbox', 'insight', 'profile', 'people', 'prep', 'impact']
 
 export function buildSnapshot(db: DatabaseSync, demo: boolean): Record<string, unknown> {
   const selections = listSelections(db)
@@ -111,10 +111,11 @@ function seedDemo(db: DatabaseSync): void {
   }
 
   const events: [string, string, string, string, string][] = [
-    ['株式会社アルファ', '2026-08-14T09:12:00+09:00', '選考通過', 'メールに「最終面接へお進みいただきます」とあった', 'mail'],
-    ['ベータ工業株式会社', '2026-08-15T18:40:00+09:00', '日程打診', '候補日3つの案内メールを受信。返信はまだ', 'mail'],
-    ['株式会社イプシロン', '2026-08-16T08:05:00+09:00', '内定', '内定通知と承諾期限(8/28)の案内', 'mail'],
-    ['ゼータ商事株式会社', '2026-08-12T11:30:00+09:00', '不合格', 'お見送りの連絡。トラックを終了に確定した', 'mail'],
+    ['株式会社アルファ', '2026-08-14T09:12:00+09:00', '選考通過', 'メールに「最終面接へお進みいただきます」とあった', 'daily-sync'],
+    ['ベータ工業株式会社', '2026-08-15T18:40:00+09:00', '日程打診', '候補日3つの案内メールを受信。返信はまだ', 'daily-sync'],
+    ['株式会社アルファ', '2026-08-15T07:00:00+09:00', '予定作成', '結果連絡の面談をカレンダーへ登録した', 'calendar-sync'],
+    ['株式会社イプシロン', '2026-08-16T08:05:00+09:00', '内定', '内定通知と承諾期限(8/28)の案内', 'daily-sync'],
+    ['ゼータ商事株式会社', '2026-08-12T11:30:00+09:00', '不合格', 'お見送りの連絡。トラックを終了に確定した', 'daily-sync'],
   ]
   for (const [company, at, kind, summary, source] of events) {
     const selectionId = byCompany.get(company)
@@ -124,19 +125,57 @@ function seedDemo(db: DatabaseSync): void {
 
   // 人(people アプリの移植で使う)。架空の役職ラベルだけ
   const people: [string, string, string, string, string][] = [
-    ['（人事担当A）', '株式会社アルファ', '採用担当', '面接官', '2026-08-14'],
-    ['（技術面接官B）', 'ベータ工業株式会社', 'エンジニアリングマネージャ', '面接官', '2026-08-19'],
-    ['（リクルーターC）', '株式会社イプシロン', 'リクルーター', 'リクルーター', '2026-07-30'],
+    ['人事担当A（架空）', '株式会社アルファ', '採用担当', '面接官', '2026-08-14'],
+    ['技術面接官B（架空）', 'ベータ工業株式会社', 'エンジニアリングマネージャ', '面接官', '2026-08-19'],
+    ['リクルーターC（架空）', '株式会社イプシロン', 'リクルーター', 'リクルーター', '2026-07-30'],
   ]
   for (const [name, company, role, category, metAt] of people) {
     upsertPerson(db, { name, company, role, category, metAt, howMet: '（説明会で）', followUp: '' })
   }
 
   upsertCompanyDossier(db, companyIds.get('株式会社アルファ')!, {
-    summary: '（企業研究の要約。架空)', facts: { founded: 2015, employees: 320 },
+    summary: '架空の企業研究の要約。一次情報から拾った事実だけを置き、感想は書かない。',
+    facts: { 設立: 2015, 従業員数: 320, 事業: '（架空のSaaS）' },
     sources: [{ title: '（一次情報のタイトル）', url: 'https://example.com/ir' }],
     researchedAt: '2026-08-10T00:00:00+09:00', sourceRef: 'demo',
   })
+  upsertCompanyDossier(db, companyIds.get('合同会社ガンマ')!, {
+    summary: '架空の企業研究の要約。適性検査はテストセンター方式、選考は書類→検査→面接2回。',
+    facts: { 設立: 2019, 従業員数: 45, 選考: '書類 → 適性検査 → 面接2回' },
+    sources: [{ title: '（採用ページ）', url: 'https://example.com/recruit' }],
+    researchedAt: '2026-08-12T00:00:00+09:00', sourceRef: 'demo',
+  })
+
+  // 個人マスタ(架空)。実在の氏名・連絡先は入れない
+  saveBasicProfile(db, {
+    name: '（氏名）', university: '（大学）', faculty: '（学部）', graduationYear: 2028,
+    careerAxis: '手を動かして、使われるものを作る',
+    desiredRole: 'ソフトウェアエンジニア', desiredIndustry: 'SaaS / Web',
+    strengths: '（強み）', selfPr: '（自己PR）',
+  }, 'demo')
+
+  // 面接記録と、そこから拾った「候補」。書き込み層はDB注入に対応していないので直に入れる
+  const now = '2026-08-16T00:00:00+09:00'
+  const alphaSel = byCompany.get('株式会社アルファ')
+  if (alphaSel !== undefined) {
+    db.prepare(`
+      INSERT INTO interview_note (selection_id, company_id, occurred_at, title, summary, source_ref, data_json, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      alphaSel, companyIds.get('株式会社アルファ')!, '2026-08-08T15:00:00+09:00',
+      '一次面接', '技術の深掘りが中心。作ったものの意思決定を聞かれた。',
+      'demo-interview-1', JSON.stringify({ questions: ['なぜその設計にしたか'], followUps: [] }), now,
+    )
+  }
+  for (const [field, value, ref, confidence] of [
+    ['careerAxis', '手を動かして、使われるものを作る', 'demo-interview-1', 0.8],
+    ['strengths', '要件が曖昧なまま動くものを出せる', 'demo-interview-1', 0.6],
+  ] as [string, string, string, number][]) {
+    db.prepare(`
+      INSERT OR IGNORE INTO profile_suggestion (field, value, source_ref, confidence, status, created_at)
+      VALUES (?, ?, ?, ?, '候補', ?)
+    `).run(field, value, ref, confidence, now)
+  }
 
   const mails: [string, string, string, string, string, string][] = [
     ['demo-1', '株式会社アルファ', '最終面接の結果について', '結果連絡の面談日程が案内されている', '選考案内', '2026-08-20'],

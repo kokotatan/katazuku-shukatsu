@@ -4,6 +4,9 @@
 公開用に移植したもので、[SmartHR Design System](https://smarthr.design/) /
 [smarthr-ui](https://github.com/kufu/smarthr-ui) に準拠しています。
 
+アプリは全部で8本あります(`board` `insight` `status` `inbox` `people` `prep` `profile` `impact`)。
+どれも同じ構成・同じ共有層([shared/](../shared/))で、ここに書いた設計は全部に当てはまります。
+
 > このプロジェクトは SmartHR 社とは無関係です。OSS として公開されているデザインシステムと
 > コンポーネントライブラリを利用しているだけで、SmartHR のロゴ・ブランドは使用していません。
 
@@ -34,15 +37,19 @@
 ## 使い方
 
 ```sh
-# 1. スナップショットを作る(リポジトリのルートで)
+# 1. スナップショットを作る(リポジトリのルートで。全アプリの public/ へ配る)
 npm run snapshot -- --demo   # 架空データ(同梱済み)
 npm run snapshot             # 自分の正本DB(data/katazuku.db または $KATAZUKU_DB)から
 
-# 2. 開く
+# 2. 開く(どのアプリでも同じ)
 cd board
 npm install
 npm run dev
 ```
+
+アプリ間のリンク(左サイドバー)は兄弟ディレクトリへの相対パスです。開発サーバーは
+アプリごとに別ポートなので飛べません — 本体と同じ制約です。ビルドして1か所へ
+並べると繋がります。
 
 `public/snapshot.json`(実データ)があればそれを、無ければ `public/snapshot.demo.json`
 (架空データ)を読みます。**実データのスナップショットは `.gitignore` 済みです。**

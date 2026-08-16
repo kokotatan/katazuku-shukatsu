@@ -1,0 +1,4 @@
+node_modules/
+dist/
+# 実データから書き出したスナップショット。絶対にコミットしない
+public/snapshot.json

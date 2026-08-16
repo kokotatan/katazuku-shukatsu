@@ -1,0 +1,311 @@
+/*
+ * アプリ群の外枠。色は SmartHR Design System のパレットに合わせる。
+ * (main #0077c7 / text #23221e / grey #706d65 / border #d6d3d0 / background #f8f7f6)
+ * レイアウトだけを持ち、部品の見た目は smarthr-ui に任せる。
+ */
+
+body {
+  margin: 0;
+  background-color: #f8f7f6;
+}
+
+.ktz-app {
+  display: flex;
+  min-height: 100vh;
+}
+
+.ktz-main {
+  min-width: 0;
+  flex: 1 1 auto;
+  padding: 1.5rem 1rem 6rem;
+}
+
+@media (min-width: 768px) {
+  .ktz-main { padding: 2rem; }
+}
+
+/* ---- デスクトップ: 左サイドバー ---- */
+
+.ktz-side {
+  display: none;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  width: 14rem;
+  flex-shrink: 0;
+  flex-direction: column;
+  border-right: 1px solid #d6d3d0;
+  background-color: #fff;
+}
+
+@media (min-width: 768px) {
+  .ktz-side { display: flex; }
+}
+
+.ktz-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 1.25rem 1.25rem 1rem;
+  text-decoration: none;
+}
+
+.ktz-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  flex-shrink: 0;
+  border-radius: 0.5rem;
+  background-color: #0077c7;
+  color: #fff;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.ktz-brand-name {
+  font-size: 1.125rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: #23221e;
+}
+
+.ktz-side-nav {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 0.125rem;
+  padding: 0 0.75rem;
+}
+
+.ktz-side-link {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  color: #23221e;
+  text-decoration: none;
+}
+
+.ktz-side-link:hover { background-color: #f2f1f0; }
+
+.ktz-side-link.is-current {
+  background-color: #e5f1f9;
+  color: #0071c1;
+  font-weight: 700;
+}
+
+.ktz-caption {
+  margin-left: auto;
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: #706d65;
+}
+
+.ktz-side-foot {
+  padding: 1rem 1.25rem;
+  font-size: 0.6875rem;
+  line-height: 1.6;
+  color: #706d65;
+}
+
+/* ---- モバイル: 下タブバー ---- */
+
+.ktz-tabbar {
+  position: fixed;
+  inset-inline: 0;
+  bottom: 0;
+  z-index: 30;
+  display: flex;
+  border-top: 1px solid #d6d3d0;
+  background-color: #fff;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+@media (min-width: 768px) {
+  .ktz-tabbar { display: none; }
+}
+
+.ktz-tab {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  border: 0;
+  background: none;
+  padding: 0.5rem 0 0.375rem;
+  font-size: 0.625rem;
+  color: #706d65;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.ktz-tab.is-current { color: #0071c1; font-weight: 700; }
+
+/* ---- モバイル: 「その他」ボトムシート ---- */
+
+.ktz-sheet { position: fixed; inset: 0; z-index: 40; }
+
+@media (min-width: 768px) {
+  .ktz-sheet { display: none; }
+}
+
+.ktz-sheet-scrim {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background-color: rgba(35, 34, 30, 0.4);
+}
+
+.ktz-sheet-body {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  border-top: 1px solid #d6d3d0;
+  border-radius: 0.5rem 0.5rem 0 0;
+  background-color: #fff;
+  padding: 0.75rem 1rem calc(1.25rem + env(safe-area-inset-bottom));
+}
+
+.ktz-sheet-title {
+  margin: 0 0 0.75rem;
+  padding-inline: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #706d65;
+}
+
+.ktz-sheet-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.ktz-sheet-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.25rem 0;
+  font-size: 0.6875rem;
+  color: #23221e;
+  text-decoration: none;
+}
+
+.ktz-sheet-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 0.5rem;
+  background-color: #f2f1f0;
+  color: #706d65;
+  font-size: 1.25rem;
+}
+
+.ktz-sheet-icon.is-current { background-color: #e5f1f9; color: #0071c1; }
+
+/* ---- 部品 ---- */
+
+.ktz-reload {
+  border: 1px solid #c1bdb7;
+  border-radius: 0.375rem;
+  background-color: #fff;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #23221e;
+  cursor: pointer;
+}
+
+.ktz-reload:hover:not(:disabled) { background-color: #f2f1f0; }
+.ktz-reload:disabled { color: #c1bdb7; cursor: default; }
+
+.ktz-tiles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+@media (min-width: 640px) {
+  .ktz-tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+.ktz-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  border: 1px solid #d6d3d0;
+  border-radius: 0.75rem;
+  background-color: #fff;
+  padding: 1rem;
+}
+
+.ktz-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+@media (min-width: 1280px) {
+  .ktz-grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ktz-grid-aside { grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr); }
+}
+
+@media (min-width: 1024px) {
+  .ktz-grid-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+.ktz-scroll-x { overflow-x: auto; }
+
+.ktz-face {
+  width: 4rem;
+  height: 4rem;
+  flex-shrink: 0;
+  border: 1px solid #d6d3d0;
+  border-radius: 0.5rem;
+  object-fit: cover;
+}
+
+.ktz-face-fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #f2f1f0;
+  color: #706d65;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.ktz-plain-button {
+  display: block;
+  width: 100%;
+  border: 0;
+  background: none;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+.ktz-bar {
+  height: 0.5rem;
+  border-radius: 9999px;
+  background-color: #edebe8;
+}
+
+.ktz-bar-fill {
+  height: 0.5rem;
+  border-radius: 9999px;
+  background-color: #0077c7;
+}
