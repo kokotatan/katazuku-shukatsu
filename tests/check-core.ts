@@ -53,9 +53,46 @@ const officialId = upsertCompany(db, { name: 'Example' })
 setOfficialName(db, 'Example', '株式会社Example Technology')
 check('正式名称が「正」(name)・通称はshortNameに残る',
   listCompanies(db).some((c) => c.name === '株式会社Example Technology' && c.shortName === 'Example'))
+// 「株式会社X」と「X, Inc.」は法人格が食い違う(日本法人と海外法人でありうる)。
+// 芯が一致しても自動マージせず、1回だけ本人確認を挟んでから学習する。
 const officialResolved = resolveCompany(db, 'Example Technology, Inc.')
-check('正式名称の英語表記(Inc.付き)でも確定できる',
-  officialResolved.kind === 'hit' && officialResolved.companyId === officialId)
+check('法人格が食い違う同名は自動マージせず要確認へ回す',
+  officialResolved.kind === 'suspicious' && officialResolved.suggestId === officialId)
+addAlias(db, 'Example Technology, Inc.', '株式会社Example Technology')
+const officialLearned = resolveCompany(db, 'Example Technology, Inc.')
+check('確認して学習すれば以後は確定する',
+  officialLearned.kind === 'hit' && officialLearned.companyId === officialId)
+
+// --- 法人格の扱い(issue #7 回帰) ---
+const kk = upsertCompany(db, { name: 'Torch K.K.' })
+const torchCorp = resolveCompany(db, 'Torch Corp')
+check('#7: K.K. と Corp は接尾辞除去で衝突しても別法人として要確認',
+  torchCorp.kind === 'suspicious' && torchCorp.suggestId === kk)
+const gk = upsertCompany(db, { name: '合同会社ハーバー' })
+const kkHarbor = resolveCompany(db, '株式会社ハーバー')
+check('#7: 合同会社と株式会社は別法人として要確認',
+  kkHarbor.kind === 'suspicious' && kkHarbor.suggestId === gk)
+check('#7: 要確認で作られた別法人は要確認リストに載る',
+  (upsertCompany(db, { name: '株式会社ハーバー' }) > 0) && listPending(db).some((p) => p.name === '株式会社ハーバー'))
+
+const plain = upsertCompany(db, { name: 'Lantern' })
+check('無印と法人格付きは同一(片方が無印なら矛盾しない)',
+  (resolveCompany(db, 'Lantern Inc.') as { kind: string; companyId?: number }).companyId === plain)
+const coLtd = upsertCompany(db, { name: 'Beacon Co., Ltd.' })
+check('Co.,Ltd. と Ltd. は部分集合なので同一',
+  (resolveCompany(db, 'Beacon Ltd.') as { kind: string; companyId?: number }).companyId === coLtd)
+
+// holdings / company はトレードネームの一部。法人格として落としてはいけない
+upsertCompany(db, { name: 'Cascade' })
+check('#7: 「X Holdings」を「X」へ自動マージしない',
+  resolveCompany(db, 'Cascade Holdings').kind === 'suspicious')
+check('#7: normalize は holdings を落とさない', !sameCompany('Cascade Holdings', 'Cascade Group'))
+
+// 名前が法人格だけ、というデータ事故で全社が1社に潰れないこと
+const onlyDesignator = listCompanies(db).length
+upsertCompany(db, { name: '株式会社' })
+upsertCompany(db, { name: '合同会社' })
+check('芯が空(法人格だけ)の名前どうしを同一視しない', listCompanies(db).length === onlyDesignator + 2)
 
 // --- applyDiff(日次反映) ---
 const companyX = upsertCompany(db, { name: '会社X' })
