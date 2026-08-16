@@ -4,7 +4,7 @@
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { openDb } from '../src/db'
+import { openDb } from '../src/db.js'
 import {
   applyApplicationEvent,
   linkCalendarAppointment,
@@ -14,7 +14,7 @@ import {
   startApplication,
   type ApplicationMaterialInput,
   type AssessmentInput,
-} from '../src/application'
+} from '../src/application.js'
 
 const db = openDb(':memory:')
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..')

@@ -1,5 +1,5 @@
 import type { DatabaseSync } from 'node:sqlite'
-import { insertSelection, resolveCompany, samePosition, upsertCompany } from './db'
+import { insertSelection, resolveCompany, samePosition, upsertCompany } from './db.js'
 
 export function resolveSelectionId(
   db: DatabaseSync,

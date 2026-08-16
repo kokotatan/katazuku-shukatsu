@@ -7,7 +7,7 @@
  *   npm run seed            # :memory: に1件入れて表示
  *   npm run seed -- ./demo.db   # ファイルに書き出して中身を確認できる
  */
-import { openDb, upsertCompany, insertSelection, addAppointment, listSelections } from '../src/db'
+import { openDb, upsertCompany, insertSelection, addAppointment, listSelections } from '../src/db.js'
 
 const path = process.argv[2] ?? ':memory:'
 const db = openDb(path)

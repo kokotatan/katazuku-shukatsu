@@ -379,3 +379,94 @@ export function listPlatformSnapshot(db: DatabaseSync): PlatformSnapshot {
     enrichedEvents,
   }
 }
+
+// ---- 書き込み(読み口と対になる writer) ----
+//
+// `listPlatformSnapshot` が読む3つのテーブルには writer が無く、公開面としては
+// 「読めるが誰も書けない」状態だった(#9)。設定GUIの保存先 `profile_basic` を含むので、
+// 読み口をカットするのではなく writer を同梱して面を閉じる。
+// いずれも source_ref / id による冪等upsert。エージェントは何度流しても同じ結果になる。
+
+/** 本人プロフィール(Schema駆動の設定GUIの保存先)。正本は1行だけ */
+export function saveBasicProfile(db: DatabaseSync, data: unknown, by = 'agent'): void {
+  db.prepare(`
+    INSERT INTO profile_basic (id, data_json, updated_at, updated_by) VALUES (1, ?, ?, ?)
+    ON CONFLICT(id) DO UPDATE SET data_json = excluded.data_json,
+      updated_at = excluded.updated_at, updated_by = excluded.updated_by
+  `).run(JSON.stringify(data ?? {}), new Date().toISOString(), by)
+}
+
+export function getBasicProfile(db: DatabaseSync): unknown {
+  const row = db.prepare('SELECT data_json FROM profile_basic WHERE id = 1').get() as { data_json?: string } | undefined
+  return parseJson(row?.data_json, {})
+}
+
+export interface CompanyDossier {
+  summary?: string
+  facts?: unknown
+  sources?: unknown[]
+  researchedAt?: string
+  sourceRef?: string
+}
+
+/** 企業研究の結果。1社1件で上書きする(researched_at が新しいものが正) */
+export function upsertCompanyDossier(db: DatabaseSync, companyId: number, d: CompanyDossier): void {
+  db.prepare(`
+    INSERT INTO company_dossier (company_id, summary, facts_json, sources_json, researched_at, source_ref)
+    VALUES (?, ?, ?, ?, ?, ?)
+    ON CONFLICT(company_id) DO UPDATE SET summary = excluded.summary,
+      facts_json = excluded.facts_json, sources_json = excluded.sources_json,
+      researched_at = excluded.researched_at, source_ref = excluded.source_ref
+  `).run(
+    companyId, d.summary ?? '', JSON.stringify(d.facts ?? {}), JSON.stringify(d.sources ?? []),
+    d.researchedAt ?? new Date().toISOString(), d.sourceRef ?? '',
+  )
+}
+
+export interface MailItemInput {
+  /** メールの安定ID(GmailのmessageId等)。これが冪等キー */
+  id: string
+  selectionId?: number | null
+  companyId?: number | null
+  receivedAt: string
+  sender?: string
+  subject: string
+  summary?: string
+  category?: string
+  needsAction?: boolean
+  deadline?: string
+  status?: string
+  sourceRef?: string
+}
+
+/**
+ * 受信メールの要約台帳。同じメールを何度取り込んでも1行に収束する。
+ * 本文は保存しない(要約とカテゴリだけ)。本文の保管はこのコアの責務ではない。
+ */
+export function upsertMailItem(db: DatabaseSync, m: MailItemInput): void {
+  db.prepare(`
+    INSERT INTO mail_item (id, selection_id, company_id, received_at, sender, subject,
+      summary, category, needs_action, deadline, status, source_ref, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(id) DO UPDATE SET selection_id = excluded.selection_id,
+      company_id = excluded.company_id, received_at = excluded.received_at,
+      sender = excluded.sender, subject = excluded.subject, summary = excluded.summary,
+      category = excluded.category, needs_action = excluded.needs_action,
+      deadline = excluded.deadline, status = excluded.status, source_ref = excluded.source_ref
+  `).run(
+    m.id, m.selectionId ?? null, m.companyId ?? null, m.receivedAt, m.sender ?? '', m.subject,
+    m.summary ?? '', m.category ?? 'その他', m.needsAction ? 1 : 0, m.deadline ?? '',
+    m.status ?? '未確認', m.sourceRef ?? '', new Date().toISOString(),
+  )
+}
+
+/** 未処理(要対応)のメールだけを締切順で返す。日次の「先に片づける」入口 */
+export function listActionableMail(db: DatabaseSync): Record<string, unknown>[] {
+  return db.prepare(`
+    SELECT m.id, m.received_at AS receivedAt, m.subject, m.summary, m.category,
+           m.deadline, m.status, c.name AS company
+    FROM mail_item m LEFT JOIN company c ON c.id = m.company_id
+    WHERE m.needs_action = 1 AND m.status <> '完了'
+    ORDER BY CASE WHEN m.deadline = '' THEN 1 ELSE 0 END, m.deadline, m.received_at DESC
+  `).all() as Record<string, unknown>[]
+}

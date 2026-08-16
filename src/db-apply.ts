@@ -12,7 +12,7 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join, resolve } from 'node:path'
 import type { DatabaseSync } from 'node:sqlite'
-import { openDb, upsertCompany, insertSelection, transition, samePosition, resolveCompany, addPending, addEvent, addAppointment, listPending, outcomeOf, STATUS_FOR, type Stage } from '../src/db'
+import { openDb, upsertCompany, insertSelection, transition, samePosition, resolveCompany, addPending, addEvent, addAppointment, listPending, outcomeOf, STATUS_FOR, type Stage } from './db.js'
 
 export const MAX_APPLY_CHANGES = 15
 

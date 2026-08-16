@@ -9,14 +9,31 @@
   "bugs": { "url": "https://github.com/kokotatan/katazuku-shukatsu/issues" },
   "homepage": "https://github.com/kokotatan/katazuku-shukatsu#readme",
   "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./schemas/*.json": "./schemas/*.json",
+    "./package.json": "./package.json"
+  },
+  "files": ["dist", "schemas", "README.md", "CHANGELOG.md", "LICENSE", "NOTICE", "SECURITY.md"],
+  "sideEffects": false,
   "engines": {
     "node": ">=22.5.0"
   },
   "scripts": {
-    "check": "npm run scan && npm test",
+    "check": "npm run scan && npm run typecheck && npm run build && npm test",
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
+    "build": "npm run clean && tsc -p tsconfig.build.json",
+    "prepack": "npm run build",
     "scan": "node tools/scan-secrets.mjs",
-    "test": "npm run test:core && npm run test:application && npm run test:mobility && npm run test:agent-runtime",
+    "test": "npm run test:core && npm run test:application && npm run test:mobility && npm run test:agent-runtime && npm run test:platform && npm run test:api",
     "test:core": "tsx tests/check-core.ts",
+    "test:platform": "tsx tests/check-platform.ts",
+    "test:api": "tsx tests/check-api.ts",
     "test:application": "tsx tests/check-application.ts",
     "test:mobility": "tsx tests/check-mobility.ts",
     "test:agent-runtime": "tsx tests/check-agent-runtime.ts",

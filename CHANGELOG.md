@@ -5,6 +5,16 @@
 
 ## [Unreleased]
 
+### Added
+- **公開API面の確定と配布可能化** (#5)。`src/index.ts` を「出したい名前だけ」に絞り、
+  `npm run build` で `dist/`(JS + 型定義 + sourcemap)を出力するようにした。`package.json` に
+  `main` / `types` / `exports` / `files` を定義し、`exports` はビルド成果物と `schemas/*.json` だけを指す。
+- 公開面を固定する `tests/check-api.ts`。宣言していない名前が増えたり、内部ヘルパー(`normalize`
+  `commandPreview` など)が漏れたら CI で落ちる。
+- **`profile_basic` / `company_dossier` / `mail_item` の writer** (#9)。読み口だけあって誰も書けない
+  公開面だった。`saveBasicProfile` / `getBasicProfile` / `upsertCompanyDossier` / `upsertMailItem` /
+  `listActionableMail` を同梱し、いずれも冪等upsertにした。`tests/check-platform.ts` を追加。
+
 ### Fixed
 - **名寄せが別法人を無確認でマージしうる問題** (#7)。`normalize()` が法人格を落とすため
   「株式会社X」と「合同会社X」、「X K.K.」と「X Corp」が同じ芯に潰れ、`resolveCompany` の
@@ -17,6 +27,9 @@
   `pte` / `pty` / `llp` と、`一般社団法人` などの日本の法人形態を追加した。
 - `upsertCompany()` は紛らわしい名前で新規作成するとき、要確認(`pending_review`)に積むようになった。
   黙って重複法人が増えるのを防ぐ。
+- モジュール解決を `nodenext` に変更し、相対 import に `.js` 拡張子を付けた(Node の ESM 仕様に合わせ、
+  ビルド成果物がそのまま実行できるようにするため)。`src` 内から `../src/...` を参照していた箇所も
+  `./...` に正した。
 
 ## [0.1.0] - 2026-08-15
 

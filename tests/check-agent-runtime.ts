@@ -22,7 +22,7 @@ import {
   type ProcessExecutor,
   type ProcessResult,
   type ProviderId,
-} from '../src/agent-runtime'
+} from '../src/agent-runtime.js'
 
 let passed = 0
 let failed = 0

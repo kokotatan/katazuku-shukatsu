@@ -8,9 +8,9 @@ import {
   openDb, upsertCompany, insertSelection, listSelections, listCompanies,
   transition, sameCompany, samePosition, resolveCompany, addAlias, listPending,
   setOfficialName, normalizeAppointmentAt, sameAppointment,
-} from '../src/db'
-import { applyDiff } from '../src/db-apply'
-import { isMeetingUrl } from '../src/meeting-url'
+} from '../src/db.js'
+import { applyDiff } from '../src/db-apply.js'
+import { isMeetingUrl } from '../src/meeting-url.js'
 
 let failed = 0
 function check(label: string, cond: boolean, detail = '') {

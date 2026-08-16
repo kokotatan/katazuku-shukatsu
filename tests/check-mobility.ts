@@ -1,7 +1,7 @@
 /**
  * 場所・参加形態・経路見積もり・確定移動と、住所のsnapshot分離を検証する。
  */
-import { addAppointment, insertSelection, openDb, upsertCompany } from '../src/db'
+import { addAppointment, insertSelection, openDb, upsertCompany } from '../src/db.js'
 import {
   addTravelSegment,
   listMobilityData,
@@ -9,8 +9,8 @@ import {
   setMobilityProfile,
   upsertPlace,
   upsertRouteEstimate,
-} from '../src/mobility'
-import { listPlatformSnapshot } from '../src/platform'
+} from '../src/mobility.js'
+import { listPlatformSnapshot } from '../src/platform.js'
 
 const db = openDb(':memory:')
 let passed = 0
