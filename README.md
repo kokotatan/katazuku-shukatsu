@@ -22,6 +22,7 @@
 | `schemas/` | 入出力の JSON Schema。`settings.schema.json` は設定UIを生成する唯一の真実 |
 | `examples/config-gui.html` | JSON Schema から設定フォーム・検証・出力を自動生成する設定GUI(単一HTML) |
 | `examples/seed.ts` | 架空企業だけで正本DBを組み立てるデモ |
+| `examples/board/` | 正本DBの状態を見る**読み取り専用ボード**の参照実装([SmartHR Design System](https://smarthr.design/) 準拠) |
 
 ## 設計の芯
 
@@ -49,6 +50,16 @@ npm run seed      # スキーマの1例で正本DBを組み立てて表示
 ```
 
 設定GUIを見る場合は `examples/config-gui.html` をブラウザで開いてください。
+
+ボード(読み取り専用の「見る窓」)を見る場合:
+
+```sh
+npm run board:demo            # 架空データのスナップショットを書き出す
+cd examples/board && npm install && npm run dev
+```
+
+自分のデータで見るなら `npm run board:snapshot`(書き出した `snapshot.json` は gitignore 済み)。
+詳細は [examples/board/README.md](./examples/board/README.md)。
 
 ## 公開API
 

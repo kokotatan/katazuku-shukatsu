@@ -6,6 +6,12 @@
 ## [Unreleased]
 
 ### Added
+- **読み取り専用ボードの参照実装** `examples/board/`(第二弾)。[SmartHR Design System](https://smarthr.design/) /
+  smarthr-ui に準拠したReact SPA。DBへは触らず `snapshot.json` 1枚だけを読み、書き込みボタンを1つも持たない
+  ことで「書き手はエージェントだけ」という原則をUIの構造で守る。会議URLとメール本文は画面に出さない。
+  コアのランタイム依存ゼロは維持(ボードは `examples/board/` に閉じた別の `package.json`)。
+- `npm run board:demo` / `npm run board:snapshot`(`examples/board-snapshot.ts`)。前者は架空データ、
+  後者は自分の正本DBからスナップショットを書き出す。実データの `snapshot.json` は gitignore 済み。
 - **公開API面の確定と配布可能化** (#5)。`src/index.ts` を「出したい名前だけ」に絞り、
   `npm run build` で `dist/`(JS + 型定義 + sourcemap)を出力するようにした。`package.json` に
   `main` / `types` / `exports` / `files` を定義し、`exports` はビルド成果物と `schemas/*.json` だけを指す。

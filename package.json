@@ -4,9 +4,22 @@
   "description": "Local-first, human-in-the-loop automation core for Japanese shukatsu (new-grad job hunting). SQLite single-writer data model, semantic layer, and a schema-driven settings UI.",
   "license": "Apache-2.0",
   "author": "kokotatan",
-  "keywords": ["shukatsu", "job-hunting", "sqlite", "agent", "human-in-the-loop", "local-first", "automation"],
-  "repository": { "type": "git", "url": "git+https://github.com/kokotatan/katazuku-shukatsu.git" },
-  "bugs": { "url": "https://github.com/kokotatan/katazuku-shukatsu/issues" },
+  "keywords": [
+    "shukatsu",
+    "job-hunting",
+    "sqlite",
+    "agent",
+    "human-in-the-loop",
+    "local-first",
+    "automation"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kokotatan/katazuku-shukatsu.git"
+  },
+  "bugs": {
+    "url": "https://github.com/kokotatan/katazuku-shukatsu/issues"
+  },
   "homepage": "https://github.com/kokotatan/katazuku-shukatsu#readme",
   "type": "module",
   "main": "./dist/index.js",
@@ -19,7 +32,15 @@
     "./schemas/*.json": "./schemas/*.json",
     "./package.json": "./package.json"
   },
-  "files": ["dist", "schemas", "README.md", "CHANGELOG.md", "LICENSE", "NOTICE", "SECURITY.md"],
+  "files": [
+    "dist",
+    "schemas",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE",
+    "NOTICE",
+    "SECURITY.md"
+  ],
   "sideEffects": false,
   "engines": {
     "node": ">=22.5.0"
@@ -40,7 +61,9 @@
     "seed": "tsx examples/seed.ts",
     "doctor": "node tools/doctor.mjs",
     "backup": "node tools/backup.mjs",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "board:demo": "tsx examples/board-snapshot.ts --demo",
+    "board:snapshot": "tsx examples/board-snapshot.ts"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

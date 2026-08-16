@@ -32,6 +32,21 @@ jobs:
       - run: npm pack --dry-run
       - run: npm test
 
+  board:
+    # 参照UI(examples/board)が腐らないように、型検査とビルドまで通す。
+    # コアの依存ゼロは保ったまま、UIはここに閉じた別の package.json を持つ。
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: examples/board
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm ci
+      - run: npm run build
+
   compat-node22:
     # 互換確認: engines の下限 Node 22。node:sqlite は 22 系では experimental フラグが要る。
     # 情報提供目的で非ブロッキング(continue-on-error)。
