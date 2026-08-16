@@ -29,3 +29,20 @@ body {
 .board-table-wrap {
   overflow-x: auto;
 }
+
+/* katazuku の印。SmartHR のブランドは使わない(デザインシステムに準拠するだけ) */
+.board-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 0.5rem;
+  background-color: #0077c7;
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.board-header-spacer { flex: 1 1 auto; }

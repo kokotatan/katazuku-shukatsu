@@ -62,8 +62,7 @@
     "doctor": "node tools/doctor.mjs",
     "backup": "node tools/backup.mjs",
     "typecheck": "tsc --noEmit",
-    "board:demo": "tsx examples/board-snapshot.ts --demo",
-    "board:snapshot": "tsx examples/board-snapshot.ts"
+    "snapshot": "tsx scripts/snapshot.ts"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

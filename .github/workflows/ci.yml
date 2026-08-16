@@ -33,12 +33,12 @@ jobs:
       - run: npm test
 
   board:
-    # 参照UI(examples/board)が腐らないように、型検査とビルドまで通す。
-    # コアの依存ゼロは保ったまま、UIはここに閉じた別の package.json を持つ。
+    # アプリ群が腐らないように、型検査とビルドまで通す。
+    # コアの依存ゼロは保ったまま、UIは各アプリに閉じた package.json を持つ。
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: examples/board
+        working-directory: board
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

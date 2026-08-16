@@ -1,0 +1,490 @@
+{
+  "generatedAt": "2026-08-16T04:50:18.073Z",
+  "demo": true,
+  "companies": [
+    {
+      "name": "株式会社アルファ",
+      "shortName": "株式会社アルファ",
+      "industry": "SaaS",
+      "mypageUrl": "https://example.com/mypage/%E6%A0%AA%E5%BC%8F%E4%BC%9A%E7%A4%BE%E3%82%A2%E3%83%AB%E3%83%95%E3%82%A1",
+      "memo": ""
+    },
+    {
+      "name": "ベータ工業株式会社",
+      "shortName": "ベータ工業株式会社",
+      "industry": "製造",
+      "mypageUrl": "https://example.com/mypage/%E3%83%99%E3%83%BC%E3%82%BF%E5%B7%A5%E6%A5%AD%E6%A0%AA%E5%BC%8F%E4%BC%9A%E7%A4%BE",
+      "memo": ""
+    },
+    {
+      "name": "合同会社ガンマ",
+      "shortName": "合同会社ガンマ",
+      "industry": "コンサル",
+      "mypageUrl": "https://example.com/mypage/%E5%90%88%E5%90%8C%E4%BC%9A%E7%A4%BE%E3%82%AC%E3%83%B3%E3%83%9E",
+      "memo": "（受検はテストセンター）"
+    },
+    {
+      "name": "Delta Systems Inc.",
+      "shortName": "Delta Systems Inc.",
+      "industry": "SIer",
+      "mypageUrl": "https://example.com/mypage/Delta%20Systems%20Inc.",
+      "memo": ""
+    },
+    {
+      "name": "株式会社イプシロン",
+      "shortName": "株式会社イプシロン",
+      "industry": "Web",
+      "mypageUrl": "https://example.com/mypage/%E6%A0%AA%E5%BC%8F%E4%BC%9A%E7%A4%BE%E3%82%A4%E3%83%97%E3%82%B7%E3%83%AD%E3%83%B3",
+      "memo": ""
+    },
+    {
+      "name": "ゼータ商事株式会社",
+      "shortName": "ゼータ商事株式会社",
+      "industry": "商社",
+      "mypageUrl": "https://example.com/mypage/%E3%82%BC%E3%83%BC%E3%82%BF%E5%95%86%E4%BA%8B%E6%A0%AA%E5%BC%8F%E4%BC%9A%E7%A4%BE",
+      "memo": ""
+    },
+    {
+      "name": "株式会社イータ",
+      "shortName": "株式会社イータ",
+      "industry": "ヘルスケア",
+      "mypageUrl": "https://example.com/mypage/%E6%A0%AA%E5%BC%8F%E4%BC%9A%E7%A4%BE%E3%82%A4%E3%83%BC%E3%82%BF",
+      "memo": ""
+    }
+  ],
+  "selections": [
+    {
+      "id": 1,
+      "companyId": 1,
+      "company": "株式会社アルファ",
+      "season": "本選考",
+      "position": "ソフトウェアエンジニア",
+      "priority": "A",
+      "status": "最終面接済・結果待ち",
+      "outcome": "進行中",
+      "steps": [
+        "ES",
+        "適性検査",
+        "一次面接",
+        "最終面接"
+      ],
+      "nextAction": "結果を待つ",
+      "nextDate": "2026-08-21",
+      "submitted": true,
+      "esUrl": "",
+      "memo": ""
+    },
+    {
+      "id": 2,
+      "companyId": 2,
+      "company": "ベータ工業株式会社",
+      "season": "夏",
+      "position": "技術総合職",
+      "priority": "B",
+      "status": "一次面接済",
+      "outcome": "進行中",
+      "steps": [
+        "ES",
+        "一次面接"
+      ],
+      "nextAction": "二次面接の日程調整",
+      "nextDate": "2026-08-19",
+      "submitted": false,
+      "esUrl": "",
+      "memo": ""
+    },
+    {
+      "id": 3,
+      "companyId": 3,
+      "company": "合同会社ガンマ",
+      "season": "本選考",
+      "position": "ビジネスコンサルタント",
+      "priority": "B",
+      "status": "出願済",
+      "outcome": "進行中",
+      "steps": [
+        "ES"
+      ],
+      "nextAction": "適性検査を受ける",
+      "nextDate": "2026-08-18",
+      "submitted": false,
+      "esUrl": "",
+      "memo": "（受検はテストセンター）"
+    },
+    {
+      "id": 4,
+      "companyId": 4,
+      "company": "Delta Systems Inc.",
+      "season": "冬",
+      "position": "データエンジニア",
+      "priority": "C",
+      "status": "出願予定",
+      "outcome": "進行中",
+      "steps": [],
+      "nextAction": "ESを書く",
+      "nextDate": "2026-08-25",
+      "submitted": false,
+      "esUrl": "",
+      "memo": ""
+    },
+    {
+      "id": 5,
+      "companyId": 5,
+      "company": "株式会社イプシロン",
+      "season": "夏",
+      "position": "プロダクトデザイナー",
+      "priority": "A",
+      "status": "内定",
+      "outcome": "内定",
+      "steps": [
+        "ES",
+        "一次面接",
+        "最終面接"
+      ],
+      "nextAction": "承諾期限までに返答",
+      "nextDate": "2026-08-28",
+      "submitted": true,
+      "esUrl": "",
+      "memo": ""
+    },
+    {
+      "id": 6,
+      "companyId": 6,
+      "company": "ゼータ商事株式会社",
+      "season": "本選考",
+      "position": "総合職",
+      "priority": "C",
+      "status": "不合格",
+      "outcome": "不合格",
+      "steps": [
+        "ES",
+        "一次面接"
+      ],
+      "nextAction": "",
+      "nextDate": "",
+      "submitted": true,
+      "esUrl": "",
+      "memo": ""
+    },
+    {
+      "id": 7,
+      "companyId": 7,
+      "company": "株式会社イータ",
+      "season": "夏",
+      "position": "エンジニア",
+      "priority": "B",
+      "status": "辞退",
+      "outcome": "辞退",
+      "steps": [
+        "ES"
+      ],
+      "nextAction": "",
+      "nextDate": "",
+      "submitted": true,
+      "esUrl": "",
+      "memo": ""
+    }
+  ],
+  "appointments": [
+    {
+      "id": 3,
+      "selectionId": 3,
+      "at": "2026-08-18T23:59:00+09:00",
+      "endAt": "",
+      "kind": "締切",
+      "title": "適性検査の受検期限",
+      "url": "",
+      "location": "",
+      "person": "",
+      "status": "予定",
+      "company": "合同会社ガンマ"
+    },
+    {
+      "id": 2,
+      "selectionId": 2,
+      "at": "2026-08-19T15:00:00+09:00",
+      "endAt": "2026-08-19T16:00:00+09:00",
+      "kind": "面接",
+      "title": "二次面接",
+      "url": "",
+      "location": "（本社・対面）",
+      "person": "（技術部門）",
+      "status": "予定",
+      "company": "ベータ工業株式会社"
+    },
+    {
+      "id": 1,
+      "selectionId": 1,
+      "at": "2026-08-21T10:00:00+09:00",
+      "endAt": "2026-08-21T11:00:00+09:00",
+      "kind": "面接",
+      "title": "結果連絡の面談",
+      "url": "https://example.com/meeting",
+      "location": "",
+      "person": "（人事）",
+      "status": "予定",
+      "company": "株式会社アルファ"
+    },
+    {
+      "id": 5,
+      "selectionId": 4,
+      "at": "2026-08-25T23:59:00+09:00",
+      "endAt": "",
+      "kind": "締切",
+      "title": "ES提出期限",
+      "url": "",
+      "location": "",
+      "person": "",
+      "status": "予定",
+      "company": "Delta Systems Inc."
+    },
+    {
+      "id": 4,
+      "selectionId": 5,
+      "at": "2026-08-28T12:00:00+09:00",
+      "endAt": "",
+      "kind": "締切",
+      "title": "内定承諾の回答期限",
+      "url": "",
+      "location": "",
+      "person": "",
+      "status": "予定",
+      "company": "株式会社イプシロン"
+    }
+  ],
+  "events": [
+    {
+      "selection_id": 1,
+      "at": "2026-08-14T09:12:00+09:00",
+      "kind": "選考通過",
+      "summary": "メールに「最終面接へお進みいただきます」とあった",
+      "source": "mail"
+    },
+    {
+      "selection_id": 2,
+      "at": "2026-08-15T18:40:00+09:00",
+      "kind": "日程打診",
+      "summary": "候補日3つの案内メールを受信。返信はまだ",
+      "source": "mail"
+    },
+    {
+      "selection_id": 5,
+      "at": "2026-08-16T08:05:00+09:00",
+      "kind": "内定",
+      "summary": "内定通知と承諾期限(8/28)の案内",
+      "source": "mail"
+    },
+    {
+      "selection_id": 6,
+      "at": "2026-08-12T11:30:00+09:00",
+      "kind": "不合格",
+      "summary": "お見送りの連絡。トラックを終了に確定した",
+      "source": "mail"
+    }
+  ],
+  "enrichedEvents": [
+    {
+      "id": 3,
+      "selectionId": 5,
+      "at": "2026-08-16T08:05:00+09:00",
+      "kind": "内定",
+      "summary": "内定通知と承諾期限(8/28)の案内",
+      "source": "mail",
+      "ref": "",
+      "company": "株式会社イプシロン",
+      "position": "プロダクトデザイナー"
+    },
+    {
+      "id": 2,
+      "selectionId": 2,
+      "at": "2026-08-15T18:40:00+09:00",
+      "kind": "日程打診",
+      "summary": "候補日3つの案内メールを受信。返信はまだ",
+      "source": "mail",
+      "ref": "",
+      "company": "ベータ工業株式会社",
+      "position": "技術総合職"
+    },
+    {
+      "id": 1,
+      "selectionId": 1,
+      "at": "2026-08-14T09:12:00+09:00",
+      "kind": "選考通過",
+      "summary": "メールに「最終面接へお進みいただきます」とあった",
+      "source": "mail",
+      "ref": "",
+      "company": "株式会社アルファ",
+      "position": "ソフトウェアエンジニア"
+    },
+    {
+      "id": 4,
+      "selectionId": 6,
+      "at": "2026-08-12T11:30:00+09:00",
+      "kind": "不合格",
+      "summary": "お見送りの連絡。トラックを終了に確定した",
+      "source": "mail",
+      "ref": "",
+      "company": "ゼータ商事株式会社",
+      "position": "総合職"
+    }
+  ],
+  "activities": [
+    {
+      "at": "2026-08-12T11:30:00+09:00",
+      "what": "ゼータ商事株式会社 不合格",
+      "why": "お見送りの連絡。トラックを終了に確定した",
+      "how": "mail"
+    },
+    {
+      "at": "2026-08-16T08:05:00+09:00",
+      "what": "株式会社イプシロン 内定",
+      "why": "内定通知と承諾期限(8/28)の案内",
+      "how": "mail"
+    },
+    {
+      "at": "2026-08-15T18:40:00+09:00",
+      "what": "ベータ工業株式会社 日程打診",
+      "why": "候補日3つの案内メールを受信。返信はまだ",
+      "how": "mail"
+    },
+    {
+      "at": "2026-08-14T09:12:00+09:00",
+      "what": "株式会社アルファ 選考通過",
+      "why": "メールに「最終面接へお進みいただきます」とあった",
+      "how": "mail"
+    }
+  ],
+  "profile": {},
+  "profileSuggestions": [],
+  "people": [
+    {
+      "id": 3,
+      "name": "（リクルーターC）",
+      "company": "株式会社イプシロン",
+      "role": "リクルーター",
+      "category": "リクルーター",
+      "metAt": "2026-07-30",
+      "howMet": "（説明会で）",
+      "followUp": "",
+      "updatedAt": "2026-08-16T04:50:18.070Z",
+      "officialCompany": null,
+      "photoKey": null,
+      "photoVerifiedAt": null
+    },
+    {
+      "id": 2,
+      "name": "（技術面接官B）",
+      "company": "ベータ工業株式会社",
+      "role": "エンジニアリングマネージャ",
+      "category": "面接官",
+      "metAt": "2026-08-19",
+      "howMet": "（説明会で）",
+      "followUp": "",
+      "updatedAt": "2026-08-16T04:50:18.070Z",
+      "officialCompany": null,
+      "photoKey": null,
+      "photoVerifiedAt": null
+    },
+    {
+      "id": 1,
+      "name": "（人事担当A）",
+      "company": "株式会社アルファ",
+      "role": "採用担当",
+      "category": "面接官",
+      "metAt": "2026-08-14",
+      "howMet": "（説明会で）",
+      "followUp": "",
+      "updatedAt": "2026-08-16T04:50:18.070Z",
+      "officialCompany": null,
+      "photoKey": null,
+      "photoVerifiedAt": null
+    }
+  ],
+  "personNotes": [],
+  "interviews": [],
+  "submissions": [],
+  "dossiers": [
+    {
+      "companyId": 1,
+      "company": "株式会社アルファ",
+      "summary": "（企業研究の要約。架空)",
+      "researchedAt": "2026-08-10T00:00:00+09:00",
+      "sourceRef": "demo",
+      "facts": {
+        "founded": 2015,
+        "employees": 320
+      },
+      "sources": [
+        {
+          "title": "（一次情報のタイトル）",
+          "url": "https://example.com/ir"
+        }
+      ]
+    }
+  ],
+  "mailItems": [
+    {
+      "id": "demo-1",
+      "selectionId": null,
+      "receivedAt": "2026-08-16T08:00:00+09:00",
+      "sender": "noreply@example.com",
+      "subject": "最終面接の結果について",
+      "summary": "結果連絡の面談日程が案内されている",
+      "category": "選考案内",
+      "needsAction": 1,
+      "deadline": "2026-08-20",
+      "status": "未確認",
+      "sourceRef": "",
+      "company": "株式会社アルファ"
+    },
+    {
+      "id": "demo-2",
+      "selectionId": null,
+      "receivedAt": "2026-08-16T08:00:00+09:00",
+      "sender": "noreply@example.com",
+      "subject": "二次面接の日程調整のお願い",
+      "summary": "候補日3つから選んで返信が必要",
+      "category": "日程調整",
+      "needsAction": 1,
+      "deadline": "2026-08-18",
+      "status": "未確認",
+      "sourceRef": "",
+      "company": "ベータ工業株式会社"
+    },
+    {
+      "id": "demo-3",
+      "selectionId": null,
+      "receivedAt": "2026-08-16T08:00:00+09:00",
+      "sender": "noreply@example.com",
+      "subject": "内定のご連絡と承諾期限",
+      "summary": "承諾書の提出期限が案内されている",
+      "category": "内定",
+      "needsAction": 1,
+      "deadline": "2026-08-28",
+      "status": "未確認",
+      "sourceRef": "",
+      "company": "株式会社イプシロン"
+    },
+    {
+      "id": "demo-4",
+      "selectionId": null,
+      "receivedAt": "2026-08-16T08:00:00+09:00",
+      "sender": "noreply@example.com",
+      "subject": "合同説明会のご案内",
+      "summary": "任意参加のイベント案内",
+      "category": "その他",
+      "needsAction": 1,
+      "deadline": "",
+      "status": "未確認",
+      "sourceRef": "",
+      "company": null
+    }
+  ],
+  "pending": [
+    {
+      "name": "株式会社ガンマ",
+      "context": "既存「合同会社ガンマ」と紛らわしい。同一なら別名として学習、別会社ならこのままでよい",
+      "createdAt": "2026-08-16T04:50:18.071Z"
+    }
+  ]
+}

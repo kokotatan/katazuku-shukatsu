@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { IntlProvider, ThemeProvider, createTheme } from 'smarthr-ui'
 import 'smarthr-normalize-css'
 import 'smarthr-ui/smarthr-ui.css'
-import { App } from './App'
+import App from './App'
 import './index.css'
 
 const root = document.getElementById('root')
