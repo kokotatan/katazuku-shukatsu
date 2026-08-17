@@ -26,7 +26,7 @@ const EXPECTED = [
   // 書き込み層
   'applyDiff', 'MAX_APPLY_CHANGES', 'applyCalendar', 'applyInterview', 'savePersonPhoto',
   // 応募の状態機械
-  'ensureApplicationSchema', 'startApplication', 'applyApplicationEvent', 'listApplicationRuns',
+  'ensureApplicationSchema', 'startApplication', 'applyApplicationEvent', 'createApprovalToken', 'listApplicationRuns',
   'listWebAssessments', 'listCalendarOutbox', 'linkCalendarAppointment',
   // 移動
   'upsertPlace', 'setMobilityProfile', 'setAppointmentMobility', 'upsertRouteEstimate',

@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url'
 import { openDb } from '../src/db.js'
 import {
   applyApplicationEvent,
+  createApprovalToken,
   linkCalendarAppointment,
   listApplicationRuns,
   listCalendarOutbox,
@@ -111,6 +112,26 @@ check('#22: 新規runは段階を飛ばして面接予定に直行できない(�
   } as never), /段階の飛ばし/)
   const ap = d.prepare('SELECT COUNT(*) AS n FROM appointment WHERE selection_id = ?').get(skip.selectionId) as { n: number }
   assert(ap.n === 0, '飛ばし遷移で予定(副作用)が作られてしまいました')
+})
+
+check('#21: 承認シークレット設定時はトークン無し/偽物を拒否し、正しいトークンだけ通す', () => {
+  const d = openDb(':memory:')
+  const r = startApplication(d, {
+    runId: 'run-approval', company: '承認検証社', position: '総合職', season: '28卒本選考',
+    entryUrl: 'https://example.test/a', materialsRef: 'private-ledger:a', sourceRef: 'test:a:001',
+    startedAt: '2026-07-18T10:00:00+09:00',
+  })
+  applyApplicationEvent(d, { eventId: 'ev-fill', runId: r.runId, type: 'entry_filled', at: '2026-07-18T10:05:00+09:00' })
+  process.env.KATAZUKU_APPROVAL_SECRET = 'test-secret'
+  try {
+    expectThrow(() => applyApplicationEvent(d, { eventId: 'ev-noToken', runId: r.runId, type: 'entry_submitted', approvedByUser: true, sourceRef: 'proof:a:002', at: '2026-07-18T10:10:00+09:00' }), /承認トークン/)
+    expectThrow(() => applyApplicationEvent(d, { eventId: 'ev-badToken', runId: r.runId, type: 'entry_submitted', approvalToken: 'deadbeef', sourceRef: 'proof:a:002', at: '2026-07-18T10:10:00+09:00' }), /承認トークン/)
+    const token = createApprovalToken('test-secret', { runId: r.runId, type: 'entry_submitted', sourceRef: 'proof:a:002' })
+    const ok = applyApplicationEvent(d, { eventId: 'ev-ok', runId: r.runId, type: 'entry_submitted', approvalToken: token, sourceRef: 'proof:a:002', at: '2026-07-18T10:12:00+09:00' })
+    assert(ok.state === 'entry_submitted', 'state=' + ok.state)
+  } finally {
+    delete process.env.KATAZUKU_APPROVAL_SECRET
+  }
 })
 
 check('フォーム入力後は本人確認待ち', () => {

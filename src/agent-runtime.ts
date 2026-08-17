@@ -158,15 +158,18 @@ export const DEFAULT_CAPABILITY_TOOLS: Record<string, string[]> = {
   'workspace.write': ['Write', 'Edit'],
   shell: ['PowerShell'],
   'web.search': ['WebSearch', 'WebFetch'],
-  'gmail.read': ['mcp__claude_ai_Gmail__*', 'mcp__google-workspace__*gmail*'],
-  'gmail.draft': ['mcp__claude_ai_Gmail__*', 'mcp__google-workspace__*gmail*'],
-  'gmail.labels': ['mcp__claude_ai_Gmail__*', 'mcp__google-workspace__*gmail*'],
-  'gmail.send': ['mcp__claude_ai_Gmail__*', 'mcp__google-workspace__*gmail*'],
-  'calendar.read': ['mcp__claude_ai_Google_Calendar__*', 'mcp__google-workspace__*calendar*'],
-  'calendar.write': ['mcp__claude_ai_Google_Calendar__*', 'mcp__google-workspace__*calendar*'],
-  'drive.read': ['mcp__claude_ai_Google_Drive__*', 'mcp__google-workspace__*drive*'],
-  'sheets.read': ['mcp__claude_ai_Google_Drive__*', 'mcp__google-workspace__*sheet*'],
-  'sheets.write': ['mcp__claude_ai_Google_Drive__*', 'mcp__google-workspace__*sheet*'],
+  // read 能力は「読み取り専用」のツール名だけに絞る(#20)。connector 全体の *gmail* 等の
+  // ワイルドカードは send/modify まで含むため、read に渡すと「読むだけ」のつもりで送れてしまう。
+  // 環境のMCP名に合わせて AdapterOptions.capabilityTools で差し替え可能。
+  'gmail.read': ['mcp__google-workspace__search_gmail_messages', 'mcp__google-workspace__get_gmail_*', 'mcp__google-workspace__list_gmail_*'],
+  'gmail.draft': ['mcp__google-workspace__draft_gmail_message'],
+  'gmail.labels': ['mcp__google-workspace__manage_gmail_label', 'mcp__google-workspace__modify_gmail_message_labels', 'mcp__google-workspace__batch_modify_gmail_message_labels'],
+  'gmail.send': ['mcp__claude_ai_Gmail__*', 'mcp__google-workspace__send_gmail_message'],
+  'calendar.read': ['mcp__google-workspace__get_events', 'mcp__google-workspace__list_calendars', 'mcp__google-workspace__query_freebusy'],
+  'calendar.write': ['mcp__claude_ai_Google_Calendar__*', 'mcp__google-workspace__manage_event', 'mcp__google-workspace__create_calendar'],
+  'drive.read': ['mcp__google-workspace__search_drive_files', 'mcp__google-workspace__get_drive_file_content', 'mcp__google-workspace__list_drive_items'],
+  'sheets.read': ['mcp__google-workspace__read_sheet_values', 'mcp__google-workspace__get_spreadsheet_info', 'mcp__google-workspace__list_spreadsheets'],
+  'sheets.write': ['mcp__claude_ai_Google_Drive__*', 'mcp__google-workspace__modify_sheet_values', 'mcp__google-workspace__append_table_rows'],
   'browser.interact': ['mcp__claude-in-chrome__*', 'mcp__claude_ai_Chrome__*'],
   'voice.transcribe': ['mcp__voicebox__*'],
 }

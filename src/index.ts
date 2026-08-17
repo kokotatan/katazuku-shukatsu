@@ -69,6 +69,7 @@ export {
   ensureApplicationSchema,
   startApplication,
   applyApplicationEvent,
+  createApprovalToken,
   listApplicationRuns,
   listWebAssessments,
   listCalendarOutbox,
