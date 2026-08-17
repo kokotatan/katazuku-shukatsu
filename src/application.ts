@@ -367,14 +367,35 @@ export function startApplication(
   })
 }
 
+/**
+ * 遷移の妥当性チェック(#22)。**副作用ハンドラより前**に呼び、段階の飛ばしや
+ * paused/failed 中の不正イベントを、状態を変える前に拒否する。
+ */
+function assertTransition(current: ApplicationState, type: ApplicationEventType): void {
+  if ((current === 'paused' || current === 'failed') && !['resumed', 'note', 'failed'].includes(type)) {
+    throw new Error('run は ' + current + ' です。先に resumed を記録してください')
+  }
+  // 高リスクな遷移(提出・面接予定・適性完了)は、対応する前段を経ていない限り拒否する。
+  // 取り込んだイベントで「提出済み」「面接予定」等の進捗を捏造できないようにする。
+  const PREREQ: Partial<Record<ApplicationEventType, ApplicationState[]>> = {
+    entry_submitted: ['entry_review'],
+    es_submitted: ['es_review'],
+    entry_es_submitted: ['started', 'entry_review', 'es_review'],
+    assessment_ready: ['assessment_pending'],
+    assessment_completed: ['assessment_pending', 'assessment_ready'],
+    interview_scheduled: ['awaiting_interview', 'entry_submitted', 'es_submitted'],
+  }
+  const allowedFrom = PREREQ[type]
+  if (allowedFrom && !allowedFrom.includes(current)) {
+    throw new Error(`イベント ${type} は状態 ${current} からは実行できません(段階の飛ばしを禁止)。許可される前段: ${allowedFrom.join(' / ')}`)
+  }
+}
+
 function nextState(
   current: ApplicationState,
   previous: string,
   type: ApplicationEventType,
 ): { state: ApplicationState; previousState: string } {
-  if ((current === 'paused' || current === 'failed') && !['resumed', 'note', 'failed'].includes(type)) {
-    throw new Error('run は ' + current + ' です。先に resumed を記録してください')
-  }
   if (type === 'paused') return { state: 'paused', previousState: current }
   if (type === 'failed') return { state: 'failed', previousState: current === 'failed' ? previous : current }
   if (type === 'resumed') {
@@ -569,6 +590,9 @@ export function applyApplicationEvent(
     } | undefined
     if (!run) throw new Error('application run が見つかりません: ' + event.runId)
     if (duplicate) return { applied: false, runId: run.id, state: run.state }
+
+    // 副作用を起こす前に遷移の妥当性を確認する(#22。段階の飛ばし・paused中の不正イベントを拒否)
+    assertTransition(run.state, event.type)
 
     const at = event.at || new Date().toISOString()
     const sourceRef = event.sourceRef?.trim() || event.eventId

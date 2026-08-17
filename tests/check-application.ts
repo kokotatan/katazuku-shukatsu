@@ -98,6 +98,21 @@ check('未定義のイベント種別を拒否する', () => {
   } as never), /type が不正/)
 })
 
+check('#22: 新規runは段階を飛ばして面接予定に直行できない(進捗の捏造を防ぐ)', () => {
+  const d = openDb(':memory:')  // 共有dbのrun一覧を汚さないよう隔離
+  const skip = startApplication(d, {
+    runId: 'run-skip-test', company: 'スキップ検証社', position: '総合職', season: '28卒本選考',
+    entryUrl: 'https://example.test/skip', materialsRef: 'private-ledger:skip', sourceRef: 'test:skip:001',
+    startedAt: '2026-07-18T10:00:00+09:00',
+  })
+  expectThrow(() => applyApplicationEvent(d, {
+    eventId: 'event:skip-interview', runId: skip.runId, type: 'interview_scheduled',
+    appointment: { at: '2026-08-01T10:00:00+09:00', kind: '面接', title: '一次面接' },
+  } as never), /段階の飛ばし/)
+  const ap = d.prepare('SELECT COUNT(*) AS n FROM appointment WHERE selection_id = ?').get(skip.selectionId) as { n: number }
+  assert(ap.n === 0, '飛ばし遷移で予定(副作用)が作られてしまいました')
+})
+
 check('フォーム入力後は本人確認待ち', () => {
   const result = applyApplicationEvent(db, {
     eventId: 'event:entry-filled',
