@@ -45,6 +45,8 @@ export interface ProcessInvocation {
   stdin?: string
   cwd: string
   env?: NodeJS.ProcessEnv
+  /** 既定の最小env(OS必須＋AIプロバイダ関連)に加えて、この子プロセスへ通したい環境変数名(#19) */
+  envAllowlist?: string[]
 }
 
 export interface ProcessResult {
@@ -451,6 +453,30 @@ function quoteForCmd(value: string): string {
   return '"' + value.replace(/"/g, '""') + '"'
 }
 
+/**
+ * spawnする子プロセスへ渡す環境を最小化する(#19)。ホストの全環境を丸ごと継承させると、
+ * 無関係な認証情報(AWS/DB/他サービスのキー等)まで provider の子プロセスから見えてしまう。
+ * OS動作に必要な変数と、AIプロバイダ関連(ANTHROPIC_/OPENAI_ 等)・プロキシだけを通す。
+ * 追加で通したい変数は invocation.envAllowlist で明示する(既定は最小)。
+ */
+export const ESSENTIAL_ENV = new Set([
+  'PATH', 'Path', 'PATHEXT', 'SystemRoot', 'SystemDrive', 'windir', 'ComSpec',
+  'TEMP', 'TMP', 'TMPDIR', 'HOME', 'HOMEDRIVE', 'HOMEPATH', 'USERPROFILE', 'USERNAME',
+  'APPDATA', 'LOCALAPPDATA', 'ProgramData', 'ProgramFiles', 'ProgramFiles(x86)', 'ProgramW6432',
+  'LANG', 'LC_ALL', 'TZ', 'NODE_OPTIONS', 'XDG_CONFIG_HOME', 'XDG_CACHE_HOME', 'XDG_DATA_HOME',
+])
+const PROVIDER_ENV_RE = /^(ANTHROPIC|CLAUDE|CODEX|OPENAI|AZURE_OPENAI|GOOGLE|GEMINI|VERTEX|MISTRAL|COHERE|GROQ|XAI|OLLAMA)_|^(HTTP_PROXY|HTTPS_PROXY|NO_PROXY|ALL_PROXY)$/i
+
+export function buildProviderEnv(invocationEnv?: NodeJS.ProcessEnv, allowlist: string[] = []): NodeJS.ProcessEnv {
+  const allow = new Set([...ESSENTIAL_ENV, ...allowlist])
+  const out: NodeJS.ProcessEnv = {}
+  for (const [key, value] of Object.entries(process.env)) {
+    if (value === undefined) continue
+    if (allow.has(key) || PROVIDER_ENV_RE.test(key)) out[key] = value
+  }
+  return { ...out, ...invocationEnv }
+}
+
 export const executeProcess: ProcessExecutor = async (invocation, timeoutMs) => {
   const started = Date.now()
   let command = invocation.command
@@ -485,7 +511,7 @@ export const executeProcess: ProcessExecutor = async (invocation, timeoutMs) => 
     try {
       child = spawn(command, args, {
         cwd: invocation.cwd,
-        env: { ...process.env, ...invocation.env },
+        env: buildProviderEnv(invocation.env, invocation.envAllowlist),
         windowsHide: true,
         stdio: ['pipe', 'pipe', 'pipe'],
       })
@@ -977,8 +1003,22 @@ export async function runAgent(request: AgentRunRequest, options: RunAgentOption
   const now = options.now ?? (() => new Date())
   const order = request.providerOrder?.length ? unique(request.providerOrder) : parseProviderOrder()
   const adapters = new Map(options.adapters.map((adapter) => [adapter.id, adapter]))
+  // runId を冪等キーとして排他的に確保する(#23)。ディレクトリ作成を非recursiveにして
+  // EEXIST を「既に同じrunで確保済み」の合図に使う。
+  // - 終端台帳(run.local.json)があれば、その結果を冪等に返す(再試行が二重起動しない)。
+  // - 無ければ実行中とみなし、同時起動を拒否する(終端台帳を上書きさせない)。
+  await mkdir(options.artifactDir, { recursive: true })
   const runDir = join(options.artifactDir, safeSegment(request.runId))
-  await mkdir(runDir, { recursive: true })
+  try {
+    await mkdir(runDir)
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error
+    const ledger = await readFile(join(runDir, 'run.local.json'), 'utf8')
+      .then((text) => JSON.parse(text) as AgentRunResult)
+      .catch(() => null)
+    if (ledger && ledger.status) return ledger
+    throw new Error(`runId ${request.runId} は既に実行中です。二重起動を防止しました(冪等キーの衝突)。`)
+  }
   const attempts: AgentAttempt[] = []
   let lastFailure: FailureCode = 'runtime_error'
   const health: ProviderHealthDocument = options.healthFile
