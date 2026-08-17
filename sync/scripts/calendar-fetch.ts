@@ -20,7 +20,21 @@ import { DatabaseSync } from 'node:sqlite'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const REPO = join(HERE, '..', '..')
-const ACCOUNT = process.env.KATAZUKU_CAL_ACCOUNT || 'okuyama.kotaro.career@gmail.com'
+const CAREER = 'okuyama.kotaro.career@gmail.com'
+// 2026-08-17: 4アカウント対応。career は就活予定が載りうる全カレンダー、追加3アカウントは
+// primary のみに絞る(私用の購読カレンダーや東北大の授業カレンダー約99個を巻き込まないため)。
+// 後方互換: KATAZUKU_CAL_ACCOUNT(単数)が指定されればそれだけを対象にする。
+const DEFAULT_ACCOUNTS = [
+  CAREER,
+  'okuyama.kotaro@gmail.com',
+  'okuyama.kotaro.robotics@gmail.com',
+  'okuyama.kotaro.p3@dc.tohoku.ac.jp',
+]
+const ACCOUNTS = process.env.KATAZUKU_CAL_ACCOUNT
+  ? [process.env.KATAZUKU_CAL_ACCOUNT]
+  : process.env.KATAZUKU_CAL_ACCOUNTS
+    ? process.env.KATAZUKU_CAL_ACCOUNTS.split(',').map((s) => s.trim()).filter(Boolean)
+    : DEFAULT_ACCOUNTS
 const PAST_DAYS = Number(process.env.KATAZUKU_CAL_PAST_DAYS || 7)
 const FUTURE_DAYS = Number(process.env.KATAZUKU_CAL_FUTURE_DAYS || 60)
 const DB_PATH = process.env.KATAZUKU_DB_PATH || join(REPO, 'data', 'katazuku.db')
@@ -33,8 +47,8 @@ interface StoredToken {
 }
 
 /** MCPが保存したOAuthトークンからアクセストークンを得る。秘密値はログに出さない。 */
-async function getAccessToken(): Promise<string> {
-  const path = join(process.env.USERPROFILE || process.env.HOME || '', '.google_workspace_mcp', 'credentials', `${ACCOUNT}.json`)
+async function getAccessToken(account: string): Promise<string> {
+  const path = join(process.env.USERPROFILE || process.env.HOME || '', '.google_workspace_mcp', 'credentials', `${account}.json`)
   let stored: StoredToken
   try {
     stored = JSON.parse(readFileSync(path, 'utf8'))
@@ -200,10 +214,34 @@ function main() {
   const knownPositions = loadKnownPositions()
 
   return (async () => {
-    const token = await getAccessToken()
-    const calendars = await listTargetCalendars(token)
     const raw: GEvent[] = []
-    for (const cid of calendars) raw.push(...(await listEvents(token, cid)))
+    let calTotal = 0
+    for (const account of ACCOUNTS) {
+      let token: string
+      try {
+        token = await getAccessToken(account)
+      } catch (e) {
+        // 未認証アカウントは同期全体を止めず、警告して飛ばす(他アカウントの同期は成功させる)
+        console.error(`[${account}] 認証スキップ(トークン未取得。google-workspace MCPで認証が要る): ${(e as Error)?.message || e}`)
+        continue
+      }
+      let calendars: string[]
+      try {
+        // career は就活予定が載りうる全カレンダー。追加アカウントは primary(=アカウント名)のみに絞る。
+        calendars = account === CAREER ? await listTargetCalendars(token) : [account]
+      } catch (e) {
+        console.error(`[${account}] カレンダー一覧の取得に失敗(スキップ): ${(e as Error)?.message || e}`)
+        continue
+      }
+      calTotal += calendars.length
+      for (const cid of calendars) {
+        try {
+          raw.push(...(await listEvents(token, cid)))
+        } catch (e) {
+          console.error(`[${account}] ${cid} の取得に失敗(スキップ): ${(e as Error)?.message || e}`)
+        }
+      }
+    }
     const events: Record<string, unknown>[] = []
     const skipped: string[] = []
     // 企業名を決定的に特定できなかった「就活っぽい」予定。ここだけを後段のLLMに渡す。
@@ -258,11 +296,11 @@ function main() {
       const kind = KIND_RULES.find(([re]) => re.test(title))?.[1] || 'その他'
       const attendees = (e.attendees || [])
         .map((a) => ({ name: (a.displayName || a.email || '').trim() }))
-        .filter((a) => a.name && !a.name.includes(ACCOUNT))
+        .filter((a) => a.name && !ACCOUNTS.some((acc) => a.name.includes(acc)))
 
       events.push({
         externalId: e.id,
-        calendarId: (e as any).calendarId || ACCOUNT,
+        calendarId: (e as any).calendarId || CAREER,
         title,
         startAt,
         endAt: e.end?.dateTime || (e.end?.date ? `${e.end.date}T00:00:00+09:00` : undefined),
@@ -292,7 +330,7 @@ function main() {
     const residuePath = outPath.replace(/\.json$/, '') + '-residue.json'
     writeFileSync(residuePath, JSON.stringify({ events: residue }, null, 2), 'utf8')
     // 取り込まなかった予定が「静かに消える」のが最悪なので必ず件数を出す
-    console.error(`取得${raw.length}件(カレンダー${calendars.length}個) → 確定${deduped.length}件(重複${dupCount}件除去) / 要判定${residue.length}件 / 対象外${skipped.length}件`)
+    console.error(`取得${raw.length}件(${ACCOUNTS.length}アカウント・カレンダー${calTotal}個) → 確定${deduped.length}件(重複${dupCount}件除去) / 要判定${residue.length}件 / 対象外${skipped.length}件`)
     if (residue.length) console.error(`要判定: ${residue.slice(0, 6).map((r: any) => r.title).join(' | ')}`)
     console.log(JSON.stringify({ fetched: raw.length, written: deduped.length, duplicates: dupCount, residue: residue.length, skipped: skipped.length, outPath, residuePath }))
   })()

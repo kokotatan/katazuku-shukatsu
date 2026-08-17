@@ -39,15 +39,21 @@ try {
 }
 
 # 完了センチネル方式で正常判定(daily-sync と同じ。ASCIIの `=== asa DONE ===` の有無だけで見る)
+# 判定材料は $logFile だけに頼らない。agent-runner の stdout はラッパー側で途中までしか
+# 拾えないことがあり(2026-07-30/07-31 に実害: メールは届いているのに「失敗」と誤報し、
+# 翌朝の「自動化の故障」に嘘が載った)、モデルの最終出力の正は
+# logs/agent-runs/<runId>/*-output.local.txt。両方を見て、どちらかに完了行があれば成功とする。
 $alertFile = Join-Path $logDir 'alert-asa.txt'
+. (Join-Path $PSScriptRoot 'agent-sentinel.ps1')
+$done = Test-AgentSentinel -Sentinel '===\s*asa\s*DONE\s*===' -LogDir $logDir -RunId $runId -LogFile $logFile
+$logSize = if (Test-Path $logFile) { (Get-Item $logFile).Length } else { 0 }
 $failReason = $null
-if (-not (Test-Path $logFile) -or (Get-Item $logFile).Length -lt 200) {
+if ($done) {
+  # 成功。何もしない(下で alert を消す)
+} elseif ($logSize -lt 200) {
   $failReason = 'ログが空か極小(agent実行自体が失敗した可能性)'
 } else {
-  $logText = Get-Content -Raw -Encoding UTF8 $logFile
-  if ($logText -notmatch '===\s*asa\s*DONE\s*===') {
-    $failReason = '完了行なし(メール送信まで到達しなかった=きょうやることが届いていない可能性)'
-  }
+  $failReason = '完了行なし(メール送信まで到達しなかった=きょうやることが届いていない可能性)'
 }
 if ($failReason) {
   ("{0} asa 失敗: {1} (詳細: logs/{2})" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $failReason, (Split-Path $logFile -Leaf)) |

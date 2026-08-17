@@ -41,6 +41,20 @@ get_events ↔ list_events、batch_modify_gmail_message_labels ↔ label/unlabel
   - **要返信・要判断**: 面談の日程調整(候補から選ぶ/空きを返す)、ES・課題・適性検査の締切、予約が要るイベント。締切日を必ず特定する。
   - **ノイズ**: 媒体の宣伝、スカウト、一般イベント勧誘、認証コード、フォーム受付控え等。件数だけ数えて中身は省く。
 
+### 1.5 ハッカソン・コンテスト機会の拾い上げ(本人希望 2026-08-17・全アカウント横断)
+
+- 本人はハッカソン経験と競技プログラミング(AtCoder)に積極的。就活とは別枠で、新しい挑戦機会を毎朝拾う
+  (メルカリAI Agent Hackathon(PM枠)の応募を逃した反省から、見逃さない仕組みにする)。
+- 4アカウントで user_google_email を切り替え、`(ハッカソン OR hackathon OR ideathon OR アイデアソン OR コンテスト OR 競技プログラミング) newer_than:7d` を検索する:
+  career=okuyama.kotaro.career@gmail.com / kotaro=okuyama.kotaro@gmail.com /
+  robotics=okuyama.kotaro.robotics@gmail.com / p3=okuyama.kotaro.p3@dc.tohoku.ac.jp。
+- **応募・参加できる開催イベントだけ**を対象にする(媒体の一般宣伝・受賞ニュース・過去回の告知は除外)。
+  各件、名称・応募締切(あれば)・開催日・応募リンクを1行で拾う。前日と同じものは省く。
+- AIエージェント系(例: 第5回 Agentic AI Hackathon with Google Cloud、本戦エントリー8/20〜)は本人の志向に合うため優先。
+  応募締切があるものは手順4に準じて career へ「【締切】」登録してよい。
+- AtCoder は直近のABC/AHC開催日を1行添える(登録済みなら「登録済み」と付す)。
+- 見つかった機会は出力の「## ハッカソン・コンテスト情報」に列挙。締切が近いものは「きょうやること」にも上げる。
+
 ### 2. 確定済みの予定は Google Calendar に自動登録する(本人が「勝手に登録してよい」と合意済み)
 
 **カレンダー運用規約(厳守):**
@@ -146,6 +160,9 @@ get_events ↔ list_events、batch_modify_gmail_message_labels ↔ label/unlabel
 
 ## きょうはやらなくていい
 (締切が遠いもの・4件目以降。明日また出るので忘れてよい)
+
+## ハッカソン・コンテスト情報
+(応募/参加できる新着のみ。名称 / 応募締切 / 開催日 / 応募リンク を1行ずつ。AtCoderの直近ABC/AHCも1行。無ければ「新着なし」)
 
 ## ノイズ
 宣伝・スカウト等 N 件。対応不要。

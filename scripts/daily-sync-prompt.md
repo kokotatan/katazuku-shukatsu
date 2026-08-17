@@ -3,9 +3,17 @@
 **構造(2026-07-18 DB中心化)**: 正本は `data/katazuku.db`。シート(選考管理/企業マスタ)は見るだけの窓で、
 DB→シートの一方向ミラー。書き手はagentのみ。サービスアカウント鍵は不要(DBはローカル・シートはMCPで書く)。
 
+**対象アカウント(2026-08-17〜 4アカウント)**: career=okuyama.kotaro.career@gmail.com、
+kotaro=okuyama.kotaro@gmail.com、robotics=okuyama.kotaro.robotics@gmail.com、p3=okuyama.kotaro.p3@dc.tohoku.ac.jp。
+手順1の検索と手順6の受信整理は、各アカウントで user_google_email を切り替えて実行する。
+就活関連メールはどのアカウントのものも**同じ正本DB(data/katazuku.db)へ取り込む**
+(id/sourceRef は Gmail メッセージID。アカウント間で重複しない)。
+
 手順:
 
-1. Gmail MCP で直近1日(`newer_than:1d`)の就活関連メールを検索する。Gmail MCP ツールは環境により
+1. Gmail MCP で直近1日(`newer_than:1d`)の就活関連メールを検索する。
+   **この検索を career→kotaro→robotics→p3 の4アカウントで行い**、就活関連メールを集める
+   (各検索で user_google_email を切り替える)。以降の抽出(手順2〜5)は4アカウント分をまとめて対象にする。Gmail MCP ツールは環境により
    mcp__google-workspace__ 系(search_gmail_messages / get_gmail_thread_content)または
    mcp__claude_ai_Gmail__ 系(search_threads / get_thread / get_message)のどちらかが使えるので、使える方を使う
    (以降の手順でツール名を挙げている箇所も同様に読み替える)。**どちらも利用できない環境のときだけ**
@@ -51,8 +59,9 @@ DB→シートの一方向ミラー。書き手はagentのみ。サービスア�
 6. `npx tsx scripts/db-mirror.ts` でミラー値を生成し、`mirror-out.json` を Read して、各 writes[] を
    mcp__google-workspace__modify_sheet_values で書き込む(range_name は `'<tab>'!<range>`、values はそのまま渡す)。
    これでシートがDBの最新を映す。シートの条件付き書式・列幅は値の上書きでは壊れない。
-6. 受信トレイの整理(Gmailはフラット化する運用):
-   - 就活サービス媒体(slogan.jp / br-campus.jp / typeshukatsu.jp / en-courage.com / labbase.jp / openwork.jp / gaishishukatsu.com / gakujo.ne.jp / ibeck.co.jp / offerbox.jp / mynavi.jp / rikunabi.com)の `is:unread older_than:7d` は batch_modify_gmail_message_labels(claude_ai 系なら label_thread / label_message)で TRASH ラベルを付けてゴミ箱へ
+6. 受信トレイの整理(Gmailはフラット化する運用。**各アカウントで user_google_email を切り替えて行う**):
+   - **career アカウント**: 就活サービス媒体(slogan.jp / br-campus.jp / typeshukatsu.jp / en-courage.com / labbase.jp / openwork.jp / gaishishukatsu.com / gakujo.ne.jp / ibeck.co.jp / offerbox.jp / mynavi.jp / rikunabi.com)の `is:unread older_than:7d` は batch_modify_gmail_message_labels(claude_ai 系なら label_thread / label_message)で TRASH ラベルを付けてゴミ箱へ
+   - **kotaro / robotics / p3 アカウント(削除は控えめに)**: 明確な広告・ニュースレター(配信専用アドレス・大量宣伝・本人と無関係の販促、`category:promotions` 相当)だけ `is:unread older_than:7d` を TRASH でゴミ箱へ。**就活媒体のスカウト・選考関連はゴミ箱にせず既読化のみ**(本人合意 2026-08-17: 削除は広告・ニュースレターに限る)
    - それ以外の `is:unread older_than:1d` は batch_modify_gmail_message_labels(claude_ai 系なら unlabel_thread / unlabel_message)で UNREAD ラベルを外す(既読化のみ・削除はしない)。選考情報は手順2〜5でDB・シートに反映済みなので見逃しは起きない
    - 当日(1日以内)の未読はそのまま残す(緊急対応の目印のため)
    - **最重要の例外**: 件名・本文に「人事面談・面談調整・Slack招待/ワークスペース・インターン事前準備(事前アンケート/セットアップ/持ち物/宿泊/交通費/キックオフ)・フォーム回答依頼/情報回収フォーム/入社・参加手続き」が含まれ、かつ未対応に見えるメールは**既読化せず未読のまま残し**、サマリの冒頭で個別に報告する。この種の見逃しは選考辞退扱いに直結するため最優先

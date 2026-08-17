@@ -11,6 +11,11 @@
       "label": "外資就活ドットコム",
       "loginUrl": "https://gaishishukatsu.com/login",
       "note": "SSRのメール+パスワードフォーム。"
+    },
+    "andpad": {
+      "label": "アンドパッド採用マイページ(snar)",
+      "loginUrl": "https://andpad-recruit.snar.jp/login.aspx",
+      "note": "snar.jp系は会社ごとに専用サブドメインのためorigin検証で安全に区別できる。ID=AP00000634(公開情報ではないがIDのみ・PWはcredential-store側)。毎日ログイン対象ではなく、必要時のログインに使う。"
     }
   }
 }

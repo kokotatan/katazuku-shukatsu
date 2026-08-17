@@ -47,6 +47,8 @@ npm --prefix board run dev             # 管理画面の開発サーバー
 cd sync; npx tsx scripts/check-db.ts   # DB遷移規則・apply・mirror のテスト
 cd sync; npx tsx scripts/check-sheet.ts# 旧シート書込エンジンのテスト(移行完了まで残す)
 cd sync; npx tsx scripts/db-inspect.ts [語]  # 正本DBの中身を確認
+cd sync; npx tsx scripts/db-quick.ts today   # エージェント用の読み口: today / next [N] / conflicts [日数] / status [語]
+                                             # 予定・締切・衝突はまずこれ(カレンダーMCP全件取得より速く・短い)
 ```
 
 ## デザインシステム「SmartHR Design System 準拠」(厳守)
