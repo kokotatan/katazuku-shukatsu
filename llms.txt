@@ -1,0 +1,26 @@
+# katazuku-shukatsu
+
+> Local-first, human-in-the-loop automation core for Japanese shukatsu (new-grad job hunting).
+> An agent is the single writer over one local SQLite source of truth, with a state-transition
+> engine, entity resolution, idempotency, audit events, and safety boundaries enforced in code.
+> Runtime dependency-free (uses Node's built-in node:sqlite); code in TypeScript.
+
+## Getting started
+- [README](README.md): overview, requirements (Node 22.5+, recommended 24), quickstart, multi-device/backup
+- Run: `npm install`, then `npm run doctor`, `npm test`, `npm run seed`
+- [AGENTS.md](AGENTS.md): guide for AI agents and "how do I use this" answers
+
+## Architecture and design
+- [ARCHITECTURE](docs/ARCHITECTURE.md): single-writer, SQLite source of truth, semantic layer, idempotency, audit events
+- [SECURITY](SECURITY.md): safety boundaries (approval gates for submission, never proxy-take assessments)
+
+## Key source files
+- src/db.ts: schema + semantic layer (transition rules, company name resolution, idempotent appointment matching)
+- src/db-apply*.ts: idempotent write layer (mail / interview / calendar inputs)
+- src/application.ts: application-flow state machine
+- src/agent-runtime.ts: provider-independent agent runtime (Claude / Codex / local)
+- src/index.ts: public API entry point
+
+## Contributing
+- [CONTRIBUTING](CONTRIBUTING.md), [CODE_OF_CONDUCT](CODE_OF_CONDUCT.md), [SUPPORT](SUPPORT.md)
+- Fixtures must be synthetic (no real company/person names); no emoji; keep `npm run check` green.
