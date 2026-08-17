@@ -207,28 +207,36 @@ if ($ok) {
 
       # 展開はWindows標準のtar.exe(bsdtar・zip対応・UTF-8エントリ名対応)。
       # powershellの入れ子クォートはssh越しに壊れるため使わない(2026-08-14実測: バックスラッシュが消える)。
-      $expand = 'tar -xf %USERPROFILE%\katazuku-shukatsu\logs\' + $zipName + ' -C %USERPROFILE%\katazuku-shukatsu && del %USERPROFILE%\katazuku-shukatsu\logs\' + $zipName
+      #
+      # minipcのログインシェルは bash(/usr/bin/bash)。cmd構文で書くと全部無言で壊れる(2026-08-17に踏んだ):
+      #   ・`%USERPROFILE%` は展開されず literal のまま渡る
+      #   ・`\` が bash のエスケープとして食われ、パスが `%USERPROFILE%katazuku-shukatsulogs...` に潰れる
+      #   ・`del` は cmd の内部コマンドで bash には無い。`rm -f` を使う
+      # さらに素の `tar` は MSYS の GNU tar に解決され、zip を読めず `C:/...` を rsh のホスト指定と誤認する
+      # (`tar: Cannot connect to C: resolve failed`)。zip を扱えるのは Windows 同梱の bsdtar だけなので
+      # フルパスで名指しし、コロンを含むパスを渡さずに `cd` してから相対パスで叩く。
+      $expand = 'cd ~/katazuku-shukatsu && /c/Windows/System32/tar.exe -xf "logs/' + $zipName + '" && rm -f "logs/' + $zipName + '"'
       ssh -o BatchMode=yes minipc $expand 2>&1 | Out-File -FilePath $logFile -Append -Encoding utf8
       if ($LASTEXITCODE -ne 0) { throw 'minipc側でのzip展開に失敗しました' }
 
       if ($AppointmentId -gt 0) {
         # minipc側のmeeting_runは(録音がこの機で完結するため)armedのまま。遷移規則は1段ずつ厳格なので
-        # digestingまで寛容に歩かせる。cmdの `&` 連結は途中失敗(既に先へ進んでいる等)でも続行される。
-        $walk = 'cd %USERPROFILE%\katazuku-shukatsu\sync && ' +
-          "(npx tsx scripts/db-meeting-run.ts transition $AppointmentId opened & " +
-          "npx tsx scripts/db-meeting-run.ts transition $AppointmentId recording & " +
-          "npx tsx scripts/db-meeting-run.ts transition $AppointmentId stopping & " +
-          "npx tsx scripts/db-meeting-run.ts transition $AppointmentId digesting)"
+        # digestingまで寛容に歩かせる。`;` 区切りなので途中失敗(既に先へ進んでいる等)でも続行される。
+        $walk = 'cd ~/katazuku-shukatsu/sync && for s in opened recording stopping digesting; do ' +
+          "npx tsx scripts/db-meeting-run.ts transition $AppointmentId " + '$s; done'
         ssh -o BatchMode=yes minipc $walk 2>&1 | Out-File -FilePath $logFile -Append -Encoding utf8
       }
-      $remoteDbJson = 'C:\Users\okuya\katazuku-shukatsu\logs\interviews\' + (Split-Path $dbJson -Leaf)
-      # db.json のファイル名には空白が入る(例 kubell-kubell 面接 澤井さん(...)-db.json)ので引用符が要るが、
-      # PowerShell 5.1 はネイティブexe(ssh)へ渡す引数から素の " を落とす。
-      # 2026-08-14の実害: 引用符なしでリモートに届き、cmdが空白で切って 'kubell-kubell' を開こうとし
-      # ENOENT でDB反映が丸ごと止まった(文字起こしとdb.json生成は成功済みだった)。
-      # \" と書けば ssh の向こうに " として届く(同日 dir で実測: 素の"はC:\Users\okuyaを列挙、\"は当該ファイルに命中)。
-      $applyCmd = 'cd %USERPROFILE%\katazuku-shukatsu\sync && ' +
-        ('npx tsx scripts/db-apply-interview.ts \"' + $remoteDbJson + '\" && npx tsx scripts/photo-sync.ts && npx tsx scripts/db-snapshot.ts')
+      # db.json のファイル名は日本語や空白を含む(例 kubell-kubell 面接 澤井さん(...)-db.json)。
+      # これを ssh の引数に載せると、クォートの取り扱いと文字コードの両方で壊れる。
+      # 2026-08-14の実害: 引用符なしで届き、空白で切られて 'kubell-kubell' を開こうとし ENOENT で
+      # DB反映が丸ごと止まった(文字起こしとdb.json生成は成功済みだった)。
+      # そこで名前を渡すのをやめ、**リモート側でASCIIのグロブで引かせる**。
+      # stem 末尾の -yyyy-MM-dd_HHmm は必ずASCIIで、同一予定内で一意になる。
+      $stamp = if ($stem -match '(\d{4}-\d{2}-\d{2}_\d{4})$') { $Matches[1] } else { '' }
+      if (-not $stamp) { throw ('stemから日時スタンプを取れませんでした: {0}' -f $stem) }
+      $applyCmd = 'cd ~/katazuku-shukatsu/sync && ' +
+        'f=$(ls ../logs/interviews/*' + $stamp + '-db.json | head -1) && ' +
+        'npx tsx scripts/db-apply-interview.ts "$f" && npx tsx scripts/photo-sync.ts && npx tsx scripts/db-snapshot.ts'
       ssh -o BatchMode=yes minipc $applyCmd 2>&1 | Out-File -FilePath $logFile -Append -Encoding utf8
       if ($LASTEXITCODE -ne 0) { throw 'minipc側でのDB反映に失敗しました' }
     } finally { $ErrorActionPreference = $prevEAPr }
