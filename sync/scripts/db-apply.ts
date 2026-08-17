@@ -35,18 +35,27 @@ export interface ApplyResult {
   added: string[]
   skipped: string[] // 複数トラックがあって特定できず触らなかった企業
   pending: string[] // 名寄せが怪しく、本人確認待ちに積んだ企業(DBには書かない)
+  errors: string[] // 反映中に例外が出て、その1件だけロールバックした企業(他は確定する)
 }
 
 export function applyDiff(db: DatabaseSync, items: DiffItem[], by = 'daily-sync'): ApplyResult {
   const now = new Date().toISOString()
-  const res: ApplyResult = { updated: [], added: [], skipped: [], pending: [] }
+  const res: ApplyResult = { updated: [], added: [], skipped: [], pending: [], errors: [] }
 
-  // バッチ全体を1トランザクションに(半適用を防ぐ。busy_timeoutはopenDbで設定済み)
+  // バッチ全体を1トランザクションに(半適用を防ぐ。busy_timeoutはopenDbで設定済み)。
+  // ただし1件が例外を投げても、その1件だけ SAVEPOINT で巻き戻し、残りは確定させる
+  // (1件の異物で「その日の同期が丸ごと失われる」のを防ぐ)。
   db.exec('BEGIN IMMEDIATE')
   try {
   for (const it of items) {
+    db.exec('SAVEPOINT it')
+    try {
     const name = (it.name ?? '').trim()
     if (!name) continue
+
+    // stage を実行時に検証する。未知のstage(タイポ・将来値・外部LLMの誤り)1件で
+    // バッチ全体がロールバックしないよう、その1件だけ skip する。
+    if (!(it.stage in STATUS_FOR)) { res.skipped.push(name); continue }
 
     // 名寄せ(2026-07-18本人方針): 正式名称・学習済み別名だけ自動。似ているだけなら本人確認に積んで触らない
     const r = resolveCompany(db, name)
@@ -136,6 +145,13 @@ export function applyDiff(db: DatabaseSync, items: DiffItem[], by = 'daily-sync'
       changed = true
     }
     if (changed) res.updated.push(name)
+    } catch (itErr) {
+      // この1件だけ巻き戻し、残りは活かす。原因は errors に残して後から追える。
+      db.exec('ROLLBACK TO it')
+      res.errors.push(`${(it.name ?? '').trim() || '(無名)'}: ${(itErr as Error).message}`)
+    } finally {
+      db.exec('RELEASE it')
+    }
   }
   db.exec('COMMIT')
   } catch (err) {
@@ -168,7 +184,8 @@ if (invokedDirectly) {
   }
 
   const res = applyDiff(db, items)
-  console.log(`DB反映: 更新 ${res.updated.length}社 / 追加 ${res.added.length}社 / 保留 ${res.skipped.length}社 / 名寄せ要確認 ${res.pending.length}社`)
+  console.log(`DB反映: 更新 ${res.updated.length}社 / 追加 ${res.added.length}社 / 保留 ${res.skipped.length}社 / 名寄せ要確認 ${res.pending.length}社 / エラー ${res.errors.length}社`)
+  if (res.errors.length) console.error(`  エラー(その1件だけ巻き戻し・要確認): ${res.errors.join(' / ')}`)
   if (res.updated.length) console.log(`  更新: ${res.updated.join('、')}`)
   if (res.added.length) console.log(`  追加: ${res.added.join('、')}`)
   if (res.skipped.length) console.log(`  保留(複数トラックで特定不能・要目視): ${res.skipped.join('、')}`)

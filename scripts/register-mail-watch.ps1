@@ -20,7 +20,7 @@ $trigger.Repetition = $rep
 # これで非管理者PowerShellのまま登録できる。
 
 $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -WakeToRun `
-  -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Minutes 20)
+  -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Minutes 20) -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
 
 Register-ScheduledTask -TaskName 'katazuku-mail-watch' `
   -Action $action -Trigger $trigger -Settings $settings `

@@ -11,7 +11,7 @@ $action = New-ScheduledTaskAction -Execute 'wscript.exe' `
 $trigger = New-ScheduledTaskTrigger -Daily -At '08:23'
 
 $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -WakeToRun `
-  -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Hours 1)
+  -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Hours 1) -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
 
 Register-ScheduledTask -TaskName 'katazuku-daily-sync' `
   -Action $action -Trigger $trigger -Settings $settings `

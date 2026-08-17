@@ -48,6 +48,9 @@ $logFile = Join-Path $logDir ("interview-digest-{0}.log" -f (Get-Date -Format 'y
 trap {
   ('[FATAL] {0} {1}' -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $_) | Out-File -FilePath $logFile -Append -Encoding utf8
   if ($_.ScriptStackTrace) { $_.ScriptStackTrace | Out-File -FilePath $logFile -Append -Encoding utf8 }
+  # 面接の議事録が失われても無音にしない。asa が alert-*.txt を拾って翌朝報告する(#5修正)。
+  ("{0} interview-digest 失敗: {1} (詳細: logs/{2})" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $_, (Split-Path $logFile -Leaf)) |
+    Out-File -FilePath (Join-Path $logDir 'alert-interview.txt') -Append -Encoding utf8
   exit 1
 }
 
@@ -284,5 +287,8 @@ if ($ok) {
   # Exit non-zero so a background/scheduled caller sees the failure. Returning 0 here made a failed run
   # look like a completed one (2026-07-16).
   Write-Warning "interview-digest FAILED (no completion marker). See log: logs/$(Split-Path $logFile -Leaf)"
+  # 完了マーカー無しの失敗も asa へ上げる(#5修正。この exit はtrapを通らないので直接書く)。
+  ("{0} interview-digest 失敗: 完了マーカーなし (詳細: logs/{1})" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), (Split-Path $logFile -Leaf)) |
+    Out-File -FilePath (Join-Path $logDir 'alert-interview.txt') -Append -Encoding utf8
   exit 1
 }

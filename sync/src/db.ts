@@ -189,6 +189,16 @@ export function sameCompany(a: string, b: string): boolean {
   return na.includes(nb) || nb.includes(na)
 }
 
+/** 法人格トークン(株式会社 / Inc / Corp / K.K. 等)を名前が持つか */
+const DESIGNATOR = /株式会社|合同会社|有限会社|\(株\)|\b(inc|corp|corporation|co|ltd|llc|kk|gk|gmbh|holdings|company)\b/i
+function hasDesignator(name: string): boolean {
+  return DESIGNATOR.test(name.normalize('NFKC').toLowerCase())
+}
+/** 法人格は残したまま、句読点・空白・大小文字だけを均した厳密キー */
+function strictNorm(name: string): string {
+  return name.normalize('NFKC').toLowerCase().replace(/[.,、。()（）\s　]/g, '')
+}
+
 // ---- ステータス遷移規則(specの「書き込みモデル」) ----
 
 export type Stage = 'scouted' | 'entried' | 'task' | 'interview' | 'intern' | 'offer' | 'rejected' | 'closed'
@@ -250,6 +260,10 @@ export function transition(current: string, stage: Stage): string | null {
   const cur = current.trim()
   if (cur === want) return null
   if (FINAL_NEG.test(cur)) return null // 終了済は動かさない
+  // 内定(offer)を不合格で自動的に潰さない。内定取り消しは稀で、別トラックの不合格メールを
+  // 誤って本トラックに割り当てると内定が破壊されるため、要人間確認に回す(触らない)。
+  // 辞退(closed)は本人意思なので内定からでも確定してよい(内定辞退)。
+  if (stage === 'rejected' && /内定/.test(cur)) return null
   if (stage === 'closed' || stage === 'rejected') return want // 終了の根拠は最優先で確定
   if (stage === 'offer') return want // 内定の根拠は途中経過の「合格」表記に関係なく確定
   if (stage === 'intern') {
@@ -275,14 +289,26 @@ export type Resolution =
  */
 export function resolveCompany(db: DatabaseSync, name: string): Resolution {
   const n = normalize(name)
+  const ns = strictNorm(name)
+  const nHas = hasDesignator(name)
   const all = db.prepare('SELECT id, name, short_name FROM company').all() as { id: number; name: string; short_name: string }[]
-  // 正式名称(=name)でも通称(short_name)でも確定できる
-  const exact = all.find((r) => normalize(r.name) === n || (r.short_name && normalize(r.short_name) === n))
-  if (exact) return { kind: 'hit', companyId: exact.id }
+  // 1. 法人格まで含めて厳密一致(正式名称でも通称でも) → 同一で確定
+  const strictHit = all.find((r) => strictNorm(r.name) === ns || (r.short_name && strictNorm(r.short_name) === ns))
+  if (strictHit) return { kind: 'hit', companyId: strictHit.id }
+  // 2. 学習済みエイリアス(本人確認を経た別名)は、下の法人格ヒューリスティクスより優先する
   const alias = db.prepare('SELECT company_id FROM company_alias WHERE alias_norm = ?').get(n) as
     | { company_id: number }
     | undefined
   if (alias) return { kind: 'hit', companyId: alias.company_id }
+  // 3. 法人格を除いた基幹名で一致する候補
+  for (const r of all) {
+    const matched = normalize(r.name) === n ? r.name : (r.short_name && normalize(r.short_name) === n ? r.short_name : null)
+    if (!matched) continue
+    // 基幹名は一致するが法人格が違う。両方が(異なる)法人格を持つなら別法人の可能性 → 自動マージせず要確認。
+    // 片方が通称(法人格なし)なら、正式名称↔通称の関係とみなして同一で確定する。
+    if (nHas && hasDesignator(matched)) return { kind: 'suspicious', suggestId: r.id, suggestName: r.name }
+    return { kind: 'hit', companyId: r.id }
+  }
   const fuzzy = all.find((r) => sameCompany(r.name, name))
   if (fuzzy) return { kind: 'suspicious', suggestId: fuzzy.id, suggestName: fuzzy.name }
   return { kind: 'new' }
@@ -445,8 +471,14 @@ export function findAppointmentMatch(db: DatabaseSync, m: AppointmentMatch): num
 /** 予定を追加する。同一の会議(findAppointmentMatch の規則)は重複させず、空欄だけ補完する */
 export function addAppointment(db: DatabaseSync, a: Appointment): { id: number; created: boolean } {
   const now = new Date().toISOString()
+  // 日時はISOで保存する。date-only/TZ無しは正規化で吸収し、解釈不能な文字列(「来週火曜」等)は
+  // 黙って保存するとカレンダー送信待ち(outbox)の julianday 判定から静かに脱落するので、例外にして可視化する。
+  const at = normalizeAppointmentAt(a.at)
+  if (a.at && a.at.trim() && Number.isNaN(Date.parse(at))) {
+    throw new Error(`予定の日時がISOとして解釈できません: ${a.at}`)
+  }
   const matchId = findAppointmentMatch(db, {
-    selectionId: a.selectionId, at: a.at, title: a.title, url: a.url, kind: a.kind,
+    selectionId: a.selectionId, at, title: a.title, url: a.url, kind: a.kind,
   })
   const dup = matchId === undefined
     ? undefined
@@ -464,7 +496,7 @@ export function addAppointment(db: DatabaseSync, a: Appointment): { id: number; 
   }
   const r = db.prepare(
     'INSERT INTO appointment (selection_id, at, end_at, kind, title, url, location, person, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-  ).run(a.selectionId, a.at, a.endAt ?? '', a.kind || 'その他', a.title, a.url ?? '', a.location ?? '', a.person ?? '', a.status ?? '予定', now)
+  ).run(a.selectionId, at, a.endAt ?? '', a.kind || 'その他', a.title, a.url ?? '', a.location ?? '', a.person ?? '', a.status ?? '予定', now)
   return { id: Number(r.lastInsertRowid), created: true }
 }
 

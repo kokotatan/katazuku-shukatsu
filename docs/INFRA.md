@@ -37,12 +37,24 @@ Neon/Postgresは使っていない。新設しない。
 ## Google
 
 - GCPプロジェクト: `katazuku` 1つだけ
-- careerアカウント: `okuyama.kotaro.career@gmail.com`
+- **対象アカウント(2026-08-17〜 4アカウント)**:
+  - career=`okuyama.kotaro.career@gmail.com`(就活の主アカウント。**自動送信を行うのはここだけ**)
+  - kotaro=`okuyama.kotaro@gmail.com`(下書き+DB登録のみ)
+  - robotics=`okuyama.kotaro.robotics@gmail.com`(下書き+DB登録のみ)
+  - p3=`okuyama.kotaro.p3@dc.tohoku.ac.jp`(東北大。下書き+DB登録のみ)
+  - workspace-mcp は `~/.claude.json` で `--single-user`(既定 career)だが、4アカウントとも
+    OAuth 認証済みでトークンがローカルにキャッシュされているため、ツール呼び出し時に
+    `user_google_email` を渡せば4アカウントを扱える。`mail-watch` / `daily-sync` は各アカウントを巡回する
+  - 送信ポリシー: 定型・低重要度の就活返信の**自動送信は career のみ**。他3アカウントは常に下書き
+  - 受信整理の削除: career は就活媒体を7日でゴミ箱。他3アカウントは**広告・ニュースレターのみ**ゴミ箱
+    (就活媒体スカウト・選考関連は既読化のみで残す。本人合意 2026-08-17)
 - コネクタ: claude.ai Gmail / Google Calendar / Drive、workspace-mcp
 - 選考管理シート: `1jf6kSy7tZqakw8QocOmMzU6WToncQVQCeIuQ1VfRjMM`
   - ミラー先: 「選考管理（新）」「企業マスタ（新）」
   - 正本ではない。人は直接編集しない
 - 活動ログ: シート「活動ログ」+ `logs/activity-log.jsonl`
+- **未対応の追い込み(follow-up)**: カレンダー同期(`calendar-sync`)と会議自動起動(`meeting-autopilot`)は
+  現状 career カレンダーのみ。他3アカウントのカレンダーを取り込む場合は別途改修が必要(2026-08-17時点で未実施)
 
 ## Windows定常タスク
 
@@ -71,7 +83,9 @@ DBのappointmentへ同期されていなかった。meeting-autopilotはDBの予
 
 **全タスクにバッテリー起動を許可すること**(`-AllowStartIfOnBatteries -DontStopIfGoingOnBatteries`)。
 `New-ScheduledTaskSettingsSet` の既定は「バッテリー駆動なら起動しない/切替時に停止」で、
-電源を外した瞬間に**無言で全自動処理が止まる**。2026-07-24に全タスクで発覚し解除済み。
+電源を外した瞬間に**無言で全自動処理が止まる**。2026-07-24に発覚。ただし daily-sync / mail-watch / asa は
+当時フラグが抜けたままで、2026-08-17に全タスクへ再適用して解消(台帳と実態のずれの再発)。
+register-*.ps1 の `New-ScheduledTaskSettingsSet` は共通設定に揃え、フラグ落ちを防ぐこと。
 あわせて現行タスクは `LogonType=Interactive` のため**本人がログオン中のセッションでしか走らない**
 (MiniPCへ移す場合は自動ログオンが前提。詳細は `docs/specs/15-minipc-migration.md`)。
 

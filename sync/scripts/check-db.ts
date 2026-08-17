@@ -45,6 +45,8 @@ check('codex反例: 途中経過の「面接合格」があっても内定は確
 check('「辞退予定」は本人意思なので内定通知でも上書きしない', transition('合格→本人辞退予定', 'offer') === null)
 check('codex反例: 不合格メールは「辞退」でなく「不合格」と書く', transition('選考中', 'rejected') === '不合格')
 check('codex反例: 合格→不合格の確定もできる', transition('合格', 'rejected') === '不合格')
+check('#5: 内定は不合格で自動的に潰さない(誤割当保護)', transition('内定', 'rejected') === null)
+check('#5: 内定辞退(closed)は本人意思なので確定できる', transition('内定', 'closed') === '辞退')
 check('codex反例: 不合格済に内定は書かない(復活なし)', transition('不合格', 'offer') === null)
 
 // --- upsertCompany(名寄せ・空欄補完) ---
@@ -74,8 +76,18 @@ setOfficialName(db, 'PKSHA', '株式会社PKSHA Technology')
 check('正式名称が「正」(name)になる', listCompanies(db).some((c) => c.name === '株式会社PKSHA Technology' && c.shortName === 'PKSHA'))
 check('正式名称(株式会社付き)で確定できる', resolveCompany(db, '株式会社PKSHA Technology').kind === 'hit')
 const rOfficial = resolveCompany(db, 'PKSHA Technology, Inc.')
-check('正式名称の英語表記(Inc.付き)でも確定できる', rOfficial.kind === 'hit' && rOfficial.companyId === pkTestId)
+// 日本語法人格(株式会社)と英語法人格(Inc.)は基幹名が同じでも別法人でありうる。
+// 自動マージせず要確認にして、本人確認→aliasで学習する(別法人の混線を防ぐ)。
+check('日本語と英語で法人格が違う表記は自動マージせず要確認にする', rOfficial.kind === 'suspicious' && rOfficial.suggestId === pkTestId)
+check('学習(alias)後は英語法人格表記でも確定できる', (() => { addAlias(db, 'PKSHA Technology, Inc.', '株式会社PKSHA Technology'); return resolveCompany(db, 'PKSHA Technology, Inc.').kind === 'hit' })())
 check('昇格後も通称(PKSHA)で確定できる', resolveCompany(db, 'PKSHA').kind === 'hit')
+
+// #3回帰: 基幹名が同じでも法人格が異なる別法人は自動マージしない(データ破壊防止)
+upsertCompany(db, { name: 'AB Inc.' })
+check('別法人格(AB Inc. と AB Ltd.)は無確認マージせず要確認', resolveCompany(db, 'AB Ltd.').kind === 'suspicious')
+// 同一企業の 正式名称↔通称(法人格なし)は従来どおり確定する
+upsertCompany(db, { name: '株式会社ダミー精機' })
+check('正式名称↔通称(法人格なし)は同一で確定する', resolveCompany(db, 'ダミー精機').kind === 'hit')
 
 // --- applyDiff(日次反映) ---
 const yashimaId = upsertCompany(db, { name: '八洲電機' })

@@ -21,16 +21,16 @@ try {
   $_ | Out-File -FilePath $logFile -Append -Encoding utf8
 }
 
-# 完了センチネル方式(daily-syncと同じ)。失敗の疑いは alert に残し asa が翌朝報告する
-$alertFile = Join-Path $logDir 'alert-daily-sync.txt'
-$ok = $false
-if ((Test-Path $logFile) -and (Get-Item $logFile).Length -ge 200) {
-  $logText = Get-Content -Raw -Encoding UTF8 $logFile
-  if ($logText -match '===\s*evening-brief\s*DONE\s*===') { $ok = $true }
-}
+# 完了センチネル方式(daily-syncと同じ)。失敗の疑いは alert に残し asa が翌朝報告する。
+# アラートは自分専用ファイルに書く(共有すると他ジョブの成功時削除で消える。2026-08-17の#2修正)。
+$alertFile = Join-Path $logDir 'alert-evening-brief.txt'
+. (Join-Path $PSScriptRoot 'agent-sentinel.ps1')
+$ok = Test-AgentSentinel -Sentinel '===\s*evening-brief\s*DONE\s*===' -LogDir $logDir -RunId $runId -LogFile $logFile
 if (-not $ok) {
   ("{0} evening-brief 失敗: 完了行なし (詳細: logs/{1})" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), (Split-Path $logFile -Leaf)) |
     Out-File -FilePath $alertFile -Append -Encoding utf8
+} elseif (Test-Path $alertFile) {
+  Remove-Item $alertFile -Force  # 成功したら自分のアラートだけ消す
 }
 
 Get-ChildItem $logDir -Filter 'evening-brief-*.log' |

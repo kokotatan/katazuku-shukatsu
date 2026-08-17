@@ -10,7 +10,7 @@ $root = Split-Path $PSScriptRoot -Parent
 $logDir = Join-Path $root 'logs'
 $activityLog = Join-Path $logDir 'activity-log.jsonl'
 $healthFile = Join-Path $logDir 'agent-runs\provider-health.local.json'
-$alertFile = Join-Path $logDir 'alert-daily-sync.txt'
+$alertFile = Join-Path $logDir 'alert-watchdog.txt'  # 自分専用(共有だと他ジョブの成功時削除で消える。#2修正)
 $stateFile = Join-Path $logDir 'watchdog-last.local.json'
 
 function Show-Toast([string]$title, [string]$body) {
@@ -32,6 +32,10 @@ if ($TestToast) {
 
 $now = Get-Date
 $problems = @()
+# 通知の重複判定に使う「変化しない鍵」。$problems の文面には経過時間などの揮発値が入るため、
+# 文面をそのまま指紋にすると30分ごとに別物と見なされ、ミュートが一度も効かない
+# (2026-08-07: 「16.2時間前」→「16.7時間前」で毎回鳴っていた)。鍵には数値を含めない。
+$problemKeys = @()
 $notes = @()
 
 # 電源状態を先に見る。このPCは Modern Standby(S0低電力アイドル)のため、バッテリー駆動や
@@ -55,6 +59,7 @@ $expected = @(
 
 if (-not (Test-Path $activityLog)) {
   $problems += '活動ログ(logs/activity-log.jsonl)が見つからない。全自動処理が動いていない可能性'
+  $problemKeys += 'activity-log-missing'
 } else {
   $lastSeen = @{}
   foreach ($line in (Get-Content $activityLog -Encoding UTF8 -Tail 1200)) {
@@ -67,12 +72,14 @@ if (-not (Test-Path $activityLog)) {
   foreach ($job in $expected) {
     if (-not $lastSeen.ContainsKey($job.by)) {
       $problems += ('{0}: 直近1200行に実行記録なし' -f $job.label)
+      $problemKeys += ('norecord:{0}' -f $job.by)
       continue
     }
     $ageH = [math]::Round(($now - $lastSeen[$job.by]).TotalHours, 1)
     if ($ageH -gt $job.maxHours) {
       $reason = if ($onBattery) { '(バッテリー駆動のためタスクが抑制されている。ACに繋ぐか常駐機へ移すのが対処)' } else { '' }
       $problems += ('{0}: 最終実行が{1}時間前(期待は{2}時間以内){3}' -f $job.label, $ageH, $job.maxHours, $reason)
+      $problemKeys += ('stale:{0}' -f $job.by)
     }
   }
 }
@@ -108,6 +115,7 @@ foreach ($tn in @('katazuku-daily-sync', 'katazuku-mail-watch', 'katazuku-asa', 
         Stop-ScheduledTask -TaskName $tn -ErrorAction SilentlyContinue
       } catch {}
       $problems += ('{0}: {1}分間ハング(制限{2}分)→ プロセス{3}件を強制終了し次の周期へ復帰させた' -f $tn, $runMin, $limit, $killed)
+      $problemKeys += ('hang:{0}' -f $tn)
     } elseif ($info.LastTaskResult -ne 0 -and $info.LastTaskResult -ne 267009 -and $info.LastTaskResult -ne 267011) {
       # タスクの終了コードは「前回の起動の残骸」でしかない。手動実行や次の周期で仕事が
       # 済んでいれば異常ではないので、活動ログ(=実際に仕事をした証拠)の方を信じる。
@@ -119,12 +127,22 @@ foreach ($tn in @('katazuku-daily-sync', 'katazuku-mail-watch', 'katazuku-asa', 
       }
       if (-not $doneAfter) {
         $problems += ('{0}: 最終実行がエラー(0x{1:X})' -f $tn, $info.LastTaskResult)
+        $problemKeys += ('taskerr:{0}:0x{1:X}' -f $tn, $info.LastTaskResult)
       } else {
         $notes += ('{0}: タスクの終了コードは0x{1:X}だが、その後に実際の実行記録があるため正常扱い' -f $tn, $info.LastTaskResult)
       }
     }
   } catch {
-    $notes += ('{0}: タスク未登録または取得失敗' -f $tn)
+    # 「本当に未登録」と「CIM/タスクスケジューラの一時的な取得失敗」を区別する(誤検知抑制)。
+    # 未登録(消えている)は最も重い異常なので problem に格上げ(2026-07-24のcalendar-sync消失の再発検知)。
+    # 取得が一時的に失敗しただけ(タスクは存在する)なら note にとどめ、次周期で再確認する。
+    $exists = $null -ne (Get-ScheduledTask -TaskName $tn -ErrorAction SilentlyContinue)
+    if (-not $exists) {
+      $problems += ('{0}: タスク未登録(消えている可能性)' -f $tn)
+      $problemKeys += ('missing:{0}' -f $tn)
+    } else {
+      $notes += ('{0}: タスク情報の取得に一時的に失敗(タスクは存在。次周期で再確認)' -f $tn)
+    }
   }
 }
 
@@ -144,6 +162,7 @@ if (Test-Path $healthFile) {
     }
     if ($down.Count -ge 2) {
       $problems += ('ClaudeとCodexの両方が利用枠切れ: {0}。自動運転が完全停止中' -f ($down -join ' / '))
+      $problemKeys += 'providers-down'
     } elseif ($down.Count -eq 1) {
       $notes += ('{0} が制限中(もう片方へ自動引継ぎ中のはず)' -f $down[0])
     }
@@ -157,9 +176,18 @@ if (Test-Path $healthFile) {
 # 翌朝の定時実行までどうやっても解消しないもの)が1日48回通知されるようになった。
 # 「番犬がすぐ止まったと言ってくる」の正体はこれ。狼少年になると本当の異常を見落とす。
 # 同一の問題集合(fingerprint)は6時間に1回だけ鳴らす。内容が変われば即座に鳴らす。
-$fingerprint = ($problems | Sort-Object) -join '||'
-$muteHours = 6
+# 2026-08-07: 指紋を $problems(文面)から作っていたため、「最終実行が16.2時間前」の数字が
+# 30分ごとに変わり、毎回「別の異常」と判定されてミュートが一度も効いていなかった。
+# 指紋は揮発値を含まない $problemKeys から作る。
+$fingerprint = ($problemKeys | Sort-Object) -join '||'
 $shouldNotify = $problems.Count -gt 0
+
+# 電源都合(バッテリー駆動でタスクが抑制されただけ)は「壊れている」ではなく「動ける状態に
+# なかった」。外出中はACに繋ぐ以外に手がなく、6時間おきに鳴らしても本人にできることがない。
+# 遅延系だけが問題のときは通知間隔を24時間に伸ばす(異常が別種に変われば即座に鳴る)。
+$staleOnly = ($problemKeys.Count -gt 0) -and -not ($problemKeys | Where-Object { $_ -notlike 'stale:*' -and $_ -notlike 'norecord:*' })
+$powerRelated = $onBattery -and $staleOnly
+$muteHours = if ($powerRelated) { 24 } else { 6 }
 if ($shouldNotify -and (Test-Path $stateFile)) {
   try {
     $prev = Get-Content $stateFile -Raw -Encoding UTF8 | ConvertFrom-Json
@@ -180,19 +208,24 @@ if (-not $shouldNotify -and (Test-Path $stateFile)) {
 }
 
 $state = [ordered]@{
-  checkedAt   = $now.ToString('yyyy-MM-ddTHH:mm:sszzz')
-  ok          = ($problems.Count -eq 0)
-  problems    = $problems
-  notes       = $notes
-  fingerprint = $fingerprint
-  notifiedAt  = $(if ($problems.Count -gt 0) { $notifiedAt } else { $null })
+  checkedAt    = $now.ToString('yyyy-MM-ddTHH:mm:sszzz')
+  ok           = ($problems.Count -eq 0)
+  problems     = $problems
+  problemKeys  = $problemKeys      # 指紋の材料。文面と違い揮発値を含まない
+  notes        = $notes
+  onBattery    = $onBattery
+  powerRelated = $powerRelated     # 真なら「壊れている」ではなく「動ける状態になかった」
+  muteHours    = $muteHours
+  fingerprint  = $fingerprint
+  notifiedAt   = $(if ($problems.Count -gt 0) { $notifiedAt } else { $null })
 }
 $state | ConvertTo-Json -Depth 4 | Out-File $stateFile -Encoding utf8
 
 if ($problems.Count -gt 0) {
   $body = ($problems -join ' / ')
   if ($shouldNotify) {
-    Show-Toast 'katazuku 自動運転が止まっています' $body
+    $title = if ($powerRelated) { 'katazuku 電源都合で自動運転が遅れています' } else { 'katazuku 自動運転が止まっています' }
+    Show-Toast $title $body
     ('watchdog|{0}|{1}' -f $state.checkedAt, $body) | Out-File $alertFile -Append -Encoding utf8
     # スマホへもWeb Push(spec16)。ロック画面に出るため件数のみの要約にする。失敗しても続行
     try {
@@ -205,5 +238,6 @@ if ($problems.Count -gt 0) {
     Write-Output ('異常 {0}件(通知済みと同内容のため{1}時間は再通知しない): {2}' -f $problems.Count, $muteHours, $body)
   }
 } else {
+  if (Test-Path $alertFile) { Remove-Item $alertFile -Force }  # 健全に戻ったら自分のアラートを消す
   Write-Output ('正常(通知なし)。notes: {0}' -f ($(if ($notes.Count) { $notes -join ' / ' } else { 'なし' })))
 }
