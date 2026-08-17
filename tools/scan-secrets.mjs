@@ -29,6 +29,14 @@ const PATTERNS = [
   { name: '秘密鍵ヘッダ', re: /-----BEGIN [A-Z ]*PRIVATE KEY-----/g },
   { name: 'AWSアクセスキー', re: /\bAKIA[0-9A-Z]{16}\b/g },
   { name: 'GitHubトークン', re: /\bgh[pousr]_[A-Za-z0-9]{20,}\b/g },
+  { name: 'GoogleAPIキー', re: /\bAIza[0-9A-Za-z_-]{35}\b/g },
+  { name: 'Slackトークン', re: /\bxox[baprs]-[0-9A-Za-z-]{10,}\b/g },
+  { name: 'Slack Webhook', re: /https:\/\/hooks\.slack\.com\/services\/[A-Za-z0-9/_-]+/g },
+  { name: 'Stripeシークレット', re: /\b(sk|rk)_live_[0-9A-Za-z]{16,}\b/g },
+  { name: 'Anthropic APIキー', re: /\bsk-ant-[0-9A-Za-z_-]{20,}\b/g },
+  { name: 'OpenAI APIキー', re: /\bsk-(proj-)?[0-9A-Za-z_-]{20,}\b/g },
+  { name: 'JWT', re: /\beyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/g },
+  { name: 'GoogleOAuthクライアント', re: /\b[0-9]+-[0-9a-z]{32}\.apps\.googleusercontent\.com\b/g },
 ]
 
 // 外部遮断リスト(固有名詞。private 限定)
