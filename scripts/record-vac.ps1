@@ -18,14 +18,20 @@ param(
   # 予定は `cd sync; npx tsx scripts/db-quick.ts today` か db-inspect で確認できる。
   [Parameter(Mandatory = $true)][string]$EndIso,
   # 予定の開始時刻(ISO・空白なし)。渡すと開始 LeadMinutes 前まで待ってから録り始める。
-  # 省略すると即座に録音を開始する(直前に手で起動する場合はそれでよい)。
-  # 2026-08-14の実害: 18:00開始の説明会を17:16から録り始め、44分/85MBを無駄にした。
+  # 省略した場合は AppointmentId を手がかりにDBから補完する(2026-08-17に追加)。
+  # DBからも引けないときだけ即座に録音を開始する。
+  # 実害2回: 2026-08-14に18:00開始を17:16から録り44分/85MBを捨て、2026-08-17に12:00開始を11:46から録った。
   [string]$StartIso = '',
   [int]$LeadMinutes = 5,
   [string]$Slug = '',
   [int]$BufferMinutes = 15
 )
 $ErrorActionPreference = 'Stop'
+# ffmpeg の -list_devices はデバイス名をUTF-8で出す。PowerShell 5.1 は既定で端末コードページ
+# (日本語環境はcp932)で復号するため、「マイク配列 (...インテル® ...)」が文字化けし、
+# 下の 'マイク配列' 判定に一致しなくなる(2026-08-17: 内蔵マイクを取り逃していた)。
+# meeting-autopilot.ps1 と同じ対処を、別プロセスで動くこちらにも入れる。
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $repo = Split-Path $PSScriptRoot -Parent
 $intDir = Join-Path $repo 'logs\interviews'
 if (-not (Test-Path $intDir)) { New-Item -ItemType Directory $intDir -Force | Out-Null }
@@ -67,6 +73,34 @@ if (Test-Path $lock) {
 Set-Content -LiteralPath $lock -Value $PID -Encoding ascii
 
 $endAt = ConvertTo-LocalTime $EndIso
+
+# -StartIso を省略されたらDBから補完する(2026-08-17に踏んだ)。
+# 省略時は「即座に録音開始」が仕様だが、会議のかなり前に手で叩くと無音を延々と録ることになる。
+# 実害は2回: 2026-08-14に18:00開始の説明会を17:16から録って44分/85MBを捨て、
+# 2026-08-17には12:00開始の面談を11:46から録った。呼び手の渡し忘れを仕様側で吸収する。
+# autopilot は -StartIso を渡すのでここは通らない(meeting-autopilot.ps1 の record-vac 起動部)。
+if (-not $StartIso) {
+  # ネイティブexeの stderr は EAP=Stop のままだと NativeCommandError に化けて死ぬ。
+  # 上の ffmpeg -list_devices と同じ既知パターンなので、この区間だけ Continue にする。
+  $prevEapT = $ErrorActionPreference
+  $ErrorActionPreference = 'Continue'
+  $timesJson = ''
+  try {
+    $timesJson = & node (Join-Path $PSScriptRoot 'appointment-times.mjs') $AppointmentId 2>$null | Select-Object -Last 1
+  } catch { $timesJson = '' }
+  $ErrorActionPreference = $prevEapT
+  if ($timesJson) {
+    try {
+      $times = $timesJson | ConvertFrom-Json
+      if ($times.startIso) {
+        $StartIso = $times.startIso
+        Log ("-StartIso が無いのでDBから補完した(予定{0}): {1}" -f $AppointmentId, $StartIso)
+      }
+    } catch { Log ("予定時刻のJSONが読めない: {0}" -f $timesJson) }
+  }
+  # 引けなければ即時開始のまま進む。前録りの無駄より、録り逃しの方が損害が大きい。
+  if (-not $StartIso) { Log '!! -StartIso が無くDBからも引けない。即座に録音を開始する(前録りに注意)' }
+}
 
 # 開始時刻が渡されていれば、開始 LeadMinutes 前まで待つ。無駄な前録りを避ける。
 if ($StartIso) {
@@ -113,7 +147,11 @@ $devs = & $ffmpeg -hide_banner -list_devices true -f dshow -i dummy 2>&1
 $ErrorActionPreference = $prevEap
 # 2>&1 で来る stderr は ErrorRecord の塊になり、そのまま foreach すると1要素扱いになって
 # 行ごとの走査ができない。必ず文字列化してから行に割る。
-$devLines = (($devs | Out-String) -split '\r?\n')
+# -Width 必須(2026-08-17に踏んだ): Out-String は既定でホストのコンソール幅(タスクスケジューラ
+# 経由の非対話ホストでは80桁)に折り返す。Alternative name の @device_... は80桁を超えるため
+# 途中で改行され、'Alternative name "([^"]+)"' が閉じ引用符を見つけられず不一致になる。
+# 結果「virtual-audio-capturer が無い」と誤判定して録音ごと落ちていた(8/17 9:45の面談を失った)。
+$devLines = (($devs | Out-String -Width 4096) -split '\r?\n')
 $loopAlt = ''; $micAlt = ''; $prev = ''
 foreach ($line in $devLines) {
   if ($line -match 'Alternative name "([^"]+)"') {
