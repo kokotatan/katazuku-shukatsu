@@ -90,6 +90,9 @@ JSON Schema は `katazuku-shukatsu/schemas/*.json` として別途参照でき�
 公開面は `tests/check-api.ts` が固定しています。export を増やしたらこのテストの `EXPECTED` にも
 足してください(=「意図して公開した」という記録になります)。
 
+AIアシスタントに使い方を尋ねる場合は、リポジトリの [AGENTS.md](AGENTS.md) と [llms.txt](llms.txt) を読ませると、
+セットアップ・設計・作法をすぐ答えられます。
+
 ## データの保管・複数デバイス
 
 正本は単一のローカルSQLite(`data/katazuku.db`、WALモード)です。**単一デバイス前提**で、
