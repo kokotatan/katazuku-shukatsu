@@ -7,7 +7,7 @@ import { DatabaseSync } from 'node:sqlite'
 import {
   openDb, upsertCompany, insertSelection, listSelections, listCompanies,
   transition, sameCompany, samePosition, resolveCompany, addAlias, listPending,
-  setOfficialName, normalizeAppointmentAt, sameAppointment,
+  setOfficialName, normalizeAppointmentAt, sameAppointment, addAppointment,
 } from '../src/db.js'
 import { applyDiff } from '../src/db-apply.js'
 import { isMeetingUrl } from '../src/meeting-url.js'
@@ -29,6 +29,16 @@ check('進行中の手書きに合格の根拠→確定に進める', transition
 check('空欄→出願済を書く', transition('', 'entried') === '出願済')
 check('「辞退予定」は本人意思なので内定通知でも上書きしない', transition('合格→本人辞退予定', 'offer') === null)
 check('不合格メールは「辞退」でなく「不合格」と書く', transition('選考中', 'rejected') === '不合格')
+check('#5: 内定は不合格で自動的に潰さない(誤割当保護)', transition('内定', 'rejected') === null)
+check('#5: 内定辞退(closed)は本人意思なので確定できる', transition('内定', 'closed') === '辞退')
+
+// #6: 予定の日時。ISO/date-only/TZ無しは保存でき、解釈不能な文字列は例外にして沈黙脱落を防ぐ
+const apCo = upsertCompany(db, { name: '予定テスト社' })
+const apSel = insertSelection(db, apCo, { company: '予定テスト社', season: '夏', position: '', priority: '', status: '選考中', steps: [], nextAction: '', nextDate: '', submitted: false, esUrl: '', memo: '' })
+check('#6: ISOの予定は登録できる', addAppointment(db, { selectionId: apSel, at: '2026-07-25T15:00', kind: '面接', title: '一次面接' }).created)
+let apThrew = false
+try { addAppointment(db, { selectionId: apSel, at: '来週火曜', kind: '面接', title: 'ダメな日時' }) } catch { apThrew = true }
+check('#6: 解釈できない日時は例外にする(outboxからの沈黙脱落を防ぐ)', apThrew)
 check('同値は書かない', transition('出願済', 'entried') === null)
 
 // --- 名寄せ(エンティティ解決)。名前は規則を試すための合成ラベル ---

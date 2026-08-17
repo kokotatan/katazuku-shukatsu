@@ -56,8 +56,8 @@ export function applyCalendar(
         title: event.title, startAt: event.startAt, endAt: event.endAt || '',
         url: event.url || '', location: event.location || '', status: event.status || '予定',
       })).digest('hex')
-      let prior = db.prepare('SELECT id, source_hash, title, person, external_id FROM appointment WHERE external_id = ?')
-        .get(event.externalId) as { id: number; source_hash: string; title: string; person: string; external_id: string } | undefined
+      let prior = db.prepare('SELECT id, selection_id, source_hash, title, person, external_id FROM appointment WHERE external_id = ?')
+        .get(event.externalId) as { id: number; selection_id: number; source_hash: string; title: string; person: string; external_id: string } | undefined
       // external_idで当たらないとき、同じ会議がメール由来(external_id空)で既に入っていないか探す。
       // 見つかったら新規作成せず、その行にexternal_id/calendar_idを埋めて「昇格」させる。
       // 昇格させないと、同じ会議がカレンダー由来とメール由来で2行になり、meeting-autopilotが
@@ -73,8 +73,8 @@ export function applyCalendar(
           onlyWithoutExternalId: true,
         })
         if (matchId !== undefined) {
-          prior = db.prepare('SELECT id, source_hash, title, person, external_id FROM appointment WHERE id = ?')
-            .get(matchId) as { id: number; source_hash: string; title: string; person: string; external_id: string }
+          prior = db.prepare('SELECT id, selection_id, source_hash, title, person, external_id FROM appointment WHERE id = ?')
+            .get(matchId) as { id: number; selection_id: number; source_hash: string; title: string; person: string; external_id: string }
           promoted = true
         }
       }
@@ -91,14 +91,22 @@ export function applyCalendar(
           //   メールから拾った相手名を空で潰さないため
           // - 統合で置き換えた旧タイトル・旧相手はイベント台帳に1行残すので情報は失われない
           const attendees = (event.attendees || []).map((a) => a.name).join('、')
+          // external_idで確定した既存予定は、カレンダー側の会社/職種の再解釈で別トラックへ勝手に移さない
+          // (トラック乗っ取り防止)。昇格は同一トラック内で突合しているので selectionId をそのまま使う。
+          const targetSelectionId = promoted ? selectionId : prior.selection_id
+          if (!promoted && prior.selection_id !== selectionId) {
+            addEvent(db, prior.selection_id, '予定注記',
+              `カレンダー再解決で別トラック(selection_id=${selectionId})に見えたが、既存トラックを維持`,
+              'calendar-sync', event.startAt, event.externalId)
+          }
           db.prepare(`
             UPDATE appointment SET selection_id = ?, at = ?, end_at = ?, kind = ?, title = ?,
               url = ?, location = ?, person = CASE WHEN ? <> '' THEN ? ELSE person END,
-              status = CASE WHEN ? = '中止' THEN '中止' WHEN status = '完了' THEN '完了' ELSE ? END,
+              status = CASE WHEN ? = '中止' THEN '中止' WHEN status IN ('完了','中止') THEN status ELSE ? END,
               external_id = ?, calendar_id = ?, source_hash = ?
             WHERE id = ?
           `).run(
-            selectionId, event.startAt, event.endAt || '', event.kind || 'その他', event.title,
+            targetSelectionId, event.startAt, event.endAt || '', event.kind || 'その他', event.title,
             event.url || '', event.location || '',
             attendees, attendees,
             // 済んだ予定(完了)を再同期で「予定」へ巻き戻さない。中止だけは反映する。
@@ -108,13 +116,13 @@ export function applyCalendar(
           )
           if (promoted) {
             addEvent(
-              db, selectionId, '予定統合',
+              db, targetSelectionId, '予定統合',
               `メール由来の予定(タイトル: ${prior.title} / 相手: ${prior.person || '不明'})をカレンダー予定「${event.title}」へ統合`,
               'calendar-sync', event.startAt, event.externalId,
             )
             result.promoted += 1
           } else {
-            addEvent(db, selectionId, '予定更新', `カレンダー更新: ${event.title}`, 'calendar-sync', event.startAt, event.externalId)
+            addEvent(db, targetSelectionId, '予定更新', `カレンダー更新: ${event.title}`, 'calendar-sync', event.startAt, event.externalId)
           }
           result.updated += 1
         }
