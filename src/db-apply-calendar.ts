@@ -56,6 +56,11 @@ export function applyCalendar(
         title: event.title, startAt: event.startAt, endAt: event.endAt || '',
         url: event.url || '', location: event.location || '', status: event.status || '予定',
       })).digest('hex')
+      // 所有権(#18): 空の external_id で検索すると、メール由来(external_id 空)の別予定に
+      // 誤って当たって書き換えてしまう。空IDは取り違えの元なので拒否する。
+      if (!(event.externalId ?? '').trim()) {
+        throw new Error('カレンダーイベントに externalId がありません(空IDでの取り違えを防ぐため拒否)')
+      }
       let prior = db.prepare('SELECT id, selection_id, source_hash, title, person, external_id FROM appointment WHERE external_id = ?')
         .get(event.externalId) as { id: number; selection_id: number; source_hash: string; title: string; person: string; external_id: string } | undefined
       // external_idで当たらないとき、同じ会議がメール由来(external_id空)で既に入っていないか探す。

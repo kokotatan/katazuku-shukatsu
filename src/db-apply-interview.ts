@@ -8,7 +8,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, extname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { DatabaseSync } from 'node:sqlite'
-import { addEvent, openDb } from './db.js'
+import { addEvent, openDb, sameCompany } from './db.js'
 import { resolveSelectionId, transaction, upsertPerson } from './inputs.js'
 
 export interface InterviewPerson {
@@ -100,10 +100,17 @@ export function applyInterview(
     let companyId: number
     if (input.appointmentId) {
       const appointment = db.prepare(`
-        SELECT a.selection_id AS selectionId, s.company_id AS companyId
-        FROM appointment a JOIN selection s ON s.id = a.selection_id WHERE a.id = ?
-      `).get(input.appointmentId) as { selectionId: number; companyId: number } | undefined
+        SELECT a.selection_id AS selectionId, s.company_id AS companyId, c.name AS companyName
+        FROM appointment a JOIN selection s ON s.id = a.selection_id JOIN company c ON c.id = s.company_id WHERE a.id = ?
+      `).get(input.appointmentId) as { selectionId: number; companyId: number; companyName: string } | undefined
       if (!appointment) throw new Error(`appointmentId が見つかりません: ${input.appointmentId}`)
+      // 所有権(#18): 渡された appointmentId が、宣言された会社の予定であることを確認する。
+      // 検証しないと、任意の予定IDを渡して別会社の予定に議事録を紐づけられてしまう。
+      if (input.company && !sameCompany(appointment.companyName, input.company)) {
+        throw new Error(
+          `appointmentId ${input.appointmentId} は「${appointment.companyName}」の予定で、宣言された会社「${input.company}」と一致しません`,
+        )
+      }
       selectionId = appointment.selectionId
       companyId = appointment.companyId
     } else {
