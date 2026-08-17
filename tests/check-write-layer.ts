@@ -157,5 +157,17 @@ check('savePersonPhoto: 未対応の拡張子は拒否する', (() => {
   try { savePersonPhoto(db, p4, bad, photoRoot); return false } catch { return true }
 })())
 
+// --- #18 所有権: 空ID/別会社の取り違えを防ぐ ---
+let calBlankThrew = false
+try { applyCalendar({ events: [{ externalId: '', title: '空ID', startAt: '2026-08-01T10:00:00+09:00', company: '株式会社サンプルA' }] }, db) } catch { calBlankThrew = true }
+check('#18: 空 external_id のカレンダーイベントを拒否する', calBlankThrew)
+
+const anAppointment = listAppointments(db)[0]
+let ownershipThrew = false
+try {
+  applyInterview({ runId: 'iv-owner-test', company: '株式会社サンプルB', appointmentId: anAppointment.id, occurredAt: '2026-08-01T11:00:00+09:00', title: '面接', summary: 'ok' }, db)
+} catch { ownershipThrew = true }
+check('#18: 別会社を宣言した appointmentId の議事録を拒否する(所有権)', ownershipThrew)
+
 if (failed) { console.error(`\n${failed}件失敗`); process.exit(1) }
 console.log('\nすべて通過')
