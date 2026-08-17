@@ -36,6 +36,9 @@ export interface CompanyInfo {
   loginId: string
   password: string
   memo: string
+  /** listCompanies は資格情報の実値を返さない。設定の有無だけをこの真偽値で示す(実値は getCompanyCredential) */
+  hasLoginId?: boolean
+  hasPassword?: boolean
 }
 
 export function openDb(path: string): DatabaseSync {
@@ -724,6 +727,10 @@ export function listSelections(db: DatabaseSync): SelectionRow[] {
   }))
 }
 
+/**
+ * 企業一覧。**資格情報(login_id / password)の実値は返さない**(平文の広域露出を防ぐ)。
+ * 設定済みかどうかだけを hasLoginId / hasPassword で示す。実値が要る場合は getCompanyCredential を使う。
+ */
 export function listCompanies(db: DatabaseSync): CompanyInfo[] {
   const rows = db.prepare('SELECT * FROM company ORDER BY id').all() as Record<string, unknown>[]
   return rows.map((r) => ({
@@ -731,10 +738,23 @@ export function listCompanies(db: DatabaseSync): CompanyInfo[] {
     shortName: (r.short_name as string) ?? '',
     industry: r.industry as string,
     mypageUrl: r.mypage_url as string,
-    loginId: r.login_id as string,
-    password: r.password as string,
+    loginId: '',
+    password: '',
+    hasLoginId: !!(r.login_id as string),
+    hasPassword: !!(r.password as string),
     memo: r.memo as string,
   }))
+}
+
+/**
+ * 企業のログイン資格情報の実値を1社ぶんだけ取り出す。ログイン自動化など、実値が本当に必要な
+ * 呼び手だけがこれを使う(一覧に混ぜて広域に漏らさないための専用アクセサ)。
+ */
+export function getCompanyCredential(db: DatabaseSync, companyId: number): { loginId: string; password: string } | undefined {
+  const r = db.prepare('SELECT login_id, password FROM company WHERE id = ?').get(companyId) as
+    | { login_id: string; password: string }
+    | undefined
+  return r ? { loginId: r.login_id, password: r.password } : undefined
 }
 
 /** 正式名称(株式会社/Inc.付き)へ昇格する。従来の名前は通称(short_name)として残る */

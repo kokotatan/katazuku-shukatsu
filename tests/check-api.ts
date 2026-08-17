@@ -18,7 +18,7 @@ const EXPECTED = [
   // db
   'openDb', 'SCHEMA_VERSION', 'transition', 'STATUS_FOR', 'outcomeOf',
   'resolveCompany', 'sameCompany', 'samePosition', 'addAlias', 'addPending', 'listPending', 'setOfficialName',
-  'upsertCompany', 'insertSelection', 'listSelections', 'listCompanies', 'addEvent', 'listEvents',
+  'upsertCompany', 'insertSelection', 'listSelections', 'listCompanies', 'getCompanyCredential', 'addEvent', 'listEvents',
   'addAppointment', 'listAppointments', 'sameAppointment', 'findAppointmentMatch',
   'normalizeAppointmentAt', 'normalizeAppointmentUrl',
   // inputs
