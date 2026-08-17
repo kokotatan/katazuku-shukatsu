@@ -48,6 +48,21 @@ try {
   if ($bat -and $bat.BatteryStatus -eq 1) { $onBattery = $true }
 } catch {}
 
+# ---- 0. 番犬自身の死活(番犬の番犬) ----
+# 番犬は4時間おきに回るので、前回のハートビートから大きく開いていたら「番犬自体が止まっていた」。
+# 復帰した今この場で報告する。恒久的に死んだ場合の検知は asa 側の外部チェックに任せる(asa-prompt.md)。
+$heartbeatFile = Join-Path $logDir 'watchdog-heartbeat.txt'
+if (-not $onBattery -and (Test-Path $heartbeatFile)) {
+  try {
+    $lastBeat = [datetime]::Parse((Get-Content -Raw $heartbeatFile).Trim())
+    $gapH = ($now - $lastBeat).TotalHours
+    if ($gapH -gt 8) {
+      $problems += ('番犬自身が約{0:N0}時間動いていなかった(いま復帰)。夜間の停止やタスク無効化の可能性' -f $gapH)
+      $problemKeys += 'watchdog-was-down'
+    }
+  } catch {}
+}
+
 # ---- 1. 活動ログの新鮮さ ----
 # 期待周期(INFRA.mdの定常タスク表に合わせる。変更したらここも直す)
 $expected = @(
@@ -241,3 +256,6 @@ if ($problems.Count -gt 0) {
   if (Test-Path $alertFile) { Remove-Item $alertFile -Force }  # 健全に戻ったら自分のアラートを消す
   Write-Output ('正常(通知なし)。notes: {0}' -f ($(if ($notes.Count) { $notes -join ' / ' } else { 'なし' })))
 }
+
+# ハートビート: この番犬が動いた時刻を残す。次回の自己監視(上の #0)と asa の外部チェックが読む。
+$now.ToString('o') | Out-File -FilePath $heartbeatFile -Encoding utf8 -NoNewline
