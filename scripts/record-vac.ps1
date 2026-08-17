@@ -24,7 +24,11 @@ param(
   [string]$StartIso = '',
   [int]$LeadMinutes = 5,
   [string]$Slug = '',
-  [int]$BufferMinutes = 15
+  [int]$BufferMinutes = 15,
+  # dshow のデバイス名にかける正規表現。OSS版と揃えるためパラメータにした(既定は従来と同じ挙動)。
+  # 日本語版Windowsの内蔵マイクは「マイク配列」、英語版は "Microphone Array"。
+  [string]$MicPattern = 'マイク配列|Microphone Array',
+  [string]$LoopbackPattern = 'virtual-audio-capturer'
 )
 $ErrorActionPreference = 'Stop'
 # ffmpeg の -list_devices はデバイス名をUTF-8で出す。PowerShell 5.1 は既定で端末コードページ
@@ -157,13 +161,13 @@ foreach ($line in $devLines) {
   if ($line -match 'Alternative name "([^"]+)"') {
     # $Matches は次の -match で上書きされるので、内側の判定より先に退避する(2026-08-14に踏んだ)
     $alt = $Matches[1]
-    if ($prev -match 'virtual-audio-capturer') { $loopAlt = $alt }
-    elseif ($prev -match 'マイク配列|Microphone Array') { $micAlt = $alt }
+    if ($prev -match $LoopbackPattern) { $loopAlt = $alt }
+    elseif ($prev -match $MicPattern) { $micAlt = $alt }
   }
   $prev = $line
 }
-if (-not $loopAlt) { Log '!! virtual-audio-capturer が無い。相手の声は録れない' }
-if (-not $micAlt)  { Log '!! 内蔵マイク配列が無い' }
+if (-not $loopAlt) { Log ("!! ループバック({0})が無い。相手の声は録れない" -f $LoopbackPattern) }
+if (-not $micAlt)  { Log ("!! マイク({0})が無い" -f $MicPattern) }
 
 $a = @('-hide_banner', '-loglevel', 'warning', '-y')
 if ($loopAlt -and $micAlt) {

@@ -13,7 +13,8 @@ if (!Number.isInteger(id) || id <= 0) {
 }
 
 const repo = path.resolve(import.meta.dirname, "..");
-const dbPath = path.join(repo, "data", "katazuku.db");
+// KATAZUKU_DB での上書きはOSS版と揃えるため(パス一致が subtree 同期の前提)。
+const dbPath = process.env.KATAZUKU_DB ?? path.join(repo, "data", "katazuku.db");
 
 let db;
 try {
