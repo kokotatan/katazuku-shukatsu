@@ -64,26 +64,49 @@ function New-RecordArgs {
     # 無音がこの秒数続いたら stderr に silence_start が出る。監視側の録り直し判定に使う。
     # 面談で相手が45秒まるごと黙るのは稀。短くすると沈黙のたびに録り直してファイルが刻まれる。
     [int]$SilenceSec = 45,
-    [string]$SilenceDb = '-50dB'
+    [string]$SilenceDb = '-50dB',
+    # 相手と自分を混ぜず、L=相手 / R=自分 の2chで残す(2026-08-18に既定化)。
+    # 混ぜると後段で「誰が話したか」を内容から推測するしかなくなり、話者ラベルが当たらない
+    # (実際 8/14 Sansan の文字起こしは「話者ラベルは音響分離ではなく内容からの推定」と
+    # 断り書きが入っている)。分けて録れば話者分離は物理的に確定し、
+    # 発話占有率や一発話の長さが推定でなく実測になる。相手の声が入っていない事故も
+    # Lチャンネルの音量を見るだけで判定できる。容量は倍(16kHz/16bit/2ch = 3.8MB/分)。
+    [switch]$Mono
   )
   # silencedetect は info レベルでログを出すので、従来の warning では拾えない。
   # ただし info にすると進捗行(size=... time=...)が毎秒2行出てログが肥大するため -nostats で止める。
   # 実測: 26秒で99行(ほぼ進捗行)。1時間の面談なら1万行を超える。
   $a = @('-hide_banner', '-loglevel', 'info', '-nostats', '-y')
+  $chans = 2
   if ($LoopAlt -and $MicAlt) {
     $a += @('-f','dshow','-i',("audio=" + $LoopAlt), '-f','dshow','-i',("audio=" + $MicAlt))
-    # [0:a]=loopback を2本に割り、片方は従来どおり amix、もう片方は監視専用にする。
+    # [0:a]=loopback を2本に割る。片方は本編、もう片方は監視専用。
     # 監視側は anullsink に捨てる。silencedetect はログを出すのが仕事で、音は要らない。
+    # 監視は必ず loopback 単体に掛ける。混ぜた後だと自分の相槌で無音判定が消え、
+    # 「相手の声だけが入っていない」という当の事故を拾えない。
+    $mixExpr = if ($Mono) {
+      # 従来どおり1本に混ぜる。話者分離はできなくなるので、容量を惜しむとき以外は使わない。
+      '[mix][1:a]amix=inputs=2:duration=longest:dropout_transition=0[out]'
+    } else {
+      # L=相手 / R=自分。両入力ともステレオで来るので、先に1chへ落としてから合流させる。
+      # 合流は amerge ではなく join を使う(2026-08-18に実測して差し替えた)。
+      # amerge は入力のチャンネルレイアウトを見て並べ直すため、1ch同士を渡しても
+      # 期待どおり L/R に割り当たらず、無音のはずのLに -28dB が乗った(=分離できていない)。
+      # join は inputs と channel_layout を明示して固定できる。
+      '[mix]pan=mono|c0=c0[l];[1:a]pan=mono|c0=c0[r];[l][r]join=inputs=2:channel_layout=stereo[out]'
+    }
+    if ($Mono) { $chans = 1 }
     $a += @('-filter_complex',
-            ("[0:a]asplit=2[mix][mon];[mix][1:a]amix=inputs=2:duration=longest:dropout_transition=0[out];" +
-             "[mon]silencedetect=n={0}:d={1},anullsink" -f $SilenceDb, $SilenceSec))
+            ("[0:a]asplit=2[mix][mon];{0};[mon]silencedetect=n={1}:d={2},anullsink" -f $mixExpr, $SilenceDb, $SilenceSec))
     $a += @('-map','[out]')
   } elseif ($MicAlt) {
-    # ループバックが取れないときは自分の声だけでも残す。監視する相手の声が無いので silencedetect も付けない。
+    # ループバックが取れないときは自分の声だけでも残す。相手の声が無いので silencedetect も付けない。
+    # 片側しか無いので2chにする意味も無い。
     $a += @('-f','dshow','-i',("audio=" + $MicAlt))
+    $chans = 1
   } else {
     return $null
   }
-  $a += @('-ac','1','-ar','16000','-t',"$DurSec", $OutWav)
+  $a += @('-ac',"$chans",'-ar','16000','-t',"$DurSec", $OutWav)
   return $a
 }
