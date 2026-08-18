@@ -2,7 +2,7 @@
 
 最終更新: 2026-08-14
 
-private(`katazuku-shukatsu-private`)の中核を、公開リポジトリ
+ホーム直下で兄弟配置した private(`katazuku-shukatsu-private`)と OSS(`katazuku-shukatsu-oss`)を使い、private の中核を公開リポジトリ
 `kokotatan/katazuku-shukatsu` へ安全に反映し、逆に OSS 側の改善を private に落とすための仕組み。
 「private を育てれば OSS が育つ」「OSS の貢献が private に戻る」を、個人データを漏らさず成立させる。
 
@@ -23,29 +23,22 @@ pwsh scripts/oss/publish.ps1          # scan + test のゲートだけ回す(pus
 pwsh scripts/oss/publish.ps1 -Push    # ゲート通過時のみ OSS へ push
 ```
 
-中核の編集は OSS クローン(`.oss-checkout/`)側で行い、上のゲートを通して push する。
+公開する中核の編集は兄弟フォルダ `C:\Users\okuya\katazuku-shukatsu-oss` 側で行い、上のゲートを通して push する。
 
-## 双方向にする(推奨: git subtree)
+## リポジトリ配置
 
-OSS リポジトリを private の中に `oss/` プレフィックスの subtree として抱えると、
-両方向の同期が git の標準操作になる。
+Private と OSS は入れ子にせず、ホーム直下の兄弟フォルダとして管理する。
 
-```powershell
-# 一度だけ: OSS を private の oss/ として取り込む(private のツリーがクリーンなときに)
-git remote add oss https://github.com/kokotatan/katazuku-shukatsu.git
-git subtree add   --prefix oss oss main --squash
-
-# private で育てた中核(oss/ 配下)を OSS へ上げる … ただし publish.ps1 のゲートを先に通す
-git subtree push  --prefix oss oss main
-
-# OSS 側の改善・PR を private に落とす
-git subtree pull  --prefix oss oss main --squash
+```text
+C:\Users\okuya\
+├── katazuku-shukatsu-private\
+└── katazuku-shukatsu-oss\
 ```
 
-- 個人レイヤー(実データ・prompt・scripts・config)は `oss/` の外に置く。ここは OSS に絶対行かない。
-- `git subtree push` の前に必ず `scripts/oss/publish.ps1`(scan + test)を通すこと。
-  取り込み忘れの個人データを subtree が素通しさせないための堰。
-- `oss/blocklist.txt` は publish 時に OSS へコピーしない(スキャナは外部参照で使うだけ)。
+- 2つは別のGit履歴・別のリモートとして扱う。nested repository、subtree、worktreeにはしない。
+- 個人レイヤー(実データ・prompt・scripts・config)はPrivateだけに置き、OSSにはコピーしない。
+- OSSへpushする前に必ずPrivate側の `scripts/oss/publish.ps1` を通す。
+- `scripts/oss/blocklist.txt` はpublish時にOSSへコピーしない(スキャナは外部参照で使うだけ)。
 
 ## 分界(何を出す・出さない)
 

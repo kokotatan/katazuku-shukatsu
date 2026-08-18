@@ -70,8 +70,6 @@ codex-windows-sandbox-setup.exe
 # record-vac の二重起動ガード用ロック(実行時の一時ファイル)
 logs/record-vac-*.lock
 
-# OSS公開作業の一時クローン
-.oss-checkout/
 # private限定の遮断リスト(個人名・実社名を含む。OSSへは出さない)
 scripts/oss/blocklist.txt
 # 企業ごとの差分JSON(実企業の選考データ・個人情報)

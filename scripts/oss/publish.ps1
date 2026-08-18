@@ -8,12 +8,11 @@
 #   powershell -File scripts/oss/publish.ps1            # gate only (scan + test), no push
 #   powershell -File scripts/oss/publish.ps1 -Push      # push to OSS if the gate passes
 #
-# Edit the core in the OSS checkout (.oss-checkout) or, for two-way sync, in the
-# git-subtree 'oss/' prefix. See docs/oss-publish.md for the subtree workflow.
+# Edit the public core in the sibling OSS repository. See docs/oss-publish.md.
 
 param(
   [switch]$Push,
-  [string]$OssDir = "$PSScriptRoot/../../.oss-checkout",
+  [string]$OssDir = '',
   [string]$OssRepo = "https://github.com/kokotatan/katazuku-shukatsu.git",
   [string]$Blocklist = "$PSScriptRoot/blocklist.txt"
 )
@@ -21,6 +20,11 @@ param(
 # native commands (git/npm) writing to stderr are wrapped as terminating errors.
 # We check $LASTEXITCODE explicitly instead.
 $ErrorActionPreference = 'Continue'
+
+if (-not $OssDir) {
+  $privateRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
+  $OssDir = Join-Path (Split-Path $privateRoot -Parent) 'katazuku-shukatsu-oss'
+}
 
 function Assert-LastExit([string]$what) {
   if ($LASTEXITCODE -ne 0) { Write-Error "$what failed (exit $LASTEXITCODE). Aborting."; exit 1 }

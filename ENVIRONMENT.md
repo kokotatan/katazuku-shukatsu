@@ -74,7 +74,7 @@ established facts, re-litigating decided questions, or narrating options I won't
 A **persistent, file-based memory** lives at:
 
 ```
-C:\Users\okuya\.claude\projects\C--Users-okuya-katazuku-shukatsu\memory\
+C:\Users\okuya\.claude\projects\C--Users-okuya-katazuku-shukatsu-private\memory\
 ```
 
 The directory already exists — write to it directly (no `mkdir`, no existence checks).
@@ -279,7 +279,7 @@ multi-modal sweep, completeness critic, no silent caps. Resume via
 ## 8. Project-Specific Environment (katazuku)
 
 ### 8.1 Environment facts
-- **Primary working directory:** `C:\Users\okuya\katazuku-shukatsu`
+- **Primary working directory:** `C:\Users\okuya\katazuku-shukatsu-private`
 - **Git repo:** yes. Branch: `main` (also the main/PR branch). Git user: `kokotatan`.
 - **Platform:** win32 — **Windows 11 Pro** (10.0.26200).
 - **Shells:** PowerShell is primary; Bash (POSIX) also available. Each takes its own syntax.

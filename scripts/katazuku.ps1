@@ -1,6 +1,6 @@
 ﻿# katazuku — 統一コマンド。READMEの `katazuku <動詞>` 構想の入口。
 # セットアップ(1回): PowerShellプロファイルに次の1行を追加
-#   function katazuku { & "C:\Users\okuya\katazuku-shukatsu\scripts\katazuku.ps1" @args }
+#   function katazuku { & "C:\Users\okuya\katazuku-shukatsu-private\scripts\katazuku.ps1" @args }
 param(
   [Parameter(Position = 0)] [string] $Command = 'help',
   [Parameter(Position = 1, ValueFromRemainingArguments = $true)] [string[]] $Rest

@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>katazuku studio — Zenn記事エディタ</title>
+  <style>
+    :root {
+      --bg: #f8f7f6; --surface: #fff; --text: #23221e; --text-sub: #706d65;
+      --border: #d6d3d0; --over: #f5f4f3; --primary: #0077c7; --primary-hover: #005fa3;
+      --link-bg: #e9f4fb; --danger: #c93b2d; --danger-bg: #fff1ee; --success: #26734d; --success-bg: #edf8f2;
+      --font: system-ui, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--font); font-size: 15px; line-height: 1.7; }
+    a { color: var(--primary); }
+    button { font-family: inherit; cursor: pointer; }
+    .btn { border: 1px solid var(--border); background: var(--surface); color: var(--text); padding: 8px 16px; border-radius: 6px; font-size: 14px; font-weight: 700; }
+    .btn:hover { background: var(--over); }
+    .btn.primary { background: var(--primary); border-color: var(--primary); color: #fff; }
+    .btn.primary:hover { background: var(--primary-hover); }
+    .btn.pub { background: var(--success); border-color: var(--success); color: #fff; }
+    .btn:disabled { opacity: .5; cursor: default; }
+    input, textarea, select { font-family: inherit; color: var(--text); }
+    input[type=text], input[type=password], select {
+      width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; background: var(--surface);
+    }
+    input:focus, textarea:focus, select:focus { outline: 2px solid var(--primary); outline-offset: 1px; }
+
+    header.top { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 20px; background: var(--surface); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 5; }
+    .top .brand { font-weight: 700; font-size: 16px; }
+    .top .brand span { color: var(--text-sub); font-weight: 400; font-size: 13px; margin-left: 8px; }
+    .top .who { font-size: 13px; color: var(--text-sub); }
+
+    /* ---- 認証ゲート ---- */
+    .gate { max-width: 420px; margin: 12vh auto; padding: 28px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
+    .gate h1 { font-size: 18px; margin: 0 0 6px; }
+    .gate p { color: var(--text-sub); font-size: 13px; margin: 0 0 16px; }
+    .gate .row { display: flex; gap: 8px; margin-top: 12px; }
+    .msg { margin-top: 12px; font-size: 13px; }
+    .msg.err { color: var(--danger); }
+    .msg.ok { color: var(--success); }
+
+    /* ---- 本体 ---- */
+    .shell { display: grid; grid-template-columns: 260px 1fr; min-height: calc(100vh - 57px); }
+    .side { border-right: 1px solid var(--border); background: var(--surface); display: flex; flex-direction: column; min-height: 0; }
+    .side .side-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px 8px; }
+    .side .side-head strong { font-size: 13px; color: var(--text-sub); letter-spacing: .04em; }
+    .side .list { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 10px 16px; }
+    .art { display: block; width: 100%; text-align: left; border: 1px solid transparent; background: none; border-radius: 8px; padding: 10px 12px; margin-bottom: 2px; }
+    .art:hover { background: var(--over); }
+    .art[aria-current="true"] { background: var(--link-bg); border-color: #cde6f7; }
+    .art .t { font-size: 14px; font-weight: 700; line-height: 1.45; }
+    .art .s { font-size: 11px; color: var(--text-sub); margin-top: 2px; word-break: break-all; }
+    .badge { display: inline-block; font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 999px; margin-left: 6px; vertical-align: 1px; }
+    .badge.draft { background: var(--over); color: var(--text-sub); border: 1px solid var(--border); }
+    .badge.live { background: var(--success-bg); color: var(--success); }
+
+    .main { display: flex; flex-direction: column; min-width: 0; }
+    .bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 12px 18px; border-bottom: 1px solid var(--border); background: var(--surface); }
+    .bar .slug { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-sub); }
+    .bar .slug input { width: 220px; }
+    .bar .spacer { flex: 1; }
+    .bar .status { font-size: 13px; }
+    .panes { display: grid; grid-template-columns: 1fr 1fr; flex: 1; min-height: 0; }
+    .pane { min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+    .pane.edit { border-right: 1px solid var(--border); }
+    .pane .pane-label { font-size: 11px; color: var(--text-disabled, #9a978f); padding: 6px 14px; border-bottom: 1px solid var(--border); background: var(--over); letter-spacing: .08em; text-transform: uppercase; }
+    textarea#md { flex: 1; width: 100%; border: 0; resize: none; padding: 16px 18px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 13px; line-height: 1.75; background: var(--surface); }
+    .preview { flex: 1; overflow-y: auto; padding: 20px 24px; }
+    .preview h1 { font-size: 26px; margin: 0 0 16px; line-height: 1.3; }
+    .preview h2 { font-size: 21px; margin: 30px 0 12px; }
+    .preview h3 { font-size: 17px; margin: 22px 0 8px; }
+    .preview p { margin: 0 0 15px; }
+    .preview img { max-width: 100%; height: auto; border: 1px solid var(--border); border-radius: 8px; margin: 8px 0; display: block; }
+    .preview pre { background: #23221e; color: #f5f4f3; padding: 14px 16px; border-radius: 6px; overflow-x: auto; font-size: 12.5px; line-height: 1.6; }
+    .preview code { background: var(--over); padding: 1px 5px; border-radius: 4px; font-size: .9em; font-family: ui-monospace, Consolas, monospace; }
+    .preview pre code { background: none; padding: 0; }
+    .preview blockquote { border-left: 3px solid var(--border); margin: 0 0 15px; padding: 2px 0 2px 16px; color: var(--text-sub); }
+    .preview ul, .preview ol { margin: 0 0 15px; padding-left: 22px; }
+    .preview .fm { font-size: 12px; color: var(--text-sub); background: var(--over); border: 1px dashed var(--border); border-radius: 8px; padding: 8px 12px; margin: 0 0 18px; }
+    .preview .fm b { color: var(--text); }
+    .hint { font-size: 12px; color: var(--text-sub); padding: 8px 18px; border-top: 1px solid var(--border); background: var(--surface); }
+    @media (max-width: 860px) {
+      .shell { grid-template-columns: 1fr; }
+      .side { border-right: 0; border-bottom: 1px solid var(--border); }
+      .side .list { max-height: 30vh; }
+      .panes { grid-template-columns: 1fr; }
+      .pane.edit { border-right: 0; border-bottom: 1px solid var(--border); }
+    }
+  </style>
+</head>
+<body>
+  <header class="top">
+    <div class="brand">katazuku studio<span>Zenn記事エディタ</span></div>
+    <div class="who" id="who"></div>
+  </header>
+
+  <!-- 認証ゲート -->
+  <div class="gate" id="gate">
+    <h1>合言葉を入力</h1>
+    <p>このエディタは編集・公開ができます。katazukuのstudio合言葉を入力してください。</p>
+    <input type="password" id="secret" placeholder="studio 合言葉" autocomplete="current-password" />
+    <div class="row">
+      <button class="btn primary" id="enter" type="button">開く</button>
+    </div>
+    <div class="msg" id="gate-msg"></div>
+  </div>
+
+  <!-- 本体 -->
+  <div class="shell" id="shell" hidden>
+    <aside class="side">
+      <div class="side-head"><strong>記事</strong><button class="btn" id="new-btn" type="button">新規</button></div>
+      <div class="list" id="list"></div>
+    </aside>
+    <div class="main">
+      <div class="bar">
+        <label class="slug">slug <input type="text" id="slug" placeholder="my-article-slug" /></label>
+        <span class="spacer"></span>
+        <span class="status" id="status"></span>
+        <button class="btn" id="save-btn" type="button" disabled>下書き保存</button>
+        <button class="btn pub" id="pub-btn" type="button" disabled>公開する</button>
+      </div>
+      <div class="panes">
+        <div class="pane edit">
+          <div class="pane-label">Markdown（frontmatter含む）</div>
+          <textarea id="md" spellcheck="false" placeholder="---&#10;title: &quot;&quot;&#10;emoji: &quot;📝&quot;&#10;type: &quot;tech&quot;&#10;topics: []&#10;published: false&#10;---&#10;&#10;本文…"></textarea>
+        </div>
+        <div class="pane">
+          <div class="pane-label">プレビュー</div>
+          <div class="preview" id="preview"></div>
+        </div>
+      </div>
+      <div class="hint">下書き保存＝<code>published: false</code>でcommit / 公開する＝<code>published: true</code>でcommit → Zennが自動反映。保存先はZenn連携リポ。</div>
+    </div>
+  </div>
+
+  <script>
+  (() => {
+    'use strict'
+    const SS_KEY = 'katazuku-studio-secret'
+    const $ = (id) => document.getElementById(id)
+    let secret = sessionStorage.getItem(SS_KEY) || ''
+    let rawBase = ''
+    let current = null // {slug}
+    let dirty = false
+
+    // ---- Markdown(簡易) ----
+    const esc = (s) => s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]))
+    function inline(s) {
+      return esc(s)
+        .replace(/`([^`]+)`/g, (_, c) => `<code>${c}</code>`)
+        .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_, a, u) => `<img alt="${a}" src="${resolveImg(u)}">`)
+        .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, t, u) => `<a href="${u}" target="_blank" rel="noopener">${t}</a>`)
+        .replace(/\*\*([^*]+)\*\*/g, (_, b) => `<strong>${b}</strong>`)
+    }
+    function resolveImg(u) { return u.startsWith('/images/') && rawBase ? rawBase + u.slice(1) : u }
+    function splitFm(md) {
+      if (md.startsWith('---')) {
+        const e = md.indexOf('\n---', 3)
+        if (e !== -1) return { fm: md.slice(3, e).trim(), body: md.slice(md.indexOf('\n', e + 1) + 1) }
+      }
+      return { fm: '', body: md }
+    }
+    function render(md) {
+      const { fm, body } = splitFm(md)
+      let html = ''
+      if (fm) {
+        const g = (k) => (fm.match(new RegExp('^' + k + ':\\s*(.*)$', 'm')) || [, ''])[1].replace(/^["']|["']$/g, '')
+        html += `<div class="fm"><b>${esc(g('emoji'))} ${esc(g('title')) || '(無題)'}</b> — ${esc(g('type'))} / ${esc(g('topics'))} / published: ${/published:\s*true/.test(fm) ? '<b>true</b>' : 'false'}</div>`
+      }
+      const lines = body.split('\n')
+      let i = 0
+      const out = []
+      while (i < lines.length) {
+        const ln = lines[i]
+        if (ln.startsWith('```')) {
+          const buf = []; i++
+          while (i < lines.length && !lines[i].startsWith('```')) { buf.push(esc(lines[i])); i++ }
+          i++; out.push(`<pre><code>${buf.join('\n')}</code></pre>`); continue
+        }
+        if (/^#{1,3}\s/.test(ln)) { const l = ln.match(/^#+/)[0].length; out.push(`<h${l}>${inline(ln.replace(/^#+\s/, ''))}</h${l}>`); i++; continue }
+        if (/^!\[[^\]]*\]\([^)]+\)\s*$/.test(ln)) { out.push(inline(ln)); i++; continue }
+        if (/^>\s?/.test(ln)) { const buf = []; while (i < lines.length && /^>\s?/.test(lines[i])) { buf.push(inline(lines[i].replace(/^>\s?/, ''))); i++ } out.push(`<blockquote>${buf.join('<br>')}</blockquote>`); continue }
+        if (/^[-*]\s/.test(ln)) { const buf = []; while (i < lines.length && /^[-*]\s/.test(lines[i])) { buf.push(`<li>${inline(lines[i].replace(/^[-*]\s/, ''))}</li>`); i++ } out.push(`<ul>${buf.join('')}</ul>`); continue }
+        if (/^\d+\.\s/.test(ln)) { const buf = []; while (i < lines.length && /^\d+\.\s/.test(lines[i])) { buf.push(`<li>${inline(lines[i].replace(/^\d+\.\s/, ''))}</li>`); i++ } out.push(`<ol>${buf.join('')}</ol>`); continue }
+        if (ln.trim() === '') { i++; continue }
+        const buf = []; while (i < lines.length && lines[i].trim() !== '' && !/^(#{1,3}\s|```|>|[-*]\s|\d+\.\s)/.test(lines[i])) { buf.push(inline(lines[i])); i++ }
+        out.push(`<p>${buf.join('<br>')}</p>`)
+      }
+      return html + out.join('\n')
+    }
+    function updatePreview() { $('preview').innerHTML = render($('md').value) }
+
+    // ---- API ----
+    async function api(path, opts) {
+      const r = await fetch(path, opts)
+      const j = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status))
+      return j
+    }
+    function setStatus(t, cls) { const s = $('status'); s.textContent = t || ''; s.className = 'status ' + (cls || '') }
+
+    async function loadList() {
+      const j = await api('/api/studio-load?key=' + encodeURIComponent(secret))
+      rawBase = j.rawBase || ''
+      const list = $('list'); list.innerHTML = ''
+      if (!j.articles.length) list.innerHTML = '<p style="color:var(--text-sub);font-size:13px;padding:8px 12px">まだ記事がありません。「新規」から作成できます。</p>'
+      for (const a of j.articles) {
+        const b = document.createElement('button')
+        b.className = 'art'; b.type = 'button'; b.dataset.slug = a.slug
+        b.innerHTML = `<div class="t">${a.emoji || ''} ${escHtml(a.title) || '(無題)'}<span class="badge ${a.published ? 'live' : 'draft'}">${a.published ? '公開中' : '下書き'}</span></div><div class="s">${a.slug}</div>`
+        b.addEventListener('click', () => openArticle(a.slug))
+        list.appendChild(b)
+      }
+      markCurrent()
+    }
+    function escHtml(s) { return (s || '').replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c])) }
+    function markCurrent() { document.querySelectorAll('.art').forEach((el) => el.setAttribute('aria-current', String(el.dataset.slug === (current && current.slug)))) }
+
+    async function openArticle(slug) {
+      if (dirty && !confirm('保存していない変更があります。破棄して開きますか？')) return
+      setStatus('読み込み中…')
+      const j = await api('/api/studio-load?key=' + encodeURIComponent(secret) + '&slug=' + encodeURIComponent(slug))
+      current = { slug }
+      $('slug').value = slug; $('slug').readOnly = true
+      $('md').value = j.md; updatePreview(); setDirty(false)
+      $('save-btn').disabled = false; $('pub-btn').disabled = false
+      setStatus(''); markCurrent()
+    }
+    function newArticle() {
+      if (dirty && !confirm('保存していない変更があります。破棄して新規作成しますか？')) return
+      current = null
+      $('slug').value = ''; $('slug').readOnly = false
+      $('md').value = '---\ntitle: ""\nemoji: "📝"\ntype: "tech"\ntopics: []\npublished: false\n---\n\n'
+      updatePreview(); setDirty(false)
+      $('save-btn').disabled = false; $('pub-btn').disabled = false
+      $('slug').focus(); markCurrent()
+    }
+
+    async function save(publish) {
+      const slug = $('slug').value.trim()
+      if (!/^[a-z0-9][a-z0-9_-]{0,49}$/.test(slug)) { setStatus('slugは英小文字/数字/-/_ の1〜50文字', 'err'); return }
+      const md = $('md').value
+      if (!md.startsWith('---')) { setStatus('frontmatter(---)が必要です', 'err'); return }
+      $('save-btn').disabled = true; $('pub-btn').disabled = true
+      setStatus(publish ? '公開中…' : '保存中…')
+      try {
+        const j = await api('/api/studio-save', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + secret }, body: JSON.stringify({ slug, md, publish }) })
+        current = { slug }; $('slug').readOnly = true; setDirty(false)
+        if (j.published) {
+          setStatus('公開しました ', 'ok')
+          if (j.zennUrl) { const a = document.createElement('a'); a.href = j.zennUrl; a.target = '_blank'; a.rel = 'noopener'; a.textContent = j.zennUrl; $('status').appendChild(a) }
+        } else {
+          setStatus(j.unchanged ? '変更なし' : '下書き保存しました', 'ok')
+        }
+        // frontmatterのpublishedをUIにも反映
+        if (typeof publish === 'boolean') { $('md').value = md.replace(/^published:\s*.*$/m, 'published: ' + publish); updatePreview() }
+        await loadList()
+      } catch (e) { setStatus(String(e.message || e), 'err') }
+      $('save-btn').disabled = false; $('pub-btn').disabled = false
+    }
+
+    function setDirty(v) { dirty = v; if (v) setStatus('未保存', '') }
+
+    // ---- ゲート ----
+    async function enter() {
+      const v = $('secret').value.trim()
+      if (!v) return
+      secret = v
+      $('gate-msg').textContent = '確認中…'; $('gate-msg').className = 'msg'
+      try {
+        await api('/api/studio-load?key=' + encodeURIComponent(secret))
+        sessionStorage.setItem(SS_KEY, secret)
+        $('gate').hidden = true; $('shell').hidden = false; $('who').textContent = 'studio'
+        await loadList()
+      } catch (e) {
+        $('gate-msg').textContent = '開けませんでした: ' + (e.message || e); $('gate-msg').className = 'msg err'
+      }
+    }
+
+    // ---- 配線 ----
+    $('enter').addEventListener('click', enter)
+    $('secret').addEventListener('keydown', (e) => { if (e.key === 'Enter') enter() })
+    $('new-btn').addEventListener('click', newArticle)
+    $('save-btn').addEventListener('click', () => save(false))
+    $('pub-btn').addEventListener('click', () => save(true))
+    let t = null
+    $('md').addEventListener('input', () => { setDirty(true); clearTimeout(t); t = setTimeout(updatePreview, 150) })
+    window.addEventListener('beforeunload', (e) => { if (dirty) { e.preventDefault(); e.returnValue = '' } })
+
+    if (secret) enter()
+  })()
+  </script>
+</body>
+</html>
