@@ -22,6 +22,7 @@
 | `examples/seed.ts` | 架空企業だけで正本DBを組み立てるデモ |
 | `shared/` | アプリ群が共有する型・読み口・共通UI(`@katazuku/data` / `@katazuku/ui`) |
 | `board/` ほか8本 | 正本DBを見る**読み取り専用アプリ群**([SmartHR Design System](https://smarthr.design/) 準拠) |
+| `scripts/record-vac.ps1` | オンライン面談を相手の声つきで録る(Windows専用・任意)。[docs/MEETING-RECORDING.md](./docs/MEETING-RECORDING.md) |
 
 ## 設計の芯
 
