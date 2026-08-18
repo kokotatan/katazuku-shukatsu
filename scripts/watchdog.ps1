@@ -65,11 +65,14 @@ if (-not $onBattery -and (Test-Path $heartbeatFile)) {
 
 # ---- 1. 活動ログの新鮮さ ----
 # 期待周期(INFRA.mdの定常タスク表に合わせる。変更したらここも直す)
+# evidence: 「実行した痕跡」として鮮度に使うファイル(logs 配下・ワイルドカード可)。
+# 活動ログは実際に何かした時だけ書かれるので、静かな日が続くジョブは動いていても古く見える。
+# 2026-08-18: mail-watch は毎時正常に動いていたのに「最終実行が14.6時間前」と鳴った。
 $expected = @(
-  @{ by = 'daily-sync';    maxHours = 30; label = '毎朝の選考同期(daily-sync)' },
-  @{ by = 'mail-watch';    maxHours = 12; label = 'メール見張り(mail-watch)' },
-  @{ by = 'asa';           maxHours = 30; label = '朝のまとめ(asa)' },
-  @{ by = 'calendar-sync'; maxHours = 3;  label = 'カレンダー同期(calendar-sync)' }
+  @{ by = 'daily-sync';    maxHours = 30; label = '毎朝の選考同期(daily-sync)'; evidence = 'agent-runs\daily-sync*' },
+  @{ by = 'mail-watch';    maxHours = 12; label = 'メール見張り(mail-watch)'; evidence = 'mail-watch-state.json' },
+  @{ by = 'asa';           maxHours = 30; label = '朝のまとめ(asa)'; evidence = 'agent-runs\asa-*' },
+  @{ by = 'calendar-sync'; maxHours = 3;  label = 'カレンダー同期(calendar-sync)'; evidence = 'calendar-sync-*.log' }
 )
 
 if (-not (Test-Path $activityLog)) {
@@ -83,6 +86,16 @@ if (-not (Test-Path $activityLog)) {
     if ($null -eq $e.by -or $null -eq $e.ts) { continue }
     try { $t = [DateTimeOffset]::Parse($e.ts).LocalDateTime } catch { continue }
     if (-not $lastSeen.ContainsKey($e.by) -or $t -gt $lastSeen[$e.by]) { $lastSeen[$e.by] = $t }
+  }
+  # 活動ログに記録が無くても、実行の痕跡があればそれを最終実行時刻として採用する。
+  foreach ($job in $expected) {
+    if (-not $job.evidence) { continue }
+    $newest = Get-ChildItem (Join-Path $logDir $job.evidence) -ErrorAction SilentlyContinue |
+      Sort-Object LastWriteTime -Descending | Select-Object -First 1
+    if ($null -eq $newest) { continue }
+    if (-not $lastSeen.ContainsKey($job.by) -or $newest.LastWriteTime -gt $lastSeen[$job.by]) {
+      $lastSeen[$job.by] = $newest.LastWriteTime
+    }
   }
   foreach ($job in $expected) {
     if (-not $lastSeen.ContainsKey($job.by)) {
@@ -108,7 +121,11 @@ $hangLimitMin = @{
   'katazuku-daily-sync' = 70; 'katazuku-mail-watch' = 25; 'katazuku-asa' = 130
   'katazuku-calendar-sync' = 30; 'katazuku-meeting-autopilot' = 10; 'katazuku-evening-brief' = 35
 }
-foreach ($tn in @('katazuku-daily-sync', 'katazuku-mail-watch', 'katazuku-asa', 'katazuku-calendar-sync', 'katazuku-meeting-autopilot', 'katazuku-evening-brief')) {
+# 面接autopilot(録音)は衛星機(note-pc)にだけ登録する設計なので、マーカーが無い常駐機では
+# 「未登録」が正常。監視対象に入れたままだと毎周期「消えている可能性」を鳴らし続ける(2026-08-18)。
+$monitoredTasks = @('katazuku-daily-sync', 'katazuku-mail-watch', 'katazuku-asa', 'katazuku-calendar-sync', 'katazuku-evening-brief')
+if (Test-Path (Join-Path $root '.katazuku-satellite')) { $monitoredTasks += 'katazuku-meeting-autopilot' }
+foreach ($tn in $monitoredTasks) {
   try {
     $task = Get-ScheduledTask -TaskName $tn -ErrorAction Stop
     $info = Get-ScheduledTaskInfo -TaskName $tn -ErrorAction Stop

@@ -15,6 +15,11 @@ $alertFile = Join-Path $logDir 'alert-mail-watch.txt'
 $notifyBefore = 0
 if (Test-Path $notifyFile) { $notifyBefore = @(Get-Content $notifyFile -Encoding UTF8).Count }
 
+# 故障検知は「この実行が書いた行」だけを見る。ログは1日分を追記していくため、末尾30行では
+# 直前の成功実行の要約(「未読N件中…」)が残り、今回の失敗を見逃す(2026-08-18)。
+$logLinesBefore = 0
+if (Test-Path $logFile) { $logLinesBefore = @(Get-Content $logFile -Encoding UTF8).Count }
+
 $prompt = Get-Content -Raw -Encoding UTF8 -Path (Join-Path $PSScriptRoot 'mail-watch-prompt.md')
 
 ("`n===== {0} mail-watch 開始 =====" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss')) | Out-File $logFile -Append -Encoding utf8
@@ -61,10 +66,14 @@ if (Test-Path $notifyFile) {
 
 # ---- 故障検知: ログが極小・認証エラーの痕跡なら alert に残す(asa が翌朝報告する) ----
 $failReason = $null
-$tail = (Get-Content $logFile -Encoding UTF8 | Select-Object -Last 30) -join "`n"
+$allLines = @(Get-Content $logFile -Encoding UTF8)
+$tail = if ($allLines.Count -gt $logLinesBefore) { ($allLines[$logLinesBefore..($allLines.Count - 1)]) -join "`n" } else { '' }
 if ($tail -notmatch '対応|未読') {
   if ($tail -match '認証|ログイン|permission|credential') { $failReason = '認証・許可エラーの痕跡' }
   elseif ($tail.Length -lt 50) { $failReason = '出力が空(agent実行自体が失敗した可能性)' }
+  # 「お手伝いできることはありますか」のような対話応答は50字を超えるため長さでは弾けない。
+  # 規定の要約が無い時点で失敗とみなす(2026-08-18 07:15: プロンプトが渡らず18秒で正常終了した)。
+  else { $failReason = '規定の要約(「未読N件中…」)が無い(プロンプトが渡らず対話応答になった可能性)' }
 }
 if ($failReason) {
   ("{0} mail-watch 失敗: {1} (詳細: logs/{2})" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $failReason, (Split-Path $logFile -Leaf)) |
