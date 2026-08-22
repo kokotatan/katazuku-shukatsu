@@ -3,6 +3,8 @@
  * doctor: 実行環境が katazuku-shukatsu を動かせるか診断する。
  * clone 直後に `npm run doctor` で、動かない原因を先回りで示す。
  */
+import { resolveDatabasePath } from '../src/data-path.js'
+
 const problems = []
 const notes = []
 
@@ -33,6 +35,7 @@ console.log('katazuku-shukatsu doctor')
 console.log(`  platform : ${process.platform} (${process.arch})`)
 console.log(`  node     : ${process.versions.node}`)
 console.log(`  sqlite   : ${sqliteOk ? 'ok (node:sqlite)' : 'NG'}`)
+console.log(`  data     : ${resolveDatabasePath()}`)
 
 for (const n of notes) console.log(`  note     : ${n}`)
 if (problems.length) {

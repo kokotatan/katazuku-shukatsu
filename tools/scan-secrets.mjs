@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * scan-secrets: 公開してはいけない個人情報・秘密情報の混入を検出する。
+ * scan-secrets: 公開してはいけない個人情報・秘密情報・SQLite DBの混入を検出する。
  *
  * このスクリプト自体には実名・実社名・実IDを一切書かない。検出は「PIIの形」で行う。
  * 固有名詞(実在の企業名・人名など)を弾きたい場合は、外部の遮断リストを渡す:
@@ -11,7 +11,8 @@
  * 遮断リストは1行1語のプレーンテキスト(# で始まる行はコメント)。
  * リポジトリには含めない(private 側にだけ置く)。マッチが1件でもあれば非ゼロ終了。
  */
-import { readFileSync, readdirSync, statSync } from 'node:fs'
+import { closeSync, openSync, readFileSync, readSync, readdirSync, statSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
 import { join, extname, relative } from 'node:path'
 
 const ROOT = process.argv[2] ?? '.'
@@ -73,12 +74,51 @@ function scan(file) {
   })
 }
 
+// 拡張子を偽装したDBも、SQLiteのファイルヘッダで検出する。
+// Git追跡対象だけを見るため、無視済みのローカルDBを日常の検査で誤検出しない。
+function scanTrackedDatabases() {
+  let tracked
+  try {
+    tracked = execFileSync('git', ['-C', ROOT, 'ls-files', '-z'], { encoding: 'utf8' })
+  } catch {
+    return // npm tarballなど、Git管理外での実行
+  }
+  for (const relativePath of tracked.split('\0').filter(Boolean)) {
+    const file = join(ROOT, relativePath)
+    let sqliteHeader = false
+    try {
+      const fd = openSync(file, 'r')
+      try {
+        const header = Buffer.alloc(16)
+        sqliteHeader = readSync(fd, header, 0, header.length, 0) === header.length
+          && header.equals(Buffer.from('SQLite format 3\0', 'utf8'))
+      } finally {
+        closeSync(fd)
+      }
+    } catch {
+      continue
+    }
+    const databaseName = /\.(?:db|sqlite|sqlite3)(?:[-.](?:wal|shm|journal|backup|bak))?$/i.test(relativePath)
+    if (sqliteHeader || databaseName) {
+      hits.push({
+        file: relativePath,
+        line: 0,
+        kind: sqliteHeader ? 'SQLiteデータベース' : 'データベース用拡張子',
+        sample: 'Git追跡対象から除外してください',
+      })
+    }
+  }
+}
+
 walk(ROOT)
+scanTrackedDatabases()
 
 if (hits.length) {
   console.error(`個人情報・秘密情報の疑いを ${hits.length} 件検出しました:\n`)
-  for (const h of hits) console.error(`  ${h.file}:${h.line}  [${h.kind}]  ${h.sample}`)
+  for (const h of hits) console.error(`  ${h.file}${h.line ? `:${h.line}` : ''}  [${h.kind}]  ${h.sample}`)
   console.error('\n公開前に必ず解消してください。')
   process.exit(1)
 }
-console.log('scan-secrets: 検出なし' + (blockTerms.length ? `（遮断リスト ${blockTerms.length} 語を適用）` : '（形ベースのみ）'))
+console.log('scan-secrets: 検出なし' + (blockTerms.length
+  ? `（形ベース + Git追跡SQLite + 遮断リスト ${blockTerms.length} 語）`
+  : '（形ベース + Git追跡SQLite）'))

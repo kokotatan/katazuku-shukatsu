@@ -11,7 +11,7 @@
 メール / 会話 / 面接 / 提出結果 / カレンダー / 企業研究
         │  (書き手は agent だけ)
         ▼
-  data/katazuku.db  ── 正本(ローカルSQLite・単一ファイル・WAL)
+  OSユーザーデータ領域/katazuku.db  ── 正本(ローカルSQLite・単一ファイル・WAL)
         │
         ├─→ 読み取り整形(listPlatformSnapshot 等)→ アプリ/画面(見る窓)
         └─→ 一方向ミラー(バックアップ・閲覧用)
@@ -19,6 +19,8 @@
 
 - **正本は1つ**。画面・シート・カレンダーは「見る窓」で、そこを人が直接編集しても次のミラーで消える。
 - **言語**: DB は SQLite、アクセスは Node 標準 `node:sqlite`、コードは TypeScript。ランタイム依存ゼロ。
+- **ソースと実データを分離**。既定の正本はリポジトリ内ではなく、WindowsのLocalAppData、
+  macOSのApplication Support、LinuxのXDG_DATA_HOMEに置く。変更時だけ`KATAZUKU_DB`で明示する。
 
 ## 中核の原則
 
@@ -52,6 +54,8 @@
 - **単一デバイス前提**。正本を複数デバイスで同時に書かない。移行・退避は `npm run backup`
   (`VACUUM INTO` で WAL を畳んだ1ファイル)経由で行う。
 - 正本をクラウド同期フォルダ直下に置かない(WAL がネットワークFSで破損しうる)。
+- 正本をGitワークツリー内に置かない。公開ゲートは追跡対象のSQLiteファイルを拒否するが、
+  最初の防御は保存場所そのものをソースから分けることとする。
 - 時刻はゼロ時差入力を Asia/Tokyo として正規化する(`normalizeAppointmentAt`)。
 
 ## 既知の課題(ロードマップ)

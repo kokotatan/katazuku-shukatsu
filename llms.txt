@@ -8,6 +8,7 @@
 ## Getting started
 - [README](README.md): overview, requirements (Node 22.5+, recommended 24), quickstart, multi-device/backup
 - Run: `npm install`, then `npm run doctor`, `npm test`, `npm run seed`
+- Real data defaults to the OS user-data directory outside the Git checkout; override the database path with `KATAZUKU_DB`.
 - [AGENTS.md](AGENTS.md): guide for AI agents and "how do I use this" answers
 
 ## Architecture and design

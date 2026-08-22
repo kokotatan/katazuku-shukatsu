@@ -146,6 +146,17 @@ vite.config.ts.timestamp-*
 data/
 logs/
 *.db
+*.sqlite
+*.sqlite3
+*.db-*
+*.sqlite-*
+*.sqlite3-*
+*.db.bak
+*.db.backup
+*.sqlite.bak
+*.sqlite.backup
+*.sqlite3.bak
+*.sqlite3.backup
 *.seed.db
 *.local.md
 .env

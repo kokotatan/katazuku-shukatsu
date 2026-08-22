@@ -45,7 +45,7 @@ cd katazuku-shukatsu
 npm install
 npm run doctor    # 環境が動かせるか診断(OS・Node・node:sqlite)
 npm test          # 架空データでコア・応募・移動・agent-runtime を検証
-npm run seed      # スキーマの1例で正本DBを組み立てて表示
+npm run seed      # メモリ上でスキーマの1例を組み立てて表示（ファイルは作らない）
 ```
 
 設定GUIを見る場合は `examples/config-gui.html` をブラウザで開いてください。
@@ -95,13 +95,24 @@ AIアシスタントに使い方を尋ねる場合は、リポジトリの [AGEN
 
 ## データの保管・複数デバイス
 
-正本は単一のローカルSQLite(`data/katazuku.db`、WALモード)です。**単一デバイス前提**で、
+正本は単一のローカルSQLite（WALモード）です。実データをソースと一緒に誤ってコミットしないよう、
+既定ではリポジトリ外のOS標準ユーザーデータ領域に保存します。
+
+| OS | 既定の正本DB |
+|---|---|
+| Windows | `%LOCALAPPDATA%\katazuku-shukatsu\katazuku.db` |
+| macOS | `~/Library/Application Support/katazuku-shukatsu/katazuku.db` |
+| Linux | `${XDG_DATA_HOME:-~/.local/share}/katazuku-shukatsu/katazuku.db` |
+
+`npm run doctor` で、この環境で実際に使われるパスを確認できます。**単一デバイス前提**で、
 同じ正本を複数デバイスから同時に書かないでください。
 
 - バックアップ・移送: `npm run backup`(`VACUUM INTO` で WAL を畳んだ1ファイルを作成)。
   別デバイスへ移すときはこの1ファイルを運びます。
 - 正本を **Dropbox/OneDrive 等の同期フォルダ直下に置かない**でください(WAL がネットワークFSで破損しうる)。
-- 正本DBのパスは環境変数 `KATAZUKU_DB` で指定します。
+- 正本DBのパスを変更する場合は環境変数 `KATAZUKU_DB`、または各CLIの明示引数で指定します。
+- リポジトリ内に正本DBを置かないでください。`.gitignore` に加え、`npm run scan` も
+  Git追跡対象のSQLiteファイルをヘッダと拡張子で拒否します。
 
 ## License
 

@@ -51,7 +51,7 @@
     "build": "npm run clean && tsc -p tsconfig.build.json",
     "prepack": "npm run build",
     "scan": "node tools/scan-secrets.mjs",
-    "test": "npm run test:core && npm run test:application && npm run test:mobility && npm run test:agent-runtime && npm run test:platform && npm run test:migration && npm run test:write-layer && npm run test:api && npm run test:schema",
+    "test": "npm run test:core && npm run test:application && npm run test:mobility && npm run test:agent-runtime && npm run test:platform && npm run test:migration && npm run test:write-layer && npm run test:data-path && npm run test:scan-secrets && npm run test:api && npm run test:schema",
     "test:core": "tsx tests/check-core.ts",
     "test:schema": "tsx tests/check-schema.ts",
     "test:platform": "tsx tests/check-platform.ts",
@@ -65,7 +65,9 @@
     "typecheck": "tsc --noEmit",
     "snapshot": "tsx scripts/snapshot.ts",
     "test:write-layer": "tsx tests/check-write-layer.ts",
-    "test:migration": "tsx tests/check-migration.ts"
+    "test:migration": "tsx tests/check-migration.ts",
+    "test:data-path": "tsx tests/check-data-path.ts",
+    "test:scan-secrets": "tsx tests/check-scan-secrets.ts"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",

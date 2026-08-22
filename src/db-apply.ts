@@ -10,9 +10,10 @@
  */
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { dirname, join, resolve } from 'node:path'
+import { resolve } from 'node:path'
 import type { DatabaseSync } from 'node:sqlite'
 import { openDb, upsertCompany, insertSelection, transition, samePosition, resolveCompany, addPending, addEvent, addAppointment, listPending, outcomeOf, STATUS_FOR, type Stage } from './db.js'
+import { resolveDatabasePath } from './data-path.js'
 
 export const MAX_APPLY_CHANGES = 15
 
@@ -167,7 +168,7 @@ const invokedDirectly =
   resolve(process.argv[1]).toLowerCase() === fileURLToPath(import.meta.url).toLowerCase()
 
 if (invokedDirectly) {
-  const DB_PATH = (process.env.KATAZUKU_DB || process.env.KATAZUKU_DB_PATH) ?? join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'data', 'katazuku.db')
+  const DB_PATH = resolveDatabasePath()
   const args = process.argv.slice(2)
   const diffPath = args.find((a) => !a.startsWith('--'))
   if (!diffPath) {

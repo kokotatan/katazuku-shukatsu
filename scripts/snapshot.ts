@@ -4,7 +4,7 @@
  * 形は本体が `/api/data` で配っているものと同じ(`shared/src/index.ts` の `KatazukuData`)。
  * アプリは「見る窓」なのでDBへ触らず、この1枚だけを読む。サーバも要らない。
  *
- *   npm run snapshot              # data/katazuku.db(または $KATAZUKU_DB)から
+ *   npm run snapshot              # OSユーザーデータ領域(または $KATAZUKU_DB)から
  *   npm run snapshot -- ./x.db    # DBを指定して
  *   npm run snapshot -- --demo    # 架空データのデモ版(リポジトリに同梱するのはこちら)
  *
@@ -20,6 +20,7 @@ import {
 } from '../src/db.js'
 import { listPlatformSnapshot, saveBasicProfile, upsertCompanyDossier, upsertMailItem } from '../src/platform.js'
 import { upsertPerson } from '../src/inputs.js'
+import { resolveDatabasePath } from '../src/data-path.js'
 import type { DatabaseSync } from 'node:sqlite'
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -198,7 +199,7 @@ function main(): void {
   const demo = process.argv.includes('--demo')
   const dbPath = demo
     ? ':memory:'
-    : (process.argv.slice(2).find((a) => !a.startsWith('--')) ?? process.env.KATAZUKU_DB ?? 'data/katazuku.db')
+    : resolveDatabasePath(process.argv.slice(2).find((a) => !a.startsWith('--')))
   const db = openDb(dbPath)
   if (demo) seedDemo(db)
 

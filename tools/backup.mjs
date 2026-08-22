@@ -4,16 +4,17 @@
  * WAL を畳んだ1ファイルになるので、そのまま別デバイスへ移送・保管できる。
  *
  *   node tools/backup.mjs [src] [dest]
- *   npm run backup                       # data/katazuku.db を data/backup/ へタイムスタンプ付きで
+ *   npm run backup                       # OSのユーザーデータ領域から backup/ へ
  *   npm run backup -- ./my.db ./out.db   # 明示指定
  */
 import { DatabaseSync } from 'node:sqlite'
 import { existsSync, mkdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
+import { resolveDatabasePath } from '../src/data-path.js'
 
-const src = process.argv[2] ?? join('data', 'katazuku.db')
+const src = resolveDatabasePath(process.argv[2])
 if (!existsSync(src)) {
-  console.error(`正本が見つかりません: ${src}\n  src を引数で指定するか、data/katazuku.db を用意してください。`)
+  console.error(`正本が見つかりません: ${src}\n  src を引数または KATAZUKU_DB で指定してください。`)
   process.exit(1)
 }
 

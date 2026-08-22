@@ -4,11 +4,12 @@
  */
 import { readFileSync } from 'node:fs'
 import { createHash, randomUUID } from 'node:crypto'
-import { dirname, join, resolve } from 'node:path'
+import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { DatabaseSync } from 'node:sqlite'
 import { addEvent, findAppointmentMatch, openDb } from './db.js'
 import { resolveSelectionId, transaction, upsertPerson } from './inputs.js'
+import { resolveDatabasePath } from './data-path.js'
 
 interface CalendarEvent {
   externalId: string
@@ -29,7 +30,7 @@ interface CalendarEvent {
 interface CalendarInput { events: CalendarEvent[] }
 
 const dbArgIndex = process.argv.indexOf('--db')
-const DB_PATH = dbArgIndex >= 0 ? resolve(process.argv[dbArgIndex + 1]) : ((process.env.KATAZUKU_DB || process.env.KATAZUKU_DB_PATH) || join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'data', 'katazuku.db'))
+const DB_PATH = resolveDatabasePath(dbArgIndex >= 0 ? process.argv[dbArgIndex + 1] : undefined)
 
 function assertInput(value: unknown): asserts value is CalendarInput {
   if (!value || typeof value !== 'object' || !Array.isArray((value as CalendarInput).events)) {

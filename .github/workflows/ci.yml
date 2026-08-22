@@ -23,7 +23,7 @@ jobs:
         with:
           node-version: '24'
       - run: npm ci
-      # 個人情報・秘密情報の混入検査(形ベース)。固有名詞の遮断は private 側の SCAN_BLOCKLIST で行う。
+      # 個人情報・秘密情報(形ベース)とGit追跡SQLiteの混入検査。固有名詞の遮断は private 側の SCAN_BLOCKLIST で行う。
       - run: npm run scan
       - run: npm run typecheck
       # 配布物(dist)が実際にビルドでき、公開エントリから読み込めることまで確認する

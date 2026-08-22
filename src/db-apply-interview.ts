@@ -1,7 +1,7 @@
 /**
  * 面接議事録の厳格JSONを、面接・人物・人物メモ・顔写真・プロフィール候補へ1トランザクションで反映する。
  * runId/sourceRef を一意キーにし、再実行しても重複しない。
- * 顔写真(people[].photoPath)は data/private/photos へ複製し、DBには storage_key と sha256 だけを持つ。
+ * 顔写真(people[].photoPath)は正本DBと同じデータ領域の private/photos へ複製し、DBには storage_key と sha256 だけを持つ。
  */
 import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url'
 import type { DatabaseSync } from 'node:sqlite'
 import { addEvent, openDb, sameCompany } from './db.js'
 import { resolveSelectionId, transaction, upsertPerson } from './inputs.js'
+import { privatePhotoDirectory, resolveDatabasePath } from './data-path.js'
 
 export interface InterviewPerson {
   name: string
@@ -43,13 +44,12 @@ export interface InterviewInput {
   followUps?: string[]
 }
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 const dbArgIndex = process.argv.indexOf('--db')
-const DB_PATH = dbArgIndex >= 0 ? resolve(process.argv[dbArgIndex + 1]) : ((process.env.KATAZUKU_DB || process.env.KATAZUKU_DB_PATH) || join(ROOT, 'data', 'katazuku.db'))
-const PHOTO_ROOT = join(ROOT, 'data', 'private', 'photos')
+const DB_PATH = resolveDatabasePath(dbArgIndex >= 0 ? process.argv[dbArgIndex + 1] : undefined)
+const PHOTO_ROOT = privatePhotoDirectory(DB_PATH)
 
 /**
- * 顔写真を data/private/photos へ複製し、DBには person_photo.storage_key と sha256 だけを記録する
+ * 顔写真を正本DBと同じデータ領域の private/photos へ複製し、DBには person_photo.storage_key と sha256 だけを記録する
  * (写真本体をDB/snapshot/gitへ入れない規約。db-import-private.ts と同じ方式)。
  * 既に写真がある人物は上書きせず ''(未登録)を返す。公開情報から手動取得した写真を
  * 面談スクショの切り出しで潰さないため。Blobへの反映は photo-sync.ts が別途行う。

@@ -39,7 +39,7 @@
 ```sh
 # 1. スナップショットを作る(リポジトリのルートで。全アプリの public/ へ配る)
 npm run snapshot -- --demo   # 架空データ(同梱済み)
-npm run snapshot             # 自分の正本DB(data/katazuku.db または $KATAZUKU_DB)から
+npm run snapshot             # OSユーザーデータ領域（または $KATAZUKU_DB）の正本から
 
 # 2. 開く(どのアプリでも同じ)
 cd board
