@@ -40,6 +40,11 @@
 Claude、Codex、ローカルOSSモデルを交換可能にする実行基盤は
 `docs/specs/14-provider-independent-agent-runtime.md` です。
 
+## ケーススタディ
+
+- [GOサマーインターン 2026](docs/case-studies/2026-08-go-summer-intern.md)
+- [Referral Agent ハッカソン](docs/case-studies/2026-08-referral-agent-hackathon.md)
+
 providerのCLI・認証状態は次で確認できます。
 
 ~~~powershell
