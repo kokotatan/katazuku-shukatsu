@@ -1,4 +1,4 @@
-﻿' self-update.ps1をウィンドウを表示せずに起動するランチャ。
+' self-update.ps1をウィンドウを表示せずに起動するランチャ。
 ' タスクスケジューラからwscriptで呼び、完了まで待って終了コードを返す。
 Dim shell
 Dim fso
