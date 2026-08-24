@@ -2,6 +2,8 @@
 
 最終更新: 2026-07-18
 
+システム全体における本仕様の位置づけと、Bronze / Silver / Gold、Control Plane、配信・機密境界は[現行アーキテクチャ](../ARCHITECTURE.md)を参照する。
+
 ## 原則
 
 - 正本は `data/katazuku.db` 1つ
