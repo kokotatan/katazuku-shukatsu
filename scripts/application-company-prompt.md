@@ -20,7 +20,11 @@ COMPANYの企業研究から、応募、適性検査を本人が受けられる�
 3. `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/application-autopilot.ps1 -Action list`で既存runを確認する。SOURCE_REFが同じrun、または会社と確定POSITIONが同じ未完了runがあれば再開し、新しいrunを重複作成しない。複数runが候補なら本人に選択を求める。paused/failedなら、停止理由を解決してから`resumed`を記録する。
 4. 新規runなら、公式エントリーURL、確定したPOSITION、MATERIALS_REFを使って`application-start.schema.json`準拠の一時JSONを`logs/`以下に作り、`application-autopilot.ps1 -Action start`で開始する。POSITIONが空のまま一意に確定した場合は、COMPANY、確定POSITION、SEASONから同じSHA-256規則で実際のsourceRefを作り、POSITION未確定時のSOURCE_REFを複数職種で使い回さない。
 5. 現在ログイン済みのChromeを使い、`09-application-autopilot.md`のとおりにフォームを進める。集約サイトではなく公式応募経路を使う。既存のプロフィールと完成済みESを正確に転記し、推測で補完しない。
-6. エントリーまたはESの送信直前に、送信対象の画面内容を本人へ提示する。同じ実行中の明示承認を得た場合だけ送信し、`approvedByUser:true`の提出イベントを記録する。過去の包括承認を流用しない。
+6. エントリーまたはESの送信直前に、送信対象の画面内容を本人へ提示する。同じ実行中に、その案件へ
+   「送って」「提出して」「任せる」等の明示承認を得た場合だけ送信し、`approvedByUser:true`の提出イベントを記録する。
+   「この日程で」「④だけ」等の内容指定を送信承認と解釈せず、過去・別案件の包括承認も流用しない。
+   送信直前に既存run、提出イベント、受付画面・確認メールを再照合し、同じsourceRefと内容で成功済みなら再送信しない。
+   成否不明の場合も再実行せず、本人へ報告して停止する。
 7. パスワード、メール認証、SMS、CAPTCHAは本人へ引き継ぎ、完了後に続行する。認証情報はファイル、DB、ログへ保存しない。
 8. 提出後に適性検査がある場合は、種類、提供元、URL、期限、所要時間、持ち物、環境だけを整理し、`assessment_ready`まで進める。問題や解答を保存・生成・入力せず、受検開始直前で本人へ引き継ぐ。受検完了は本人の申告後だけ記録する。
 9. 面接候補が提示された場合、本人が事前指定した可能時間帯の中だけ予約する。範囲外または設定がなければ候補を提示して確認し、確定後に`interview_scheduled`とappointmentを記録する。

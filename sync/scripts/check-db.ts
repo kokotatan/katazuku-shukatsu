@@ -3,7 +3,7 @@
  * インメモリSQLiteで実行。実行: cd sync && npx tsx scripts/check-db.ts
  */
 import { DatabaseSync } from 'node:sqlite'
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { openDb, upsertCompany, insertSelection, listSelections, listCompanies, listEvents, listAppointments, addAppointment, outcomeOf, transition, sameCompany, samePosition, resolveCompany, addAlias, listPending, setOfficialName, normalizeAppointmentAt, sameAppointment, SCHEMA_VERSION } from '../src/db'
@@ -24,6 +24,18 @@ function check(label: string, cond: boolean, detail = '') {
 
 // openDbは:memory:でも動く(mkdirはdirname='.'で無害)
 const db: DatabaseSync = openDb(':memory:')
+
+// --- 2拠点運用の所有者ガード ---
+const satelliteRoot = mkdtempSync(join(tmpdir(), 'katazuku-satellite-'))
+mkdirSync(join(satelliteRoot, 'data'))
+writeFileSync(join(satelliteRoot, '.katazuku-satellite'), 'laptop\n', 'utf8')
+let ownerGuardError = ''
+try { openDb(join(satelliteRoot, 'data', 'katazuku.db')) } catch (e) { ownerGuardError = (e as Error).message }
+check('衛星機は既定の正本DBを開けない', ownerGuardError.includes('ノートPC実行拠点'))
+const nonCanonicalDb = openDb(join(satelliteRoot, 'data', 'test.db'))
+check('衛星機でも明示したテストDBは使える', (nonCanonicalDb.prepare('PRAGMA user_version').get() as { user_version: number }).user_version === SCHEMA_VERSION)
+nonCanonicalDb.close()
+rmSync(satelliteRoot, { recursive: true, force: true })
 
 // --- スキーマ版(2026-07-22。破壊的マイグレーションを番号で束ねる土台) ---
 const uv = (db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version

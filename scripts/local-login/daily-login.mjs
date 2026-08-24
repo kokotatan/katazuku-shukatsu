@@ -14,7 +14,7 @@
 // 本人がIdP(Google等)でサインインするための入口(セッションは隔離プロファイルに残る)。
 
 import { spawn } from 'node:child_process'
-import { access, mkdir, readFile, appendFile, constants } from 'node:fs/promises'
+import { access, mkdir, readFile, appendFile, rm, constants } from 'node:fs/promises'
 import { join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
@@ -60,6 +60,13 @@ async function findChrome() {
     if (await exists(candidate)) return candidate
   }
   throw new Error('chrome.exeが見つかりません(LOCAL_LOGIN_CHROMEで明示指定してください)')
+}
+
+// 前回のDevToolsActivePortを消してからChromeを起動する。
+// kill()で終わらせた回のファイルが残っていると、次回の起動直後に「前回のポート」を読んでしまい、
+// 接続が全部ECONNREFUSEDになって login_page_not_reached に化ける(2026-07-30から毎朝失敗していた)。
+async function clearDebugPort(userDataDir) {
+  await rm(join(userDataDir, 'DevToolsActivePort'), { force: true })
 }
 
 // Chromeが --remote-debugging-port=0 で選んだ実ポートを DevToolsActivePort から読む。
@@ -158,6 +165,7 @@ async function runSso(portalId, portal, { headful, timeoutMs, manual }) {
   if (!headful) args.push('--headless=new')
   args.push(loginUrl)
 
+  await clearDebugPort(userDataDir)
   const chromeProcess = spawn(chrome, args, { windowsHide: true, stdio: 'ignore' })
   try {
     const debugPort = await readDebugPort(userDataDir, chromeProcess)
@@ -219,6 +227,7 @@ async function run(portalId, { headful, timeoutMs, manual }) {
   if (!headful) args.push('--headless=new')
   args.push(loginUrl)
 
+  await clearDebugPort(userDataDir)
   const chromeProcess = spawn(chrome, args, { windowsHide: true, stdio: 'ignore' })
   try {
     const debugPort = await readDebugPort(userDataDir, chromeProcess)

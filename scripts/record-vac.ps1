@@ -90,7 +90,11 @@ if (-not $StartIso) {
   $ErrorActionPreference = 'Continue'
   $timesJson = ''
   try {
-    $timesJson = & node (Join-Path $PSScriptRoot 'appointment-times.mjs') $AppointmentId 2>$null | Select-Object -Last 1
+    if (Test-Path (Join-Path $repo '.katazuku-satellite')) {
+      $timesJson = & (Join-Path $PSScriptRoot 'invoke-minipc-db.ps1') -Operation appointment-times -AppointmentId $AppointmentId 2>$null | Select-Object -Last 1
+    } else {
+      $timesJson = & node (Join-Path $PSScriptRoot 'appointment-times.mjs') $AppointmentId 2>$null | Select-Object -Last 1
+    }
   } catch { $timesJson = '' }
   $ErrorActionPreference = $prevEapT
   if ($timesJson) {

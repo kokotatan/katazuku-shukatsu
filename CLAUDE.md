@@ -47,6 +47,8 @@ npm --prefix board run dev             # 管理画面の開発サーバー
 cd sync; npx tsx scripts/check-db.ts   # DB遷移規則・apply・mirror のテスト
 cd sync; npx tsx scripts/check-sheet.ts# 旧シート書込エンジンのテスト(移行完了まで残す)
 cd sync; npx tsx scripts/db-inspect.ts [語]  # 正本DBの中身を確認
+cd sync; npx tsx scripts/db-quick.ts today   # エージェント用の読み口: today / next [N] / conflicts [日数] / status [語]
+                                             # 予定・締切・衝突はまずこれ(カレンダーMCP全件取得より速く・短い)
 ```
 
 ## デザインシステム「SmartHR Design System 準拠」(厳守)
@@ -80,5 +82,9 @@ cd sync; npx tsx scripts/db-inspect.ts [語]  # 正本DBの中身を確認
 
 - UI文言・コードコメント・コミットメッセージは日本語。コミットは機能単位で、ビルド+全テスト通過後に
 - 検証スクリプトは `sync/scripts/check-*.ts`(tsx実行・依存ゼロの自前assert形式)に揃える
-- Webテスト・コーディングテストの代行受験は不可(本人受験)。ES・メールの事実は submit.local.md が正で創作禁止
+- ES・メールの事実は submit.local.md が正で創作禁止
+- **本人が「任せる」と言った判断は、選択肢を並べて聞き返さず、自分で決めて提出・実行まで完了させる。**
+  判断材料は profile_basic の価値観・軸、interview_note、当日の録音や文字起こしから取る。
+  材料が無いときだけ「無い」と言って聞く(選択肢リストを投げ返さない)。
+  本人に返すのは、選考の試験・課題の回答、金銭の支払い、日程の確定など本人しかできないものに限る
 - codex CLI と併用する(引き継ぎは AGENTS.md)。大きな実装の後は codex に敵対的レビューをさせると良い

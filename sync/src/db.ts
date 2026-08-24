@@ -7,8 +7,8 @@
  * - だから「上書きしない」ではなく「遷移規則で堂々と更新する」(transition() に集約)
  */
 import { DatabaseSync } from 'node:sqlite'
-import { mkdirSync } from 'node:fs'
-import { dirname } from 'node:path'
+import { existsSync, mkdirSync } from 'node:fs'
+import { dirname, join, resolve } from 'node:path'
 import { ensurePlatformSchema } from './platform'
 
 export interface Selection {
@@ -38,7 +38,29 @@ export interface CompanyInfo {
   memo: string
 }
 
+/**
+ * ノートPC(衛星機)が、退役前のローカルDBを誤って正本として更新するのを止める。
+ *
+ * `.katazuku-satellite` は端末固有(gitignore)で、MiniPCには置かない。テスト用の
+ * `:memory:` や明示した別DBは許可し、リポジトリ既定の data/katazuku.db だけを拒否する。
+ * 読み書きの入口を openDb に集約しているため、db-apply / snapshot / agenda / mirror など
+ * 既存CLIを個別に直さなくても同じ安全境界になる。
+ */
+export function assertCanonicalDbOwner(path: string): void {
+  if (path === ':memory:') return
+  const absolute = resolve(path)
+  const repo = dirname(dirname(absolute))
+  const canonical = resolve(join(repo, 'data', 'katazuku.db'))
+  if (absolute.toLowerCase() !== canonical.toLowerCase()) return
+  if (!existsSync(join(repo, '.katazuku-satellite'))) return
+  throw new Error(
+    'この端末はノートPC実行拠点(.katazuku-satellite)です。ローカルの data/katazuku.db は正本ではありません。' +
+    'DB操作は scripts/invoke-minipc-db.ps1 経由でMiniPCへ送ってください。',
+  )
+}
+
 export function openDb(path: string): DatabaseSync {
+  assertCanonicalDbOwner(path)
   mkdirSync(dirname(path), { recursive: true })
   const db = new DatabaseSync(path)
   db.exec(`

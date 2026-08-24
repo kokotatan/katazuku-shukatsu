@@ -304,6 +304,20 @@ try {
     assert(preview.args.includes('WebSearch'), 'capabilityがallowedToolsへ変換されていません')
     assert(!preview.args.includes(req.prompt), 'promptが引数へ漏れています')
 
+    const draftOnly = commandPreview(adapter, request({
+      risk: 'external-draft',
+      capabilities: ['workspace.read', 'gmail.read', 'gmail.draft'],
+    }), join(workDir, 'unused.txt'))
+    const draftTools = draftOnly.args.join(' ')
+    assert(draftTools.includes('draft_gmail_message'), '下書きtoolが許可されていません')
+    assert(!draftTools.includes('send_gmail_message'), 'gmail.send未要求なのに送信toolが許可されています')
+
+    const sendAllowed = commandPreview(adapter, request({
+      risk: 'external-commit',
+      capabilities: ['workspace.read', 'gmail.read', 'gmail.send'],
+    }), join(workDir, 'unused.txt'))
+    assert(sendAllowed.args.join(' ').includes('send_gmail_message'), 'gmail.send要求時に送信toolが許可されていません')
+
     const limited = processResult({
       exitCode: 1,
       stdout: [

@@ -15,6 +15,23 @@ data/katazuku.db(正本・SQLite/node:sqlite・gitignore)
 ```
 
 - **DBに書いたら必ず `cd sync && npx tsx scripts/db-snapshot.ts` を実行**(アプリへの即時反映)。合言葉は repo直下 .env
+- **2拠点運用(2026-08-24確定)**: 正本DB・Gmail/Calendar同期・定常タスクはMiniPCだけが持つ。
+  ノートPCはChrome・Downloads添付・OAuth/CAPTCHA・会議/録音を担当し、DB操作は
+  `scripts/invoke-minipc-db.ps1` でSSH先のMiniPCへ送る。ノートPCには `.katazuku-satellite` を置き、
+  `data/katazuku.db` を正本として開かない。コードは各cloneをGitで同期し、SSH越しに作業ツリーを編集しない
+- **外部確定操作は必ずkatazukuの事前検査を通す(2026-08-25更新)**:
+  - 第三者宛メールやフォーム確定を一律禁止しない。`docs/mail-style.md`で自動送信可の定型返信、または
+    本人が対象と内容を確認して「送って」「提出して」「任せる」等と指示した操作は、検査通過後に実行してよい。
+  - Gmail/Calendarの直接コネクタから外部確定せず、正本DB照合・文面検査・冪等性を強制するworkflow/Executorを通す。
+  - 日時を提示・回答・予約する直前はCalendarを同期し、MiniPCの正本DBで予定・移動時間・前後バッファを照合する。
+    `available`を証明できない`unknown`では送らない・確定しない。
+  - 元メール/フォームとDBを読み直し、宛先、会社、選考、日時、回答項目が根拠と一致することを確認する。
+    「他社の選考」「他のインターン」「面接があるため」など、相手に不要な第三者情報は書かない。
+    理由が必要なら「大学・研究上の都合」「一身上の都合」等、用件に応じた中立表現にする。
+  - 実行直前に同じthread/sourceRefと内容hashの成功記録を照合し、成功済みなら再実行しない。
+    成否不明も再実行せず、本人へ報告する。成功後はmessage ID・受付番号等を活動ログへ残す。
+  - 辞退・志望度・条件交渉など本人の意思を新たに決める内容は、本人が実際の本文・回答を確認してから確定する。
+    ログインやMFAの完了だけを本文確認の代わりにはしない。
 - スキーマ: company(name=正式名称/short_name) / selection(+outcome列挙) / **appointment(面接・締切の日時/URL/場所/相手)** /
   event(+ref=元メールID) / company_alias / pending_review / mail_item / submission / company_dossier /
   interview_note / meeting_run / person / person_note / appointment_person / person_photo / profile_basic / profile_suggestion

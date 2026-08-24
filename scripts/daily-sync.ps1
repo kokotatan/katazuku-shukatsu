@@ -33,14 +33,15 @@ try {
 # 実際 2026-07-15/16 は処理成功なのに「完了」が化けて誤報していた)。旧ログ互換で「完了」も許容する。
 # 鍵不在によるシート同期スキップは「正常完了(部分)」であり、完了行が出るので故障扱いしない。
 $alertFile = Join-Path $logDir 'alert-daily-sync.txt'
+. (Join-Path $PSScriptRoot 'agent-sentinel.ps1')
+$done = Test-AgentSentinel -Sentinel '===\s*daily-sync\s*(DONE|完了)\s*===' -LogDir $logDir -RunId $runId -LogFile $logFile
 $failReason = $null
-if (-not (Test-Path $logFile) -or (Get-Item $logFile).Length -lt 200) {
+if ($done) {
+  # 正常完了
+} elseif (-not (Test-Path $logFile) -or (Get-Item $logFile).Length -lt 200) {
   $failReason = 'ログが空か極小(agent実行自体が失敗した可能性)'
 } else {
-  $logText = Get-Content -Raw -Encoding UTF8 $logFile
-  if ($logText -notmatch '===\s*daily-sync\s*(DONE|完了)\s*===') {
-    $failReason = '完了行なし(Gmail不通・認証エラー・途中終了などで最後まで到達しなかった可能性)'
-  }
+  $failReason = '完了行なし(Gmail不通・認証エラー・途中終了などで最後まで到達しなかった可能性)'
 }
 if ($failReason) {
   ("{0} daily-sync 失敗: {1} (詳細: logs/{2})" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $failReason, (Split-Path $logFile -Leaf)) |
