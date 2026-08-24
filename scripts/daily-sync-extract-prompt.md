@@ -5,9 +5,9 @@ Gmailのラベル/送信/下書きは**一切変更しないでください**。
 ## 手順
 
 1. Gmail MCP で直近1日(`newer_than:1d`)の就活関連メールを検索し、本文/スレッドを読む。
-   ツールは環境により mcp__google-workspace__ 系(search_gmail_messages / get_gmail_thread_content)または
-   mcp__claude_ai_Gmail__ 系(search_threads / get_thread / get_message)のどちらか使える方を使う。
-   **どちらも使えない環境のときだけ**、JSONを出さず `GMAIL_UNAVAILABLE` とだけ出力して終了する。
+   katazuku 名義のOAuthを使う mcp__google-workspace__ 系
+   (search_gmail_messages / get_gmail_thread_content)だけを使う。claude.ai Gmail は別認証なので使わない。
+   mcp__google-workspace__ 系を使えない環境では、JSONを出さず `GMAIL_UNAVAILABLE` とだけ出力して終了する。
 2. メールから企業ごとに選考の動きを抽出する:
    - 選考ステージ → stage: 出願予定=scouted / 出願済=entried / ES・テスト中=task / 面接中=interview /
      インターン合格=intern / 内定=offer / 不合格・お見送り=rejected / 辞退=closed

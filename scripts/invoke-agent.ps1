@@ -28,6 +28,10 @@ if (-not $env:MCP_TIMEOUT) { $env:MCP_TIMEOUT = '180000' }
 if (-not $env:MCP_TOOL_TIMEOUT) { $env:MCP_TOOL_TIMEOUT = '180000' }
 $repo = Split-Path $PSScriptRoot -Parent
 $sync = Join-Path $repo 'sync'
+$env:KATAZUKU_DB = if ($env:KATAZUKU_DB) { [IO.Path]::GetFullPath($env:KATAZUKU_DB) } else { Join-Path $repo 'data\katazuku.db' }
+if (-not $env:KATAZUKU_DB_ROLE) {
+  $env:KATAZUKU_DB_ROLE = if (Test-Path (Join-Path $repo '.katazuku-satellite')) { 'replica' } else { 'canonical' }
+}
 $runner = Join-Path $sync 'scripts\agent-runner.ts'
 $temporaryPrompt = $null
 if ([string]::IsNullOrWhiteSpace($PromptFile) -eq [string]::IsNullOrWhiteSpace($PromptText)) {

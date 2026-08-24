@@ -13,10 +13,10 @@ kotaro=okuyama.kotaro@gmail.com、robotics=okuyama.kotaro.robotics@gmail.com、p
 
 1. Gmail MCP で直近1日(`newer_than:1d`)の就活関連メールを検索する。
    **この検索を career→kotaro→robotics→p3 の4アカウントで行い**、就活関連メールを集める
-   (各検索で user_google_email を切り替える)。以降の抽出(手順2〜5)は4アカウント分をまとめて対象にする。Gmail MCP ツールは環境により
-   mcp__google-workspace__ 系(search_gmail_messages / get_gmail_thread_content)または
-   mcp__claude_ai_Gmail__ 系(search_threads / get_thread / get_message)のどちらかが使えるので、使える方を使う
-   (以降の手順でツール名を挙げている箇所も同様に読み替える)。**どちらも利用できない環境のときだけ**
+   (各検索で user_google_email を切り替える)。以降の抽出(手順2〜5)は4アカウント分をまとめて対象にする。Gmail MCP は
+   katazuku 名義のOAuthを使う mcp__google-workspace__ 系
+   (search_gmail_messages / get_gmail_thread_content)だけを使う。claude.ai Gmail は別認証なので使わない
+   (以降の手順でツール名を挙げている箇所も同様に読み替える)。mcp__google-workspace__ 系を利用できない環境では
    「Gmail MCP が使えないため中止」と出力して終了する(この場合は最後の完了行を出さない)。
 2. メールから企業ごとに以下を抽出する:
    - 選考の動き → stage にマッピング(出願予定=scouted, 出願済=entried, ES・テスト中=task, 面接中=interview, インターン合格=intern, 内定=offer, 不合格・お見送り=rejected, 辞退=closed)

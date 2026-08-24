@@ -1,0 +1,72 @@
+{
+  "$schema": "../schemas/workflow-contract.schema.json",
+  "schemaVersion": 1,
+  "id": "daily-sync",
+  "version": 1,
+  "title": "メールから正本DBを更新する日次同期",
+  "database": { "requiredRole": "canonical" },
+  "firstStep": "prepare",
+  "steps": [
+    {
+      "id": "prepare",
+      "title": "正本DBと入力を固定する",
+      "owner": "executor",
+      "sideEffect": "none",
+      "capabilities": [],
+      "approval": "none",
+      "idempotency": "run-step",
+      "next": "extract"
+    },
+    {
+      "id": "extract",
+      "title": "Gmailを読み取り構造化提案を作る",
+      "owner": "agent",
+      "sideEffect": "none",
+      "capabilities": ["gmail.read"],
+      "outputSchema": "../schemas/daily-sync-result.schema.json",
+      "approval": "none",
+      "idempotency": "run-step",
+      "next": "validate"
+    },
+    {
+      "id": "validate",
+      "title": "提案をSchemaと業務規則で検証する",
+      "owner": "executor",
+      "sideEffect": "none",
+      "capabilities": [],
+      "approval": "none",
+      "idempotency": "run-step",
+      "next": "apply"
+    },
+    {
+      "id": "apply",
+      "title": "専用関数で正本DBへ反映する",
+      "owner": "executor",
+      "sideEffect": "db-write",
+      "capabilities": [],
+      "approval": "none",
+      "idempotency": "external-key",
+      "next": "snapshot"
+    },
+    {
+      "id": "snapshot",
+      "title": "スナップショットとバックアップを更新する",
+      "owner": "executor",
+      "sideEffect": "internal-sync",
+      "capabilities": [],
+      "approval": "none",
+      "idempotency": "run-step",
+      "next": "audit"
+    },
+    {
+      "id": "audit",
+      "title": "活動ログへ結果を記録する",
+      "owner": "executor",
+      "sideEffect": "internal-sync",
+      "capabilities": [],
+      "approval": "none",
+      "idempotency": "run-step",
+      "next": null
+    }
+  ]
+}

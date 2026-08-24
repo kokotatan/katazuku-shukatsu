@@ -13,13 +13,11 @@ import { DatabaseSync } from 'node:sqlite'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { normalizeAppointmentAt, normalizeAppointmentUrl, sameAppointment } from '../src/db'
+import { resolveDatabasePath } from '../src/database-path'
 
 const argv = process.argv.slice(2)
 const dbArgIndex = argv.indexOf('--db')
-const DB_PATH = dbArgIndex >= 0
-  ? resolve(argv[dbArgIndex + 1])
-  : (process.env.KATAZUKU_DB_PATH || process.env.KATAZUKU_DB
-    || join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'data', 'katazuku.db'))
+const DB_PATH = resolveDatabasePath(dbArgIndex >= 0 ? argv[dbArgIndex + 1] : undefined)
 const AS_JSON = argv.includes('--json')
 
 interface Row {

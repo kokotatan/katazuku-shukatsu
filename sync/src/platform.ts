@@ -20,6 +20,57 @@ export function ensurePlatformSchema(db: DatabaseSync): void {
     CREATE UNIQUE INDEX IF NOT EXISTS idx_appointment_external
       ON appointment(external_id) WHERE external_id <> '';
 
+    -- 正本の論理ID。バックアップや複製後も同じデータ系列だと判別できるよう、
+    -- OS上のファイルパスとは別にDB自身へ保持する。canonical/replica/fixture の
+    -- 実行時役割はコピーで変わるため、この表には固定せず呼び出し側が指定する。
+    CREATE TABLE IF NOT EXISTS database_identity (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      database_id TEXT NOT NULL UNIQUE,
+      created_at TEXT NOT NULL
+    );
+    INSERT OR IGNORE INTO database_identity (id, database_id, created_at)
+      VALUES (1, lower(hex(randomblob(16))), datetime('now'));
+
+    -- 外部入力の取得状態。「最後に動いた」だけでなく、どのアカウントのどの期間を
+    -- 正常取得できたかを持つ。空き判定はこの鮮度と期間被覆を満たさない限り unknown。
+    CREATE TABLE IF NOT EXISTS source_sync_state (
+      source TEXT NOT NULL,
+      account_id TEXT NOT NULL DEFAULT '',
+      scope_id TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'unknown'
+        CHECK (status IN ('success', 'partial', 'failed', 'unknown')),
+      covered_from TEXT NOT NULL DEFAULT '',
+      covered_until TEXT NOT NULL DEFAULT '',
+      last_attempt_at TEXT NOT NULL,
+      last_success_at TEXT NOT NULL DEFAULT '',
+      last_error TEXT NOT NULL DEFAULT '',
+      PRIMARY KEY (source, account_id, scope_id)
+    );
+
+    -- 空き判定専用の占有投影。appointmentは選考トラック所属だが、こちらは
+    -- 大学・私用・終日予定も会社を捏造せず保持する。snapshotには出さない。
+    CREATE TABLE IF NOT EXISTS schedule_block (
+      id INTEGER PRIMARY KEY,
+      provider TEXT NOT NULL,
+      account_id TEXT NOT NULL DEFAULT '',
+      calendar_id TEXT NOT NULL DEFAULT '',
+      external_id TEXT NOT NULL,
+      appointment_id INTEGER REFERENCES appointment(id),
+      start_at TEXT NOT NULL,
+      end_at TEXT NOT NULL,
+      title TEXT NOT NULL DEFAULT '',
+      all_day INTEGER NOT NULL DEFAULT 0 CHECK (all_day IN (0, 1)),
+      busy INTEGER NOT NULL DEFAULT 1 CHECK (busy IN (0, 1)),
+      status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'cancelled')),
+      source_hash TEXT NOT NULL DEFAULT '',
+      updated_at TEXT NOT NULL,
+      UNIQUE(provider, account_id, calendar_id, external_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_schedule_block_time
+      ON schedule_block(start_at, end_at, status, busy);
+    CREATE INDEX IF NOT EXISTS idx_schedule_block_appointment
+      ON schedule_block(appointment_id) WHERE appointment_id IS NOT NULL;
+
     CREATE TABLE IF NOT EXISTS profile_basic (
       id INTEGER PRIMARY KEY CHECK (id = 1),
       data_json TEXT NOT NULL DEFAULT '{}',

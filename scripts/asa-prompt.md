@@ -9,11 +9,11 @@
 参照: 正本DB(data/katazuku.db)・docs/PROGRESS.md・個人マスタ(chrome-prompts/submit.local.md §4〜§11)。
 プロジェクト規約に従い、**絵文字は一切使わない**(カレンダー本文・返信下書きも含む)。出力は日本語。
 
-MCPツールは環境により mcp__google-workspace__ 系または mcp__claude_ai_* 系(claude_ai_Gmail /
-claude_ai_Google_Calendar / claude_ai_Google_Drive)のどちらかが使える。**使える方を使う**こと。
-以下の手順でツール名を挙げている箇所は例であり、同等の機能を持つ方のツールに読み替える
-(例: get_gmail_thread_content ↔ get_thread、draft_gmail_message ↔ create_draft、
-get_events ↔ list_events、batch_modify_gmail_message_labels ↔ label/unlabel 系)。
+Gmailは katazuku 名義のOAuthを使う mcp__google-workspace__ 系だけを使う。
+claude.ai Gmail は別認証なので使わない。Calendar / Drive は mcp__google-workspace__ 系または
+mcp__claude_ai_* 系の使える方を使う。
+以下の手順でCalendar / Driveのツール名を挙げている箇所は例であり、同等の機能を持つ方へ読み替える
+(例: get_events ↔ list_events)。Gmailのツール名は mcp__google-workspace__ 系へ読み替える。
 
 ## 手順
 
@@ -74,7 +74,11 @@ get_events ↔ list_events、batch_modify_gmail_message_labels ↔ label/unlabel
 
 - Gmail MCP の下書き作成ツール(draft_gmail_message)で、該当スレッドへの返信下書きを作成する。
   無ければ、そのまま送れる完成度の返信文を出力に含める(本人はコピーして送るだけ)。
-- 日程調整は、先に Google Calendar で該当期間の空きを確認し、既存予定と重ならない候補を2〜3個選んで下書きに入れる。対面は前後60分の移動時間も空けておく。
+- 日程調整は、先に `scripts/calendar-sync.ps1` を成功させ、候補ごとに正本DBへ
+  `cd sync; npx tsx scripts/db-appointment.ts conflicts <開始ISO> <終了ISO>` を実行する。
+  `state: "available"`、`available: true`、`database.role: "canonical"` の候補だけを使う。`unknown`は候補にしない。
+  その後にGoogle Calendarでも確認する。会話要約や画面だけで空きと判断しない。
+  既存予定と重ならない候補を2〜3個選んで下書きに入れ、対面は前後60分の移動時間も空けておく。
 - 文面は就活標準の敬語+署名。氏名・連絡先は個人マスタ§4を参照する。
 - 志望度や辞退など本人の意思に関わる返信は、下書きを作らず質問として出す。
 - **どんな場合も送信はしない。** 本人が「送っていい」と言ったら送る(送信ツールが無ければ本人送信)。

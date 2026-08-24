@@ -7,6 +7,7 @@ import { readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { openDb } from '../src/db'
+import { resolveDatabasePath } from '../src/database-path'
 import {
   applyApplicationEvent,
   listApplicationRuns,
@@ -17,9 +18,7 @@ import {
 } from '../src/application'
 
 const dbArgIndex = process.argv.indexOf('--db')
-const DB_PATH = dbArgIndex >= 0
-  ? resolve(process.argv[dbArgIndex + 1])
-  : (process.env.KATAZUKU_DB_PATH || join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'data', 'katazuku.db'))
+const DB_PATH = resolveDatabasePath(dbArgIndex >= 0 ? process.argv[dbArgIndex + 1] : undefined)
 
 function readJson(path: string): unknown {
   return JSON.parse(readFileSync(resolve(path), 'utf8'))

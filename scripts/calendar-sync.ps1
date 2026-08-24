@@ -8,6 +8,10 @@
 $ErrorActionPreference = 'Continue'
 $repo = Split-Path $PSScriptRoot -Parent
 Set-Location $repo
+$env:KATAZUKU_DB = if ($env:KATAZUKU_DB) { [IO.Path]::GetFullPath($env:KATAZUKU_DB) } else { Join-Path $repo 'data\katazuku.db' }
+if (-not $env:KATAZUKU_DB_ROLE) {
+  $env:KATAZUKU_DB_ROLE = if (Test-Path (Join-Path $repo '.katazuku-satellite')) { 'replica' } else { 'canonical' }
+}
 $logDir = Join-Path $repo 'logs'
 if (-not (Test-Path $logDir)) { New-Item -ItemType Directory $logDir | Out-Null }
 $logFile = Join-Path $logDir ("calendar-sync-{0}.log" -f (Get-Date -Format 'yyyy-MM-dd_HHmm'))

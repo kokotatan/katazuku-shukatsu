@@ -13,9 +13,10 @@ import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { openDb, listCompanies, listSelections, listAppointments, listEvents } from '../src/db'
 import { listPlatformSnapshot } from '../src/platform'
+import { resolveDatabasePath } from '../src/database-path'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
-const DB_PATH = process.env.KATAZUKU_DB ?? join(root, 'data', 'katazuku.db')
+const DB_PATH = resolveDatabasePath()
 
 /** repo直下の .env から KEY=VALUE を読む(依存ゼロの簡易パーサ) */
 function loadEnv(): Record<string, string> {

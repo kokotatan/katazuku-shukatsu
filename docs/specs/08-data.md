@@ -37,6 +37,8 @@ Google Calendar ─────┤       ├─→ snapshot → Private Blob →
 - 企業・選考: company / company_alias / selection / pending_review
 - 出来事・予定: event / appointment
   - appointmentはexternal_id、calendar_id、source_hash、end_atを持つ
+  - 空き判定はschedule_blockへ大学・私用・終日を含む全Calendar占有を投影し、source_sync_stateの鮮度と期間被覆も検証する
+  - database_identityで論理DBを識別し、実行時role(canonical / replica / fixture)を外部確定前に確認する
 - 会議: meeting_run
 - 面接・人物: interview_note / person / person_note / appointment_person / person_photo
 - 個人情報: profile_basic / profile_suggestion

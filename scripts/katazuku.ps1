@@ -49,13 +49,13 @@ switch ($Command) {
     Set-Location $root
     $prompt = Get-Content (Join-Path $root 'scripts\asa-prompt.md') -Raw -Encoding UTF8
     Invoke-KatazukuAgent 'asa-manual' $prompt 'external-commit' 'reconcile' `
-      @('workspace.read', 'workspace.write', 'shell', 'gmail.read', 'gmail.draft', 'gmail.labels', 'gmail.send', 'calendar.read', 'calendar.write', 'drive.read', 'sheets.read')
+      @('workspace.read', 'workspace.write', 'shell', 'gmail.read', 'gmail.draft', 'gmail.labels', 'calendar.read', 'calendar.write', 'drive.read', 'sheets.read')
   }
   'inbox'   {                                         # 連絡管理: asa と同じルーチン(旧inbox-triageを吸収)
     Set-Location $root
     $prompt = Get-Content (Join-Path $root 'scripts\asa-prompt.md') -Raw -Encoding UTF8
     Invoke-KatazukuAgent 'inbox-manual' $prompt 'external-commit' 'reconcile' `
-      @('workspace.read', 'workspace.write', 'shell', 'gmail.read', 'gmail.draft', 'gmail.labels', 'gmail.send', 'calendar.read', 'calendar.write', 'drive.read', 'sheets.read')
+      @('workspace.read', 'workspace.write', 'shell', 'gmail.read', 'gmail.draft', 'gmail.labels', 'calendar.read', 'calendar.write', 'drive.read', 'sheets.read')
   }
   'inbox-web' { Open-App 'inbox' 4173 }               # 旧inbox: 取込メールの仕分けSPA(Web)
   'status'  { Open-App 'status' 4174 }                # 進捗管理: 全社の選考状況ボード

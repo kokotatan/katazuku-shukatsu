@@ -13,6 +13,7 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { DatabaseSync } from 'node:sqlite'
 import { openDb } from '../src/db'
+import { resolveDatabasePath } from '../src/database-path'
 import { validateJsonSchema } from '../src/agent-runtime'
 import { applyDiff, MAX_APPLY_CHANGES, type DiffItem } from './db-apply'
 import { applyMail } from './db-apply-mail'
@@ -129,13 +130,14 @@ if (invokedDirectly) {
     process.exit(1)
   }
   const dbArgIndex = args.indexOf('--db')
-  const dbPath =
-    dbArgIndex >= 0
-      ? resolve(args[dbArgIndex + 1])
-      : process.env.KATAZUKU_DB_PATH || join(scriptDir, '..', '..', 'data', 'katazuku.db')
+  const dbPath = resolveDatabasePath(dbArgIndex >= 0 ? args[dbArgIndex + 1] : undefined)
 
   const value: unknown = JSON.parse(readFileSync(resolve(file), 'utf8'))
   validateDailySyncResult(value)
+  if (args.includes('--validate-only')) {
+    console.log(JSON.stringify({ valid: true, schemaVersion: value.schemaVersion }, null, 2))
+    process.exit(0)
+  }
   const db = openDb(dbPath)
   const summary = applyDailySyncResult(db, value, { force: args.includes('--force') })
 

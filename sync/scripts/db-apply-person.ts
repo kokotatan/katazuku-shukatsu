@@ -11,6 +11,7 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { openDb, resolveCompany, upsertCompany } from '../src/db'
 import { transaction, upsertPerson } from '../src/inputs'
+import { resolveDatabasePath } from '../src/database-path'
 
 interface PersonInput {
   name: string
@@ -28,7 +29,7 @@ interface ApplyPersonInput {
 }
 
 const dbArgIndex = process.argv.indexOf('--db')
-const DB_PATH = dbArgIndex >= 0 ? resolve(process.argv[dbArgIndex + 1]) : (process.env.KATAZUKU_DB_PATH || join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'data', 'katazuku.db'))
+const DB_PATH = resolveDatabasePath(dbArgIndex >= 0 ? process.argv[dbArgIndex + 1] : undefined)
 
 function validate(value: unknown): asserts value is ApplyPersonInput {
   if (!value || typeof value !== 'object') throw new Error('入力はオブジェクトです')

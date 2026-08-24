@@ -369,6 +369,12 @@ preflightし、OllamaまたはLM Studioのmodel endpointはworkflow実行時に�
 
 daily-syncのDB反映経路を、モデル直接applyから「抽出(read-only)→決定論的executor」へ分割した。
 
+### Phase B.3: workflow工程契約の実装(2026-08-24)
+
+step単位のowner、capability、副作用、承認、冪等性、遷移をJSON契約として実装した。横断実行台帳は
+業務正本と混ぜず`logs/workflow-runtime.local.db`へ置き、対象となる正本DB identityとroleをrun開始時に固定する。
+`daily-sync-v2`は最初の適用先として、Agentを`extract`工程だけに限定した。詳細はspec17を参照する。
+
 - `scripts/daily-sync-extract-prompt.md`: 抽出フェーズのプロンプト。agentはGmailを読むだけで、
   DB・シート・カレンダー・Gmailラベルを一切変更しない。`daily-sync-result.schema.json`準拠の
   厳格JSONを1つ返す。必要capabilityは`gmail.read`のみ。

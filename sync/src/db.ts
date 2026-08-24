@@ -155,7 +155,41 @@ export function openDb(path: string): DatabaseSync {
 }
 
 /** 現行スキーマの版。破壊的マイグレーションを足すたびに +1 し、番号で分岐させる */
-export const SCHEMA_VERSION = 1
+export const SCHEMA_VERSION = 2
+
+export type DatabaseRole = 'canonical' | 'replica' | 'fixture'
+
+export interface DatabaseContext {
+  databaseId: string
+  path: string
+  role: DatabaseRole
+  schemaVersion: number
+}
+
+/**
+ * 今開いているDBの身元を返す。エージェントへパスを選ばせず、runner/CLIが一度だけ
+ * 正本を解決して同じDatabaseSyncを下流へ渡すための診断情報。
+ *
+ * roleはファイルの属性ではなく実行環境の役割である。バックアップを別端末へ複製すると
+ * databaseIdは同じままでもreplicaになるため、環境または呼び出し側の指定を優先する。
+ */
+export function getDatabaseContext(db: DatabaseSync, requestedRole?: DatabaseRole): DatabaseContext {
+  const identity = db.prepare('SELECT database_id AS databaseId FROM database_identity WHERE id = 1')
+    .get() as { databaseId: string }
+  const main = (db.prepare('PRAGMA database_list').all() as { name: string; file: string }[])
+    .find((entry) => entry.name === 'main')
+  const configured = requestedRole ?? process.env.KATAZUKU_DB_ROLE
+  const role: DatabaseRole = configured === 'replica' || configured === 'fixture' || configured === 'canonical'
+    ? configured
+    : main?.file ? 'canonical' : 'fixture'
+  const schemaVersion = (db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version
+  return {
+    databaseId: identity.databaseId,
+    path: main?.file || ':memory:',
+    role,
+    schemaVersion,
+  }
+}
 
 /** statusの自由文からoutcome(列挙)を機械判定する。書き込み側はstatus更新時に必ずこれも更新する */
 export function outcomeOf(status: string): string {
@@ -465,6 +499,53 @@ export interface AppointmentMatch extends AppointmentLike {
   excludeId?: number
 }
 
+export interface AppointmentConflict {
+  id: number
+  at: string
+  endAt: string
+  title: string
+  status: string
+  company: string
+}
+
+/** 指定時間帯と重なる有効な予定を、会社・選考をまたいで返す。 */
+export function listAppointmentConflicts(
+  db: DatabaseSync,
+  startAt: string,
+  endAt: string,
+  excludeId?: number,
+): AppointmentConflict[] {
+  const start = Date.parse(normalizeAppointmentAt(startAt))
+  const end = Date.parse(normalizeAppointmentAt(endAt))
+  if (Number.isNaN(start) || Number.isNaN(end) || end <= start) {
+    throw new Error(`予定照合の時間帯が不正です: ${startAt} - ${endAt}`)
+  }
+  const rows = db.prepare(`
+    SELECT a.id, a.at, a.end_at, a.title, a.status,
+           CASE WHEN c.short_name <> '' THEN c.short_name ELSE c.name END AS company
+    FROM appointment a
+    JOIN selection s ON s.id = a.selection_id
+    JOIN company c ON c.id = s.company_id
+    ORDER BY a.at, a.id
+  `).all() as { id: number; at: string; end_at: string; title: string; status: string; company: string }[]
+
+  return rows.filter((row) => {
+    if (row.id === excludeId || row.status === '中止' || row.status === '完了') return false
+    const rowStart = Date.parse(normalizeAppointmentAt(row.at))
+    if (Number.isNaN(rowStart)) return false
+    const parsedEnd = row.end_at ? Date.parse(normalizeAppointmentAt(row.end_at)) : Number.NaN
+    const rowEnd = Number.isNaN(parsedEnd) || parsedEnd <= rowStart ? rowStart + 60 * 60 * 1000 : parsedEnd
+    return start < rowEnd && end > rowStart
+  }).map((row) => ({
+    id: row.id,
+    at: row.at,
+    endAt: row.end_at,
+    title: row.title,
+    status: row.status,
+    company: row.company,
+  }))
+}
+
 /**
  * 同じ会議を指す既存の appointment を探す(重複作成を防ぐ単一の突合規則)。
  *
@@ -504,6 +585,7 @@ export function addAppointment(db: DatabaseSync, a: Appointment): { id: number; 
   // 日時はISOで保存する。date-only/TZ無しは正規化で吸収し、解釈不能な文字列(「来週火曜」等)は
   // 黙って保存するとカレンダー送信待ち(outbox)の julianday 判定から静かに脱落するので、例外にして可視化する。
   const at = normalizeAppointmentAt(a.at)
+  const endAt = a.endAt ? normalizeAppointmentAt(a.endAt) : ''
   if (a.at && a.at.trim() && Number.isNaN(Date.parse(at))) {
     throw new Error(`予定の日時がISOとして解釈できません: ${a.at}`)
   }
@@ -521,12 +603,12 @@ export function addAppointment(db: DatabaseSync, a: Appointment): { id: number; 
     fill('url', a.url)
     fill('location', a.location)
     fill('person', a.person)
-    if (a.endAt) db.prepare("UPDATE appointment SET end_at = ? WHERE id = ? AND end_at = ''").run(a.endAt, dup.id)
+    if (endAt) db.prepare("UPDATE appointment SET end_at = ? WHERE id = ? AND end_at = ''").run(endAt, dup.id)
     return { id: dup.id, created: false }
   }
   const r = db.prepare(
     'INSERT INTO appointment (selection_id, at, end_at, kind, title, url, location, person, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-  ).run(a.selectionId, at, a.endAt ?? '', a.kind || 'その他', a.title, a.url ?? '', a.location ?? '', a.person ?? '', a.status ?? '予定', now)
+  ).run(a.selectionId, at, endAt, a.kind || 'その他', a.title, a.url ?? '', a.location ?? '', a.person ?? '', a.status ?? '予定', now)
   return { id: Number(r.lastInsertRowid), created: true }
 }
 

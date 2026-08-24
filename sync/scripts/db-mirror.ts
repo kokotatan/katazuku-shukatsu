@@ -12,6 +12,7 @@ import { fileURLToPath } from 'node:url'
 import { dirname, join, resolve } from 'node:path'
 import type { DatabaseSync } from 'node:sqlite'
 import { openDb, listSelections, listCompanies } from '../src/db'
+import { resolveDatabasePath } from '../src/database-path'
 
 export const SHEET_ID = '1jf6kSy7tZqakw8QocOmMzU6WToncQVQCeIuQ1VfRjMM'
 // タブ名(シート側をリネームしたらここを合わせる)
@@ -77,7 +78,7 @@ const invokedDirectly =
 
 if (invokedDirectly) {
   const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
-  const DB_PATH = process.env.KATAZUKU_DB ?? join(root, 'data', 'katazuku.db')
+  const DB_PATH = resolveDatabasePath()
   const db = openDb(DB_PATH)
   const writes = renderMirror(db)
   const out = join(root, 'mirror-out.json')

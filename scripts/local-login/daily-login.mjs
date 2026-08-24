@@ -37,6 +37,7 @@ function parseArgs(argv) {
     const key = argv[index]
     if (key === '--headful') { result.headful = true; continue }
     if (key === '--manual') { result.manual = true; continue }
+    if (key === '--keep-open') { result.keepOpen = true; continue }
     if (!key.startsWith('--') || index + 1 >= argv.length) throw new Error(`引数が不正です: ${key}`)
     result[key.slice(2)] = argv[index + 1]
     index += 1
@@ -137,7 +138,7 @@ async function writeLog(entry) {
 
 // SSOポータルの毎日ログイン。パスワードを持たないのでブローカーは呼ばず、
 // 隔離プロファイルに残ったセッションが生きているかを確かめて温めるだけにする。
-async function runSso(portalId, portal, { headful, timeoutMs, manual }) {
+async function runSso(portalId, portal, { headful, timeoutMs, manual, keepOpen }) {
   const loginUrl = portal.loginUrl
   const allowedOrigin = normalizeAllowedOrigin(new URL(loginUrl).origin)
   const chrome = await findChrome()
@@ -166,7 +167,7 @@ async function runSso(portalId, portal, { headful, timeoutMs, manual }) {
   args.push(loginUrl)
 
   await clearDebugPort(userDataDir)
-  const chromeProcess = spawn(chrome, args, { windowsHide: true, stdio: 'ignore' })
+  const chromeProcess = spawn(chrome, args, { windowsHide: true, stdio: 'ignore', detached: keepOpen })
   try {
     const debugPort = await readDebugPort(userDataDir, chromeProcess)
     const state = await waitForSsoState(debugPort, allowedOrigin, loginUrl, timeoutMs)
@@ -186,15 +187,16 @@ async function runSso(portalId, portal, { headful, timeoutMs, manual }) {
       reason: classification === 'offsite' ? 'sso_redirected_offsite' : 'sso_session_expired_manual_login_required'
     }
   } finally {
-    chromeProcess.kill()
+    if (keepOpen) chromeProcess.unref()
+    else chromeProcess.kill()
   }
 }
 
-async function run(portalId, { headful, timeoutMs, manual }) {
+async function run(portalId, { headful, timeoutMs, manual, keepOpen }) {
   const registry = JSON.parse(await readFile(join(scriptDir, 'portals.json'), 'utf8'))
   const portalEntry = registry.portals?.[portalId]
   if (!portalEntry) return { status: 'error', portalId, origin: null, reason: 'portal_not_in_registry' }
-  if (portalEntry.authMode === 'sso') return runSso(portalId, portalEntry, { headful, timeoutMs, manual })
+  if (portalEntry.authMode === 'sso') return runSso(portalId, portalEntry, { headful, timeoutMs, manual, keepOpen })
 
   const credentialPath = join(repoRoot, 'credential-store', `${portalId}.json`)
   if (!(await exists(credentialPath))) {
@@ -228,7 +230,7 @@ async function run(portalId, { headful, timeoutMs, manual }) {
   args.push(loginUrl)
 
   await clearDebugPort(userDataDir)
-  const chromeProcess = spawn(chrome, args, { windowsHide: true, stdio: 'ignore' })
+  const chromeProcess = spawn(chrome, args, { windowsHide: true, stdio: 'ignore', detached: keepOpen })
   try {
     const debugPort = await readDebugPort(userDataDir, chromeProcess)
     const { summary } = await waitForLoginState(debugPort, allowedOrigin, timeoutMs)
@@ -256,7 +258,8 @@ async function run(portalId, { headful, timeoutMs, manual }) {
     })
     return { status: result.status, portalId, origin: result.origin, reason: result.reason ?? null }
   } finally {
-    chromeProcess.kill()
+    if (keepOpen) chromeProcess.unref()
+    else chromeProcess.kill()
   }
 }
 
@@ -265,11 +268,12 @@ async function main() {
   const portalId = validatePortalId(args.portal)
   const headful = Boolean(args.headful) || process.env.LOCAL_LOGIN_HEADFUL === '1'
   const manual = Boolean(args.manual)
+  const keepOpen = Boolean(args.keepOpen)
   const timeoutMs = Number.isInteger(Number(args['timeout-ms'])) ? Number(args['timeout-ms']) : 30000
 
   let outcome
   try {
-    outcome = await run(portalId, { headful, timeoutMs, manual })
+    outcome = await run(portalId, { headful, timeoutMs, manual, keepOpen })
   } catch (error) {
     outcome = { status: 'error', portalId, origin: null, reason: error.message }
   }

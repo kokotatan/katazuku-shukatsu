@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url'
 import type { DatabaseSync } from 'node:sqlite'
 import { openDb, resolveCompany } from '../src/db'
 import { resolveSelectionId, transaction } from '../src/inputs'
+import { resolveDatabasePath } from '../src/database-path'
 
 interface MailItem {
   id: string
@@ -24,7 +25,7 @@ interface MailItem {
 }
 interface MailInput { items: MailItem[] }
 const dbArgIndex = process.argv.indexOf('--db')
-const DB_PATH = dbArgIndex >= 0 ? resolve(process.argv[dbArgIndex + 1]) : (process.env.KATAZUKU_DB_PATH || join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'data', 'katazuku.db'))
+const DB_PATH = resolveDatabasePath(dbArgIndex >= 0 ? process.argv[dbArgIndex + 1] : undefined)
 
 function validate(value: unknown): asserts value is MailInput {
   if (!value || typeof value !== 'object' || !Array.isArray((value as MailInput).items)) throw new Error('入力は {items:[...]} 形式です')

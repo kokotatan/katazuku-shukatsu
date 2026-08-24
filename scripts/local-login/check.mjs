@@ -144,6 +144,34 @@ async function main() {
   }, ambiguousControls, 'portal'), /送信コントロール/)
   checks += 1
 
+  const iWebFields = sanitizePageSummary({
+    origin: 'https://mitsui.i-web.jpn.com',
+    title: 'i-web形式',
+    fields: [
+      { type: 'text', name: 'gksid', autocomplete: 'off' },
+      { type: 'password', name: 'password', autocomplete: 'off' }
+    ],
+    controls: [{ type: 'submit', label: 'ログイン' }],
+    blockers: []
+  })
+  const iWebDecision = analyzeDeterministically(iWebFields, 'company-20')
+  ok(iWebDecision.action === 'fill_credentials' && iWebDecision.username_element === 1 && iWebDecision.password_element === 2,
+    'labelのないi-web形式でもID型欄とpassword欄が各1件なら一意に判定する')
+
+  const ambiguousFallbackFields = sanitizePageSummary({
+    origin: 'https://example.test',
+    title: 'フォールバック曖昧性',
+    fields: [
+      { type: 'text', name: 'first' },
+      { type: 'text', name: 'second' },
+      { type: 'password', name: 'password' }
+    ],
+    controls: [{ type: 'submit', label: 'ログイン' }],
+    blockers: []
+  })
+  ok(analyzeDeterministically(ambiguousFallbackFields, 'portal').reason === 'credential_fields_not_unique',
+    'ID型欄が複数ある場合はフォールバックせず停止する')
+
   await mkdir(join(repoRoot, 'logs'), { recursive: true })
   const tempDir = await mkdtemp(join(repoRoot, 'logs', 'local-login-check-'))
   const fixture = await startFixtureServer()

@@ -9,7 +9,7 @@
 //   1. 就活サービス媒体の is:unread older_than:7d に TRASH を付ける
 //   2. それ以外の is:unread older_than:1d から UNREAD を外す(--keep で指定したIDは残す)
 //   当日(1日以内)の未読は対象外。削除は媒体メルマガのみ。
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -134,6 +134,13 @@ try {
     console.log(JSON.stringify({ trashed, markedRead: marked, kept: keep.size }));
   }
 } finally {
-  child.stdin.end();
-  child.kill();
+  try { child.stdin.end(); } catch {}
+  if (process.platform === "win32" && child.pid) {
+    spawnSync("taskkill.exe", ["/PID", String(child.pid), "/T", "/F"], {
+      stdio: "ignore",
+      windowsHide: true,
+    });
+  } else {
+    try { child.kill("SIGKILL"); } catch {}
+  }
 }

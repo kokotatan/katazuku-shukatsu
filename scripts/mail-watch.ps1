@@ -33,7 +33,7 @@ try {
   & $invoke -Workflow 'mail-watch' -RunId $runId `
     -PromptFile (Join-Path $PSScriptRoot 'mail-watch-prompt.md') `
     -Risk 'external-draft' -SideEffectMode 'reconcile' `
-    -Capability @('workspace.read', 'workspace.write', 'shell', 'gmail.read', 'gmail.draft', 'gmail.send', 'calendar.read', 'calendar.write') `
+    -Capability @('workspace.read', 'workspace.write', 'shell', 'gmail.read', 'gmail.draft', 'calendar.read', 'calendar.write') `
     -TimeoutMs 900000 `
     *>&1 | Out-File -FilePath $logFile -Append -Encoding utf8
 } catch {

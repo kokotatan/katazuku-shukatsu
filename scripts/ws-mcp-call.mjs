@@ -6,12 +6,14 @@
 //   node scripts/ws-mcp-call.mjs calls.json [out.json]
 //     calls.json = [{ "name": "search_gmail_messages", "arguments": { ... } }, ...]
 //   node scripts/ws-mcp-call.mjs --list
+//   node scripts/ws-mcp-call.mjs --health
 //
 // 1プロセスで複数呼び出しをまとめて処理する(起動コストが重いため)。
-import { spawn } from "node:child_process";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { spawn, spawnSync } from "node:child_process";
+import { readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const claudeConfig = JSON.parse(
   readFileSync(join(homedir(), ".claude.json"), "utf8"),
@@ -21,12 +23,10 @@ if (!source?.command || !Array.isArray(source.args) || !source.env) {
   throw new Error("Claude Code の google-workspace MCP 設定が見つかりません");
 }
 
-const bundledUvx = join(homedir(), ".local", "bin", "uvx.exe");
-const command = source.command === "uvx" && existsSync(bundledUvx)
-  ? bundledUvx
-  : source.command;
-
-const child = spawn(command, source.args, {
+// 読取専用healthを含め、すべての呼び出しを共通bridgeへ通す。
+// これにより第三者宛送信は、本人承認したtool callとの完全一致検証を迂回できない。
+const bridgePath = fileURLToPath(new URL('./workspace-mcp-bridge.mjs', import.meta.url));
+const child = spawn(process.execPath, [bridgePath], {
   env: { ...process.env, ...source.env },
   stdio: ["pipe", "pipe", "pipe"],
   windowsHide: true,
@@ -83,6 +83,7 @@ function notify(method, params) {
 
 const args = process.argv.slice(2);
 const listOnly = args.includes("--list");
+const healthOnly = args.includes("--health");
 const callsPath = args.find((arg) => !arg.startsWith("--"));
 const outPath = args.filter((arg) => !arg.startsWith("--"))[1];
 
@@ -94,7 +95,18 @@ try {
   });
   notify("notifications/initialized", {});
 
-  if (listOnly) {
+  if (healthOnly) {
+    const result = await send("tools/call", {
+      name: "search_gmail_messages",
+      arguments: {
+        user_google_email: source.env.USER_GOOGLE_EMAIL,
+        query: "newer_than:1d",
+        page_size: 1,
+      },
+    });
+    if (result.isError) throw new Error("Gmail read health check failed");
+    console.log(JSON.stringify({ ok: true, service: "gmail", operation: "read" }));
+  } else if (listOnly) {
     const tools = await send("tools/list", {});
     // --schema=名前,名前 を付けると入力スキーマも出す
     const wanted = args
@@ -134,6 +146,13 @@ try {
     else console.log(json);
   }
 } finally {
-  child.stdin.end();
-  child.kill();
+  try { child.stdin.end(); } catch {}
+  if (process.platform === "win32" && child.pid) {
+    spawnSync("taskkill.exe", ["/PID", String(child.pid), "/T", "/F"], {
+      stdio: "ignore",
+      windowsHide: true,
+    });
+  } else {
+    try { child.kill("SIGKILL"); } catch {}
+  }
 }
