@@ -253,7 +253,7 @@ Executorはモデル出力をそのまま命令として実行しない。次の
 
 ## 10. 第三者への確定操作
 
-採用担当者、面接官、企業サイトなど第三者へ影響する操作は、重要度や定型性にかかわらず自動確定しない。対象にはメール送信、フォーム送信、面接予約、日程回答、取消、変更通知を含む。
+採用担当者、面接官、企業サイトなど第三者へ影響する操作は、重要度や定型性にかかわらず、事前検査と本人確認を省略して確定しない。対象にはメール送信、フォーム送信、面接予約、日程回答、取消、変更通知を含む。一方、本人が宛先・本文・日時・通知内容を確認した後も下書きで停止する必要はなく、同じActionを検査済みExecutorが確定してよい。
 
 ### 10.1 承認対象
 
@@ -285,8 +285,9 @@ Executorはモデル出力をそのまま命令として実行しない。次の
 - `gmail.draft`: 下書き作成
 - `gmail.labels`: ラベル変更、既読化
 - `gmail.send.self`: 本人自身への通知送信
+- `gmail.send.confirmed`: 本人が確認したActionと完全一致する第三者宛送信
 
-Google Workspace bridgeは、契約外capabilityのtool callを拒否する。`send_gmail_message`はTo、CC、BCCの全宛先をコードで検査し、本人以外または宛先不明なら拒否する。第三者への確定送信は、この無人Agent経路を通さず、承認hashを検証する専用Executorまたは本人操作で実行する。
+Google Workspace bridgeは、契約外capabilityのtool callを拒否する。`send_gmail_message`はTo、CC、BCCの全宛先をコードで検査し、本人以外または宛先不明なら拒否する。第三者への確定送信は、この無人Agent経路を通さず、`third-party-email` workflowで承認hash、正本DB、Calendar同期鮮度、文面、重複を再検査する専用Executorが実行する。
 
 ## 11. 障害、再試行、provider切替
 
@@ -339,6 +340,7 @@ prepare
 | daily-sync | Gmailから事実を抽出 | DB反映、snapshot、監査 | Schema不一致、正本DB不一致 |
 | calendar-sync | Calendar結果の構造化補助が必要な場合のみ使用 | appointment・schedule_block・同期状態のupsert | partial、鮮度切れ、期間外 |
 | mail-watch | 新着の分類、返信要否の提案 | 台帳反映、必要なら下書き | 第三者送信前 |
+| third-party-email | なし。確認対象Actionは事前に固定 | 正本DB・Calendar・文面・重複の検査、承認後の送信、監査 | `unknown`、根拠不一致、未承認、送信済み |
 | asa | 今日の予定とタスクの要約 | 正本DBからagenda生成 | 根拠不足、同期不全 |
 | application | フォーム項目の対応案、入力候補 | サイト別入力、checkpoint、結果記録 | 送信、テスト、本人確認 |
 | appointment booking | 候補日時と必要情報の整理 | 直前同期、空き判定、承認後の確定 | `conflict`、`unknown`、未承認 |
@@ -357,6 +359,7 @@ prepare
 | Workspace最終防壁 | `scripts/workspace-mcp-policy.mjs`、`scripts/workspace-mcp-bridge.mjs` |
 | daily-sync契約 | `sync/workflows/daily-sync.json` |
 | 第三者Action Schema | `sync/schemas/third-party-action.schema.json` |
+| 第三者メール契約・Executor | `sync/workflows/third-party-email.json`、`sync/scripts/third-party-email.ts` |
 | 契約回帰試験 | `sync/scripts/check-workflow-control.ts` |
 
 ## 16. 受け入れ条件

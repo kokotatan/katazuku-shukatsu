@@ -1,8 +1,17 @@
-import { readFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { DatabaseContext } from '../src/db'
+import { openDb } from '../src/db'
 import { validateJsonSchema } from '../src/agent-runtime'
+import {
+  buildWorkspaceSendCall,
+  hasScheduleCommitmentLanguage,
+  preflightThirdPartyEmail,
+  professionalEmailIssues,
+  type ThirdPartyEmailAction,
+} from '../src/third-party-email'
 import {
   beginWorkflowStep,
   completeWorkflowStep,
@@ -35,6 +44,8 @@ function expectThrow(label: string, fn: () => unknown, pattern: RegExp): void {
 const here = dirname(fileURLToPath(import.meta.url))
 const dailyContractPath = join(here, '..', 'workflows', 'daily-sync.json')
 const dailyContract = loadWorkflowContract(dailyContractPath)
+const emailContractPath = join(here, '..', 'workflows', 'third-party-email.json')
+const emailContract = loadWorkflowContract(emailContractPath)
 const contractSchema = JSON.parse(readFileSync(join(here, '..', 'schemas', 'workflow-contract.schema.json'), 'utf8'))
 const dailyRaw = JSON.parse(readFileSync(dailyContractPath, 'utf8'))
 const proposalSchemaPath = join(here, '..', 'schemas', 'workflow-proposal.schema.json')
@@ -46,6 +57,17 @@ check('daily-syncのAgent工程はextractだけ',
 check('daily-syncのAgent工程は副作用なし・gmail.readだけ', (() => {
   const step = dailyContract.steps.find((item) => item.id === 'extract')!
   return step.sideEffect === 'none' && step.capabilities.join(',') === 'gmail.read'
+})())
+check('third-party-email契約は共通JSON Schemaに一致する', (() => {
+  const raw = JSON.parse(readFileSync(emailContractPath, 'utf8'))
+  return validateJsonSchema(raw, contractSchema).length === 0
+})())
+check('third-party-emailは本人承認後のExecutorだけが送信する', (() => {
+  const send = emailContract.steps.find((step) => step.id === 'send')
+  const approve = emailContract.steps.find((step) => step.id === 'approve')
+  return send?.owner === 'executor' && send.sideEffect === 'third-party-commit' &&
+    send.requiresApprovalFrom === 'approve' && send.capabilities.includes('gmail.send.confirmed') &&
+    approve?.owner === 'user' && approve.approval === 'user'
 })())
 
 const target: DatabaseContext = {
@@ -201,5 +223,60 @@ failWorkflowStep(store, simple, 'simple:unknown', 'think', 'agent', 'unknown', '
 check('根拠不足はfailedと混ぜずunknownで停止する', getWorkflowRun(store, 'simple:unknown').run.status === 'unknown')
 
 store.close()
+
+const emailTmp = mkdtempSync(join(tmpdir(), 'katazuku-email-workflow-'))
+try {
+  const db = openDb(join(emailTmp, 'katazuku.db'))
+  try {
+    const now = '2026-08-25T01:00:00.000Z'
+    const companyResult = db.prepare(`INSERT INTO company (name, updated_at) VALUES (?, ?)`).run('GO株式会社', now)
+    const companyId = Number(companyResult.lastInsertRowid)
+    db.prepare(`INSERT INTO selection (company_id, position, status, updated_at) VALUES (?, ?, ?, ?)`)
+      .run(companyId, '食事会', '参加予定', now)
+    db.prepare(`INSERT INTO mail_item
+      (id, company_id, received_at, sender, subject, source_ref, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)`)
+      .run('mail-go-dinner', companyId, now, 'recruiter@example.com', '食事会のご案内', 'gmail:mail-go-dinner', now)
+
+    const emailAction: ThirdPartyEmailAction = {
+      actionType: 'gmail.send',
+      target: {
+        userGoogleEmail: 'okuyama.kotaro.career@gmail.com',
+        to: ['recruiter@example.com'],
+        companyName: 'GO株式会社',
+      },
+      content: {
+        subject: 'Re: 食事会のご案内',
+        body: 'GO株式会社\n新卒採用担当者様\n\nお世話になっております。東北大学大学院の奥山彪太郎です。\n\nご案内いただきありがとうございます。\nご確認のほど、よろしくお願いいたします。',
+        threadId: 'thread-go-dinner',
+        sourceMessageId: 'mail-go-dinner',
+        scheduleCommitments: [],
+      },
+      effectiveAt: 'immediate',
+      notification: 'GO株式会社の採用担当者へ食事会の返信が送信される',
+    }
+    const preflight = preflightThirdPartyEmail(db, emailAction)
+    check('メール事前検査は正本DBの企業と元メールを照合する', preflight.ok, preflight.issues.join(' / '))
+    const call = buildWorkspaceSendCall(emailAction)
+    check('承認actionから送信tool callを決定論的に生成する',
+      call.name === 'send_gmail_message' && call.arguments.thread_id === 'thread-go-dinner' &&
+      call.arguments.to === 'recruiter@example.com')
+    check('日時を約束しないメールへ不要なCalendar検査を要求しない', !hasScheduleCommitmentLanguage(emailAction))
+    check('他社選考や訪中情報を文面検査で拒否する',
+      professionalEmailIssues('他社の選考と訪中団からの帰国があるため変更希望です').length >= 2)
+    const scheduleWithoutFacts: ThirdPartyEmailAction = {
+      ...emailAction,
+      content: { ...emailAction.content, body: '9月24日18時30分から参加を希望いたします。' },
+    }
+    const schedulePreflight = preflightThirdPartyEmail(db, scheduleWithoutFacts)
+    check('日時を約束するのに予定情報がないactionを拒否する',
+      !schedulePreflight.ok && schedulePreflight.issues.some((issue) => issue.includes('scheduleCommitments')))
+  } finally {
+    db.close()
+  }
+} finally {
+  rmSync(emailTmp, { recursive: true, force: true })
+}
+
 console.log(`workflow-control テスト: ${failed === 0 ? '全件成功' : `${failed}件失敗`}`)
 if (failed) process.exit(1)

@@ -16,10 +16,12 @@ param(
     'agenda', 'appointment-times',
     'meeting-ensure', 'meeting-transition', 'meeting-done',
     'apply-selection', 'apply-submission', 'apply-mail', 'apply-calendar',
-    'apply-research', 'apply-person'
+    'apply-research', 'apply-person',
+    'email-prepare', 'email-approve', 'email-reject', 'email-send', 'email-status'
   )]
   [string]$Operation,
   [string]$InputPath = '',
+  [string]$RunId = '',
   [int]$AppointmentId = 0,
   [ValidateSet('', 'armed', 'opened', 'recording', 'stopping', 'digesting', 'done', 'failed')]
   [string]$State = '',
@@ -108,6 +110,34 @@ switch ($Operation) {
     Invoke-Remote ($remoteSync + 'npx tsx scripts/db-meeting-done.ts ' + $AppointmentId + ' && npx tsx scripts/db-snapshot.ts')
     return
   }
+}
+
+if ($Operation -like 'email-*') {
+  if ($RunId -notmatch '^[A-Za-z0-9:._-]+$') { throw "$Operation には安全な -RunId が必要です" }
+  $emailCommand = $Operation.Substring('email-'.Length)
+  if ($emailCommand -eq 'status') {
+    Invoke-Remote ($remoteSync + 'npx tsx scripts/third-party-email.ts status --run-id ' + $RunId)
+    return
+  }
+  if (-not $InputPath) { throw "$Operation には -InputPath が必要です" }
+  $resolvedEmailInput = (Resolve-Path -LiteralPath $InputPath).Path
+  if ([IO.Path]::GetExtension($resolvedEmailInput).ToLowerInvariant() -ne '.json') { throw '転送できる入力はJSONだけです' }
+  if ((Get-Item -LiteralPath $resolvedEmailInput).Length -gt 1MB) { throw 'メールaction JSONが1MBを超えています' }
+  $remoteEmailName = 'email-' + [guid]::NewGuid().ToString('N') + '.json'
+  $remoteEmailRel = 'logs/handoff-in/' + $remoteEmailName
+  Invoke-Remote ('cd ~/' + $RemoteRepoName + ' && mkdir -p logs/handoff-in')
+  & scp -o BatchMode=yes -o ConnectTimeout=10 -q -- $resolvedEmailInput ($SshHost + ':' + $RemoteRepoName + '/' + $remoteEmailRel)
+  if ($LASTEXITCODE -ne 0) { throw "MiniPCへのメールaction転送に失敗しました: $Operation" }
+  $emailExit = 0
+  try {
+    & ssh -o BatchMode=yes -o ConnectTimeout=10 $SshHost `
+      ($remoteSync + 'npx tsx scripts/third-party-email.ts ' + $emailCommand + ' --run-id ' + $RunId + ' --action ../' + $remoteEmailRel)
+    $emailExit = $LASTEXITCODE
+  } finally {
+    & ssh -o BatchMode=yes -o ConnectTimeout=10 $SshHost ('cd ~/' + $RemoteRepoName + ' && rm -f ' + $remoteEmailRel) 2>$null | Out-Null
+  }
+  if ($emailExit -ne 0) { throw "MiniPCのメールworkflowに失敗しました(exit=$emailExit): $Operation" }
+  return
 }
 
 $applyScripts = @{

@@ -449,9 +449,9 @@ try {
 
     const sendAllowed = commandPreview(adapter, request({
       risk: 'external-commit',
-      capabilities: ['workspace.read', 'gmail.read', 'gmail.send'],
+      capabilities: ['workspace.read', 'gmail.read', 'gmail.send.confirmed'],
     }), join(workDir, 'unused.txt'))
-    assert(sendAllowed.args.join(' ').includes('send_gmail_message'), 'gmail.send要求時に送信toolが許可されていません')
+    assert(sendAllowed.args.join(' ').includes('send_gmail_message'), 'gmail.send.confirmed要求時に送信toolが許可されていません')
 
     const limited = processResult({
       exitCode: 1,
@@ -720,13 +720,14 @@ try {
     assert(!ledger.includes(req.prompt), 'run台帳へpromptが入りました')
   })
 
-  await check('mail-watchは第三者へ自動送信せず下書きで止まる', async () => {
+  await check('headlessのmail-watchは直接送信せず対話workflowへ引き継ぐ', async () => {
     const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
     const prompt = await readFile(join(repoRoot, 'scripts', 'mail-watch-prompt.md'), 'utf8')
     assert(prompt.includes('第三者への送信は一切行わない'), '第三者送信の禁止が明記されていません')
     assert(prompt.includes('必ず下書き(draft_gmail_message)までに留める'), '下書き停止が明記されていません')
     assert(!prompt.includes('そのスレッドへ自動送信'), '定型返信の自動送信ルールが残っています')
     assert(!prompt.includes('自動送信可'), '自動送信可のアカウント設定が残っています')
+    assert(prompt.includes('third-party-email'), '本人確認後の送信workflowへの引き継ぎがありません')
     assert(prompt.includes('大学・研究上の都合により'), '日程変更理由が大学・研究上の都合に固定されていません')
     assert(!prompt.includes('「就活の予定と重複したため」'), '他社選考を示唆する日程変更理由が残っています')
   })
