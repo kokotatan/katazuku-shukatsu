@@ -50,6 +50,16 @@ npm run seed      # メモリ上でスキーマの1例を組み立てて表示�
 
 設定GUIを見る場合は `examples/config-gui.html` をブラウザで開いてください。
 
+Gmail・Calendar・Drive・Sheetsを使う場合は、各利用者が自分のGoogle Cloudプロジェクトと
+デスクトップ用OAuthクライアントを作成します。配布元のアカウントへは紐づきません。
+
+```sh
+npm run setup:google -- --credentials /path/to/client_secret.json --email you@example.com
+```
+
+詳しい手順とOAuthをIn productionへ切り替える方法は
+[Google Workspace連携](docs/GOOGLE_WORKSPACE_SETUP.md)を参照してください。
+
 ## アプリ群（読み取り専用の「見る窓」）
 
 正本DBの状態を見るためのUIです。**どのアプリもDBへ書き込みません**。状態を変えるのは

@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "google-workspace": {
+      "command": "node",
+      "args": ["tools/google-workspace-mcp.mjs"]
+    }
+  }
+}

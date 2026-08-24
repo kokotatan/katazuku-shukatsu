@@ -305,6 +305,15 @@ try {
     assert(preview.args.includes('WebSearch'), 'capabilityがallowedToolsへ変換されていません')
     assert(!preview.args.includes(req.prompt), 'promptが引数へ漏れています')
 
+    const workspace = commandPreview(adapter, request({
+      capabilities: ['gmail.read', 'gmail.send', 'calendar.write', 'sheets.write'],
+    }), join(workDir, 'workspace-unused.txt'))
+    const allowedTools = workspace.args.join(' ')
+    assert(allowedTools.includes('mcp__google-workspace__send_gmail_message'), 'Google Workspace MCPのGmail送信が許可されていません')
+    assert(!allowedTools.includes('mcp__claude_ai_Gmail__'), 'Claude.ai内蔵Gmailへフォールバックしています')
+    assert(!allowedTools.includes('mcp__claude_ai_Google_Calendar__'), 'Claude.ai内蔵Calendarへフォールバックしています')
+    assert(!allowedTools.includes('mcp__claude_ai_Google_Drive__'), 'Claude.ai内蔵Driveへフォールバックしています')
+
     const limited = processResult({
       exitCode: 1,
       stdout: [

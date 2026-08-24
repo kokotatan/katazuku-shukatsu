@@ -52,4 +52,5 @@ AIコーディングエージェント(および使い方を尋ねられたAI)�
 - **どう動かす?** `npm install && npm run doctor && npm test`、次に `npm run seed`。
 - **自分のデータを入れるには?** 無指定ならOSユーザーデータ領域を使う。既存DBは環境変数 `KATAZUKU_DB` で明示し、書き込みは `src/db-apply*.ts` 経由(エージェントが書き手)。
 - **設定は?** `examples/config-gui.html` をブラウザで開く。設定は `schemas/settings.schema.json` が唯一の真実。
+- **Google連携は?** 利用者ごとに自分のGoogle CloudプロジェクトとデスクトップOAuthクライアントを作り、`npm run setup:google`でOSの利用者別領域へ保存する。配布元のOAuth値は共有しない。
 - **複数デバイスは?** 単一デバイス前提。移送は `npm run backup` の1ファイルで(クラウド同期フォルダ直下に正本を置かない)。

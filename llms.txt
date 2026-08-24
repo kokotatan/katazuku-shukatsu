@@ -10,6 +10,7 @@
 - Run: `npm install`, then `npm run doctor`, `npm test`, `npm run seed`
 - Real data defaults to the OS user-data directory outside the Git checkout; override the database path with `KATAZUKU_DB`.
 - [AGENTS.md](AGENTS.md): guide for AI agents and "how do I use this" answers
+- [Google Workspace setup](docs/GOOGLE_WORKSPACE_SETUP.md): per-user OAuth client, local MCP bridge, and production publishing status
 
 ## Architecture and design
 - [ARCHITECTURE](docs/ARCHITECTURE.md): single-writer, SQLite source of truth, semantic layer, idempotency, audit events

@@ -162,6 +162,9 @@ logs/
 .env
 .env.*
 service-account.json
+client_secret*.json
+client_secrets*.json
+google-oauth*.json
 credential-store/
 mirror-out.json
 *-import-*.json
