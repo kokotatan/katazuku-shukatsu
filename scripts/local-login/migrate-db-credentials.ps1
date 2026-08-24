@@ -13,7 +13,8 @@
 
 param(
   [switch]$ClearDbPassword,
-  [string]$OutputDir = ''
+  [string]$OutputDir = '',
+  [ValidateRange(1, 2147483647)][int]$CompanyId = 0
 )
 
 $ErrorActionPreference = 'Stop'
@@ -60,9 +61,19 @@ function Get-Scope([string]$Url) {
 
 # 平文を含むJSONを変数で受ける(ファイルに落とさない)
 $reader = Join-Path $PSScriptRoot 'read-db-credentials.mjs'
-$json = & node $reader
+$priorCompanyId = $env:KATAZUKU_COMPANY_ID
+try {
+  if ($CompanyId) { $env:KATAZUKU_COMPANY_ID = [string]$CompanyId }
+  else { Remove-Item Env:KATAZUKU_COMPANY_ID -ErrorAction SilentlyContinue }
+  $json = & node $reader
+}
+finally {
+  if ($null -eq $priorCompanyId) { Remove-Item Env:KATAZUKU_COMPANY_ID -ErrorAction SilentlyContinue }
+  else { $env:KATAZUKU_COMPANY_ID = $priorCompanyId }
+}
 if ($LASTEXITCODE -ne 0 -or -not $json) { throw 'DBから移行対象を読み出せませんでした。' }
 $entries = $json | ConvertFrom-Json
+if ($CompanyId -and @($entries).Count -eq 0) { throw "company.id=$CompanyId に移行可能な資格情報がありません。" }
 
 $migrated = @()
 foreach ($entry in $entries) {

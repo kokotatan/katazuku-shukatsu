@@ -8,11 +8,12 @@ import { dirname, extname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { openDb, resolveCompany } from '../src/db'
 import { transaction, upsertPerson } from '../src/inputs'
+import { resolveDatabasePath } from '../src/database-path'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 const dbArgIndex = process.argv.indexOf('--db')
-const DB_PATH = dbArgIndex >= 0 ? resolve(process.argv[dbArgIndex + 1]) : (process.env.KATAZUKU_DB_PATH || join(ROOT, 'data', 'katazuku.db'))
-const PHOTO_ROOT = join(ROOT, 'data', 'private', 'photos')
+const DB_PATH = resolveDatabasePath(dbArgIndex >= 0 ? process.argv[dbArgIndex + 1] : undefined)
+const PHOTO_ROOT = join(dirname(DB_PATH), 'private', 'photos')
 
 function stripImages(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(stripImages)

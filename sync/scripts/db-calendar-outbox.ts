@@ -6,11 +6,10 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { listCalendarOutbox } from '../src/application'
 import { openDb } from '../src/db'
+import { resolveDatabasePath } from '../src/database-path'
 
 const dbArgIndex = process.argv.indexOf('--db')
-const DB_PATH = dbArgIndex >= 0
-  ? resolve(process.argv[dbArgIndex + 1])
-  : (process.env.KATAZUKU_DB_PATH || join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'data', 'katazuku.db'))
+const DB_PATH = resolveDatabasePath(dbArgIndex >= 0 ? process.argv[dbArgIndex + 1] : undefined)
 
 const currentFile = fileURLToPath(import.meta.url)
 if (process.argv[1] && currentFile === resolve(process.argv[1])) {

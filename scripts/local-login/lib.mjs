@@ -144,12 +144,21 @@ function fieldMatches(field, pattern) {
 }
 
 function credentialCandidates(summary) {
-  const usernames = summary.fields.filter((field) =>
+  const typedUsernames = summary.fields.filter((field) =>
+    !field.disabled && ['text', 'email', 'tel'].includes(field.type)
+  )
+  const recognizedUsernames = typedUsernames.filter((field) =>
     !field.disabled && ['text', 'email', 'tel'].includes(field.type) &&
     (field.autocomplete === 'username' || field.autocomplete === 'email' ||
       fieldMatches(field, /メール|mail|email|ログイン|login|user|ユーザー|会員id|account/i))
   )
   const passwords = summary.fields.filter((field) => !field.disabled && field.type === 'password')
+  // i-web等はlabel/autocompleteを持たず、name="gksid"のような裸の属性しか出さない。
+  // 認識済み候補が0件でも、入力可能なID型欄とpassword欄が各1件だけなら、その組に限定する。
+  // ID型欄が複数ある場合は従来どおり曖昧として停止する。
+  const usernames = recognizedUsernames.length === 0 && typedUsernames.length === 1 && passwords.length === 1
+    ? typedUsernames
+    : recognizedUsernames
   const submits = summary.controls.filter((control) =>
     !control.disabled && (control.type === 'submit' || /ログイン|login|sign in|次へ|continue/i.test(control.label))
   )
@@ -393,8 +402,10 @@ function fillExpression({ allowedOrigin, allowedPathPrefix, decision, username, 
     const usernameField = fields[${decision.username_element - 1}]
     const passwordField = fields[${decision.password_element - 1}]
     const fieldText = (element) => [element.labels ? Array.from(element.labels).map((label) => label.innerText).join(' ') : '', element.getAttribute('aria-label'), element.name, element.id, element.placeholder, element.autocomplete].join(' ')
-    const usernameCandidates = fields.filter((element) => !element.disabled && ['text', 'email', 'tel'].includes((element.type || '').toLowerCase()) && (['username', 'email'].includes((element.autocomplete || '').toLowerCase()) || /メール|mail|email|ログイン|login|user|ユーザー|会員id|account/i.test(fieldText(element))))
+    const typedUsernameCandidates = fields.filter((element) => !element.disabled && ['text', 'email', 'tel'].includes((element.type || '').toLowerCase()))
+    const recognizedUsernameCandidates = typedUsernameCandidates.filter((element) => ['username', 'email'].includes((element.autocomplete || '').toLowerCase()) || /メール|mail|email|ログイン|login|user|ユーザー|会員id|account/i.test(fieldText(element)))
     const passwordCandidates = fields.filter((element) => !element.disabled && (element.type || '').toLowerCase() === 'password')
+    const usernameCandidates = recognizedUsernameCandidates.length === 0 && typedUsernameCandidates.length === 1 && passwordCandidates.length === 1 ? typedUsernameCandidates : recognizedUsernameCandidates
     const submitCandidates = controls.filter((element) => !element.disabled && ((element.type || '').toLowerCase() === 'submit' || /ログイン|login|sign in|次へ|continue/i.test(element.innerText || element.value || element.getAttribute('aria-label') || '')))
     if (!usernameField || !passwordField || usernameCandidates.length !== 1 || passwordCandidates.length !== 1 || usernameCandidates[0] !== usernameField || passwordCandidates[0] !== passwordField) throw new Error('field_mismatch')
     const control = ${Boolean(submit)} ? controls[${decision.submit_control == null ? -1 : decision.submit_control - 1}] : null
@@ -460,4 +471,74 @@ export async function readSafePageState(debugPort, allowedOrigin) {
     result: document.querySelector('[data-result]')?.getAttribute('data-result') || '',
     passwordValuePresent: Boolean(document.querySelector('input[type="password"]')?.value)
   }))()`)
+}
+
+/**
+ * ログイン後ページの可視テキストと同一originリンクだけを読む。
+ * input値、Cookie、認証ヘッダー、storageは取得しない。
+ */
+export async function readSafeVisiblePage(debugPort, allowedOrigin, allowedPathPrefix = null) {
+  const target = await findTargetByOrigin(debugPort, allowedOrigin, allowedPathPrefix)
+  const result = await evaluateTarget(target, String.raw`(() => {
+    const visible = (element) => {
+      const style = getComputedStyle(element)
+      const rect = element.getBoundingClientRect()
+      return style.display !== 'none' && style.visibility !== 'hidden' && rect.width > 0 && rect.height > 0
+    }
+    const text = (value, limit) => String(value || '').replace(/\s+/g, ' ').trim().slice(0, limit)
+    const links = Array.from(document.querySelectorAll('a[href]'))
+      .filter(visible)
+      .map((element) => {
+        try {
+          const url = new URL(element.href, location.href)
+          if (url.origin !== location.origin) return null
+          return { text: text(element.innerText || element.getAttribute('aria-label'), 240), url: url.href }
+        } catch { return null }
+      })
+      .filter((item) => item && item.text)
+      .slice(0, 120)
+    const actions = Array.from(document.querySelectorAll('button, [role="button"], [onclick]'))
+      .filter(visible)
+      .map((element, index) => ({
+        element: index + 1,
+        tag: element.tagName.toLowerCase(),
+        id: text(element.id, 120),
+        label: text(element.innerText || element.value || element.getAttribute('aria-label'), 500)
+      }))
+      .filter((item) => item.label)
+      .slice(0, 120)
+    return {
+      origin: location.origin,
+      url: location.href,
+      title: text(document.title, 240),
+      text: text(document.body?.innerText, 30000),
+      links,
+      actions
+    }
+  })()`)
+  if (result?.origin !== allowedOrigin || !urlWithinAllowedScope(result?.url, allowedOrigin, allowedPathPrefix)) {
+    throw new Error('可視ページが登録済みの適用範囲外です')
+  }
+  return result
+}
+
+export async function clickSafeVisibleAction(debugPort, allowedOrigin, allowedPathPrefix, actionElement) {
+  if (!Number.isInteger(actionElement) || actionElement <= 0) throw new Error('action elementが不正です')
+  const target = await findTargetByOrigin(debugPort, allowedOrigin, allowedPathPrefix)
+  if (!urlWithinAllowedScope(target.url, allowedOrigin, allowedPathPrefix)) throw new Error('対象ページが登録済みの適用範囲外です')
+  return evaluateTarget(target, String.raw`(() => {
+    const visible = (element) => {
+      const style = getComputedStyle(element)
+      const rect = element.getBoundingClientRect()
+      return style.display !== 'none' && style.visibility !== 'hidden' && rect.width > 0 && rect.height > 0
+    }
+    const actions = Array.from(document.querySelectorAll('button, [role="button"], [onclick]'))
+      .filter(visible)
+      .filter((element) => String(element.innerText || element.value || element.getAttribute('aria-label') || '').trim())
+    const action = actions[${actionElement - 1}]
+    if (!action) throw new Error('action_not_found')
+    const label = String(action.innerText || action.value || action.getAttribute('aria-label') || '').replace(/\s+/g, ' ').trim().slice(0, 500)
+    action.click()
+    return { clicked: true, label }
+  })()`)
 }

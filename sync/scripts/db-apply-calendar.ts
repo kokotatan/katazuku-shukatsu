@@ -9,6 +9,13 @@ import { fileURLToPath } from 'node:url'
 import type { DatabaseSync } from 'node:sqlite'
 import { addEvent, findAppointmentMatch, openDb } from '../src/db'
 import { resolveSelectionId, transaction, upsertPerson } from '../src/inputs'
+import {
+  applyScheduleProjection,
+  type ScheduleBlockInput,
+  type SourceSyncStateInput,
+  type ScheduleProjectionResult,
+} from '../src/schedule'
+import { resolveDatabasePath } from '../src/database-path'
 
 interface CalendarEvent {
   externalId: string
@@ -26,10 +33,14 @@ interface CalendarEvent {
   sourceHash?: string
 }
 
-interface CalendarInput { events: CalendarEvent[] }
+interface CalendarInput {
+  events: CalendarEvent[]
+  scheduleBlocks?: ScheduleBlockInput[]
+  syncStates?: SourceSyncStateInput[]
+}
 
 const dbArgIndex = process.argv.indexOf('--db')
-const DB_PATH = dbArgIndex >= 0 ? resolve(process.argv[dbArgIndex + 1]) : (process.env.KATAZUKU_DB_PATH || join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'data', 'katazuku.db'))
+const DB_PATH = resolveDatabasePath(dbArgIndex >= 0 ? process.argv[dbArgIndex + 1] : undefined)
 
 function assertInput(value: unknown): asserts value is CalendarInput {
   if (!value || typeof value !== 'object' || !Array.isArray((value as CalendarInput).events)) {
@@ -47,7 +58,7 @@ function assertInput(value: unknown): asserts value is CalendarInput {
 export function applyCalendar(
   input: CalendarInput,
   db: DatabaseSync = openDb(DB_PATH),
-): { created: number; updated: number; unchanged: number; promoted: number } {
+): { created: number; updated: number; unchanged: number; promoted: number; schedule: ScheduleProjectionResult } {
   return transaction(db, () => {
     const result = { created: 0, updated: 0, unchanged: 0, promoted: 0 }
     for (const event of input.events) {
@@ -164,7 +175,14 @@ export function applyCalendar(
         `).run(randomUUID(), appointmentId, new Date().toISOString())
       }
     }
-    return result
+    // 全カレンダー予定(大学・私用・終日を含む)は、選考トラックを捏造せず
+    // schedule_blockへ投影する。上で作ったappointmentへexternalIdでリンクされる。
+    const schedule = applyScheduleProjection(db, {
+      blocks: input.scheduleBlocks,
+      syncStates: input.syncStates,
+      replaceSyncSources: Boolean(input.syncStates),
+    })
+    return { ...result, schedule }
   })
 }
 

@@ -15,9 +15,14 @@ const dbPath = process.env.KATAZUKU_DB
   ?? join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'data', 'katazuku.db')
 
 const db = new DatabaseSync(dbPath, { readOnly: true })
-const rows = db
-  .prepare("SELECT id, name, login_id, password, mypage_url FROM company WHERE password <> '' AND mypage_url <> '' ORDER BY id")
-  .all()
+const companyIdText = String(process.env.KATAZUKU_COMPANY_ID || '').trim()
+const companyId = companyIdText ? Number(companyIdText) : null
+if (companyId !== null && (!Number.isInteger(companyId) || companyId <= 0)) {
+  throw new Error('KATAZUKU_COMPANY_IDが不正です')
+}
+const rows = companyId === null
+  ? db.prepare("SELECT id, name, login_id, password, mypage_url FROM company WHERE password <> '' AND mypage_url <> '' ORDER BY id").all()
+  : db.prepare("SELECT id, name, login_id, password, mypage_url FROM company WHERE id = ? AND password <> '' AND mypage_url <> ''").all(companyId)
 
 process.stdout.write(JSON.stringify(rows.map((row) => ({
   portalId: `company-${row.id}`,

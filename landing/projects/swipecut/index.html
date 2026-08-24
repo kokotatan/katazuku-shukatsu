@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <meta name="description" content="長い動画を「編集」せずに仕分けるツール SwipeCut の開発記録。1分割 × Tinder UIという設計、FastAPI+FFmpegの構成、あまり使われなかった理由、そして今ならAIが自動でやるという話。" />
+  <title>SwipeCutの開発記録 | katazuku</title>
+  <style>
+    :root {
+      --bg: #f8f7f6;
+      --surface: #ffffff;
+      --text: #23221e;
+      --text-sub: #706d65;
+      --border: #d6d3d0;
+      --head: #edebe8;
+      --over: #f5f4f3;
+      --primary: #0077c7;
+      --primary-hover: #005fa3;
+      --danger: #c93b2d;
+      --danger-bg: #fff1ee;
+      --success: #26734d;
+      --success-bg: #edf8f2;
+      --font: system-ui, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 16px;
+      line-height: 1.75;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: var(--primary); }
+    a:hover { color: var(--primary-hover); }
+    :focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
+    img { max-width: 100%; height: auto; display: block; }
+    .wrap { width: min(1040px, calc(100% - 48px)); margin: 0 auto; }
+    .site-head { border-bottom: 1px solid var(--border); background: rgba(248, 247, 246, .96); position: sticky; top: 0; z-index: 5; }
+    .site-head .wrap { min-height: 64px; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+    .brand { color: var(--text); font-size: 18px; font-weight: 700; text-decoration: none; }
+    .back { color: var(--primary); font-size: 14px; font-weight: 700; text-decoration: none; }
+    .hero { padding: 72px 0 56px; }
+    .kicker { margin: 0 0 12px; color: var(--primary); font-size: 13px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+    h1 { max-width: 820px; margin: 0; font-size: clamp(34px, 6vw, 60px); line-height: 1.16; letter-spacing: -.035em; }
+    .lead { max-width: 760px; margin: 24px 0 0; color: var(--text-sub); font-size: clamp(17px, 2vw, 21px); line-height: 1.85; }
+    .meta { display: grid; grid-template-columns: repeat(4, 1fr); margin-top: 40px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+    .meta-item { padding: 18px 20px 18px 0; }
+    .meta-item + .meta-item { padding-left: 20px; border-left: 1px solid var(--border); }
+    .meta-label { display: block; margin-bottom: 4px; color: var(--text-sub); font-size: 12px; font-weight: 700; }
+    .meta-value { font-size: 14px; font-weight: 700; }
+    main { padding-bottom: 96px; }
+    section { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 56px; padding: 56px 0; border-top: 1px solid var(--border); }
+    .section-label { margin: 0; color: var(--text-sub); font-size: 13px; font-weight: 700; letter-spacing: .04em; }
+    .section-body > :first-child { margin-top: 0; }
+    .section-body > :last-child { margin-bottom: 0; }
+    h2 { margin: 0 0 20px; font-size: clamp(24px, 3vw, 32px); line-height: 1.35; letter-spacing: -.02em; }
+    h3 { margin: 34px 0 10px; font-size: 18px; line-height: 1.5; }
+    p { margin: 0 0 18px; }
+    .thesis { padding: 28px 32px; border-left: 4px solid var(--primary); background: var(--surface); font-size: clamp(19px, 2.4vw, 26px); font-weight: 700; line-height: 1.65; }
+    code { padding: 2px 5px; border-radius: 4px; background: var(--over); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: .9em; }
+    pre { margin: 24px 0 0; padding: 20px 22px; background: #23221e; color: #f5f4f3; border-radius: 6px; overflow-x: auto; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 13px; line-height: 1.7; }
+    pre code { background: none; padding: 0; color: inherit; }
+    figure { margin: 28px 0 0; }
+    figure img { border: 1px solid var(--border); border-radius: 10px; }
+    figcaption { margin-top: 10px; color: var(--text-sub); font-size: 13px; }
+    .shots { display: grid; grid-template-columns: 1fr; gap: 28px; margin-top: 8px; }
+    .built { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 24px; }
+    .built-card { padding: 20px 22px; border: 1px solid var(--border); background: var(--surface); }
+    .built-card strong { display: block; margin-bottom: 6px; font-size: 14px; }
+    .built-card span { color: var(--text-sub); font-size: 14px; }
+    .rule { margin-top: 28px; padding: 24px 28px; background: #23221e; color: #fff; font-size: 19px; font-weight: 700; line-height: 1.7; }
+    footer { padding: 28px 0 52px; border-top: 1px solid var(--border); color: var(--text-sub); font-size: 13px; display: flex; justify-content: space-between; }
+    @media (max-width: 820px) {
+      .wrap { width: min(100% - 32px, 720px); }
+      .hero { padding: 48px 0 40px; }
+      .meta { grid-template-columns: 1fr 1fr; }
+      .meta-item:nth-child(3) { border-left: 0; border-top: 1px solid var(--border); }
+      .meta-item:nth-child(4) { border-top: 1px solid var(--border); }
+      section { grid-template-columns: 1fr; gap: 14px; padding: 42px 0; }
+      .built { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 520px) {
+      .site-head .wrap { min-height: 56px; }
+      .meta { grid-template-columns: 1fr; }
+      .meta-item, .meta-item + .meta-item { padding: 14px 0; border-left: 0; border-top: 1px solid var(--border); }
+      .meta-item:first-child { border-top: 0; }
+      .thesis { padding: 22px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="site-head">
+    <div class="wrap">
+      <a class="brand" href="/">katazuku</a>
+      <a class="back" href="/">ホームへ戻る</a>
+    </div>
+  </header>
+
+  <div class="wrap">
+    <header class="hero">
+      <p class="kicker">Development record / 2025</p>
+      <h1>長い動画を「編集」せずに、仕分ける。</h1>
+      <p class="lead">現場ヒアリングの動画を共有するのに、いらない所を削る作業が重かった。そこで編集をやめて、1分ごとに機械分割してからTinder風に「残す/捨てる」だけ決める、という動画仕分けツールを作りました。正直あまり使われず、今ならAIがそのまま自動でやる領域です。それでも、課題の見つけ方と「作らない判断」の記録として残します。</p>
+      <div class="meta" aria-label="プロジェクト概要">
+        <div class="meta-item"><span class="meta-label">形式</span><span class="meta-value">個人開発 / AIと制作</span></div>
+        <div class="meta-item"><span class="meta-label">担当</span><span class="meta-value">課題設計・実装・デプロイ</span></div>
+        <div class="meta-item"><span class="meta-label">構成</span><span class="meta-value">FastAPI+FFmpeg / React</span></div>
+        <div class="meta-item"><span class="meta-label">結果</span><span class="meta-value">配布したがあまり使われず</span></div>
+      </div>
+    </header>
+
+    <main>
+      <section>
+        <p class="section-label">結論</p>
+        <div class="section-body">
+          <div class="thesis">「この1分はいる / いらない」の判断は軽い。重かったのは、その判断を動画編集という操作に乗せ換えることだった。だから編集をやめ、判断だけを最軽量のUIに寄せた。</div>
+        </div>
+      </section>
+
+      <section>
+        <p class="section-label">きっかけ</p>
+        <div class="section-body">
+          <h2>ヒアリングの動画整理が、地味に重かった</h2>
+          <p>いろいろな現場へヒアリングに行って、様子を動画で撮り、あとでチームに共有していました。ただ、この「あとで共有する」が地味に大変でした。</p>
+          <p>撮った動画は長い。全部送っても誰も最後まで見ません。かといって必要なところだけを切り出そうとすると、編集ソフトを開き、タイムラインをスクラブして、いる/いらないを判断して書き出す。数分の動画のために、その往復をやることになります。現場ごとに何本もたまると、これがつらい。</p>
+          <p>一つひとつの判断は難しくありません。見れば数秒で決まります。大変なのは、その判断を「動画編集」という重い操作に乗せ換えることのほうでした。</p>
+        </div>
+      </section>
+
+      <section>
+        <p class="section-label">設計</p>
+        <div class="section-body">
+          <h2>「編集」をやめて、「仕分け」にする</h2>
+          <p>きれいに編集するのをやめて、まず機械的に1分ごとに分割してしまう。あとは出てきた断片を1つずつ見て、「残す/捨てる」だけ決める。判断を、編集ではなく仕分けにする。</p>
+          <p>その仕分けを、いちばん軽いUIに寄せました。思いついたのがTinderのスワイプです。カードが1枚出て、右で残す・左で捨てる。矢印キーでも振れる。残すものにだけ、あとで探せるよう短い名前をつける。最後に、残したものだけをZIPでまとめて落とす。</p>
+          <div class="rule">編集ソフトの「全部できるけど重い」に対して、「残すか捨てるかしかできないけど速い」を作る。</div>
+        </div>
+      </section>
+
+      <section>
+        <p class="section-label">動くもの</p>
+        <div class="section-body">
+          <h2>3画面だけ</h2>
+          <div class="shots">
+            <figure>
+              <img src="./assets/01-upload.jpg" alt="SwipeCutのアップロード画面。ファイルまたはGoogle Photosから動画を渡す" />
+              <figcaption>1. 動画を渡す。ファイル選択か、Google Photosから直接。渡すと裏で1分ごとに分割される。</figcaption>
+            </figure>
+            <figure>
+              <img src="./assets/02-swipe.jpg" alt="SwipeCutのスワイプ画面。1分の断片をTinder風に残す/捨てるで仕分ける" />
+              <figcaption>2. 断片が1枚ずつ出る。左右で「捨てる/残す」。残すものには名前をつける。矢印キーだけで振れる。</figcaption>
+            </figure>
+            <figure>
+              <img src="./assets/03-done.jpg" alt="SwipeCutの完了画面。残した断片だけをZIP/JSONで書き出す" />
+              <figcaption>3. 振り終わると残す/捨てるの数が出る。残した断片だけをZIP、または一覧をJSONで書き出す。</figcaption>
+            </figure>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <p class="section-label">中身</p>
+        <div class="section-body">
+          <h2>薄いAPIと、中断から戻れる状態</h2>
+          <div class="built">
+            <div class="built-card"><strong>バックエンド</strong><span>FastAPI + FFmpeg + SQLite（SQLAlchemy）。分割はFFmpegに任せる。</span></div>
+            <div class="built-card"><strong>フロントエンド</strong><span>React + Vite。「次の未判定をくれ→判定を保存」を繰り返す薄いループ。</span></div>
+            <div class="built-card"><strong>連携</strong><span>Google Photos OAuth。スマホの動画を落とさず一覧から直接分割。</span></div>
+            <div class="built-card"><strong>デプロイ</strong><span>Railway。FFmpegが動く前提で選定。</span></div>
+          </div>
+          <p style="margin-top:24px">判定はセグメント単位でDBに持たせています。だから途中でブラウザを閉じても、次に開けば未判定の続きから戻れます。状態を全部フロントのメモリに載せるとリロードで最初からになる。動画の仕分けは件数が多いので、そこは早い段階でサーバ側に寄せました。</p>
+          <pre><code>POST /api/upload?chunk_sec=60     動画を1分ごとに分割
+GET  /api/next_segment?video_id   次の未判定セグメント
+POST /api/decide?segment_id&amp;decision=keep|drop   判定を保存
+GET  /api/export_zip?video_id     keepだけをZIPで返す</code></pre>
+        </div>
+      </section>
+
+      <section>
+        <p class="section-label">正直な結果</p>
+        <div class="section-body">
+          <h2>あまり使われず、今ならAIがやる</h2>
+          <p>このツールはあまり使われませんでした。動画をサーバで分割する構成は、長い動画だと待ちが出て気軽さが落ちる。そして何より、「動画を細かく仕分けたい」場面が、思ったほど日常には多くなかった。課題は本物でしたが、それが毎日起きるのか、たまに起きるのかを、作る前に見ていませんでした。</p>
+          <p>状況も変わりました。いまのモデルは長い動画をそのまま読み、要点といらない所を言えるようになってきています。「この現場ヒアリングから意思決定に効く部分だけ3分に」と頼めば、近いことができる。SwipeCutは人間の判断を最軽量UIに寄せる道具でしたが、その「人間が全部見て振る」ところ自体を、AIが肩代わりし始めています。</p>
+        </div>
+      </section>
+
+      <section>
+        <p class="section-label">それでも</p>
+        <div class="section-body">
+          <h2>作ってよかったこと</h2>
+          <p>うまくいかなかった話ばかりですが、自分には意味のある一本でした。「重い操作を、軽い判断に置き換える」という設計の型を最初に試せた。FFmpegでの分割、薄いAPI、状態をサーバに持たせて中断復帰する構成を通しで作れた。そして、AIと一緒に作ったものを自分以外の人に配って使ってもらおうとした、最初の経験でした。</p>
+          <p>このあと作った <a href="https://github.com/kokotatan/katazuku-shukatsu">katazuku-shukatsu</a> では、「人間には最後の判断だけ残す」「状態は正本に持たせて中断から戻す」を、もっと真剣にやっています。その原型を、この小さな動画ツールで一度触っていました。</p>
+          <p style="margin-top:24px"><a href="https://github.com/kokotatan/swipecut">GitHub: kokotatan/swipecut</a></p>
+        </div>
+      </section>
+    </main>
+
+    <footer class="wrap">
+      <span>katazuku</span>
+      <span>&copy; 2026</span>
+    </footer>
+  </div>
+</body>
+</html>

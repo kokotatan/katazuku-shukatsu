@@ -178,6 +178,22 @@ foreach ($tn in $monitoredTasks) {
   }
 }
 
+# ---- 1.6 旧stdio MCPの残留掃除 ----
+# 2026-08-24: Windows Terminalで開いたままの旧Claude対話セッション4件が、それぞれ
+# uvx -> workspace-mcp -> Pythonを1週間保持していた。現行bridgeはstdin終了時に回収するが、
+# 旧構成の直接起動だけは24時間を超えたものをここで掃除する。
+$workspaceCleanup = Join-Path $root 'scripts\cleanup-workspace-mcp.ps1'
+if (Test-Path -LiteralPath $workspaceCleanup) {
+  try {
+    $cleanupResult = (& $workspaceCleanup -OlderThanMinutes 1440 -Apply -Confirm:$false | Out-String) | ConvertFrom-Json
+    if (@($cleanupResult.stopped).Count -gt 0) {
+      $notes += ('Google Workspace MCP: 24時間超の旧プロセスツリー{0}件を回収' -f @($cleanupResult.stopped).Count)
+    }
+  } catch {
+    $notes += ('Google Workspace MCPの旧プロセス掃除に失敗(次周期で再試行): {0}' -f $_.Exception.Message)
+  }
+}
+
 # ---- 2. プロバイダ健康状態(Claude/Codex両方停止だけが異常。片方停止は正常な引継ぎ中) ----
 if (Test-Path $healthFile) {
   try {

@@ -134,7 +134,8 @@ const CLAUDE_EXTRA_CAPABILITIES = [
   'gmail.read',
   'gmail.draft',
   'gmail.labels',
-  'gmail.send',
+  'gmail.send.self',
+  'gmail.send.confirmed',
   'calendar.read',
   'calendar.write',
   'drive.read',
@@ -149,15 +150,19 @@ const CLAUDE_TOOLS: Record<string, string[]> = {
   'workspace.write': ['Write', 'Edit'],
   shell: ['PowerShell'],
   'web.search': ['WebSearch', 'WebFetch'],
-  'gmail.read': ['mcp__claude_ai_Gmail__*', 'mcp__google-workspace__*gmail*'],
-  'gmail.draft': ['mcp__claude_ai_Gmail__*', 'mcp__google-workspace__*gmail*'],
-  'gmail.labels': ['mcp__claude_ai_Gmail__*', 'mcp__google-workspace__*gmail*'],
-  'gmail.send': ['mcp__claude_ai_Gmail__*', 'mcp__google-workspace__*gmail*'],
-  'calendar.read': ['mcp__claude_ai_Google_Calendar__*', 'mcp__google-workspace__*calendar*'],
-  'calendar.write': ['mcp__claude_ai_Google_Calendar__*', 'mcp__google-workspace__*calendar*'],
-  'drive.read': ['mcp__claude_ai_Google_Drive__*', 'mcp__google-workspace__*drive*'],
-  'sheets.read': ['mcp__claude_ai_Google_Drive__*', 'mcp__google-workspace__*sheet*'],
-  'sheets.write': ['mcp__claude_ai_Google_Drive__*', 'mcp__google-workspace__*sheet*'],
+  // capabilityごとに実ツールを絞る。`*gmail*`をreadへ渡すとsend/labelまで含まれ、
+  // 「読むだけ」のworkflowが送信できてしまう。本人宛通知と本人承認済み送信を分離し、
+  // workspace-mcp-bridgeでも宛先と承認済みtool callの完全一致をコード検証する。
+  'gmail.read': ['mcp__google-workspace__search_gmail_messages', 'mcp__google-workspace__get_gmail_*', 'mcp__google-workspace__list_gmail_*'],
+  'gmail.draft': ['mcp__google-workspace__draft_gmail_message'],
+  'gmail.labels': ['mcp__google-workspace__manage_gmail_label', 'mcp__google-workspace__modify_gmail_message_labels', 'mcp__google-workspace__batch_modify_gmail_message_labels'],
+  'gmail.send.self': ['mcp__google-workspace__send_gmail_message'],
+  'gmail.send.confirmed': ['mcp__google-workspace__send_gmail_message'],
+  'calendar.read': ['mcp__google-workspace__get_events', 'mcp__google-workspace__list_calendars', 'mcp__google-workspace__query_freebusy'],
+  'calendar.write': ['mcp__google-workspace__manage_event', 'mcp__google-workspace__create_calendar'],
+  'drive.read': ['mcp__google-workspace__search_drive_files', 'mcp__google-workspace__get_drive_file_content', 'mcp__google-workspace__list_drive_items'],
+  'sheets.read': ['mcp__google-workspace__read_sheet_values', 'mcp__google-workspace__get_spreadsheet_info', 'mcp__google-workspace__list_spreadsheets'],
+  'sheets.write': ['mcp__google-workspace__modify_sheet_values', 'mcp__google-workspace__append_table_rows'],
   'browser.interact': ['mcp__claude-in-chrome__*', 'mcp__claude_ai_Chrome__*'],
   'voice.transcribe': ['mcp__voicebox__*'],
 }
@@ -196,6 +201,42 @@ function hasBlockingRateLimitEvent(text: string): boolean {
   return false
 }
 
+/**
+ * 利用枠判定に使ってよいprovider由来の信号だけを取り出す。
+ *
+ * CodexのJSONLにはcommand_executionのaggregated_outputとして、agentが読んだソースや
+ * コマンド出力も入る。そこにドキュメントの「weekly limit」説明があるだけで枠切れと
+ * 誤判定すると、正常runの後にprovider-healthが汚染され、全定常処理が数日止まる。
+ * stderr、非JSONの旧CLI出力、明示的なエラー/rate-limit eventだけを信頼する。
+ */
+function quotaSignalText(result: ProcessResult): string {
+  const signals = [result.stderr]
+  for (const line of result.stdout.split(/\r?\n/).filter(Boolean)) {
+    try {
+      const event = JSON.parse(line) as {
+        type?: unknown
+        is_error?: unknown
+        item?: { type?: unknown }
+      }
+      const type = typeof event.type === 'string' ? event.type.toLowerCase() : ''
+      const itemType = typeof event.item?.type === 'string' ? event.item.type.toLowerCase() : ''
+      if (
+        type === 'rate_limit_event' ||
+        type === 'error' ||
+        type === 'turn.failed' ||
+        (type === 'result' && event.is_error === true) ||
+        (type === 'item.completed' && itemType === 'error')
+      ) {
+        signals.push(line)
+      }
+    } catch {
+      // 旧CLIの非構造化出力ではprovider本文とtool出力を分離できないため従来どおり読む。
+      signals.push(line)
+    }
+  }
+  return signals.join('\n').toLowerCase()
+}
+
 function classifyKnownFailure(result: ProcessResult): FailureCode | undefined {
   if (result.errorCode === 'ENOENT') return 'command_missing'
   if (result.timedOut) return 'timeout'
@@ -205,9 +246,10 @@ function classifyKnownFailure(result: ProcessResult): FailureCode | undefined {
   if (/unexpected argument|unrecognized (option|argument|subcommand)|invalid value for|for more information, try '--help'/.test(text)) {
     return 'command_missing'
   }
+  const quotaText = quotaSignalText(result)
   if (
-    /weekly limit|usage limit|quota( has been)? exceeded|credit balance|out of extra usage|maximum.*usage/.test(text) ||
-    hasBlockingRateLimitEvent(text)
+    /weekly limit|usage limit|quota( has been)? exceeded|credit balance|out of extra usage|maximum.*usage/.test(quotaText) ||
+    hasBlockingRateLimitEvent(quotaText)
   ) {
     return 'quota_exhausted'
   }
@@ -667,7 +709,8 @@ const GOOGLE_WORKSPACE_CAPABILITIES = [
   'gmail.read',
   'gmail.draft',
   'gmail.labels',
-  'gmail.send',
+  'gmail.send.self',
+  'gmail.send.confirmed',
   'calendar.read',
   'calendar.write',
   'drive.read',
@@ -770,7 +813,17 @@ export function createCodexAdapter(options: AdapterOptions, id: 'codex' | 'codex
       if (options.model) args.push('--model', options.model)
       if (id === 'codex-oss') args.push('--oss', '--local-provider', options.localProvider ?? 'ollama')
       args.push('-')
-      return { command: options.command, args, stdin: request.prompt, cwd: request.cwd }
+      return {
+        command: options.command,
+        args,
+        stdin: request.prompt,
+        cwd: request.cwd,
+        env: {
+          KATAZUKU_WORKSPACE_CAPABILITIES: request.capabilities
+            .filter((capability) => GOOGLE_WORKSPACE_CAPABILITIES.includes(capability))
+            .join(','),
+        },
+      }
     },
     async readOutput(result, paths) {
       try {
@@ -1188,6 +1241,7 @@ export function commandPreview(adapter: AgentAdapter, request: AgentRunRequest, 
   provider: ProviderId
   command: string
   args: string[]
+  env?: NodeJS.ProcessEnv
   promptViaStdin: true
 } {
   const invocation = adapter.buildInvocation(request, { finalOutputPath })
@@ -1195,6 +1249,7 @@ export function commandPreview(adapter: AgentAdapter, request: AgentRunRequest, 
     provider: adapter.id,
     command: invocation.command,
     args: invocation.args,
+    env: invocation.env,
     promptViaStdin: true,
   }
 }

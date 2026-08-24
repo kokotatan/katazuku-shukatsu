@@ -17,6 +17,7 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import { join, resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { DatabaseSync } from 'node:sqlite'
+import { resolveDatabasePath } from '../src/database-path'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const REPO = join(HERE, '..', '..')
@@ -37,7 +38,7 @@ const ACCOUNTS = process.env.KATAZUKU_CAL_ACCOUNT
     : DEFAULT_ACCOUNTS
 const PAST_DAYS = Number(process.env.KATAZUKU_CAL_PAST_DAYS || 7)
 const FUTURE_DAYS = Number(process.env.KATAZUKU_CAL_FUTURE_DAYS || 60)
-const DB_PATH = process.env.KATAZUKU_DB_PATH || join(REPO, 'data', 'katazuku.db')
+const DB_PATH = resolveDatabasePath()
 
 interface StoredToken {
   refresh_token: string
@@ -83,7 +84,25 @@ interface GEvent {
   attendees?: { displayName?: string; email?: string }[]
   hangoutLink?: string
   recurringEventId?: string
+  transparency?: 'opaque' | 'transparent'
+  calendarId?: string
+  accountId?: string
 }
+
+interface SyncState {
+  source: 'google-calendar'
+  accountId: string
+  scopeId: string
+  status: 'success' | 'partial' | 'failed'
+  coveredFrom: string
+  coveredUntil: string
+  attemptedAt: string
+  error?: string
+}
+
+const FETCHED_AT = new Date()
+const COVERED_FROM = new Date(FETCHED_AT.getTime() - PAST_DAYS * 86400000).toISOString()
+const COVERED_UNTIL = new Date(FETCHED_AT.getTime() + FUTURE_DAYS * 86400000).toISOString()
 
 /** 就活予定が載りうるカレンダーを選ぶ。祝日・家族は対象外(私用・自動生成のため)。 */
 async function listTargetCalendars(token: string): Promise<string[]> {
@@ -97,15 +116,12 @@ async function listTargetCalendars(token: string): Promise<string[]> {
     .map((c) => c.id)
 }
 
-async function listEvents(token: string, calendarId: string): Promise<GEvent[]> {
-  const now = Date.now()
-  const timeMin = new Date(now - PAST_DAYS * 86400000).toISOString()
-  const timeMax = new Date(now + FUTURE_DAYS * 86400000).toISOString()
+async function listEvents(token: string, calendarId: string, accountId: string): Promise<GEvent[]> {
   const out: GEvent[] = []
   let pageToken: string | undefined
   do {
     const params = new URLSearchParams({
-      timeMin, timeMax, singleEvents: 'true', orderBy: 'startTime', maxResults: '250',
+      timeMin: COVERED_FROM, timeMax: COVERED_UNTIL, singleEvents: 'true', orderBy: 'startTime', maxResults: '250',
       // 中止(cancelled)も status として持ち帰り、DB側で「中止」に落とせるようにする
       showDeleted: 'true',
     })
@@ -115,7 +131,7 @@ async function listEvents(token: string, calendarId: string): Promise<GEvent[]> 
     })
     if (!res.ok) throw new Error(`カレンダー取得に失敗(${calendarId}: HTTP ${res.status})`)
     const json = (await res.json()) as { items?: GEvent[]; nextPageToken?: string }
-    for (const item of json.items || []) out.push({ ...item, calendarId } as GEvent & { calendarId: string })
+    for (const item of json.items || []) out.push({ ...item, calendarId, accountId })
     pageToken = json.nextPageToken
   } while (pageToken)
   return out
@@ -215,14 +231,21 @@ function main() {
 
   return (async () => {
     const raw: GEvent[] = []
+    const syncStates: SyncState[] = []
     let calTotal = 0
     for (const account of ACCOUNTS) {
+      const scopeId = account === CAREER ? 'career-visible-calendars' : 'primary'
       let token: string
       try {
         token = await getAccessToken(account)
       } catch (e) {
         // 未認証アカウントは同期全体を止めず、警告して飛ばす(他アカウントの同期は成功させる)
         console.error(`[${account}] 認証スキップ(トークン未取得。google-workspace MCPで認証が要る): ${(e as Error)?.message || e}`)
+        syncStates.push({
+          source: 'google-calendar', accountId: account, scopeId, status: 'failed',
+          coveredFrom: COVERED_FROM, coveredUntil: COVERED_UNTIL, attemptedAt: FETCHED_AT.toISOString(),
+          error: 'OAuth token unavailable',
+        })
         continue
       }
       let calendars: string[]
@@ -231,17 +254,56 @@ function main() {
         calendars = account === CAREER ? await listTargetCalendars(token) : [account]
       } catch (e) {
         console.error(`[${account}] カレンダー一覧の取得に失敗(スキップ): ${(e as Error)?.message || e}`)
+        syncStates.push({
+          source: 'google-calendar', accountId: account, scopeId, status: 'failed',
+          coveredFrom: COVERED_FROM, coveredUntil: COVERED_UNTIL, attemptedAt: FETCHED_AT.toISOString(),
+          error: 'calendar list unavailable',
+        })
         continue
       }
       calTotal += calendars.length
+      let failedCalendars = 0
       for (const cid of calendars) {
         try {
-          raw.push(...(await listEvents(token, cid)))
+          raw.push(...(await listEvents(token, cid, account)))
         } catch (e) {
+          failedCalendars += 1
           console.error(`[${account}] ${cid} の取得に失敗(スキップ): ${(e as Error)?.message || e}`)
         }
       }
+      syncStates.push({
+        source: 'google-calendar', accountId: account, scopeId,
+        status: failedCalendars === 0 && calendars.length > 0 ? 'success' : failedCalendars < calendars.length ? 'partial' : 'failed',
+        coveredFrom: COVERED_FROM, coveredUntil: COVERED_UNTIL, attemptedAt: FETCHED_AT.toISOString(),
+        error: failedCalendars ? `${failedCalendars}/${calendars.length} calendars failed` : undefined,
+      })
     }
+    // 空き判定用の全予定投影。会社と結び付かない大学・私用予定もここには残す。
+    // titleはローカル正本にだけ保存され、snapshot/ログへは出さない。
+    const scheduleBlocks = raw.flatMap((e) => {
+      if (!e.id) return []
+      const allDay = Boolean(e.start?.date)
+      const startAt = e.start?.dateTime || (e.start?.date ? `${e.start.date}T00:00:00+09:00` : '')
+      if (!startAt) return []
+      let endAt = e.end?.dateTime || (e.end?.date ? `${e.end.date}T00:00:00+09:00` : '')
+      if (!endAt) {
+        const startMs = Date.parse(startAt)
+        if (Number.isNaN(startMs)) return []
+        endAt = new Date(startMs + (allDay ? 86400000 : 3600000)).toISOString()
+      }
+      return [{
+        provider: 'google-calendar',
+        accountId: e.accountId || '',
+        calendarId: e.calendarId || '',
+        externalId: e.id,
+        startAt,
+        endAt,
+        title: (e.summary || '').trim(),
+        allDay,
+        busy: e.transparency !== 'transparent',
+        status: e.status === 'cancelled' ? 'cancelled' as const : 'active' as const,
+      }]
+    })
     const events: Record<string, unknown>[] = []
     const skipped: string[] = []
     // 企業名を決定的に特定できなかった「就活っぽい」予定。ここだけを後段のLLMに渡す。
@@ -325,14 +387,14 @@ function main() {
     })
     const dupCount = events.length - deduped.length
 
-    writeFileSync(outPath, JSON.stringify({ events: deduped }, null, 2), 'utf8')
+    writeFileSync(outPath, JSON.stringify({ events: deduped, scheduleBlocks, syncStates }, null, 2), 'utf8')
     // 判断が要る残りは別ファイルへ。呼び出し側はこれが空でないときだけLLMを起動する。
     const residuePath = outPath.replace(/\.json$/, '') + '-residue.json'
     writeFileSync(residuePath, JSON.stringify({ events: residue }, null, 2), 'utf8')
     // 取り込まなかった予定が「静かに消える」のが最悪なので必ず件数を出す
-    console.error(`取得${raw.length}件(${ACCOUNTS.length}アカウント・カレンダー${calTotal}個) → 確定${deduped.length}件(重複${dupCount}件除去) / 要判定${residue.length}件 / 対象外${skipped.length}件`)
+    console.error(`取得${raw.length}件(${ACCOUNTS.length}アカウント・カレンダー${calTotal}個) → 占有${scheduleBlocks.length}件 / 就活確定${deduped.length}件(重複${dupCount}件除去) / 要判定${residue.length}件 / 対象外${skipped.length}件`)
     if (residue.length) console.error(`要判定: ${residue.slice(0, 6).map((r: any) => r.title).join(' | ')}`)
-    console.log(JSON.stringify({ fetched: raw.length, written: deduped.length, duplicates: dupCount, residue: residue.length, skipped: skipped.length, outPath, residuePath }))
+    console.log(JSON.stringify({ fetched: raw.length, scheduleBlocks: scheduleBlocks.length, written: deduped.length, duplicates: dupCount, residue: residue.length, skipped: skipped.length, syncStates, outPath, residuePath }))
   })()
 }
 

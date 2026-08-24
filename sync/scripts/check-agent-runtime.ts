@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promis
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { dirname } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import {
   classifyFailure,
   commandPreview,
@@ -117,6 +117,104 @@ function request(overrides: Partial<AgentRunRequest> = {}): AgentRunRequest {
 const workDir = await mkdtemp(join(tmpdir(), 'katazuku-agent-runtime-'))
 
 try {
+  const policyPath = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'scripts', 'workspace-mcp-policy.mjs')
+  const mailPolicy = await import(pathToFileURL(policyPath).href) as {
+    evaluateWorkspaceToolCall(message: unknown, selfEmails: string[], capabilities?: string[], approvedCall?: unknown):
+      { allow: boolean; reason?: string; consumeApproval?: boolean }
+  }
+
+  await check('Google Workspace bridgeはstdio終了時に子プロセスツリーを回収する', async () => {
+    const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
+    const bridge = await readFile(join(repoRoot, 'scripts', 'workspace-mcp-bridge.mjs'), 'utf8')
+    assert(bridge.includes("process.stdin.on('close'"), 'stdin closeの終了境界がありません')
+    assert(bridge.includes('taskkill.exe') && bridge.includes('/T') && bridge.includes('/F'), 'Windows子孫回収がありません')
+    assert(bridge.includes('process.once("exit", forceStopChildTree)'), 'bridge終了時の最終回収がありません')
+  })
+
+  await check('旧Google Workspace MCPの掃除は現行node bridgeを対象外にする', async () => {
+    const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
+    const cleanup = await readFile(join(repoRoot, 'scripts', 'cleanup-workspace-mcp.ps1'), 'utf8')
+    assert(cleanup.includes("$_.Name -eq 'uvx.exe'"), 'uvx rootへ対象を限定していません')
+    assert(cleanup.includes("Name -ne 'node.exe'"), '現行node bridgeの除外がありません')
+    assert(cleanup.includes('[switch]$Apply'), '明示的な実行ゲートがありません')
+  })
+
+  await check('Google Workspace直接クライアントも子プロセスツリーを回収する', async () => {
+    const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
+    for (const name of ['ws-mcp-call.mjs', 'inbox-tidy.mjs']) {
+      const source = await readFile(join(repoRoot, 'scripts', name), 'utf8')
+      assert(source.includes('taskkill.exe') && source.includes('/T') && source.includes('/F'), `${name}にWindows子孫回収がありません`)
+    }
+    const healthClient = await readFile(join(repoRoot, 'scripts', 'ws-mcp-call.mjs'), 'utf8')
+    assert(healthClient.includes('args.includes("--health")'), '読み取り専用health入口がありません')
+    assert(healthClient.includes('query: "newer_than:1d"'), 'healthが固定の読み取りクエリではありません')
+  })
+
+  await check('Google Workspace境界は未承認の第三者宛送信をコードで拒否する', () => {
+    const call = {
+      method: 'tools/call',
+      params: { name: 'send_gmail_message', arguments: { to: 'recruiter@example.com', cc: 'self@example.com' } },
+    }
+    const verdict = mailPolicy.evaluateWorkspaceToolCall(call, ['self@example.com'], ['gmail.send.confirmed'])
+    assert(!verdict.allow && verdict.reason?.includes('本人が確認'), JSON.stringify(verdict))
+  })
+
+  await check('Google Workspace境界は本人承認と完全一致する第三者宛送信を一度だけ許可する', () => {
+    const args = {
+      to: 'recruiter@example.com',
+      subject: '交通費精算',
+      body: '領収書を添付します。',
+      attachments: [{ path: 'receipt.jpg' }],
+    }
+    const call = { method: 'tools/call', params: { name: 'send_gmail_message', arguments: args } }
+    const verdict = mailPolicy.evaluateWorkspaceToolCall(
+      call,
+      ['self@example.com'],
+      ['gmail.send.confirmed'],
+      { name: 'send_gmail_message', arguments: args },
+    )
+    assert(verdict.allow && verdict.consumeApproval, JSON.stringify(verdict))
+  })
+
+  await check('Google Workspace境界は承認後に本文や添付が変わった第三者宛送信を拒否する', () => {
+    const approved = {
+      name: 'send_gmail_message',
+      arguments: { to: 'recruiter@example.com', subject: '交通費精算', body: '本文', attachments: ['a.jpg'] },
+    }
+    const call = {
+      method: 'tools/call',
+      params: { name: 'send_gmail_message', arguments: { ...approved.arguments, body: '変更本文' } },
+    }
+    const verdict = mailPolicy.evaluateWorkspaceToolCall(
+      call, ['self@example.com'], ['gmail.send.confirmed'], approved,
+    )
+    assert(!verdict.allow && verdict.reason?.includes('一致しない'), JSON.stringify(verdict))
+  })
+
+  await check('Google Workspace境界は本人だけへの通知を許可する', () => {
+    const verdict = mailPolicy.evaluateWorkspaceToolCall({
+      method: 'tools/call',
+      params: { name: 'send_gmail_message', arguments: { to: 'Self <self@example.com>' } },
+    }, ['self@example.com'], ['gmail.send.self'])
+    assert(verdict.allow, JSON.stringify(verdict))
+  })
+
+  await check('Google Workspace境界は下書き作成を妨げない', () => {
+    const verdict = mailPolicy.evaluateWorkspaceToolCall({
+      method: 'tools/call',
+      params: { name: 'draft_gmail_message', arguments: { to: 'recruiter@example.com' } },
+    }, ['self@example.com'])
+    assert(verdict.allow, JSON.stringify(verdict))
+  })
+
+  await check('Google Workspace境界はread-only workflowの送信を本人宛でも拒否する', () => {
+    const verdict = mailPolicy.evaluateWorkspaceToolCall({
+      method: 'tools/call',
+      params: { name: 'send_gmail_message', arguments: { to: 'self@example.com' } },
+    }, ['self@example.com'], ['gmail.read'])
+    assert(!verdict.allow && verdict.reason?.includes('許可されていない'), JSON.stringify(verdict))
+  })
+
   await check('provider順を重複なしで解決する', () => {
     const order = parseProviderOrder('claude,codex,claude,codex-oss')
     assert(order.join(',') === 'claude,codex,codex-oss', order.join(','))
@@ -211,6 +309,33 @@ try {
     )
   })
 
+  await check('Codexのtool出力にあるweekly limit説明を枠切れ扱いしない', () => {
+    // 2026-08-22 実害: asaがdocs/PROGRESS.mdを読んだcommand_execution出力に
+    // 過去の週制限文言が含まれただけでCodexを8/29まで停止扱いにし、mail-watch等が全停止した。
+    const toolOutput = JSON.stringify({
+      type: 'item.completed',
+      item: {
+        type: 'command_execution',
+        aggregated_output: 'Claude CLIの実制限文言 weekly limit · resets Jul 26, 9pm を実測し、従来regexを修正',
+        exit_code: 0,
+        status: 'completed',
+      },
+    })
+    assert(
+      detectProcessFailure(processResult({ exitCode: 0, stdout: toolOutput })) === undefined,
+      '正常なCodex tool出力を枠切れ扱いしました',
+    )
+    assert(
+      classifyFailure(processResult({ exitCode: 1, stdout: toolOutput })) !== 'quota_exhausted',
+      '失敗runのtool出力を枠切れ根拠にしました',
+    )
+    const providerError = JSON.stringify({ type: 'error', message: 'You have hit your weekly limit' })
+    assert(
+      detectProcessFailure(processResult({ exitCode: 0, stdout: providerError })) === 'quota_exhausted',
+      'provider自身の構造化エラーを見逃しました',
+    )
+  })
+
   await check('認証切れ・接続失敗・spawn失敗を分類する', async () => {
     assert(classifyFailure(processResult({ exitCode: 1, stderr: 'Login required' })) === 'auth_unavailable', 'auth')
     assert(classifyFailure(processResult({ exitCode: 1, stderr: 'Unable to connect to API' })) === 'connection_failed', 'connection')
@@ -277,15 +402,19 @@ try {
 
   await check('Codexは非対話・stdin・安全なsandboxで起動する', () => {
     const adapter = createCodexAdapter({ command: 'codex', voiceboxMcpUrl: 'http://127.0.0.1:17493/mcp' })
-    const preview = commandPreview(adapter, request({ risk: 'db-write', capabilities: ['workspace.read', 'web.search', 'voice.transcribe'] }), join(workDir, 'final.txt'))
+    const preview = commandPreview(adapter, request({ risk: 'db-write', capabilities: ['workspace.read', 'web.search', 'voice.transcribe', 'gmail.read'] }), join(workDir, 'final.txt'))
     assert(preview.args[0] === 'exec', 'codex execではありません')
     assert(preview.args.includes('--json') && preview.args.includes('--output-last-message'), '自動化用出力がありません')
     assert(preview.args.includes('workspace-write'), 'workspace-writeではありません')
     assert(preview.args.includes('tools.web_search=true'), 'web searchがconfig overrideで有効化されていません')
     assert(preview.args.some((arg) => arg.includes('mcp_servers.voicebox.url=')), 'Voicebox MCP設定がありません')
+    assert(preview.env?.KATAZUKU_WORKSPACE_CAPABILITIES === 'gmail.read', 'MCP bridgeへ最小capabilityが渡っていません')
     assert(!preview.args.includes('--search'), '現行codexが解釈できない--searchを渡しています')
     assert(preview.args.at(-1) === '-', 'promptをstdinから読んでいません')
     assert(!preview.args.some((arg) => /danger|yolo/.test(arg)), '危険なflagがあります')
+    const confirmed = commandPreview(adapter, request({ capabilities: ['gmail.send.confirmed'] }), join(workDir, 'confirmed.txt'))
+    assert(confirmed.env?.KATAZUKU_WORKSPACE_CAPABILITIES === 'gmail.send.confirmed',
+      '本人承認済み送信capabilityがMCP bridgeへ渡っていません')
   })
 
   await check('ローカルOSS adapterはCodexのlocal provider境界を使う', () => {
@@ -297,11 +426,17 @@ try {
 
   await check('Claudeはstream-jsonで副作用と最終出力を分離する', async () => {
     const adapter = createClaudeAdapter({ command: 'claude' })
-    const req = request({ capabilities: ['workspace.read', 'web.search'] })
+    const req = request({ capabilities: ['workspace.read', 'web.search', 'gmail.read'] })
     const preview = commandPreview(adapter, req, join(workDir, 'unused.txt'))
     assert(preview.args.includes('-p'), 'headless modeではありません')
     assert(preview.args.includes('stream-json') && preview.args.includes('--verbose'), '構造化event出力ではありません')
     assert(preview.args.includes('WebSearch'), 'capabilityがallowedToolsへ変換されていません')
+    assert(preview.args.includes('mcp__google-workspace__search_gmail_messages'),
+      'katazukuのGoogle Workspace Gmail読取がallowedToolsにありません')
+    assert(!preview.args.includes('mcp__google-workspace__send_gmail_message'),
+      'gmail.readだけのworkflowに送信toolが混入しています')
+    assert(!preview.args.some((arg) => arg.includes('claude_ai_Gmail')),
+      '別認証のclaude.ai GmailがallowedToolsに残っています')
     assert(!preview.args.includes(req.prompt), 'promptが引数へ漏れています')
 
     const limited = processResult({
@@ -535,7 +670,7 @@ try {
     )
     const detected = await detectCodexExtraCapabilities(nested)
     assert(
-      detected.includes('gmail.read') && detected.includes('gmail.send')
+      detected.includes('gmail.read') && detected.includes('gmail.send.self') && detected.includes('gmail.send.confirmed')
         && detected.includes('calendar.write') && detected.includes('sheets.write')
         && detected.includes('voice.transcribe'),
       '設定済みMCP capabilityを検出できません',
@@ -569,6 +704,17 @@ try {
     assert(calls[0].stdin === req.prompt && !calls[0].args.includes(req.prompt), 'promptがstdin境界にありません')
     const ledger = await readFile(join(workDir, 'prompt-boundary', 'run.local.json'), 'utf8')
     assert(!ledger.includes(req.prompt), 'run台帳へpromptが入りました')
+  })
+
+  await check('mail-watchは第三者へ自動送信せず下書きで止まる', async () => {
+    const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
+    const prompt = await readFile(join(repoRoot, 'scripts', 'mail-watch-prompt.md'), 'utf8')
+    assert(prompt.includes('第三者への送信は一切行わない'), '第三者送信の禁止が明記されていません')
+    assert(prompt.includes('必ず下書き(draft_gmail_message)までに留める'), '下書き停止が明記されていません')
+    assert(!prompt.includes('そのスレッドへ自動送信'), '定型返信の自動送信ルールが残っています')
+    assert(!prompt.includes('自動送信可'), '自動送信可のアカウント設定が残っています')
+    assert(prompt.includes('大学・研究上の都合により'), '日程変更理由が大学・研究上の都合に固定されていません')
+    assert(!prompt.includes('「就活の予定と重複したため」'), '他社選考を示唆する日程変更理由が残っています')
   })
 
   const DIRECT_CALL = /(?:^|[|&\s])codex(?:\s+exec|\s+--)|(?:^|[|&\s])claude(?:\s+-p|\s+\$)/m

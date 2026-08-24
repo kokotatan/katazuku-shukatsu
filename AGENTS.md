@@ -4,6 +4,14 @@
 目的: ルーチン・雑務を自動運転し、本人は「考える・受ける・認証する・決める」だけに集中する。
 返答・コメント・コミットは日本語。絵文字禁止。
 
+## 端末の役割分担
+
+- MiniPC（Windowsホスト名 `KOKOTATANPC`）は常時運転・バックグラウンド処理用、ノートPCは本人の認証・確認・手入力用とする。
+- パスワード、パスキー、OAuth同意、メール/SMSコード、CAPTCHA、本人確認など、本人操作が必要になり得るブラウザ作業は、接続中ChromeのうちノートPC上で本人が開いたタブを明示参照してもらったインスタンスを優先する。`KOKOTATANPC` と表示されるローカルprobeはMiniPCの識別子であり、ノートPC判定には使わない。
+- Chrome拡張の接続IDは再起動で変わり得るため固定保存しない。候補が複数ある場合は、ノートPC上で本人が開いたタブを明示参照してもらって識別する。
+- MiniPCで準備を始めた作業が認証境界に到達した場合、秘密をチャット・ログ・URL表示へ出さず、同じページをノートPC側Chromeへ引き渡して本人がその場で続行できる状態にする。
+- ノートPCではCodexをローカル実行し、Chrome・Downloads・OAuth等を同一端末内で扱う。正本DB・snapshot・定常処理だけを`notebook-minipc.ps1`からSSHでMiniPCへ依頼する。別端末のChrome拡張を介したファイル転送は行わない。詳細は`docs/NOTEBOOK-MINIPC-OPERATIONS.md`。
+
 ## アーキテクチャ(2026-07-18 DB中心化。docs/specs/08-data.md)
 
 ```
@@ -15,6 +23,18 @@ data/katazuku.db(正本・SQLite/node:sqlite・gitignore)
 ```
 
 - **DBに書いたら必ず `cd sync && npx tsx scripts/db-snapshot.ts` を実行**(アプリへの即時反映)。合言葉は repo直下 .env
+- **外部サイトで面接・面談・イベントの日程を確定する直前は、必ずカレンダー同期を実行してから正本DBを照合する**。
+  `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/calendar-sync.ps1` の成功後、
+  `cd sync && npx tsx scripts/db-appointment.ts conflicts <開始ISO> <終了ISO>` が
+  `state: "available"`、`available: true`、`database.role: "canonical"` の場合だけ確定する。
+  `unknown`は空きではない。Calendar同期失敗・10分超の鮮度切れ・同期期間外・replica DBはすべて`unknown`として停止する。
+  Googleカレンダーの画面だけ、会話要約だけ、記憶だけで空きと判断しない。複数日・終日予定も占有として扱う。
+- **採用担当者・面接官など第三者への送信は、内容の重要度や定型性にかかわらず自動送信しない**。
+  メール、Slack、フォームの自由記述、日程回答、予約確定、取消・変更通知を含め、agentは下書き・入力・確認画面までで停止する。
+  送信直前に宛先・本文・確定日時・通知される内容を本人へそのまま提示し、その内容に対する本人の明示承認を得た同じ作業内でのみ送信する。
+  過去の包括承認や「対応して」などの広い依頼を最終送信の承認として流用しない。
+  日程変更理由は原則「大学・研究上の都合により、当該日程での参加が難しいため」とする。
+  「就活の予定」「他社の予定」など他社選考を示唆する表現、他社名・選考名、相手に不要な第三者情報は、本人が明示承認しない限り開示しない。
 - スキーマ: company(name=正式名称/short_name) / selection(+outcome列挙) / **appointment(面接・締切の日時/URL/場所/相手)** /
   event(+ref=元メールID) / company_alias / pending_review / mail_item / submission / company_dossier /
   interview_note / meeting_run / person / person_note / appointment_person / person_photo / profile_basic / profile_suggestion
@@ -52,7 +72,7 @@ npm run build                              # board(管理画面)ビルド + sync
    共通 @katazuku/data で /api/data を読む。insight/boardも同じsnapshotを読む。
    **見た目はSmartHR Design Systemのまま維持**(本人が気に入っている。刷新はしない。細部改善のみ可)。
    api/ のみ廃止のまま(履歴はタグ apps-archive-20260718)
-2. **外部実走確認のみ残る**: daily-sync/calendar-sync/asa/mail-watchは実装済み。Windowsタスク登録と実コネクタでの初回実走を確認
+2. **外部実走確認のみ残る**: daily-sync/calendar-sync/asa/mail-watchは実装済み。calendar-syncは5分ごとのWindowsタスクで常時同期する。
 3. **board/の実機確認**: katazuku.kotalabo.com にデプロイ後、スマホでOAuth→表示確認
 4. **次の構想**: 企業研究・面接対策パイプライン(deep research・IR・ブログ/動画・OBOG・業務/顧客/技術理解を
    企業ごとのdossierに集約し、DBと面接準備に接続する)。着手前に本人と設計を確認する
@@ -94,6 +114,11 @@ npm run build                              # board(管理画面)ビルド + sync
     ミラー等の副作用は未分離で従来daily-sync.ps1に残す。実走でCodex CLIの版差(--search廃止→
     tools.web_search config、引数エラーの安全分類)も修正。次はcalendar-sync/mail-watch/asaを同型で移行。
     設計はdocs/specs/14。
+    **workflow工程制御(2026-08-24)**: stepごとのowner・capability・副作用・承認・冪等性・遷移を
+    `sync/workflows/*.json`で宣言し、`workflow-control.ts`が順序、正本DB identity、契約hashを強制する。
+    実行台帳は`logs/workflow-runtime.local.db`へ分離。daily-sync-v2は
+    `prepare→extract(Agent)→validate→apply→snapshot→audit`へ接続済み。第三者確定操作は、提示action全体の
+    hashと同一作業内の本人承認が一致する場合だけExecutorが実行できる。次はmail-watch/asaを契約へ移行する。
     **Claude週制限の自動引継ぎ(2026-07-24)**: 実文言`weekly limit · resets ...`を検知し、復活日時を
     `logs/agent-runs/provider-health.local.json`へ保存。期限まではCodexへ即時切替、期限後の次runでClaudeを
     再優先する。コード・文書開発は`workspace`、Gmail・Calendar等の運用は`reconcile`でCodexが継続する。

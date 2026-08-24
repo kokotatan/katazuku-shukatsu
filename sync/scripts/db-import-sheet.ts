@@ -14,8 +14,9 @@ import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { openDb, upsertCompany, insertSelection, type Selection, type CompanyInfo } from '../src/db'
 import { PASSWORD_MASK } from './db-mirror'
+import { resolveDatabasePath } from '../src/database-path'
 
-const DB_PATH = process.env.KATAZUKU_DB ?? join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'data', 'katazuku.db')
+const DB_PATH = resolveDatabasePath()
 
 const args = process.argv.slice(2)
 const seedPath = args.find((a) => !a.startsWith('--'))

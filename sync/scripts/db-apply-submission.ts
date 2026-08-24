@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url'
 import type { DatabaseSync } from 'node:sqlite'
 import { addEvent, openDb, outcomeOf, transition, type Stage } from '../src/db'
 import { resolveSelectionId, transaction } from '../src/inputs'
+import { resolveDatabasePath } from '../src/database-path'
 
 interface SubmissionInput {
   sourceRef: string
@@ -19,7 +20,7 @@ interface SubmissionInput {
 }
 
 const dbArgIndex = process.argv.indexOf('--db')
-const DB_PATH = dbArgIndex >= 0 ? resolve(process.argv[dbArgIndex + 1]) : (process.env.KATAZUKU_DB_PATH || join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'data', 'katazuku.db'))
+const DB_PATH = resolveDatabasePath(dbArgIndex >= 0 ? process.argv[dbArgIndex + 1] : undefined)
 
 function stageFor(result: string): Stage | null {
   if (/不合格|見送り/.test(result)) return 'rejected'

@@ -32,7 +32,7 @@ $runId = 'asa:' + (Get-Date -Format 'yyyy-MM-dd')
 try {
   & $invoke -Workflow 'asa' -RunId $runId -PromptText $prompt `
     -Risk 'external-commit' -SideEffectMode 'reconcile' `
-    -Capability @('workspace.read', 'workspace.write', 'shell', 'gmail.read', 'gmail.draft', 'gmail.labels', 'gmail.send', 'calendar.read', 'calendar.write', 'drive.read', 'sheets.read') `
+    -Capability @('workspace.read', 'workspace.write', 'shell', 'gmail.read', 'gmail.draft', 'gmail.labels', 'gmail.send.self', 'calendar.read', 'calendar.write', 'drive.read', 'sheets.read') `
     *>&1 | Out-File -FilePath $logFile -Encoding utf8
 } catch {
   $_ | Out-File -FilePath $logFile -Append -Encoding utf8

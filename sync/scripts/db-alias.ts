@@ -9,8 +9,9 @@
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { openDb, addAlias, addPending, listPending, upsertCompany, resolveCompany, setOfficialName } from '../src/db'
+import { resolveDatabasePath } from '../src/database-path'
 
-const DB_PATH = process.env.KATAZUKU_DB ?? join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'data', 'katazuku.db')
+const DB_PATH = resolveDatabasePath()
 const db = openDb(DB_PATH)
 const [cmd, a, b] = process.argv.slice(2)
 

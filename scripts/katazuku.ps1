@@ -1,6 +1,6 @@
 ﻿# katazuku — 統一コマンド。READMEの `katazuku <動詞>` 構想の入口。
 # セットアップ(1回): PowerShellプロファイルに次の1行を追加
-#   function katazuku { & "C:\Users\okuya\katazuku-shukatsu\scripts\katazuku.ps1" @args }
+#   function katazuku { & "C:\Users\okuya\katazuku-shukatsu-private\scripts\katazuku.ps1" @args }
 param(
   [Parameter(Position = 0)] [string] $Command = 'help',
   [Parameter(Position = 1, ValueFromRemainingArguments = $true)] [string[]] $Rest
@@ -49,13 +49,13 @@ switch ($Command) {
     Set-Location $root
     $prompt = Get-Content (Join-Path $root 'scripts\asa-prompt.md') -Raw -Encoding UTF8
     Invoke-KatazukuAgent 'asa-manual' $prompt 'external-commit' 'reconcile' `
-      @('workspace.read', 'workspace.write', 'shell', 'gmail.read', 'gmail.draft', 'gmail.labels', 'gmail.send', 'calendar.read', 'calendar.write', 'drive.read', 'sheets.read')
+      @('workspace.read', 'workspace.write', 'shell', 'gmail.read', 'gmail.draft', 'gmail.labels', 'calendar.read', 'calendar.write', 'drive.read', 'sheets.read')
   }
   'inbox'   {                                         # 連絡管理: asa と同じルーチン(旧inbox-triageを吸収)
     Set-Location $root
     $prompt = Get-Content (Join-Path $root 'scripts\asa-prompt.md') -Raw -Encoding UTF8
     Invoke-KatazukuAgent 'inbox-manual' $prompt 'external-commit' 'reconcile' `
-      @('workspace.read', 'workspace.write', 'shell', 'gmail.read', 'gmail.draft', 'gmail.labels', 'gmail.send', 'calendar.read', 'calendar.write', 'drive.read', 'sheets.read')
+      @('workspace.read', 'workspace.write', 'shell', 'gmail.read', 'gmail.draft', 'gmail.labels', 'calendar.read', 'calendar.write', 'drive.read', 'sheets.read')
   }
   'inbox-web' { Open-App 'inbox' 4173 }               # 旧inbox: 取込メールの仕分けSPA(Web)
   'status'  { Open-App 'status' 4174 }                # 進捗管理: 全社の選考状況ボード

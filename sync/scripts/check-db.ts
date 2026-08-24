@@ -6,7 +6,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { openDb, upsertCompany, insertSelection, listSelections, listCompanies, listEvents, listAppointments, addAppointment, outcomeOf, transition, sameCompany, samePosition, resolveCompany, addAlias, listPending, setOfficialName, normalizeAppointmentAt, sameAppointment, SCHEMA_VERSION } from '../src/db'
+import { openDb, upsertCompany, insertSelection, listSelections, listCompanies, listEvents, listAppointments, addAppointment, listAppointmentConflicts, outcomeOf, transition, sameCompany, samePosition, resolveCompany, addAlias, listPending, setOfficialName, normalizeAppointmentAt, sameAppointment, getDatabaseContext, SCHEMA_VERSION } from '../src/db'
 import { applyDiff } from './db-apply'
 import { savePersonPhoto } from './db-apply-interview'
 import { applyCalendar } from './db-apply-calendar'
@@ -15,6 +15,8 @@ import { renderMirror, PASSWORD_MASK } from './db-mirror'
 import { listPlatformSnapshot } from '../src/platform'
 import { transaction, upsertPerson } from '../src/inputs'
 import { isMeetingUrl } from '../src/meeting-url'
+import { applyScheduleProjection, getScheduleAvailability } from '../src/schedule'
+import { resolveDatabasePath } from '../src/database-path'
 
 let failed = 0
 function check(label: string, cond: boolean, detail = '') {
@@ -28,6 +30,14 @@ const db: DatabaseSync = openDb(':memory:')
 // --- スキーマ版(2026-07-22。破壊的マイグレーションを番号で束ねる土台) ---
 const uv = (db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version
 check('openDbが現行スキーマ版をuser_versionへ記録する', uv === SCHEMA_VERSION, `user_version=${uv}`)
+const memoryContext = getDatabaseContext(db)
+check('DB identity: インメモリDBをfixtureとして識別する', memoryContext.role === 'fixture' && memoryContext.path === ':memory:')
+check('DB identity: 同じDBを開いている間は論理IDが安定する', memoryContext.databaseId === getDatabaseContext(db).databaseId)
+check('DB path: KATAZUKU_DBを旧KATAZUKU_DB_PATHより優先する',
+  resolveDatabasePath(undefined, { env: { KATAZUKU_DB: './canonical.db', KATAZUKU_DB_PATH: './legacy.db' } })
+    .endsWith('canonical.db'))
+check('DB path: 明示引数を環境変数より優先する',
+  resolveDatabasePath('./explicit.db', { env: { KATAZUKU_DB: './canonical.db' } }).endsWith('explicit.db'))
 
 // --- transition(遷移規則) ---
 check('八洲問題: 合格でも辞退の根拠があれば確定する', transition('合格', 'closed') === '辞退')
@@ -191,6 +201,63 @@ const ap2 = addAppointment(db, { selectionId: apSel.id, at: '2026-07-21T23:59', 
 check('appointment: 同一(トラック×日時×タイトル)は重複しない', !ap2.created && ap2.id === ap1.id)
 check('appointment: 空欄のURLは後から補完される', listAppointments(db).some((a) => a.title === '研究資料PDF提出' && a.url === 'https://example.com/submit'))
 
+const allDay = addAppointment(db, {
+  selectionId: apSel.id,
+  at: '2026-09-02T00:00:00+09:00',
+  endAt: '2026-09-05T00:00:00+09:00',
+  kind: 'インターン',
+  title: '3daysインターン',
+})
+check('appointment: start/endを同じUTC形式で保存する',
+  listAppointments(db).find((a) => a.id === allDay.id)?.endAt === normalizeAppointmentAt('2026-09-05T00:00:00+09:00'))
+check('予定衝突: 複数日の終日予定の途中を検出する',
+  listAppointmentConflicts(db, '2026-09-04T18:00:00+09:00', '2026-09-04T18:30:00+09:00').some((a) => a.id === allDay.id))
+check('予定衝突: 終了境界直後は空きとして扱う',
+  !listAppointmentConflicts(db, '2026-09-05T00:00:00+09:00', '2026-09-05T00:30:00+09:00').some((a) => a.id === allDay.id))
+
+// --- 空き判定セマンティック層(会社に属さない大学・私用予定も含み、同期不全はunknown) ---
+const scheduleNow = '2026-10-01T00:00:00.000Z'
+applyScheduleProjection(db, {
+  blocks: [{
+    provider: 'google-calendar', accountId: 'personal@example.com', calendarId: 'primary',
+    externalId: 'private-block-1', title: '大学の予定',
+    startAt: '2026-10-10T13:00:00+09:00', endAt: '2026-10-10T15:00:00+09:00',
+  }],
+  syncStates: [{
+    source: 'google-calendar', accountId: 'personal@example.com', scopeId: 'primary', status: 'success',
+    coveredFrom: '2026-09-24T00:00:00.000Z', coveredUntil: '2026-11-30T00:00:00.000Z', attemptedAt: scheduleNow,
+  }],
+  replaceSyncSources: true,
+})
+const privateConflict = getScheduleAvailability(
+  db, '2026-10-10T14:00:00+09:00', '2026-10-10T14:30:00+09:00',
+  { now: new Date(scheduleNow), requireCanonical: false },
+)
+check('schedule: 選考トラックに属さない私用・大学予定も衝突になる',
+  privateConflict.state === 'conflict' && privateConflict.conflicts.some((item) => item.source === 'calendar'))
+const freeSlot = getScheduleAvailability(
+  db, '2026-10-10T16:00:00+09:00', '2026-10-10T16:30:00+09:00',
+  { now: new Date(scheduleNow), requireCanonical: false },
+)
+check('schedule: 同期済み期間内で衝突なしの場合だけavailable', freeSlot.state === 'available' && freeSlot.available)
+applyScheduleProjection(db, {
+  syncStates: [{
+    source: 'google-calendar', accountId: 'personal@example.com', scopeId: 'primary', status: 'failed',
+    attemptedAt: '2026-10-01T00:05:00.000Z', error: 'test failure',
+  }],
+  replaceSyncSources: true,
+})
+const unknownSlot = getScheduleAvailability(
+  db, '2026-10-10T16:00:00+09:00', '2026-10-10T16:30:00+09:00',
+  { now: new Date('2026-10-01T00:05:00.000Z'), requireCanonical: false },
+)
+check('schedule: 最新Calendar同期が失敗なら空きへ丸めずunknown', !unknownSlot.available && unknownSlot.state === 'unknown')
+const knownConflictWithFailedSync = getScheduleAvailability(
+  db, '2026-10-10T14:00:00+09:00', '2026-10-10T14:30:00+09:00',
+  { now: new Date('2026-10-01T00:05:00.000Z'), requireCanonical: false },
+)
+check('schedule: 同期不全でも既知の衝突があれば安全側のconflict', knownConflictWithFailedSync.state === 'conflict')
+
 const apRes = applyDiff(db, [{ name: '予定テスト社', stage: 'interview', appointments: [{ at: '2026-07-25T15:00', kind: '面接', title: '2次面接', url: 'https://zoom.us/j/xxx', person: '川島氏' }] }])
 check('apply: 予定つき新規はappointmentも入る', apRes.added.length === 1 && listAppointments(db).some((a) => a.title === '2次面接' && a.person === '川島氏'))
 check('apply: 予定追加はイベントに残る', listEvents(db).some((e) => e.kind === '予定追加' && e.summary.includes('2次面接')))
@@ -331,7 +398,7 @@ check('meeting-url: www.付き短縮リンクも受理', isMeetingUrl('https://w
 check('meeting-url: 無関係URL・空・不正は非会議', !isMeetingUrl('https://example.com/x') && !isMeetingUrl('') && !isMeetingUrl('not a url') && !isMeetingUrl(null))
 check('meeting-url: 偽装ホスト(weburl.jp.evil.com)は受理しない', !isMeetingUrl('https://weburl.jp.evil.com/x'))
 
-const requiredTables = ['meeting_run', 'interview_note', 'submission', 'company_dossier', 'mail_item', 'appointment_person']
+const requiredTables = ['meeting_run', 'interview_note', 'submission', 'company_dossier', 'mail_item', 'appointment_person', 'database_identity', 'source_sync_state', 'schedule_block']
 const schemaTables = (db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as { name: string }[]).map((row) => row.name)
 check('6入力: 必要な専用テーブルが揃う', requiredTables.every((name) => schemaTables.includes(name)))
 

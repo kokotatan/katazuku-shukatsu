@@ -23,7 +23,10 @@ COMPANYの企業研究から、応募、適性検査を本人が受けられる�
 6. エントリーまたはESの送信直前に、送信対象の画面内容を本人へ提示する。同じ実行中の明示承認を得た場合だけ送信し、`approvedByUser:true`の提出イベントを記録する。過去の包括承認を流用しない。
 7. パスワード、メール認証、SMS、CAPTCHAは本人へ引き継ぎ、完了後に続行する。認証情報はファイル、DB、ログへ保存しない。
 8. 提出後に適性検査がある場合は、種類、提供元、URL、期限、所要時間、持ち物、環境だけを整理し、`assessment_ready`まで進める。問題や解答を保存・生成・入力せず、受検開始直前で本人へ引き継ぐ。受検完了は本人の申告後だけ記録する。
-9. 面接候補が提示された場合、本人が事前指定した可能時間帯の中だけ予約する。範囲外または設定がなければ候補を提示して確認し、確定後に`interview_scheduled`とappointmentを記録する。
+9. 面接候補が提示された場合、まず `scripts/calendar-sync.ps1` を成功させ、候補ごとに正本DBへ
+   `cd sync; npx tsx scripts/db-appointment.ts conflicts <開始ISO> <終了ISO>` を実行する。
+   `state: "available"`、`available: true`、`database.role: "canonical"` かつ本人が事前指定した可能時間帯の中だけ予約する。
+   `unknown`、範囲外、設定なし、DB衝突ありなら候補を提示して確認し、確定後に`interview_scheduled`とappointmentを記録する。
 10. 後日のメール待ちになった場合は、現在の正確なstate、次に自動で拾う内容、本人が行うことを簡潔に報告して終了する。daily-syncが適性検査案内と面接確定メールを同じrunへ反映する。
 
 ## 完了条件
