@@ -2,6 +2,38 @@
 
 最終更新: 2026-07-24
 
+## 2026-08-24 運用決定: 同じkatazukuの2実行拠点
+
+「ブラウザ操作もMiniPCへ寄せる」案は採用しない。Chrome拡張の接続、ローカルファイル権限、
+端末判定をまたいでノートPCのファイルを添付する経路が不安定だったため、役割を次で固定する。
+
+| 実行拠点 | 担当 |
+| --- | --- |
+| ノートPC | Gmail・応募サイトのブラウザ操作、Downloads添付、OAuth/CAPTCHA/本人確認、会議・録音 |
+| MiniPC | 正本DB、Gmail/Calendar同期、定常タスク、snapshot・バックアップ、重い調査・バックグラウンド処理 |
+
+ノートPCからDB更新が必要な場合は、`.katazuku-satellite` によるローカルDBガードの下で
+`scripts/invoke-minipc-db.ps1` を使う。このCLIは操作を許可リストへ限定し、JSONをASCII名でMiniPCへ転送、
+MiniPC上の `db-apply-*` と `db-snapshot.ts` を連続実行する。コード変更はそれぞれのcloneでGit同期し、
+SSH越しに同じ作業ディレクトリを編集しない。
+
+```text
+ノートPCのCodex
+  +-- ローカルChrome・Downloads・会議/録音
+  +-- SSH許可リストCLI
+        +-- MiniPCの正本DB
+        +-- snapshot・活動ログ
+```
+
+提出結果の例:
+
+```powershell
+.\scripts\invoke-minipc-db.ps1 -Operation apply-submission -InputPath .\tmp\submission.json
+```
+
+ノートPCに残す `katazuku-meeting-autopilot` も、agenda取得とmeeting_run更新は同じSSH入口を使う。
+Google Workspace MCPの多重残留はMiniPC側の同期基盤の問題として扱い、ノートPCのChrome操作とは切り離す。
+
 ## 目的
 
 見張り(mail-watch)、毎日同期(daily-sync)、朝のまとめ(asa)、カレンダー同期、毎日ログイン、
@@ -103,7 +135,7 @@ DBミラーといった定常処理を、本人の主PCの電源・バッテリ�
 | meeting-autopilot(URLを開く) | M | 会議URLを**本人が座っている画面**で開く必要がある。MiniPCで開いても意味がない |
 | record-audio(面接録音) | M | 実マイク・実スピーカーが要る。相手の声は本人の使う出力デバイスに出る。移設不可 |
 | interview-digest(文字起こし) | H寄りのD | Voiceboxがローカルサーバー(GUIアプリ)。MiniPCの自動ログオンセッションなら動く見込み。CPU負荷が高く、実測してから移す |
-| Claude in Chrome によるブラウザ操作(応募・ES提出・マイページ) | D | ログイン済みChromeと拡張、本人の承認操作が要る。**将来はMiniPC上のChromeへ寄せ、本人はリモートデスクトップで入る**のが本命 |
+| Chromeによるブラウザ操作(応募・ES提出・マイページ) | D | ノートPCに固定する。ログイン済みChrome、Downloads添付、本人の承認操作を同じ端末内で完結させる |
 | 資格情報ブローカーの登録(`store-credential.ps1`) | D | 本人がSecureStringで入力する。DPAPI CurrentUserなので**登録した機械でしか復号できない** |
 | 対話認証が要るMCP(google-workspace初回OAuth、claude.aiログイン) | D | ブラウザ同意が要る。MiniPCの画面で1回やる(リモートデスクトップ経由でも可) |
 | クラウド見張りルーチン | 対象外 | claude.ai側で動く |
@@ -355,6 +387,13 @@ data/katazuku.db / 各 db-apply-* / 活動ログ
 | --- | --- | --- |
 | 自動でよい | 状況照会、DBの読み取り、下書き作成、カレンダー登録、企業研究、活動ログ記録 | そのまま実行して結果を返す |
 | 本人の明示承認が要る | 企業・採用担当へのメール送信、応募の確定送信、ES提出、辞退、面接予約の確定、購入、削除(DBレコード・ファイル)、資格情報の登録 | agentは実行せず、**本文全文**をDiscordへ提示し、本人が `承認 <ID>` と返すまで待つ。承認は時限(例: 15分)で失効させる |
+
+外部確定操作を一律禁止するのではなく、すべてを同じ事前検査へ通す。定型の受諾・受領確認・日程回答は
+`docs/mail-style.md`の委任範囲内で自動送信できる。本人の意思を新たに決める操作は、対象・内容・操作IDを
+本人が確認した後に実行する。確定前には、元の外部状態、MiniPCの正本DB、予定の同期鮮度、
+同一thread/sourceRefと内容hashの成功記録、相手に不要な第三者情報が本文へ含まれていないことを照合する。
+成功済み・成否不明の操作は再実行しない。Gmail/Calendarの直接コネクタは確定操作に使わず、
+この検査と冪等化を強制するworkflow/Executorだけに送信・確定権限を与える。
 | 常に不可 | Webテスト・コーディングテストの代行受験、パスワードの平文取得・表示 | 実行しない。理由を返す |
 
 - 承認待ちは `application_run` / `application_event` の既存の承認ゲートに寄せる。
@@ -465,19 +504,16 @@ MiniPCもHomeで組むなら、素のRDPは選べない。Proへ上げるか、�
 ### Phase 3: リモート運用
 
 1. Tailscale を主PC・MiniPC・スマホに入れ、ACLを3台に限定する
-2. MiniPCへ OpenSSHサーバ(または RustDesk/Parsec)を入れ、tailnet内からのみ到達できることを確認する
-3. MiniPCの対話セッションに **career アカウントでログイン済みのChrome** を常設し、
-   Claude in Chrome 拡張を入れる。応募自動運転・マイページ操作の実行場所をMiniPCへ寄せる
-4. 資格情報ブローカーの登録(`store-credential.ps1`)をMiniPC上で本人が行い、
-   `katazuku-local-login` を登録する
-5. 面接録音の受け渡し(handoffフォルダ)をtailnet越しに繋ぐ。
-   Voiceboxの負荷を実測し、digestをMiniPCへ移すか主PCに残すかを決める
+2. MiniPCへOpenSSHサーバを入れ、tailnet内からのみ到達できることを確認する
+3. ノートPCに `.katazuku-satellite` を置き、`invoke-minipc-db.ps1` のagenda取得・JSON反映を確認する
+4. MiniPC側ではgoogle-workspace MCPの初回OAuthだけを対話セッションで通す
+5. 面接録音の成果物と厳格JSONをtailnet越しに渡し、DB反映とsnapshotだけMiniPCで行う
 
-完了条件: 外出先のスマホからMiniPCの画面に入れる。ブラウザ操作の承認をリモートで返せる。
-毎日ログインが `submitted` または `no_login_form` で安定して回る。
+完了条件: ノートPCのChrome・Downloadsで応募作業が完結し、提出後のJSONだけがSSH経由で
+MiniPCの正本DBへ冪等反映される。ノートPCでローカル正本DBを開こうとするとガードで失敗する。
 
-切り戻し: Tailscaleを止める。ブラウザ操作の実行場所を主PCへ戻す(どちらで動かしてもDBを書くのは
-`db-apply-*` 経由の1経路なので、実行場所の切替は運用判断だけで済む)。
+切り戻し: MiniPC側の定常タスクを停止し、日付付きで退避したノートPCのDBを、差分確認後に
+正本名へ戻す。退避DBへ直接上書きはしない。
 
 ## リスクと未解決事項
 

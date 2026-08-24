@@ -204,42 +204,34 @@ if ($ok) {
         }
       } finally { $zip.Dispose() }
 
-      # minipcも兄弟フォルダ構成へ移行済みなら新名を使う。未移行なら旧名を使い、移行中も処理を止めない。
-      $remoteRepoOutput = ssh -o BatchMode=yes minipc 'if exist "%USERPROFILE%\katazuku-shukatsu-private" (echo katazuku-shukatsu-private) else if exist "%USERPROFILE%\katazuku-shukatsu" (echo katazuku-shukatsu) else (exit /b 2)' 2>&1
+      # minipcのログインシェルはbash。Privateの新名を優先し、移行中だけ旧名へフォールバックする。
+      $remoteRepoOutput = ssh -o BatchMode=yes minipc 'if [ -d ~/katazuku-shukatsu-private ]; then printf katazuku-shukatsu-private; elif [ -d ~/katazuku-shukatsu ]; then printf katazuku-shukatsu; else exit 2; fi' 2>&1
       $remoteRepoOutput | Out-File -FilePath $logFile -Append -Encoding utf8
       if ($LASTEXITCODE -ne 0) { throw 'minipc側のPrivateリポジトリが見つかりません' }
       $remoteRepoName = [string]($remoteRepoOutput | Select-Object -Last 1)
       $remoteRepoName = $remoteRepoName.Trim()
-      $remoteRepoPath = '%USERPROFILE%\' + $remoteRepoName
-
       scp -o BatchMode=yes -q $zipPath ("minipc:$remoteRepoName/logs/" + $zipName) 2>&1 | Out-File -FilePath $logFile -Append -Encoding utf8
       if ($LASTEXITCODE -ne 0) { throw 'minipcへの成果物転送(scp)に失敗しました' }
       Remove-Item $zipPath -Force -ErrorAction SilentlyContinue
 
-      # 展開はWindows標準のtar.exe(bsdtar・zip対応・UTF-8エントリ名対応)。
-      # powershellの入れ子クォートはssh越しに壊れるため使わない(2026-08-14実測: バックスラッシュが消える)。
-      $expand = 'tar -xf ' + $remoteRepoPath + '\logs\' + $zipName + ' -C ' + $remoteRepoPath + ' && del ' + $remoteRepoPath + '\logs\' + $zipName
+      # bash上のMSYS tarではzipとWindowsパスが壊れるため、Windows同梱bsdtarを相対パスで呼ぶ。
+      $expand = 'cd ~/' + $remoteRepoName + ' && /c/Windows/System32/tar.exe -xf "logs/' + $zipName + '" && rm -f "logs/' + $zipName + '"'
       ssh -o BatchMode=yes minipc $expand 2>&1 | Out-File -FilePath $logFile -Append -Encoding utf8
       if ($LASTEXITCODE -ne 0) { throw 'minipc側でのzip展開に失敗しました' }
 
       if ($AppointmentId -gt 0) {
         # minipc側のmeeting_runは(録音がこの機で完結するため)armedのまま。遷移規則は1段ずつ厳格なので
-        # digestingまで寛容に歩かせる。cmdの `&` 連結は途中失敗(既に先へ進んでいる等)でも続行される。
-        $walk = 'cd ' + $remoteRepoPath + '\sync && ' +
-          "(npx tsx scripts/db-meeting-run.ts transition $AppointmentId opened & " +
-          "npx tsx scripts/db-meeting-run.ts transition $AppointmentId recording & " +
-          "npx tsx scripts/db-meeting-run.ts transition $AppointmentId stopping & " +
-          "npx tsx scripts/db-meeting-run.ts transition $AppointmentId digesting)"
+        # digestingまで寛容に歩かせる。途中の状態が既に進んでいても後続を試す。
+        $walk = 'cd ~/' + $remoteRepoName + '/sync && for s in opened recording stopping digesting; do ' +
+          "npx tsx scripts/db-meeting-run.ts transition $AppointmentId " + '$s; done'
         ssh -o BatchMode=yes minipc $walk 2>&1 | Out-File -FilePath $logFile -Append -Encoding utf8
       }
-      $remoteDbJson = $remoteRepoPath + '\logs\interviews\' + (Split-Path $dbJson -Leaf)
-      # db.json のファイル名には空白が入る(例 kubell-kubell 面接 澤井さん(...)-db.json)ので引用符が要るが、
-      # PowerShell 5.1 はネイティブexe(ssh)へ渡す引数から素の " を落とす。
-      # 2026-08-14の実害: 引用符なしでリモートに届き、cmdが空白で切って 'kubell-kubell' を開こうとし
-      # ENOENT でDB反映が丸ごと止まった(文字起こしとdb.json生成は成功済みだった)。
-      # \" と書けば ssh の向こうに " として届く(同日 dir で実測: 素の"はC:\Users\okuyaを列挙、\"は当該ファイルに命中)。
-      $applyCmd = 'cd ' + $remoteRepoPath + '\sync && ' +
-        ('npx tsx scripts/db-apply-interview.ts \"' + $remoteDbJson + '\" && npx tsx scripts/photo-sync.ts && npx tsx scripts/db-snapshot.ts')
+      # 日本語・空白を含むdb.json名をssh引数へ載せず、末尾のASCII日時スタンプでリモート側から引く。
+      $stamp = if ($stem -match '(\d{4}-\d{2}-\d{2}_\d{4})$') { $Matches[1] } else { '' }
+      if (-not $stamp) { throw ('stemから日時スタンプを取れませんでした: {0}' -f $stem) }
+      $applyCmd = 'cd ~/' + $remoteRepoName + '/sync && ' +
+        'f=$(ls ../logs/interviews/*' + $stamp + '-db.json | head -1) && ' +
+        'npx tsx scripts/db-apply-interview.ts "$f" && npx tsx scripts/photo-sync.ts && npx tsx scripts/db-snapshot.ts'
       ssh -o BatchMode=yes minipc $applyCmd 2>&1 | Out-File -FilePath $logFile -Append -Encoding utf8
       if ($LASTEXITCODE -ne 0) { throw 'minipc側でのDB反映に失敗しました' }
     } finally { $ErrorActionPreference = $prevEAPr }

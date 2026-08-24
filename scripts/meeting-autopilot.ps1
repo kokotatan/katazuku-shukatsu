@@ -8,6 +8,8 @@ $ErrorActionPreference = 'Continue'
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $repo = Split-Path $PSScriptRoot -Parent
 $log = Join-Path $repo 'logs\meeting-record.log'
+$satellite = Test-Path (Join-Path $repo '.katazuku-satellite')
+$remoteDbCli = Join-Path $PSScriptRoot 'invoke-minipc-db.ps1'
 function Log($m) { ("{0} [autopilot] {1}" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $m) | Out-File -FilePath $log -Append -Encoding utf8 }
 
 # 多重起動ガード(2026-08-10): npx呼び出しが遅く1回の実行が数分かかるため、5分毎のタスクが
@@ -23,26 +25,32 @@ try {
 
 function Get-RunState([int]$appointmentId) {
   $json = ''
-  try {
+  if ($satellite) {
+    $json = & $remoteDbCli -Operation meeting-ensure -AppointmentId $appointmentId 2>>$log | Select-Object -Last 1
+  } else { try {
     Push-Location (Join-Path $repo 'sync')
     $json = npx tsx scripts/db-meeting-run.ts ensure $appointmentId 2>$null | Select-Object -Last 1
-  } finally { Pop-Location }
+  } finally { Pop-Location } }
   if (-not $json) { return $null }
   try { return ($json | ConvertFrom-Json) } catch { Log "meeting_runのJSONが読めない: $json"; return $null }
 }
 
 function Move-Run([int]$appointmentId, [string]$state, [string]$message = '') {
-  try {
+  if ($satellite) {
+    & $remoteDbCli -Operation meeting-transition -AppointmentId $appointmentId -State $state -Message $message 2>&1 | Out-File -FilePath $log -Append -Encoding utf8
+  } else { try {
     Push-Location (Join-Path $repo 'sync')
     npx tsx scripts/db-meeting-run.ts transition $appointmentId $state $message 2>&1 | Out-File -FilePath $log -Append -Encoding utf8
-  } finally { Pop-Location }
+  } finally { Pop-Location } }
 }
 
 $agendaJson = ''
-try {
+if ($satellite) {
+  $agendaJson = & $remoteDbCli -Operation agenda 2>>$log | Select-Object -Last 1
+} else { try {
   Push-Location (Join-Path $repo 'sync')
   $agendaJson = npx tsx scripts/db-agenda.ts 2>$null | Select-Object -Last 1
-} finally { Pop-Location }
+} finally { Pop-Location } }
 if (-not $agendaJson) { return }
 $agenda = @()
 try { $agenda = $agendaJson | ConvertFrom-Json } catch { Log "agendaのJSONが読めない: $agendaJson"; return }
@@ -125,14 +133,13 @@ foreach ($a in $agenda) {
 
   if ($run.state -eq 'recording' -and $now -ge $end.AddMinutes(4)) {
     Move-Run ([int]$a.id) 'stopping'
-    try {
+    if ($satellite) {
+      & $remoteDbCli -Operation meeting-done -AppointmentId ([int]$a.id) 2>&1 | Out-File -FilePath $log -Append -Encoding utf8
+    } else { try {
       Push-Location (Join-Path $repo 'sync')
       npx tsx scripts/db-meeting-done.ts $a.id 2>&1 | Out-File -FilePath $log -Append -Encoding utf8
-      if (-not (Test-Path (Join-Path $repo '.katazuku-satellite'))) {
-        # 衛星機のsnapshotは正本ではないので押し込まない(押すのはminipcのみ。2026-08-14)
-        npx tsx scripts/db-snapshot.ts 2>&1 | Out-File -FilePath $log -Append -Encoding utf8
-      }
-    } finally { Pop-Location }
+      npx tsx scripts/db-snapshot.ts 2>&1 | Out-File -FilePath $log -Append -Encoding utf8
+    } finally { Pop-Location } }
     Log ("録音終了待ちへ進めた: {0} {1}" -f $a.company, $a.title)
   } elseif ($run.state -eq 'opened' -and $now -ge $end) {
     Move-Run ([int]$a.id) 'failed' '予定終了までに録音を開始できなかった'

@@ -1,5 +1,6 @@
 ﻿# katazuku mail-watch — 日中の自律メール対応ループ本体 (タスクスケジューラから毎時起動)
-# 役割: 未読メールの見張り→緊急なら返信下書き+カレンダー登録+Windows通知。送信は絶対にしない。
+# 役割: 未読メールの見張り→緊急なら返信下書き+カレンダー登録+Windows通知。
+# 本人確認後の送信は別のthird-party-email workflowへ引き継ぎ、このheadless工程からは直接送らない。
 # 登録は register-mail-watch.ps1、解除は Unregister-ScheduledTask -TaskName 'katazuku-mail-watch'
 $ErrorActionPreference = 'Continue'
 $repo = Split-Path $PSScriptRoot -Parent

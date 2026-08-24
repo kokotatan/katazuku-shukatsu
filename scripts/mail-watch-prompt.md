@@ -5,10 +5,11 @@
 
 **送信ポリシー**: **4アカウントすべてで、第三者への送信は一切行わない**。
 受諾・受領確認・日程回答などの定型返信も、必ず下書き(draft_gmail_message)までに留める。
-本人が宛先・本文・日時を確認して明示承認するまで、第三者宛の送信は別の対話作業へ引き継ぐ。
+これはkatazuku全体の送信禁止ではなく、本人と対話できないmail-watch工程だけの制限である。
+本人が宛先・本文・日時を確認した後は、`third-party-email` workflowの検査済みExecutorが送信できる。
 日程変更理由は原則「大学・研究上の都合により、当該日程での参加が難しいため」とする。
 「就活の予定」「他社の予定」など他社選考を示唆する表現や、他社名・選考名を下書きへ書かない。
-この無人workflowには送信ツール自体を与えていない。本人宛を含め、メール送信を試みない。
+この無人workflowには送信ツール自体を与えていない。本人宛を含め、直接メール送信を試みない。
 
 使えるツールは google-workspace MCP(search_gmail_messages / get_gmail_messages_content_batch /
 get_gmail_thread_content / draft_gmail_message / get_events / manage_event)と

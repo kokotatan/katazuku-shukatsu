@@ -18,14 +18,24 @@ param(
   # 予定は `cd sync; npx tsx scripts/db-quick.ts today` か db-inspect で確認できる。
   [Parameter(Mandatory = $true)][string]$EndIso,
   # 予定の開始時刻(ISO・空白なし)。渡すと開始 LeadMinutes 前まで待ってから録り始める。
-  # 省略すると即座に録音を開始する(直前に手で起動する場合はそれでよい)。
-  # 2026-08-14の実害: 18:00開始の説明会を17:16から録り始め、44分/85MBを無駄にした。
+  # 省略した場合は AppointmentId を手がかりにDBから補完する(2026-08-17に追加)。
+  # DBからも引けないときだけ即座に録音を開始する。
+  # 実害2回: 2026-08-14に18:00開始を17:16から録り44分/85MBを捨て、2026-08-17に12:00開始を11:46から録った。
   [string]$StartIso = '',
   [int]$LeadMinutes = 5,
   [string]$Slug = '',
-  [int]$BufferMinutes = 15
+  [int]$BufferMinutes = 15,
+  # dshow のデバイス名にかける正規表現。OSS版と揃えるためパラメータにした(既定は従来と同じ挙動)。
+  # 日本語版Windowsの内蔵マイクは「マイク配列」、英語版は "Microphone Array"。
+  [string]$MicPattern = 'マイク配列|Microphone Array',
+  [string]$LoopbackPattern = 'virtual-audio-capturer'
 )
 $ErrorActionPreference = 'Stop'
+# ffmpeg の -list_devices はデバイス名をUTF-8で出す。PowerShell 5.1 は既定で端末コードページ
+# (日本語環境はcp932)で復号するため、「マイク配列 (...インテル® ...)」が文字化けし、
+# 下の 'マイク配列' 判定に一致しなくなる(2026-08-17: 内蔵マイクを取り逃していた)。
+# meeting-autopilot.ps1 と同じ対処を、別プロセスで動くこちらにも入れる。
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $repo = Split-Path $PSScriptRoot -Parent
 $intDir = Join-Path $repo 'logs\interviews'
 if (-not (Test-Path $intDir)) { New-Item -ItemType Directory $intDir -Force | Out-Null }
@@ -68,6 +78,38 @@ Set-Content -LiteralPath $lock -Value $PID -Encoding ascii
 
 $endAt = ConvertTo-LocalTime $EndIso
 
+# -StartIso を省略されたらDBから補完する(2026-08-17に踏んだ)。
+# 省略時は「即座に録音開始」が仕様だが、会議のかなり前に手で叩くと無音を延々と録ることになる。
+# 実害は2回: 2026-08-14に18:00開始の説明会を17:16から録って44分/85MBを捨て、
+# 2026-08-17には12:00開始の面談を11:46から録った。呼び手の渡し忘れを仕様側で吸収する。
+# autopilot は -StartIso を渡すのでここは通らない(meeting-autopilot.ps1 の record-vac 起動部)。
+if (-not $StartIso) {
+  # ネイティブexeの stderr は EAP=Stop のままだと NativeCommandError に化けて死ぬ。
+  # 上の ffmpeg -list_devices と同じ既知パターンなので、この区間だけ Continue にする。
+  $prevEapT = $ErrorActionPreference
+  $ErrorActionPreference = 'Continue'
+  $timesJson = ''
+  try {
+    if (Test-Path (Join-Path $repo '.katazuku-satellite')) {
+      $timesJson = & (Join-Path $PSScriptRoot 'invoke-minipc-db.ps1') -Operation appointment-times -AppointmentId $AppointmentId 2>$null | Select-Object -Last 1
+    } else {
+      $timesJson = & node (Join-Path $PSScriptRoot 'appointment-times.mjs') $AppointmentId 2>$null | Select-Object -Last 1
+    }
+  } catch { $timesJson = '' }
+  $ErrorActionPreference = $prevEapT
+  if ($timesJson) {
+    try {
+      $times = $timesJson | ConvertFrom-Json
+      if ($times.startIso) {
+        $StartIso = $times.startIso
+        Log ("-StartIso が無いのでDBから補完した(予定{0}): {1}" -f $AppointmentId, $StartIso)
+      }
+    } catch { Log ("予定時刻のJSONが読めない: {0}" -f $timesJson) }
+  }
+  # 引けなければ即時開始のまま進む。前録りの無駄より、録り逃しの方が損害が大きい。
+  if (-not $StartIso) { Log '!! -StartIso が無くDBからも引けない。即座に録音を開始する(前録りに注意)' }
+}
+
 # 開始時刻が渡されていれば、開始 LeadMinutes 前まで待つ。無駄な前録りを避ける。
 if ($StartIso) {
   $startAt = ConvertTo-LocalTime $StartIso
@@ -97,49 +139,41 @@ $stem = "{0}-{1}" -f $Slug, (Get-Date -Format 'yyyy-MM-dd_HHmm')
 $outWav = Join-Path $intDir ($stem + '.wav')
 $shotsDir = Join-Path $intDir ($stem + '-shots')
 
-# dshow のデバイスは表示名に空白や (R) を含むので、必ず Alternative name(@device_...)で指定する
-$ffmpeg = (Get-Command ffmpeg -ErrorAction SilentlyContinue).Source
-if (-not $ffmpeg) {
-  $ffmpeg = (Get-ChildItem "$env:LOCALAPPDATA\Microsoft\WinGet\Packages" -Recurse -Filter ffmpeg.exe -ErrorAction SilentlyContinue |
-             Select-Object -First 1 -ExpandProperty FullName)
-}
+# dshow のデバイスは表示名に空白や (R) を含むので、必ず Alternative name(@device_...)で指定する。
+# 列挙の罠(Out-String の折り返しで Alternative name が切れる / cp932 でデバイス名が化ける)は
+# lib-audio-devices.ps1 に閉じ込めた。録り直す見張りも同じ列挙を使うため、写して片方だけ直す事故を防ぐ。
+. (Join-Path $PSScriptRoot 'lib-audio-devices.ps1')
+$ffmpeg = Find-Ffmpeg
 if (-not $ffmpeg) { Log 'ffmpegが見つからない'; exit 1 }
 
-# ffmpeg -list_devices は結果を stderr に出す。EAP=Stop のままだと 2>&1 が NativeCommandError に
-# 化けてここで死ぬ(interview-digest.ps1 と同じ既知パターン)。この区間だけ Continue にする。
-$prevEap = $ErrorActionPreference
-$ErrorActionPreference = 'Continue'
-$devs = & $ffmpeg -hide_banner -list_devices true -f dshow -i dummy 2>&1
-$ErrorActionPreference = $prevEap
-# 2>&1 で来る stderr は ErrorRecord の塊になり、そのまま foreach すると1要素扱いになって
-# 行ごとの走査ができない。必ず文字列化してから行に割る。
-$devLines = (($devs | Out-String) -split '\r?\n')
-$loopAlt = ''; $micAlt = ''; $prev = ''
-foreach ($line in $devLines) {
-  if ($line -match 'Alternative name "([^"]+)"') {
-    # $Matches は次の -match で上書きされるので、内側の判定より先に退避する(2026-08-14に踏んだ)
-    $alt = $Matches[1]
-    if ($prev -match 'virtual-audio-capturer') { $loopAlt = $alt }
-    elseif ($prev -match 'マイク配列|Microphone Array') { $micAlt = $alt }
-  }
-  $prev = $line
-}
-if (-not $loopAlt) { Log '!! virtual-audio-capturer が無い。相手の声は録れない' }
-if (-not $micAlt)  { Log '!! 内蔵マイク配列が無い' }
+$dev = Get-DshowAudioAlternatives -Ffmpeg $ffmpeg -MicPattern $MicPattern -LoopbackPattern $LoopbackPattern
+$loopAlt = $dev.Loopback; $micAlt = $dev.Mic
+if (-not $loopAlt) { Log ("!! ループバック({0})が無い。相手の声は録れない" -f $LoopbackPattern) }
+if (-not $micAlt)  { Log ("!! マイク({0})が無い" -f $MicPattern) }
 
-$a = @('-hide_banner', '-loglevel', 'warning', '-y')
-if ($loopAlt -and $micAlt) {
-  $a += @('-f','dshow','-i',("audio=" + $loopAlt), '-f','dshow','-i',("audio=" + $micAlt),
-          '-filter_complex','amix=inputs=2:duration=longest:dropout_transition=0')
-} elseif ($micAlt) {
-  $a += @('-f','dshow','-i',("audio=" + $micAlt))
-} else { Log '録れるデバイスが無い'; exit 1 }
-$a += @('-ac','1','-ar','16000','-t',"$durSec", $outWav)
+$a = New-RecordArgs -LoopAlt $loopAlt -MicAlt $micAlt -DurSec $durSec -OutWav $outWav
+if (-not $a) { Log '録れるデバイスが無い'; exit 1 }
 
-$p = Start-Process -FilePath $ffmpeg -ArgumentList $a -WindowStyle Hidden -PassThru
+# stderr をファイルに落とす(2026-08-18)。New-RecordArgs が仕込んだ silencedetect の
+# silence_start をここに書かせ、見張りは追記読みするだけで「相手の声が無い」を検知できる。
+$errLog = Join-Path $intDir ($stem + '.stderr.log')
+$p = Start-Process -FilePath $ffmpeg -ArgumentList $a -WindowStyle Hidden -PassThru -RedirectStandardError $errLog
 # ロックの持ち主を ffmpeg 本体に移す(この待機用スクリプトはすぐ終了するため)
 Set-Content -LiteralPath $lock -Value $p.Id -Encoding ascii
 Log ("録音開始 PID={0} 予定ID={1} 終了{2}+{3}分 = {4}秒 -> {5}" -f $p.Id, $AppointmentId, $endAt.ToString('HH:mm'), $BufferMinutes, $durSec, $outWav)
+
+# 見張りを付ける(2026-08-18)。virtual-audio-capturer は開いた瞬間の既定再生デバイスに張り付くが、
+# 人の運用は「会議に入ってからイヤホンを繋ぐ」なので、録音開始(開始5分前)と接続の順序は必ずずれる。
+# ずれると相手の声だけが無音になる。無音が続いたら今の既定デバイスで録り直させる。
+# -ArgumentList は空白で引数を割るので、空白を含みうるパターンだけは明示的に括る(既定値に空白がある)。
+$stopIso = $endAt.AddMinutes($BufferMinutes).ToString('yyyy-MM-ddTHH:mm:sszzz')
+$watchArgs = @('-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $PSScriptRoot 'watch-recording.ps1'),
+               '-FfmpegPid', "$($p.Id)", '-StderrLog', $errLog, '-OutWav', $outWav,
+               '-StopIso', $stopIso, '-LockPath', $lock,
+               '-MicPattern', ('"' + $MicPattern + '"'), '-LoopbackPattern', ('"' + $LoopbackPattern + '"'))
+if ($StartIso) { $watchArgs += @('-StartIso', $StartIso) }
+$wp = Start-Process powershell.exe -WindowStyle Hidden -PassThru -ArgumentList $watchArgs
+Log ("見張り開始 PID={0} 無音が続いたら今の既定デバイスで録り直す" -f $wp.Id)
 
 # ショットは録音と同じ stem にする(digest が <stem>-shots を探して顔写真を同梱する規約)
 $delays = @()

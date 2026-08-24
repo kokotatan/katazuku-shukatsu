@@ -29,12 +29,16 @@ data/katazuku.db(正本・SQLite/node:sqlite・gitignore)
   `state: "available"`、`available: true`、`database.role: "canonical"` の場合だけ確定する。
   `unknown`は空きではない。Calendar同期失敗・10分超の鮮度切れ・同期期間外・replica DBはすべて`unknown`として停止する。
   Googleカレンダーの画面だけ、会話要約だけ、記憶だけで空きと判断しない。複数日・終日予定も占有として扱う。
-- **採用担当者・面接官など第三者への送信は、内容の重要度や定型性にかかわらず自動送信しない**。
-  メール、Slack、フォームの自由記述、日程回答、予約確定、取消・変更通知を含め、agentは下書き・入力・確認画面までで停止する。
-  送信直前に宛先・本文・確定日時・通知される内容を本人へそのまま提示し、その内容に対する本人の明示承認を得た同じ作業内でのみ送信する。
-  過去の包括承認や「対応して」などの広い依頼を最終送信の承認として流用しない。
-  日程変更理由は原則「大学・研究上の都合により、当該日程での参加が難しいため」とする。
-  「就活の予定」「他社の予定」など他社選考を示唆する表現、他社名・選考名、相手に不要な第三者情報は、本人が明示承認しない限り開示しない。
+- **第三者への確定操作を一律禁止しない。必ずkatazukuの事前検査済みExecutorを通す**。
+  メール送信、フォーム提出、日程回答、予約確定、取消・変更通知は、本人が宛先・本文・日時・通知内容を
+  確認して「送って」「提出して」「任せる」等と指示した後、同じaction hashの操作をExecutorが実行してよい。
+  本人確認後も下書きで停止する必要はない。反対に、ログインやMFAの完了だけを本文確認の代わりにはしない。
+  Gmail/Calendarの直接コネクタで確定せず、`sync/workflows/third-party-email.json`等の契約を通す。
+  Executorは直前に元スレッド、正本DB、Calendar同期鮮度、予定・移動・前後バッファ、送信済み履歴を再照合する。
+  `unknown`、根拠不一致、成功済み、成否不明では確定しない。
+  日程変更理由は必要な場合だけ「大学・研究上の都合」等の中立表現にする。
+  「他社の選考」「他のインターン」「面接があるため」など、相手に不要な第三者情報は本文へ書かない。
+  headlessのmail-watchは本人へactionを提示できないため下書きで止め、対話セッションのExecutorへ引き継ぐ。
 - スキーマ: company(name=正式名称/short_name) / selection(+outcome列挙) / **appointment(面接・締切の日時/URL/場所/相手)** /
   event(+ref=元メールID) / company_alias / pending_review / mail_item / submission / company_dossier /
   interview_note / meeting_run / person / person_note / appointment_person / person_photo / profile_basic / profile_suggestion
