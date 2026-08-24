@@ -2,7 +2,7 @@
 
 重複作成を防ぐための一次情報。新しいクラウド資源や定常タスクを作る前に必ず確認する。
 
-最終更新: 2026-07-18
+最終更新: 2026-08-25
 
 ## 正本DBと配信
 
@@ -63,10 +63,11 @@ Neon/Postgresは使っていない。新設しない。
 | katazuku-mail-watch | 07:15〜22:15、1時間ごと | `run-mail-watch.vbs` |
 | katazuku-daily-sync | 08:23 | `run-daily-sync.vbs` |
 | katazuku-asa | 09:00 | `run-asa.vbs` |
-| katazuku-calendar-sync | 30分ごと | `run-calendar-sync.vbs` |
-| katazuku-meeting-autopilot | 5分ごと | `meeting-autopilot.ps1` |
+| katazuku-calendar-sync | 5分ごと | `run-calendar-sync.vbs` |
+| katazuku-meeting-autopilot | ノートPCで5分ごと | `meeting-autopilot.ps1` |
 | katazuku-watchdog | 08:35〜20:35、4時間ごと | `run-watchdog.vbs` |
 | katazuku-evening-brief | 毎晩20:15 | `run-evening-brief.vbs` |
+| katazuku-self-update | MiniPCで毎日03:54 | `run-self-update.vbs` |
 
 `katazuku-watchdog` は番犬(AI非依存の純PowerShell)。活動ログの by別最終実行時刻と
 provider-health を監視し、定常タスクの停止・Claude/Codex両方の枠切れを検知したときだけ
@@ -75,6 +76,8 @@ provider-health を監視し、定常タスクの停止・Claude/Codex両方の�
 
 登録スクリプトは `scripts/register-*.ps1`。タスク登録はOS側権限が必要。
 旧 `katazuku-meeting-opener` はmeeting-autopilotと二重起動するため無効化する。
+`katazuku-self-update`はMiniPCの`main`だけをfast-forwardで更新し、実行中タスク、追跡済み未コミット変更、
+履歴分岐、更新後チェック失敗のいずれかで停止する。更新後チェックに失敗した場合は更新前commitへ戻す。
 
 **この表は実態と一致していること。2026-07-24に台帳と実態のずれが原因で事故が起きた**:
 `katazuku-calendar-sync` は表に載っていたが**実際には未登録**で、7/19以降カレンダーが

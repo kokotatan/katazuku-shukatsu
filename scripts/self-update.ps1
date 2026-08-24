@@ -9,7 +9,7 @@
 #   - 更新があったときだけ npm install と全チェックを走らせ、落ちたら元へ戻す
 #
 # 使い方: powershell -NoProfile -ExecutionPolicy Bypass -File scripts\self-update.ps1
-# 定期実行にするなら1日1回で十分(タスク登録は register-self-update.ps1)。
+# 定期実行は毎日03:54(タスク登録は register-self-update.ps1)。
 $ErrorActionPreference = 'Continue'
 $repo = Split-Path $PSScriptRoot -Parent
 Set-Location $repo
@@ -17,6 +17,13 @@ $logDir = Join-Path $repo 'logs'
 if (-not (Test-Path $logDir)) { New-Item -ItemType Directory $logDir | Out-Null }
 $log = Join-Path $logDir 'self-update.log'
 function Log($m) { ("{0} {1}" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $m) | Tee-Object -FilePath $log -Append }
+
+# main以外のブランチを動かさない。常駐機で作業ブランチを開いていた場合は人が確認する。
+$branch = (& git branch --show-current 2>&1).Trim()
+if ($LASTEXITCODE -ne 0 -or $branch -ne 'main') {
+  Log "mainブランチではないため更新しない: $branch"
+  exit 1
+}
 
 # 実行中の定常タスクがあれば見送る(走っているスクリプトを差し替えると途中で挙動が変わる)
 $running = @(Get-ScheduledTask -TaskName 'katazuku-*' -ErrorAction SilentlyContinue |
@@ -35,6 +42,7 @@ if ($dirty) {
 
 $before = (& git rev-parse HEAD 2>&1).Trim()
 & git fetch origin 2>&1 | Out-File -FilePath $log -Append -Encoding utf8
+if ($LASTEXITCODE -ne 0) { Log 'originの取得に失敗したため更新しない'; exit 1 }
 $behind = (& git rev-list --count HEAD..origin/main 2>&1).Trim()
 if ($behind -eq '0') { Log '最新。更新なし'; exit 0 }
 
