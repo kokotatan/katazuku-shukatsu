@@ -2,11 +2,18 @@
 
 **Local-first, human-in-the-loop automation core for Japanese _shūkatsu_ (new-grad job hunting).**
 
+[![npm version](https://img.shields.io/npm/v/katazuku-shukatsu)](https://www.npmjs.com/package/katazuku-shukatsu)
+[![CI](https://github.com/kokotatan/katazuku-shukatsu/actions/workflows/ci.yml/badge.svg)](https://github.com/kokotatan/katazuku-shukatsu/actions/workflows/ci.yml)
+
 就活のルーチンを自動運転しつつ、「考える・受ける・認証する・決める」は必ず本人に残すための基盤。
 このリポジトリは個人プロジェクト katazuku から、汎用で公開できる中核を切り出したものです。
 
-> Status: early (v0.2)。中核のデータモデル・セマンティックレイヤーと、読み取り専用のアプリ群8本を公開しています。
-> 応募自動運転・認証・ブラウザ操作は順次追加します。
+> Status: early (v0.3)。コアと読み取り専用アプリ、任意のCloudflareセルフホストを公開しています。
+> ブラウザ操作とOS資格情報ストアは未実装です。安全境界から一緒に作る貢献者を募集しています。
+
+[ロードマップ](./ROADMAP.md) / [参加方法](./CONTRIBUTING.md) /
+[good first issue](https://github.com/kokotatan/katazuku-shukatsu/labels/good%20first%20issue) /
+[Discussions](https://github.com/kokotatan/katazuku-shukatsu/discussions)
 
 ## What's here / 収録範囲
 
@@ -17,6 +24,7 @@
 | `src/db-apply*.ts` | メール・面接・カレンダー由来の入力を冪等にDBへ反映する書き込み層 |
 | `src/agent-runtime.ts` | **provider非依存**のエージェント実行契約(Claude / Codex / ローカルモデルを目的・capability・承認点で抽象化) |
 | `src/mobility.ts` | オンライン/対面・経路・移動可能性の判定 |
+| `src/career-support.ts` | 応募先と就活支援組織・イベント運営者を分離し、面談を冪等に取り込む |
 | `schemas/` | 入出力の JSON Schema。`settings.schema.json` は設定UIを生成する唯一の真実 |
 | `examples/config-gui.html` | JSON Schema から設定フォーム・検証・出力を自動生成する設定GUI(単一HTML) |
 | `examples/seed.ts` | 架空企業だけで正本DBを組み立てるデモ |
@@ -38,6 +46,14 @@
 - ランタイム依存はゼロです。開発時のみ `tsx` / `typescript`(devDependencies)を使います。
 
 ## Quickstart
+
+ライブラリとして使う場合:
+
+```sh
+npm install katazuku-shukatsu
+```
+
+リポジトリのダミーデータ、テスト、閲覧アプリを試す場合:
 
 ```sh
 git clone https://github.com/kokotatan/katazuku-shukatsu.git
@@ -72,6 +88,9 @@ cd insight && npm install && npm run dev
 ```
 
 自分のデータで見るなら `npm run snapshot`(書き出した `snapshot.json` は gitignore 済み)。
+
+複数端末から読み取る場合は、任意で[Cloudflareへセルフホスト](docs/CLOUDFLARE-SELF-HOSTING.md)できます。
+作者のCloudflareや認証基盤は使わず、各利用者が自分のアカウントへWorkerとR2を配置します。
 共通の設計は [shared/README.md](./shared/README.md)、各アプリの詳細は [board/README.md](./board/README.md)。
 
 ## 公開API

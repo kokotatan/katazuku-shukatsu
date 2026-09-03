@@ -24,6 +24,17 @@ const userVersion = (db: DatabaseSync) =>
 const fresh = openDb(':memory:')
 check('新規DBは現行の版が刻まれる', userVersion(fresh) === SCHEMA_VERSION, `${userVersion(fresh)} ≠ ${SCHEMA_VERSION}`)
 check('SCHEMA_VERSION は正の整数', Number.isInteger(SCHEMA_VERSION) && SCHEMA_VERSION > 0)
+check('v3: 就活支援組織・面談テーブルが版管理下で作られる', (() => {
+  const tables = fresh.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as { name: string }[]
+  return ['career_organization', 'career_meeting', 'career_meeting_run'].every((name) => tables.some((row) => row.name === name))
+})())
+check('v3: 議事録と人物が支援組織を参照できる', (() => {
+  const interview = fresh.prepare('PRAGMA table_info(interview_note)').all() as { name: string }[]
+  const person = fresh.prepare('PRAGMA table_info(person)').all() as { name: string }[]
+  return interview.some((row) => row.name === 'organization_id')
+    && interview.some((row) => row.name === 'career_meeting_id')
+    && person.some((row) => row.name === 'organization_id')
+})())
 
 // --- ファイルDB: 破壊的な版の前にスナップショットが残る ---
 const dir = mkdtempSync(join(tmpdir(), 'katazuku-migration-'))

@@ -10,6 +10,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { mkdirSync, rmSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { ensurePlatformSchema } from './platform.js'
+import { ensureCareerSupportSchema } from './career-support-schema.js'
 
 export interface Selection {
   id?: number
@@ -131,7 +132,7 @@ export function openDb(path: string): DatabaseSync {
 }
 
 /** 現行スキーマの版。マイグレーションを足すたびに +1 し、`MIGRATIONS` に1本足す */
-export const SCHEMA_VERSION = 2
+export const SCHEMA_VERSION = 3
 
 /**
  * 版ゲート方式のマイグレーション(#10)。
@@ -189,6 +190,12 @@ const MIGRATIONS: Migration[] = [
     description: '人物・プロフィール・移動などの拡張スキーマ(platform)を版の管理下に入れる',
     destructive: false,
     up: (db) => ensurePlatformSchema(db),
+  },
+  {
+    version: 3,
+    description: '応募先企業と分離した就活支援組織・支援面談を追加',
+    destructive: false,
+    up: (db) => ensureCareerSupportSchema(db),
   },
 ]
 

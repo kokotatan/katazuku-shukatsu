@@ -63,6 +63,24 @@ export { applyDiff, MAX_APPLY_CHANGES } from './db-apply.js'
 export type { DiffItem, ApplyResult } from './db-apply.js'
 export { applyCalendar } from './db-apply-calendar.js'
 export { applyInterview, savePersonPhoto } from './db-apply-interview.js'
+export { applyCareerCalendar } from './db-apply-career-calendar.js'
+export type { CareerCalendarCandidate, CareerCalendarInput, CareerCalendarResult } from './db-apply-career-calendar.js'
+
+// ---- 就活エージェント・イベント運営者(応募企業とは分離) ----
+export {
+  ensureCareerSupportSchema,
+  normalizeOrganizationAlias,
+  upsertCareerOrganization,
+  resolveCareerOrganization,
+  upsertCareerMeeting,
+  listCareerMeetings,
+} from './career-support.js'
+export type {
+  CareerOrganizationKind,
+  CareerMeetingStatus,
+  CareerMeetingInput,
+  CareerMeetingRow,
+} from './career-support.js'
 
 // ---- 応募の状態機械 ----
 export {

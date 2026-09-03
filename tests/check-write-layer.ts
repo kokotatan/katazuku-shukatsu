@@ -17,6 +17,8 @@ import {
 import { upsertPerson, resolveSelectionId } from '../src/inputs.js'
 import { applyCalendar } from '../src/db-apply-calendar.js'
 import { applyInterview, savePersonPhoto } from '../src/db-apply-interview.js'
+import { applyCareerCalendar } from '../src/db-apply-career-calendar.js'
+import { listCareerMeetings, upsertCareerOrganization } from '../src/career-support.js'
 
 let failed = 0
 function check(label: string, cond: boolean, detail = '') {
@@ -168,6 +170,41 @@ try {
   applyInterview({ runId: 'iv-owner-test', company: '株式会社サンプルB', appointmentId: anAppointment.id, occurredAt: '2026-08-01T11:00:00+09:00', title: '面接', summary: 'ok' }, db)
 } catch { ownershipThrew = true }
 check('#18: 別会社を宣言した appointmentId の議事録を拒否する(所有権)', ownershipThrew)
+
+// --- 応募先と分離した就活エージェント/イベント面談 ---
+const selectionCountBeforeSupport = (db.prepare('SELECT count(*) AS n FROM selection').get() as { n: number }).n
+upsertCareerOrganization(db, {
+  name: '支援サンプル株式会社', shortName: '支援サンプル', kind: 'career_agent', aliases: ['無料キャリア相談'],
+})
+const supportApplied = applyCareerCalendar({ events: [{
+  externalId: 'support-cal-1', calendarId: 'career-calendar', title: '無料キャリア相談 初回面談',
+  startAt: '2026-09-02T15:00:00+09:00', endAt: '2026-09-02T15:30:00+09:00',
+  kind: '面談', url: 'https://zoom.us/j/123456789',
+}] }, db)
+const supportMeeting = listCareerMeetings(db).find((row) => row.externalId === 'support-cal-1')!
+check('career-support: aliasから支援組織を解決し、録音可能なscheduled面談にする',
+  supportApplied.scheduled === 1 && supportMeeting.organization === '支援サンプル' && supportMeeting.recordable)
+check('career-support: 支援組織を応募selectionへ混ぜない',
+  (db.prepare('SELECT count(*) AS n FROM selection').get() as { n: number }).n === selectionCountBeforeSupport)
+const unresolved = applyCareerCalendar({ events: [{
+  externalId: 'support-cal-2', calendarId: 'career-calendar', title: '正体不明の就活面談',
+  startAt: '2026-09-03T10:00:00+09:00', kind: '面談',
+}] }, db)
+check('career-support: 未解決面談を捨てずreviewで止める', unresolved.review === 1)
+const supportInterview = applyInterview({
+  runId: 'career-meeting-test', careerMeetingId: supportMeeting.id, contextKind: 'career_support',
+  organization: '支援サンプル株式会社', occurredAt: '2026-09-02T15:30:00+09:00',
+  title: '初回面談', summary: 'キャリア相談を実施', people: [{ name: '氏名不明' }],
+}, db, photoRoot)
+const supportNote = db.prepare(`
+  SELECT selection_id AS selectionId, company_id AS companyId, organization_id AS organizationId,
+    career_meeting_id AS careerMeetingId FROM interview_note WHERE id = ?
+`).get(supportInterview.interviewId) as { selectionId: number | null; companyId: number | null; organizationId: number | null; careerMeetingId: number }
+check('career-support: 議事録もselection/companyを捏造せず支援組織へ結び付く',
+  supportNote.selectionId === null && supportNote.companyId === null
+  && Boolean(supportNote.organizationId) && supportNote.careerMeetingId === supportMeeting.id)
+check('career-support: 氏名不明を人物マスタへ登録しない',
+  !(db.prepare("SELECT 1 FROM person WHERE name = '氏名不明'").get()))
 
 if (failed) { console.error(`\n${failed}件失敗`); process.exit(1) }
 console.log('\nすべて通過')

@@ -45,6 +45,7 @@
 - `company` / `company_alias` / `pending_review` — 企業と名寄せ
 - `selection` / `event` — 選考トラックと、その状態変化の台帳
 - `appointment` — 面接・締切・説明会(時刻・会議URL・場所・相手を構造化)
+- `career_organization` / `career_meeting` — 応募先と混同しない就活支援組織・支援面談
 - 応募自動運転・移動・プロフィール等の専用テーブル(`src/application.ts` / `src/mobility.ts` / `src/platform.ts`)
 
 ## 運用上の前提
@@ -54,7 +55,7 @@
 - 正本をクラウド同期フォルダ直下に置かない(WAL がネットワークFSで破損しうる)。
 - 時刻はゼロ時差入力を Asia/Tokyo として正規化する(`normalizeAppointmentAt`)。
 
-## 既知の課題(ロードマップ)
+## 既知の課題
 
-Issue も参照。公開API面(バレル export とビルド)の整備、書き込み層(`db-apply-*`)のテスト拡充、
-`resolveCompany` の完全一致経路での法人格衝突の扱い、破壊的マイグレーションのバックアップ自動化など。
+ブラウザ操作、OS資格情報ストア、入力connector、再開可能なworkflowは未実装です。
+優先順と参加できる作業は[ROADMAP.md](../ROADMAP.md)を参照してください。
