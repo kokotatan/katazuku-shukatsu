@@ -50,6 +50,9 @@ web_modules/
 # Optional npm cache directory
 .npm
 
+# npm認証情報はユーザー領域だけに置き、リポジトリへ入れない
+.npmrc
+
 # Optional eslint cache
 .eslintcache
 

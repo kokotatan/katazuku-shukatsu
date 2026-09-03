@@ -30,6 +30,7 @@ jobs:
       - run: npm run build
       - run: node -e "import('./dist/index.js').then(m => { if (typeof m.openDb !== 'function') { throw new Error('dist の公開エントリが壊れています') } })"
       - run: npm pack --dry-run
+      - run: node tools/check-npm-release.mjs
       - run: npm test
 
   apps:
