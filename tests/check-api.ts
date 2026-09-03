@@ -24,7 +24,10 @@ const EXPECTED = [
   // inputs
   'resolveSelectionId', 'upsertPerson', 'transaction',
   // 書き込み層
-  'applyDiff', 'MAX_APPLY_CHANGES', 'applyCalendar', 'applyInterview', 'savePersonPhoto',
+  'applyDiff', 'MAX_APPLY_CHANGES', 'applyCalendar', 'applyInterview', 'savePersonPhoto', 'applyCareerCalendar',
+  // 応募企業と分離した支援組織・支援面談
+  'ensureCareerSupportSchema', 'normalizeOrganizationAlias', 'upsertCareerOrganization',
+  'resolveCareerOrganization', 'upsertCareerMeeting', 'listCareerMeetings',
   // 応募の状態機械
   'ensureApplicationSchema', 'startApplication', 'applyApplicationEvent', 'createApprovalToken', 'listApplicationRuns',
   'listWebAssessments', 'listCalendarOutbox', 'linkCalendarAppointment',
