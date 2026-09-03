@@ -72,7 +72,8 @@
     "cloudflare:check": "npm run cloudflare:types && tsc -p cloudflare/tsconfig.json && wrangler deploy --config cloudflare/wrangler.example.jsonc --dry-run",
     "cloudflare:deploy": "wrangler deploy --config cloudflare/wrangler.jsonc",
     "test:write-layer": "tsx tests/check-write-layer.ts",
-    "test:migration": "tsx tests/check-migration.ts"
+    "test:migration": "tsx tests/check-migration.ts",
+    "release:check": "npm run check && npm pack --dry-run && node tools/check-npm-release.mjs"
   },
   "devDependencies": {
     "@types/node": "^26.3.0",

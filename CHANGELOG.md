@@ -5,6 +5,15 @@
 
 ## [Unreleased]
 
+### Added
+
+- npm Trusted Publishing用のGitHub Actionsと、タグ・version・公開先を検査するリリースゲート。
+
+### Security
+
+- npmパスワードや長期トークンをリポジトリ／GitHub Secretsへ置かず、OIDCで公開できる手順を追加。
+- リポジトリ直下の `.npmrc` をgitignoreし、CLI認証情報の誤コミットを防止。
+
 ## [0.3.0] - 2026-09-03
 
 ### Added
