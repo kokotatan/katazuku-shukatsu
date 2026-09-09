@@ -252,6 +252,41 @@ const freeSlot = getScheduleAvailability(
   { now: new Date(scheduleNow), requireCanonical: false },
 )
 check('schedule: 同期済み期間内で衝突なしの場合だけavailable', freeSlot.state === 'available' && freeSlot.available)
+
+// 宿泊のカレンダー予定は滞在期間を表すメモであり、availability=FREEを正とする。
+// appointmentにも同じ期間が残っていてもfallbackで再び全期間を占有してはならない。
+const freeLodging = addAppointment(db, {
+  selectionId: apSel.id,
+  at: '2026-10-20T00:00:00+09:00',
+  endAt: '2026-10-23T00:00:00+09:00',
+  kind: '宿泊',
+  title: '宿泊: テストホテル(手配済み)',
+})
+db.prepare('UPDATE appointment SET external_id = ?, calendar_id = ? WHERE id = ?')
+  .run('free-lodging-1', 'primary', freeLodging.id)
+applyScheduleProjection(db, {
+  blocks: [{
+    provider: 'google-calendar', accountId: 'personal@example.com', calendarId: 'primary',
+    externalId: 'free-lodging-1', title: '宿泊: テストホテル(手配済み)',
+    startAt: '2026-10-20T00:00:00+09:00', endAt: '2026-10-23T00:00:00+09:00',
+    allDay: true, busy: false,
+  }, {
+    provider: 'google-calendar', accountId: 'personal@example.com', calendarId: 'primary',
+    externalId: 'private-block-1', title: '大学の予定',
+    startAt: '2026-10-10T13:00:00+09:00', endAt: '2026-10-10T15:00:00+09:00',
+  }],
+  syncStates: [{
+    source: 'google-calendar', accountId: 'personal@example.com', scopeId: 'primary', status: 'success',
+    coveredFrom: '2026-09-24T00:00:00.000Z', coveredUntil: '2026-11-30T00:00:00.000Z', attemptedAt: scheduleNow,
+  }],
+  replaceSyncSources: true,
+})
+const freeLodgingSlot = getScheduleAvailability(
+  db, '2026-10-21T14:00:00+09:00', '2026-10-21T14:30:00+09:00',
+  { now: new Date(scheduleNow), requireCanonical: false },
+)
+check('schedule: availability=FREEの宿泊予定は滞在期間全体を占有しない',
+  freeLodgingSlot.state === 'available' && freeLodgingSlot.available)
 applyScheduleProjection(db, {
   syncStates: [{
     source: 'google-calendar', accountId: 'personal@example.com', scopeId: 'primary', status: 'failed',

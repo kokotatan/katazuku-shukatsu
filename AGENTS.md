@@ -30,7 +30,12 @@ data/katazuku.db(正本・SQLite/node:sqlite・gitignore)
   `cd sync && npx tsx scripts/db-appointment.ts conflicts <開始ISO> <終了ISO>` が
   `state: "available"`、`available: true`、`database.role: "canonical"` の場合だけ確定する。
   `unknown`は空きではない。Calendar同期失敗・10分超の鮮度切れ・同期期間外・replica DBはすべて`unknown`として停止する。
-  Googleカレンダーの画面だけ、会話要約だけ、記憶だけで空きと判断しない。複数日・終日予定も占有として扱う。
+  Googleカレンダーの画面だけ、会話要約だけ、記憶だけで空きと判断しない。通常の複数日・終日予定は占有として扱う。
+  **候補日時を本人や相手へ提示する段階でも同じ判定を使う。** ただし宿泊予定は滞在期間全体を占有せず、
+  Calendar上の宿泊マーカーを `availability=FREE` / `busy=0` とする。チェックイン・チェックアウト、集合時刻と、
+  その前後の実移動だけを、時刻付き予定・`appointment_mobility`・`travel_segment`で占有する。
+  agentが予定名だけから空きを推測してはならないが、宿泊マーカーが誤ってbusyなら、本人の指示またはカレンダー入力を
+  根拠に通常経路でfree/busyと移動データを訂正し、再同期後の正本判定で空きを決める。
 - **第三者への確定操作を一律禁止しない。必ずkatazukuの事前検査済みExecutorを通す**。
   メール送信、フォーム提出、日程回答、予約確定、取消・変更通知は、本人が宛先・本文・日時・通知内容を
   確認して「送って」「提出して」「任せる」等と指示した後、同じaction hashの操作をExecutorが実行してよい。

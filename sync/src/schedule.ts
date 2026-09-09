@@ -313,13 +313,18 @@ export function getScheduleAvailability(
   }
 
   const conflicts: ScheduleConflict[] = []
-  const linkedBusyAppointments = new Set<number>()
+  // Calendar projectionがあるappointmentは、そのprojectionのbusyを正とする。
+  // availability=FREEの宿泊予定までappointment fallbackで滞在期間全体の占有へ
+  // 戻してしまうと、Calendar側のfree/busy指定が無効になるため。
+  const linkedProjectedAppointments = new Set<number>()
   const blocks = db.prepare(`
-    SELECT id, appointment_id AS appointmentId, start_at AS startAt, end_at AS endAt, title
-    FROM schedule_block WHERE status = 'active' AND busy = 1
-  `).all() as { id: number; appointmentId: number | null; startAt: string; endAt: string; title: string }[]
+    SELECT id, appointment_id AS appointmentId, start_at AS startAt, end_at AS endAt, title, busy
+    FROM schedule_block WHERE status = 'active'
+  `).all() as { id: number; appointmentId: number | null; startAt: string; endAt: string; title: string; busy: number }[]
   for (const block of blocks) {
     if (block.appointmentId === options.excludeAppointmentId) continue
+    if (block.appointmentId) linkedProjectedAppointments.add(block.appointmentId)
+    if (block.busy !== 1) continue
     const blockStart = validMs(block.startAt)
     const blockEnd = validMs(block.endAt)
     if (blockStart === undefined || blockEnd === undefined) continue
@@ -333,7 +338,6 @@ export function getScheduleAvailability(
         title: block.title || '予定あり',
       })
     }
-    if (block.appointmentId) linkedBusyAppointments.add(block.appointmentId)
   }
 
   const appointments = db.prepare(`
@@ -345,7 +349,7 @@ export function getScheduleAvailability(
     WHERE a.status NOT IN ('中止', '完了')
   `).all() as { id: number; at: string; endAt: string; title: string; company: string }[]
   for (const appointment of appointments) {
-    if (appointment.id === options.excludeAppointmentId || linkedBusyAppointments.has(appointment.id)) continue
+    if (appointment.id === options.excludeAppointmentId || linkedProjectedAppointments.has(appointment.id)) continue
     const appointmentStart = validMs(appointment.at)
     if (appointmentStart === undefined) continue
     const parsedEnd = validMs(appointment.endAt)

@@ -42,6 +42,12 @@ try {
   Push-Location (Join-Path $repo 'sync')
   npx tsx scripts/db-apply-calendar.ts $importJson 2>&1 | Out-File -FilePath $logFile -Append -Encoding utf8
   if ($LASTEXITCODE -eq 0) {
+    # 企業へ紐付かない就活予定も消さない。応募selectionを捏造せず、支援面談の専用台帳へ
+    # upsertする。既知の支援組織aliasに当たれば自動録音対象、未解決ならreviewで停止する。
+    if (Test-Path $residueJson) {
+      npx tsx scripts/db-apply-career-calendar.ts $residueJson 2>&1 | Out-File -FilePath $logFile -Append -Encoding utf8
+      if ($LASTEXITCODE -ne 0) { throw '支援面談台帳への反映に失敗しました' }
+    }
     if (Test-Path (Join-Path $repo '.katazuku-satellite')) {
       # 衛星機(note-pc録音担当)のDBは正本ではないため、snapshotを本番Blobへ押し込まない。
       # 実害(2026-08-14発見): minipcとnote-pcが交互にsnapshotを上書きし、アプリ表示が二重状態になっていた。
