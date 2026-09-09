@@ -7,6 +7,9 @@
 
 `data/katazuku.db`（SQLite、gitignore）が唯一の正本です。書き手はagentだけです。
 
+システム全体の責務、Bronze / Silver / Gold、Control Plane、機密境界、現在の未統一領域は
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)を設計の入口とします。
+
 - 入力: メール、本人との会話、面接録音、提出結果、Google Calendar、企業研究
 - 配信: `db-snapshot.ts` → 認証付きVercel Blob → 8アプリが `/api/data` を読む
 - 写真: DB・snapshot・gitには入れず、Private Blobを `/api/photo` 経由で読む

@@ -21,6 +21,8 @@
 
 ## アーキテクチャ(2026-07-18 DB中心化。docs/specs/08-data.md)
 
+全体の責務、Bronze / Silver / Gold、Control Plane、配信・機密境界は`docs/ARCHITECTURE.md`を入口とする。
+
 ```
 data/katazuku.db(正本・SQLite/node:sqlite・gitignore)
    ↑ agent(唯一の書き手): メール / 会話 / 面接録音 / 提出結果 / カレンダー / 企業研究
