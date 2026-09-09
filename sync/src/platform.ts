@@ -3,6 +3,7 @@
  * 写真本体はDB/スナップショットへ入れず、person_photo.storage_keyだけを保持する。
  */
 import { DatabaseSync } from 'node:sqlite'
+import { meetingPreparationSnapshot } from './meeting-preparation'
 
 function addColumn(db: DatabaseSync, table: string, name: string, definition: string): void {
   const cols = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]
@@ -15,10 +16,20 @@ export function ensurePlatformSchema(db: DatabaseSync): void {
   addColumn(db, 'appointment', 'external_id', "TEXT NOT NULL DEFAULT ''")
   addColumn(db, 'appointment', 'calendar_id', "TEXT NOT NULL DEFAULT ''")
   addColumn(db, 'appointment', 'source_hash', "TEXT NOT NULL DEFAULT ''")
+  // インターンの交通費精算を予定に結び付ける。元予定の日程変更後も派生タスクを
+  // 同じ行として追跡できるよう、親予定とtask_typeの組を論理キーにする。
+  addColumn(db, 'appointment', 'reimbursement_status', "TEXT NOT NULL DEFAULT 'unknown'")
+  addColumn(db, 'appointment', 'receipt_required', 'INTEGER NOT NULL DEFAULT 0')
+  addColumn(db, 'appointment', 'parent_appointment_id', 'INTEGER REFERENCES appointment(id)')
+  addColumn(db, 'appointment', 'task_type', "TEXT NOT NULL DEFAULT ''")
+  addColumn(db, 'appointment', 'flexible', 'INTEGER NOT NULL DEFAULT 0')
 
   db.exec(`
     CREATE UNIQUE INDEX IF NOT EXISTS idx_appointment_external
       ON appointment(external_id) WHERE external_id <> '';
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_appointment_derived_task
+      ON appointment(parent_appointment_id, task_type)
+      WHERE parent_appointment_id IS NOT NULL AND task_type <> '';
 
     -- 正本の論理ID。バックアップや複製後も同じデータ系列だと判別できるよう、
     -- OS上のファイルパスとは別にDB自身へ保持する。canonical/replica/fixture の
@@ -264,6 +275,16 @@ export function ensurePlatformSchema(db: DatabaseSync): void {
       source_ref TEXT NOT NULL DEFAULT ''
     );
 
+    CREATE TABLE IF NOT EXISTS appointment_preparation (
+      appointment_id INTEGER PRIMARY KEY REFERENCES appointment(id),
+      context_hash TEXT NOT NULL,
+      status TEXT NOT NULL CHECK (status IN ('ready', 'blocked')),
+      data_json TEXT NOT NULL DEFAULT '{}',
+      prepared_at TEXT NOT NULL DEFAULT '',
+      source_ref TEXT NOT NULL DEFAULT '',
+      blocker TEXT NOT NULL DEFAULT ''
+    );
+
     CREATE TABLE IF NOT EXISTS mail_item (
       id TEXT PRIMARY KEY,
       selection_id INTEGER REFERENCES selection(id),
@@ -280,11 +301,40 @@ export function ensurePlatformSchema(db: DatabaseSync): void {
       created_at TEXT NOT NULL
     );
 
+    -- 企業・大学等から求められた提出物を、メール単位ではなく成果物単位で追跡する。
+    -- mail-watch の processed から消えても、submitted/waived になるまでこの台帳に残る。
+    CREATE TABLE IF NOT EXISTS submission_requirement (
+      id INTEGER PRIMARY KEY,
+      logical_key TEXT NOT NULL UNIQUE,
+      selection_id INTEGER REFERENCES selection(id),
+      company_id INTEGER REFERENCES company(id),
+      kind TEXT NOT NULL,
+      title TEXT NOT NULL,
+      deadline TEXT NOT NULL DEFAULT '',
+      action_url TEXT NOT NULL DEFAULT '',
+      instructions TEXT NOT NULL DEFAULT '',
+      source_ref TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'required'
+        CHECK (status IN ('required', 'completed', 'waived')),
+      preparation_status TEXT NOT NULL DEFAULT 'not_started'
+        CHECK (preparation_status IN ('not_started', 'researching', 'ready_for_approval', 'blocked', 'done')),
+      preparation_ref TEXT NOT NULL DEFAULT '',
+      blocker TEXT NOT NULL DEFAULT '',
+      completion_ref TEXT NOT NULL DEFAULT '',
+      first_seen_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      completed_at TEXT NOT NULL DEFAULT ''
+    );
+
     CREATE INDEX IF NOT EXISTS idx_person_company ON person(company_id);
     CREATE INDEX IF NOT EXISTS idx_person_note_person ON person_note(person_id);
     CREATE INDEX IF NOT EXISTS idx_interview_selection ON interview_note(selection_id);
     CREATE INDEX IF NOT EXISTS idx_submission_selection ON submission(selection_id);
     CREATE INDEX IF NOT EXISTS idx_mail_received ON mail_item(received_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_submission_requirement_open
+      ON submission_requirement(status, deadline, preparation_status);
+    CREATE INDEX IF NOT EXISTS idx_submission_requirement_company
+      ON submission_requirement(company_id, selection_id, kind);
     CREATE UNIQUE INDEX IF NOT EXISTS idx_place_provider_external
       ON place(provider, external_id) WHERE provider <> '' AND external_id <> '';
     CREATE INDEX IF NOT EXISTS idx_place_company ON place(company_id);
@@ -327,7 +377,9 @@ export interface PlatformSnapshot {
   personNotes: Record<string, unknown>[]
   interviews: Record<string, unknown>[]
   submissions: Record<string, unknown>[]
+  submissionRequirements: Record<string, unknown>[]
   dossiers: Record<string, unknown>[]
+  meetingPreparations: Record<string, unknown>[]
   meetingRuns: Record<string, unknown>[]
   mailItems: Record<string, unknown>[]
   enrichedEvents: Record<string, unknown>[]
@@ -381,6 +433,20 @@ export function listPlatformSnapshot(db: DatabaseSync): PlatformSnapshot {
     ORDER BY s.submitted_at DESC, s.id DESC
   `).all() as Record<string, unknown>[]
 
+  const submissionRequirements = db.prepare(`
+    SELECT r.id, r.selection_id AS selectionId, COALESCE(c.name, '') AS company,
+           COALESCE(se.position, '') AS position, r.kind, r.title, r.deadline,
+           r.action_url AS actionUrl, r.instructions, r.status,
+           r.preparation_status AS preparationStatus, r.preparation_ref AS preparationRef,
+           r.blocker, r.source_ref AS sourceRef, r.completion_ref AS completionRef,
+           r.first_seen_at AS firstSeenAt, r.updated_at AS updatedAt, r.completed_at AS completedAt
+    FROM submission_requirement r
+    LEFT JOIN selection se ON se.id = r.selection_id
+    LEFT JOIN company c ON c.id = r.company_id
+    ORDER BY CASE WHEN r.status = 'required' THEN 0 ELSE 1 END,
+             CASE WHEN r.deadline = '' THEN 1 ELSE 0 END, r.deadline, r.id
+  `).all() as Record<string, unknown>[]
+
   const dossiers = (db.prepare(`
     SELECT d.company_id AS companyId, c.name AS company, d.summary,
            d.facts_json AS factsJson, d.sources_json AS sourcesJson,
@@ -424,7 +490,9 @@ export function listPlatformSnapshot(db: DatabaseSync): PlatformSnapshot {
     personNotes,
     interviews,
     submissions,
+    submissionRequirements,
     dossiers,
+    meetingPreparations: meetingPreparationSnapshot(db),
     meetingRuns,
     mailItems,
     enrichedEvents,

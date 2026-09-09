@@ -8,6 +8,7 @@ import type { DatabaseSync } from 'node:sqlite'
 import { addEvent, openDb, outcomeOf, transition, type Stage } from '../src/db'
 import { resolveSelectionId, transaction } from '../src/inputs'
 import { resolveDatabasePath } from '../src/database-path'
+import { completeMatchingRequirement } from '../src/submission-requirement'
 
 interface SubmissionInput {
   sourceRef: string
@@ -43,7 +44,10 @@ export function applySubmission(input: SubmissionInput, db: DatabaseSync = openD
   return transaction(db, () => {
     const duplicate = db.prepare('SELECT selection_id AS selectionId FROM submission WHERE source_ref = ?')
       .get(input.sourceRef) as { selectionId: number } | undefined
-    if (duplicate) return { created: false, selectionId: duplicate.selectionId }
+    if (duplicate) {
+      completeMatchingRequirement(db, duplicate.selectionId, input.kind, input.sourceRef, new Date(input.submittedAt))
+      return { created: false, selectionId: duplicate.selectionId }
+    }
     const { selectionId } = resolveSelectionId(db, input.company, input.position)
     db.prepare(`
       INSERT INTO submission (selection_id, kind, submitted_at, result, detail, source_ref, created_at)
@@ -65,6 +69,7 @@ export function applySubmission(input: SubmissionInput, db: DatabaseSync = openD
       input.result ? `${input.kind}: ${input.result}` : `${input.kind}を提出`,
       'submit-agent', input.submittedAt, input.sourceRef,
     )
+    completeMatchingRequirement(db, selectionId, input.kind, input.sourceRef, new Date(input.submittedAt))
     return { created: true, selectionId }
   })
 }

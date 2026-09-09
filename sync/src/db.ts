@@ -10,6 +10,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { existsSync, mkdirSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { ensurePlatformSchema } from './platform'
+import { inspectEmergencyCanonicalLease } from './emergency-canonical'
 
 export interface Selection {
   id?: number
@@ -53,9 +54,11 @@ export function assertCanonicalDbOwner(path: string): void {
   const canonical = resolve(join(repo, 'data', 'katazuku.db'))
   if (absolute.toLowerCase() !== canonical.toLowerCase()) return
   if (!existsSync(join(repo, '.katazuku-satellite'))) return
+  const emergency = inspectEmergencyCanonicalLease(repo)
+  if (emergency.active) return
   throw new Error(
     'この端末はノートPC実行拠点(.katazuku-satellite)です。ローカルの data/katazuku.db は正本ではありません。' +
-    'DB操作は scripts/invoke-minipc-db.ps1 経由でMiniPCへ送ってください。',
+    `DB操作は scripts/invoke-minipc-db.ps1 経由でMiniPCへ送ってください。緊急正本リース=${emergency.reason}`,
   )
 }
 
@@ -201,9 +204,15 @@ export function getDatabaseContext(db: DatabaseSync, requestedRole?: DatabaseRol
   const main = (db.prepare('PRAGMA database_list').all() as { name: string; file: string }[])
     .find((entry) => entry.name === 'main')
   const configured = requestedRole ?? process.env.KATAZUKU_DB_ROLE
+  const mainRepositoryRoot = main?.file ? dirname(dirname(main.file)) : ''
+  const satellite = mainRepositoryRoot ? existsSync(join(mainRepositoryRoot, '.katazuku-satellite')) : false
+  const emergencyCanonical = mainRepositoryRoot
+    ? inspectEmergencyCanonicalLease(mainRepositoryRoot).active
+    : false
   const role: DatabaseRole = configured === 'replica' || configured === 'fixture' || configured === 'canonical'
     ? configured
-    : main?.file ? 'canonical' : 'fixture'
+    : !main?.file ? 'fixture'
+      : satellite && !emergencyCanonical ? 'replica' : 'canonical'
   const schemaVersion = (db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version
   return {
     databaseId: identity.databaseId,
@@ -444,6 +453,87 @@ export interface Appointment {
   location?: string
   person?: string
   status?: string
+  /** 企業が本人立替分を精算するか。企業による切符手配は arranged で、領収書送付タスクを作らない */
+  reimbursementStatus?: ReimbursementStatus
+  /** 案内に領収書提出が明記されている場合。支給形態が未確定でも提出タスクを作る */
+  receiptRequired?: boolean
+  /** 自動生成タスクの元になった予定。通常の入力では指定しない */
+  parentAppointmentId?: number | null
+  /** 自動生成タスクの種類。通常の入力では指定しない */
+  taskType?: string
+  /** 固定予定と重なったら移動してよい本人タスク。空き判定では占有扱いにしない */
+  flexible?: boolean
+}
+
+export type ReimbursementStatus = 'unknown' | 'none' | 'full' | 'partial' | 'fixed' | 'arranged'
+
+const REIMBURSEMENT_STATUSES = new Set<ReimbursementStatus>([
+  'unknown', 'none', 'full', 'partial', 'fixed', 'arranged',
+])
+const RECEIPT_TASK_TYPE = 'transportation_receipt_submission'
+
+function isInternshipAppointment(a: Pick<Appointment, 'kind' | 'title'>): boolean {
+  return /インターン|internship|ハッカソン/i.test(`${a.kind} ${a.title}`)
+}
+
+/**
+ * インターン終了日の翌日9:00(JST)を返す。
+ * 終日予定のendAtはGoogle Calendarと同じ終了日exclusiveになりうるため、
+ * JST 00:00ちょうどなら1ms戻して実際の最終開催日を基準にする。
+ */
+function receiptTaskTimes(at: string, endAt: string): { at: string; endAt: string } {
+  const startMs = Date.parse(at)
+  let basisMs = Date.parse(endAt || at)
+  if (Number.isNaN(basisMs)) basisMs = startMs
+  if (!Number.isNaN(startMs) && basisMs > startMs) {
+    const jst = new Date(basisMs + 9 * 60 * 60 * 1000)
+    if (jst.getUTCHours() === 0 && jst.getUTCMinutes() === 0 && jst.getUTCSeconds() === 0) basisMs -= 1
+  }
+  const jst = new Date(basisMs + 9 * 60 * 60 * 1000)
+  const taskStart = Date.UTC(jst.getUTCFullYear(), jst.getUTCMonth(), jst.getUTCDate() + 1, 0, 0, 0)
+  return {
+    at: new Date(taskStart).toISOString(),       // 09:00 JST
+    endAt: new Date(taskStart + 15 * 60 * 1000).toISOString(),
+  }
+}
+
+function ensureTransportationReceiptTask(
+  db: DatabaseSync,
+  source: { id: number; selectionId: number; at: string; endAt: string; kind: string; title: string; reimbursementStatus: ReimbursementStatus; receiptRequired: boolean },
+): void {
+  const participantReimbursement = ['full', 'partial', 'fixed'].includes(source.reimbursementStatus)
+  if (!isInternshipAppointment(source) || (!participantReimbursement && !source.receiptRequired)) return
+  const times = receiptTaskTimes(source.at, source.endAt)
+  const existing = db.prepare(
+    'SELECT id, external_id AS externalId FROM appointment WHERE parent_appointment_id = ? AND task_type = ?',
+  ).get(source.id, RECEIPT_TASK_TYPE) as { id: number; externalId: string } | undefined
+  if (existing) {
+    // 外部カレンダー反映前なら、元インターンの日程訂正に追随させる。反映済み予定の
+    // 書換えはcalendar update executorが未実装なので、誤ってDBだけ動かさない。
+    if (!existing.externalId) {
+      db.prepare("UPDATE appointment SET at = ?, end_at = ?, status = '予定' WHERE id = ?")
+        .run(times.at, times.endAt, existing.id)
+    }
+    return
+  }
+  db.prepare(
+    'INSERT INTO appointment ' +
+    '(selection_id, at, end_at, kind, title, url, location, person, status, created_at, ' +
+    'parent_appointment_id, task_type, flexible) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)',
+  ).run(
+    source.selectionId,
+    times.at,
+    times.endAt,
+    'タスク',
+    '交通費領収書を送る',
+    '',
+    '',
+    '',
+    '予定',
+    new Date().toISOString(),
+    source.id,
+    RECEIPT_TASK_TYPE,
+  )
 }
 
 /**
@@ -543,16 +633,16 @@ export function listAppointmentConflicts(
     throw new Error(`予定照合の時間帯が不正です: ${startAt} - ${endAt}`)
   }
   const rows = db.prepare(`
-    SELECT a.id, a.at, a.end_at, a.title, a.status,
+    SELECT a.id, a.at, a.end_at, a.title, a.status, a.flexible,
            CASE WHEN c.short_name <> '' THEN c.short_name ELSE c.name END AS company
     FROM appointment a
     JOIN selection s ON s.id = a.selection_id
     JOIN company c ON c.id = s.company_id
     ORDER BY a.at, a.id
-  `).all() as { id: number; at: string; end_at: string; title: string; status: string; company: string }[]
+  `).all() as { id: number; at: string; end_at: string; title: string; status: string; flexible: number; company: string }[]
 
   return rows.filter((row) => {
-    if (row.id === excludeId || row.status === '中止' || row.status === '完了') return false
+    if (row.id === excludeId || row.status === '中止' || row.status === '完了' || row.flexible === 1) return false
     const rowStart = Date.parse(normalizeAppointmentAt(row.at))
     if (Number.isNaN(rowStart)) return false
     const parsedEnd = row.end_at ? Date.parse(normalizeAppointmentAt(row.end_at)) : Number.NaN
@@ -611,13 +701,17 @@ export function addAppointment(db: DatabaseSync, a: Appointment): { id: number; 
   if (a.at && a.at.trim() && Number.isNaN(Date.parse(at))) {
     throw new Error(`予定の日時がISOとして解釈できません: ${a.at}`)
   }
+  const reimbursementStatus = a.reimbursementStatus || 'unknown'
+  if (!REIMBURSEMENT_STATUSES.has(reimbursementStatus)) {
+    throw new Error(`reimbursementStatus が不正です: ${reimbursementStatus}`)
+  }
   const matchId = findAppointmentMatch(db, {
     selectionId: a.selectionId, at, title: a.title, url: a.url, kind: a.kind,
   })
   const dup = matchId === undefined
     ? undefined
-    : db.prepare('SELECT id, url, location, person FROM appointment WHERE id = ?')
-      .get(matchId) as { id: number; url: string; location: string; person: string } | undefined
+    : db.prepare('SELECT id, end_at AS endAt, url, location, person, reimbursement_status AS reimbursementStatus, receipt_required AS receiptRequired, flexible FROM appointment WHERE id = ?')
+      .get(matchId) as { id: number; endAt: string; url: string; location: string; person: string; reimbursementStatus: ReimbursementStatus; receiptRequired: number; flexible: number } | undefined
   if (dup) {
     const fill = (col: string, v?: string) => {
       if (v && !(dup as unknown as Record<string, string>)[col]) db.prepare(`UPDATE appointment SET ${col} = ? WHERE id = ?`).run(v, dup.id)
@@ -626,12 +720,47 @@ export function addAppointment(db: DatabaseSync, a: Appointment): { id: number; 
     fill('location', a.location)
     fill('person', a.person)
     if (endAt) db.prepare("UPDATE appointment SET end_at = ? WHERE id = ? AND end_at = ''").run(endAt, dup.id)
+    if (a.reimbursementStatus && dup.reimbursementStatus === 'unknown') {
+      db.prepare('UPDATE appointment SET reimbursement_status = ? WHERE id = ?').run(reimbursementStatus, dup.id)
+      dup.reimbursementStatus = reimbursementStatus
+    }
+    if (a.receiptRequired && !dup.receiptRequired) {
+      db.prepare('UPDATE appointment SET receipt_required = 1 WHERE id = ?').run(dup.id)
+      dup.receiptRequired = 1
+    }
+    if (a.flexible && !dup.flexible) db.prepare('UPDATE appointment SET flexible = 1 WHERE id = ?').run(dup.id)
+    ensureTransportationReceiptTask(db, {
+      id: dup.id,
+      selectionId: a.selectionId,
+      at,
+      endAt: endAt || dup.endAt,
+      kind: a.kind,
+      title: a.title,
+      reimbursementStatus: dup.reimbursementStatus,
+      receiptRequired: Boolean(dup.receiptRequired),
+    })
     return { id: dup.id, created: false }
   }
   const r = db.prepare(
-    'INSERT INTO appointment (selection_id, at, end_at, kind, title, url, location, person, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-  ).run(a.selectionId, at, endAt, a.kind || 'その他', a.title, a.url ?? '', a.location ?? '', a.person ?? '', a.status ?? '予定', now)
-  return { id: Number(r.lastInsertRowid), created: true }
+    'INSERT INTO appointment (selection_id, at, end_at, kind, title, url, location, person, status, created_at, ' +
+    'reimbursement_status, receipt_required, parent_appointment_id, task_type, flexible) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+  ).run(
+    a.selectionId, at, endAt, a.kind || 'その他', a.title, a.url ?? '', a.location ?? '', a.person ?? '',
+    a.status ?? '予定', now, reimbursementStatus, a.receiptRequired ? 1 : 0,
+    a.parentAppointmentId ?? null, a.taskType ?? '', a.flexible ? 1 : 0,
+  )
+  const id = Number(r.lastInsertRowid)
+  ensureTransportationReceiptTask(db, {
+    id,
+    selectionId: a.selectionId,
+    at,
+    endAt,
+    kind: a.kind || 'その他',
+    title: a.title,
+    reimbursementStatus,
+    receiptRequired: Boolean(a.receiptRequired),
+  })
+  return { id, created: true }
 }
 
 export interface AppointmentRow extends Required<Appointment> {
@@ -641,6 +770,7 @@ export interface AppointmentRow extends Required<Appointment> {
 export function listAppointments(db: DatabaseSync): AppointmentRow[] {
   const rows = db.prepare(`
     SELECT a.id, a.selection_id, a.at, a.end_at, a.kind, a.title, a.url, a.location, a.person, a.status,
+           a.reimbursement_status, a.receipt_required, a.parent_appointment_id, a.task_type, a.flexible,
            CASE WHEN c.short_name <> '' THEN c.short_name ELSE c.name END AS company
     FROM appointment a
     JOIN selection s ON s.id = a.selection_id
@@ -658,6 +788,11 @@ export function listAppointments(db: DatabaseSync): AppointmentRow[] {
     location: r.location as string,
     person: r.person as string,
     status: r.status as string,
+    reimbursementStatus: r.reimbursement_status as ReimbursementStatus,
+    receiptRequired: (r.receipt_required as number) === 1,
+    parentAppointmentId: r.parent_appointment_id as number | null,
+    taskType: r.task_type as string,
+    flexible: (r.flexible as number) === 1,
     company: r.company as string,
   }))
 }

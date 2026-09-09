@@ -7,6 +7,8 @@ Set-Location $repo
 $logDir = Join-Path $repo 'logs'
 if (-not (Test-Path $logDir)) { New-Item -ItemType Directory $logDir | Out-Null }
 $logFile = Join-Path $logDir ("evening-brief-{0}.log" -f (Get-Date -Format 'yyyy-MM-dd_HHmm'))
+. (Join-Path $PSScriptRoot 'meeting-preparation-guard.ps1')
+$null = Update-KatazukuMeetingPreparation -RepositoryRoot $repo
 
 $invoke = Join-Path $PSScriptRoot 'invoke-agent.ps1'
 $runId = 'evening-brief:' + (Get-Date -Format 'yyyy-MM-dd')
@@ -14,7 +16,7 @@ try {
   & $invoke -Workflow 'evening-brief' -RunId $runId `
     -PromptFile (Join-Path $PSScriptRoot 'evening-brief-prompt.md') `
     -Risk 'external-commit' -SideEffectMode 'reconcile' `
-    -Capability @('workspace.read', 'shell', 'gmail.read', 'gmail.send.self') `
+    -Capability @('workspace.read', 'workspace.write', 'shell', 'web.search', 'gmail.read', 'gmail.send.self') `
     -TimeoutMs 1200000 `
     *>&1 | Out-File -FilePath $logFile -Encoding utf8
 } catch {
@@ -26,6 +28,8 @@ try {
 $alertFile = Join-Path $logDir 'alert-evening-brief.txt'
 . (Join-Path $PSScriptRoot 'agent-sentinel.ps1')
 $ok = Test-AgentSentinel -Sentinel '===\s*evening-brief\s*DONE\s*===' -LogDir $logDir -RunId $runId -LogFile $logFile
+$preparationOk = Update-KatazukuMeetingPreparation -RepositoryRoot $repo -RequireReady
+if (-not $preparationOk) { $ok = $false }
 if (-not $ok) {
   ("{0} evening-brief 失敗: 完了行なし (詳細: logs/{1})" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), (Split-Path $logFile -Leaf)) |
     Out-File -FilePath $alertFile -Append -Encoding utf8
