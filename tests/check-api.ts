@@ -41,6 +41,7 @@ const EXPECTED = [
   'DEFAULT_CAPABILITY_TOOLS', 'DEFAULT_ABORT_PATTERNS',
   // 会議URL
   'isMeetingUrl', 'MEETING_HOSTS', 'SHORTENER_HOSTS',
+  'isAutomaticRecordingEligible',
   // platform
   'ensurePlatformSchema', 'listPlatformSnapshot', 'saveBasicProfile', 'getBasicProfile',
   'upsertCompanyDossier', 'upsertMailItem', 'listActionableMail',

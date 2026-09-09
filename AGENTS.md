@@ -19,6 +19,8 @@ AIコーディングエージェント(および使い方を尋ねられたAI)�
 
 ## 壊してはいけない設計の芯
 
+- 自動録音は会議URLのある予定を対象にし、説明会・セミナー等も含める。インターン参加、宿泊、対面、終日・24時間以上の予定は除外する。インターンの選考面接・面談・説明会は対象にする。公開APIの `isAutomaticRecordingEligible()` を開始前にも使う。詳細は [docs/RECORDING-POLICY.md](docs/RECORDING-POLICY.md)。
+
 - 正本はローカルSQLite 1つ。人・アプリは読み取りのみ(見る窓)。
 - 状態変更は `src/db.ts` の `transition()` を必ず通す(上書きせず遷移規則で更新)。
 - 外部由来の入力は冪等キー(`source_ref`/`external_id`)で冪等化し、変化は `event` 台帳に残す。

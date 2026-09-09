@@ -1,0 +1,366 @@
+{
+  "base": {
+    "kind": "面接",
+    "title": "オンライン面接",
+    "url": "https://meet.google.com/aaa-bbbb-ccc",
+    "startAt": "2028-01-10T15:00:00+09:00",
+    "endAt": "2028-01-10T15:45:00+09:00",
+    "status": "予定"
+  },
+  "cases": [
+    {
+      "name": "Meet面接",
+      "meeting": {},
+      "eligible": true
+    },
+    {
+      "name": "Zoom面談",
+      "meeting": {
+        "kind": "面談",
+        "title": "オンライン面談",
+        "url": "https://us05web.zoom.us/j/123"
+      },
+      "eligible": true
+    },
+    {
+      "name": "Teams面談",
+      "meeting": {
+        "kind": "面談",
+        "title": "面談",
+        "url": "https://teams.microsoft.com/l/meetup-join/example"
+      },
+      "eligible": true
+    },
+    {
+      "name": "支援面談",
+      "meeting": {
+        "kind": "面談",
+        "title": "初回面談",
+        "scope": "career-support"
+      },
+      "eligible": true
+    },
+    {
+      "name": "インターン選考の面接",
+      "meeting": {
+        "title": "インターン選考 面接"
+      },
+      "eligible": true
+    },
+    {
+      "name": "対面面接の会議URL残存",
+      "meeting": {
+        "title": "面接",
+        "location": "対面・来社",
+        "attendanceMode": "in_person"
+      },
+      "eligible": false
+    },
+    {
+      "name": "対面の件名",
+      "meeting": {
+        "title": "最終面接（対面）"
+      },
+      "eligible": false
+    },
+    {
+      "name": "会議URLなし",
+      "meeting": {
+        "url": ""
+      },
+      "eligible": false
+    },
+    {
+      "name": "未解決の短縮URL",
+      "meeting": {
+        "url": "https://bit.ly/example"
+      },
+      "eligible": false
+    },
+    {
+      "name": "案内ページ",
+      "meeting": {
+        "url": "https://example.com/interview",
+        "openable": true
+      },
+      "eligible": false
+    },
+    {
+      "name": "その他にMeetURL",
+      "meeting": {
+        "kind": "その他",
+        "openable": true
+      },
+      "eligible": true
+    },
+    {
+      "name": "未分類でも会議URLがあれば対象",
+      "meeting": {
+        "kind": ""
+      },
+      "eligible": true
+    },
+    {
+      "name": "オンライン説明会",
+      "meeting": {
+        "kind": "説明会",
+        "title": "オンライン説明会",
+        "recordable": true
+      },
+      "eligible": true
+    },
+    {
+      "name": "セミナー",
+      "meeting": {
+        "kind": "セミナー",
+        "title": "セミナー",
+        "recordable": true
+      },
+      "eligible": true
+    },
+    {
+      "name": "イベント",
+      "meeting": {
+        "kind": "イベント",
+        "title": "交流イベント",
+        "recordable": true
+      },
+      "eligible": true
+    },
+    {
+      "name": "日別インターン",
+      "meeting": {
+        "kind": "説明会",
+        "title": "インターン Day1",
+        "startAt": "2028-01-10T09:00:00+09:00",
+        "endAt": "2028-01-10T19:00:00+09:00"
+      },
+      "eligible": false
+    },
+    {
+      "name": "誤分類されたインターン",
+      "meeting": {
+        "kind": "面談",
+        "title": "インターン Day1"
+      },
+      "eligible": false
+    },
+    {
+      "name": "宿泊予定",
+      "meeting": {
+        "kind": "その他",
+        "title": "宿泊",
+        "endAt": "2028-01-12T15:45:00+09:00"
+      },
+      "eligible": false
+    },
+    {
+      "name": "誤分類されたチェックイン",
+      "meeting": {
+        "kind": "面談",
+        "title": "ホテル チェックイン"
+      },
+      "eligible": false
+    },
+    {
+      "name": "誤分類された説明会",
+      "meeting": {
+        "kind": "面談",
+        "title": "オンライン説明会"
+      },
+      "eligible": true
+    },
+    {
+      "name": "締切（会議URLなし）",
+      "meeting": {
+        "kind": "締切",
+        "title": "締切",
+        "url": ""
+      },
+      "eligible": false
+    },
+    {
+      "name": "テスト（会議URLなし）",
+      "meeting": {
+        "kind": "テスト",
+        "title": "テスト",
+        "url": ""
+      },
+      "eligible": false
+    },
+    {
+      "name": "recordableの拒否",
+      "meeting": {
+        "recordable": false
+      },
+      "eligible": false
+    },
+    {
+      "name": "キャンセル",
+      "meeting": {
+        "status": "cancelled"
+      },
+      "eligible": false
+    },
+    {
+      "name": "完了済み",
+      "meeting": {
+        "status": "完了"
+      },
+      "eligible": false
+    },
+    {
+      "name": "終日",
+      "meeting": {
+        "startAt": "2028-01-10",
+        "endAt": "2028-01-11"
+      },
+      "eligible": false
+    },
+    {
+      "name": "24時間",
+      "meeting": {
+        "startAt": "2028-01-10T00:00:00+09:00",
+        "endAt": "2028-01-11T00:00:00+09:00"
+      },
+      "eligible": false
+    },
+    {
+      "name": "複数日",
+      "meeting": {
+        "endAt": "2028-01-13T15:45:00+09:00"
+      },
+      "eligible": false
+    },
+    {
+      "name": "終了未入力は1時間",
+      "meeting": {
+        "endAt": ""
+      },
+      "eligible": true
+    },
+    {
+      "name": "開始不正",
+      "meeting": {
+        "startAt": "invalidT15:00"
+      },
+      "eligible": false
+    },
+    {
+      "name": "終了不正",
+      "meeting": {
+        "endAt": "invalidT16:00"
+      },
+      "eligible": false
+    },
+    {
+      "name": "逆転日時",
+      "meeting": {
+        "endAt": "2028-01-10T14:00:00+09:00"
+      },
+      "eligible": false
+    },
+    {
+      "name": "ゼロ分",
+      "meeting": {
+        "endAt": "2028-01-10T15:00:00+09:00"
+      },
+      "eligible": false
+    },
+    {
+      "name": "日付をまたぐ面談",
+      "meeting": {
+        "startAt": "2028-01-10T23:30:00+09:00",
+        "endAt": "2028-01-11T00:30:00+09:00"
+      },
+      "eligible": true
+    },
+    {
+      "name": "HTTP",
+      "meeting": {
+        "url": "http://meet.google.com/aaa-bbbb-ccc"
+      },
+      "eligible": false
+    },
+    {
+      "name": "偽装ホスト",
+      "meeting": {
+        "url": "https://meet.google.com.example.com/aaa-bbbb-ccc"
+      },
+      "eligible": false
+    },
+    {
+      "name": "サービスのトップページ",
+      "meeting": {
+        "url": "https://zoom.us/"
+      },
+      "eligible": false
+    },
+    {
+      "name": "インターン説明会",
+      "meeting": {
+        "kind": "説明会",
+        "title": "インターン説明会"
+      },
+      "eligible": true
+    },
+    {
+      "name": "インターン向けセミナー",
+      "meeting": {
+        "kind": "セミナー",
+        "title": "インターン選考対策セミナー"
+      },
+      "eligible": true
+    },
+    {
+      "name": "インターン種別の参加予定",
+      "meeting": {
+        "kind": "インターン",
+        "title": "事業開発コース Day1"
+      },
+      "eligible": false
+    },
+    {
+      "name": "宿泊種別の予定",
+      "meeting": {
+        "kind": "宿泊",
+        "title": "ホテルA"
+      },
+      "eligible": false
+    },
+    {
+      "name": "説明会に会議URLなし",
+      "meeting": {
+        "kind": "説明会",
+        "title": "説明会",
+        "url": ""
+      },
+      "eligible": false
+    },
+    {
+      "name": "未分類で会議URLなし",
+      "meeting": {
+        "kind": "",
+        "title": "未分類",
+        "url": ""
+      },
+      "eligible": false
+    },
+    {
+      "name": "オンライン懇親会",
+      "meeting": {
+        "kind": "イベント",
+        "title": "オンライン懇親会"
+      },
+      "eligible": true
+    },
+    {
+      "name": "オンライン研修",
+      "meeting": {
+        "kind": "その他",
+        "title": "オンライン研修"
+      },
+      "eligible": true
+    }
+  ]
+}

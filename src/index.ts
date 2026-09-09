@@ -168,6 +168,8 @@ export type {
 
 // ---- 会議URLの許可リスト ----
 export { isMeetingUrl, MEETING_HOSTS, SHORTENER_HOSTS } from './meeting-url.js'
+export { isAutomaticRecordingEligible } from './recording-eligibility.js'
+export type { AutomaticRecordingCandidate } from './recording-eligibility.js'
 
 // ---- 人物・プロフィール・企業研究・メール ----
 export {
