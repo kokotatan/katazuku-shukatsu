@@ -4,8 +4,16 @@
   "version": "0.2.0",
   "scripts": {
     "build": "npm --prefix inbox install && npm --prefix inbox run build && npm --prefix status install && npm --prefix status run build && npm --prefix insight install && npm --prefix insight run build && npm --prefix profile install && npm --prefix profile run build && npm --prefix people install && npm --prefix people run build && npm --prefix prep install && npm --prefix prep run build && npm --prefix impact install && npm --prefix impact run build && npm --prefix board install && npm --prefix board run build && node scripts/assemble.mjs && npm run check",
-    "check": "npm --prefix sync install && npm --prefix sync run check && npm --prefix sync run check:db && npm --prefix sync run check:application && npm --prefix sync run check:mobility && npm --prefix sync run check:agent-runtime && npm --prefix sync run check:daily-sync && npm --prefix sync run check:workflow-control && npm run check:local-login",
-    "check:local-login": "node scripts/local-login/check.mjs"
+    "check": "npm --prefix sync install && npm --prefix sync run check && npm --prefix sync run check:db && npm --prefix sync run check:application && npm --prefix sync run check:mobility && npm --prefix sync run check:agent-runtime && npm --prefix sync run check:daily-sync && npm --prefix sync run check:workflow-control && npm --prefix sync run check:data-access && npm --prefix sync run check:activity-calendar && npm run check:local-login && npm run check:google-workspace && npm --prefix sync run check:recording && powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/check-recording-eligibility.ps1",
+    "check:google-workspace": "node tools/google-workspace/check.mjs && node sync/node_modules/tsx/dist/cli.mjs google-auth/check.ts && node sync/node_modules/tsx/dist/cli.mjs google-auth/check-connection.ts",
+    "google:connect": "node tools/google-workspace/connect.mjs",
+    "google:doctor": "node tools/google-workspace/doctor.mjs",
+    "check:local-login": "node scripts/local-login/check-settings.mjs && node scripts/local-login/check.mjs",
+    "local-login:settings": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/local-login/open-settings.ps1",
+    "cloudflare:types": "wrangler types",
+    "cloudflare:check": "npm run cloudflare:types && tsc -p cloudflare/tsconfig.json && wrangler deploy --dry-run",
+    "cloudflare:dev": "wrangler dev --local",
+    "cloudflare:deploy": "wrangler deploy"
   },
   "dependencies": {
     "@vercel/blob": "^2.6.1",
@@ -13,5 +21,11 @@
   },
   "engines": {
     "node": ">=24 <25"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260829.1",
+    "@types/web-push": "^3.6.4",
+    "typescript": "^7.0.2",
+    "wrangler": "^4.127.1"
   }
 }

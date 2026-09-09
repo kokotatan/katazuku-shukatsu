@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url'
 import { addEvent, openDb, outcomeOf } from '../src/db'
 import { transaction } from '../src/inputs'
 import { resolveDatabasePath } from '../src/database-path'
+import { moveMeetingPreparation } from '../src/meeting-preparation'
 
 const dbArgIndex = process.argv.indexOf('--db')
 const DB_PATH = resolveDatabasePath(dbArgIndex >= 0 ? process.argv[dbArgIndex + 1] : undefined)
@@ -70,6 +71,7 @@ function mergeAppointments(db: ReturnType<typeof openDb>, keepId: number, mergeI
     else if (sourceRun && targetRun) db.prepare('DELETE FROM meeting_run WHERE appointment_id = ?').run(sourceId)
     db.prepare('UPDATE interview_note SET appointment_id = ? WHERE appointment_id = ?').run(targetId, sourceId)
     db.prepare('DELETE FROM appointment_person WHERE appointment_id = ?').run(sourceId)
+    moveMeetingPreparation(db, sourceId, targetId)
     db.prepare('DELETE FROM appointment WHERE id = ?').run(sourceId)
   }
 }

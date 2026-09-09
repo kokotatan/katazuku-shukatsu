@@ -8,7 +8,9 @@ $ErrorActionPreference = 'Continue'
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $repo = Split-Path $PSScriptRoot -Parent
 $log = Join-Path $repo 'logs\meeting-record.log'
-$satellite = Test-Path (Join-Path $repo '.katazuku-satellite')
+. (Join-Path $PSScriptRoot 'katazuku-role.ps1')
+. (Join-Path $PSScriptRoot 'lib-recording-eligibility.ps1')
+$satellite = (Get-KatazukuOperationalRole -RepositoryRoot $repo) -eq 'replica'
 $remoteDbCli = Join-Path $PSScriptRoot 'invoke-minipc-db.ps1'
 function Log($m) { ("{0} [autopilot] {1}" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $m) | Out-File -FilePath $log -Append -Encoding utf8 }
 
@@ -23,24 +25,38 @@ if (Test-Path $lockFile) {
 Set-Content -Path $lockFile -Value $PID -Encoding ascii
 try {
 
-function Get-RunState([int]$appointmentId) {
+function Get-RunState($meeting) {
+  $meetingId = [int]$meeting.id
+  $careerSupport = $meeting.scope -eq 'career-support'
   $json = ''
   if ($satellite) {
-    $json = & $remoteDbCli -Operation meeting-ensure -AppointmentId $appointmentId 2>>$log | Select-Object -Last 1
+    if ($careerSupport) {
+      $json = & $remoteDbCli -Operation career-meeting-ensure -CareerMeetingId $meetingId 2>>$log | Select-Object -Last 1
+    } else {
+      $json = & $remoteDbCli -Operation meeting-ensure -AppointmentId $meetingId 2>>$log | Select-Object -Last 1
+    }
   } else { try {
     Push-Location (Join-Path $repo 'sync')
-    $json = npx tsx scripts/db-meeting-run.ts ensure $appointmentId 2>$null | Select-Object -Last 1
+    $script = if ($careerSupport) { 'scripts/db-career-meeting-run.ts' } else { 'scripts/db-meeting-run.ts' }
+    $json = npx tsx $script ensure $meetingId 2>$null | Select-Object -Last 1
   } finally { Pop-Location } }
   if (-not $json) { return $null }
   try { return ($json | ConvertFrom-Json) } catch { Log "meeting_runのJSONが読めない: $json"; return $null }
 }
 
-function Move-Run([int]$appointmentId, [string]$state, [string]$message = '') {
+function Move-Run($meeting, [string]$state, [string]$message = '') {
+  $meetingId = [int]$meeting.id
+  $careerSupport = $meeting.scope -eq 'career-support'
   if ($satellite) {
-    & $remoteDbCli -Operation meeting-transition -AppointmentId $appointmentId -State $state -Message $message 2>&1 | Out-File -FilePath $log -Append -Encoding utf8
+    if ($careerSupport) {
+      & $remoteDbCli -Operation career-meeting-transition -CareerMeetingId $meetingId -State $state -Message $message 2>&1 | Out-File -FilePath $log -Append -Encoding utf8
+    } else {
+      & $remoteDbCli -Operation meeting-transition -AppointmentId $meetingId -State $state -Message $message 2>&1 | Out-File -FilePath $log -Append -Encoding utf8
+    }
   } else { try {
     Push-Location (Join-Path $repo 'sync')
-    npx tsx scripts/db-meeting-run.ts transition $appointmentId $state $message 2>&1 | Out-File -FilePath $log -Append -Encoding utf8
+    $script = if ($careerSupport) { 'scripts/db-career-meeting-run.ts' } else { 'scripts/db-meeting-run.ts' }
+    npx tsx $script transition $meetingId $state $message 2>&1 | Out-File -FilePath $log -Append -Encoding utf8
   } finally { Pop-Location } }
 }
 
@@ -55,11 +71,19 @@ if (-not $agendaJson) { return }
 $agenda = @()
 try { $agenda = $agendaJson | ConvertFrom-Json } catch { Log "agendaのJSONが読めない: $agendaJson"; return }
 
+# MiniPCから古いagendaが届く場合にも、端末側で開始前に判定する。
+# 同時刻の会議判定より前に除外し、宿泊・終日マーカーが通常の面接を妨げないようにする。
+$agenda = @($agenda | Where-Object {
+  $reason = Get-AutomaticRecordingExclusionReason -Meeting $_
+  if ($reason) { Log ("自動録音対象外: {0} {1} (予定ID {2}: {3})" -f $_.company, $_.title, $_.id, $reason) }
+  -not $reason
+})
+
 $now = Get-Date
 foreach ($a in $agenda) {
   $start = ([datetime]$a.startIso).ToLocalTime()
   $end = ([datetime]$a.endIso).ToLocalTime()
-  $run = Get-RunState ([int]$a.id)
+  $run = Get-RunState $a
   if (-not $run -or $run.state -eq 'done') { continue }
 
   if ($run.state -eq 'armed' -and $now -ge $start.AddMinutes(-10) -and $now -lt $end) {
@@ -67,22 +91,20 @@ foreach ($a in $agenda) {
     # URLを開かない。面談中に次のMeetが開くとフォーカスを奪い実害があるため。armedのまま次巡回へ。
     # 進行中の会議が終わった時点でまだ次の会議の時間内なら、その巡回で開く。
     $concurrent = $agenda | Where-Object {
-      $_.id -ne $a.id -and (([datetime]$_.startIso).ToLocalTime()) -le $now -and $now -lt (([datetime]$_.endIso).ToLocalTime())
+      ($_.scope + ':' + $_.id) -ne ($a.scope + ':' + $a.id) -and (([datetime]$_.startIso).ToLocalTime()) -le $now -and $now -lt (([datetime]$_.endIso).ToLocalTime())
     }
     if ($concurrent) {
       Log ("別会議が進行中のためURLを開かず待機: {0} {1}" -f $a.company, $a.title)
       continue
     }
     if ($a.url) {
-      # 短縮リンク(weburl.jp等)も含め、URLがあれば必ず開く。ブラウザが302リダイレクトを解決する。
-      # openable は会議ホスト許可リスト(sync/src/meeting-url.ts)での判定結果。診断用に記録するだけで開閉は止めない。
+      # 上の対象判定で、オンラインの面接・面談と確認できたURLだけを開く。
       Start-Process $a.url
-      $known = if ($a.openable) { '会議ホスト認識' } else { '未知ホスト(短縮リンクの可能性・そのまま開く)' }
-      Log ("URLを開いた[{0}]: {1} {2} ({3})" -f $known, $a.company, $a.title, $a.url)
+      Log ("オンライン会議URLを開いた: {0} {1} ({2})" -f $a.company, $a.title, $a.url)
     } else {
       Log ("URLなしの予定を開始待機にした: {0} {1}" -f $a.company, $a.title)
     }
-    Move-Run ([int]$a.id) 'opened'
+    Move-Run $a 'opened'
     $activityArgs = @{
       By = 'meeting-autopilot'
       Action = ("会議を開始待機: {0} {1}" -f $a.company, $a.title)
@@ -92,7 +114,7 @@ foreach ($a in $agenda) {
       Result = '成功'
     }
     & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'log-activity.ps1') @activityArgs | Out-Null
-    $run = Get-RunState ([int]$a.id)
+    $run = Get-RunState $a
   }
 
   # 録音は開始5分前から待機する(本人指示 2026-07-29: 冒頭から録る)。タスクは5分毎なので、
@@ -110,14 +132,18 @@ foreach ($a in $agenda) {
     #     これが「自動録音が動かない」の真因。渡す値は空白なし(ISOのTつなぎ・スラッグ)に統一する。
     # スクショも record-vac が録音と同じスラッグで面倒を見るため、ここでは起動しない
     # (digest が <録音ファイル名>-shots を探す規約に自動で揃う)。
-    $slug = (($a.company -replace '[\\/:*?"<>|\s]', '') + '-' + $a.id)
+    $scopeSlug = if ($a.scope -eq 'career-support') { 'support' } else { 'selection' }
+    $slug = (($a.company -replace '[\\/:*?"<>|\s]', '') + '-' + $scopeSlug + '-' + $a.id)
+    # record-vacのIDはロックとファイル名にだけ使う。支援面談は負数にしてappointment IDと衝突させず、
+    # digest側では「応募選考に紐付かない録音」として扱わせる。
+    $recordingId = if ($a.scope -eq 'career-support') { -([int]$a.id) } else { [int]$a.id }
     Start-Process powershell.exe -WindowStyle Hidden -ArgumentList @(
       '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ('"{0}"' -f (Join-Path $PSScriptRoot 'record-vac.ps1')),
-      '-AppointmentId', ([int]$a.id),
+      '-AppointmentId', $recordingId,
       '-StartIso', $start.ToString('yyyy-MM-ddTHH:mm:ss'),
       '-EndIso', $end.ToString('yyyy-MM-ddTHH:mm:ss'),
       '-Slug', $slug)
-    Move-Run ([int]$a.id) 'recording'
+    Move-Run $a 'recording'
     Log ("録音を開始した(record-vac): {0} / slug={1} (予定ID {2})" -f $title, $slug, $a.id)
     $recordArgs = @{
       By = 'meeting-autopilot'
@@ -128,21 +154,26 @@ foreach ($a in $agenda) {
       Result = '録音中'
     }
     & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'log-activity.ps1') @recordArgs | Out-Null
-    $run = Get-RunState ([int]$a.id)
+    $run = Get-RunState $a
   }
 
   if ($run.state -eq 'recording' -and $now -ge $end.AddMinutes(4)) {
-    Move-Run ([int]$a.id) 'stopping'
+    Move-Run $a 'stopping'
     if ($satellite) {
-      & $remoteDbCli -Operation meeting-done -AppointmentId ([int]$a.id) 2>&1 | Out-File -FilePath $log -Append -Encoding utf8
+      if ($a.scope -eq 'career-support') {
+        & $remoteDbCli -Operation career-meeting-done -CareerMeetingId ([int]$a.id) 2>&1 | Out-File -FilePath $log -Append -Encoding utf8
+      } else {
+        & $remoteDbCli -Operation meeting-done -AppointmentId ([int]$a.id) 2>&1 | Out-File -FilePath $log -Append -Encoding utf8
+      }
     } else { try {
       Push-Location (Join-Path $repo 'sync')
-      npx tsx scripts/db-meeting-done.ts $a.id 2>&1 | Out-File -FilePath $log -Append -Encoding utf8
+      $doneScript = if ($a.scope -eq 'career-support') { 'scripts/db-career-meeting-done.ts' } else { 'scripts/db-meeting-done.ts' }
+      npx tsx $doneScript $a.id 2>&1 | Out-File -FilePath $log -Append -Encoding utf8
       npx tsx scripts/db-snapshot.ts 2>&1 | Out-File -FilePath $log -Append -Encoding utf8
     } finally { Pop-Location } }
     Log ("録音終了待ちへ進めた: {0} {1}" -f $a.company, $a.title)
   } elseif ($run.state -eq 'opened' -and $now -ge $end) {
-    Move-Run ([int]$a.id) 'failed' '予定終了までに録音を開始できなかった'
+    Move-Run $a 'failed' '予定終了までに録音を開始できなかった'
     Log ("録音開始を逃した: {0} {1}" -f $a.company, $a.title)
   }
 }

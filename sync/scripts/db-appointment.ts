@@ -2,6 +2,7 @@
  * 予定(appointment)の点検と中止。日程変更で古い予定が残ったときの消し込みに使う。
  *   cd sync && npx tsx scripts/db-appointment.ts list [YYYY-MM-DD]  … その日の予定一覧(省略時は今日以降10件)
  *   cd sync && npx tsx scripts/db-appointment.ts conflicts <開始ISO> <終了ISO> … 正本・同期鮮度込みの空き判定
+ *   cd sync && npx tsx scripts/db-appointment.ts move <id> <開始ISO> <終了ISO> … 未反映の可動タスクを移動
  *   cd sync && npx tsx scripts/db-appointment.ts cancel <id> <理由>  … statusを「中止」にする(削除はしない)
  */
 import { fileURLToPath } from 'node:url'
@@ -10,13 +11,14 @@ import { existsSync } from 'node:fs'
 import { openDb, addEvent, getDatabaseContext, type DatabaseRole } from '../src/db'
 import { getScheduleAvailability } from '../src/schedule'
 import { resolveDatabasePath } from '../src/database-path'
+import { isEmergencyCanonical } from '../src/emergency-canonical'
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 const DB_PATH = resolveDatabasePath()
 const configuredRole = process.env.KATAZUKU_DB_ROLE
 const DB_ROLE: DatabaseRole = configuredRole === 'canonical' || configuredRole === 'replica' || configuredRole === 'fixture'
   ? configuredRole
-  : existsSync(join(REPO, '.katazuku-satellite')) ? 'replica' : 'canonical'
+  : existsSync(join(REPO, '.katazuku-satellite')) && !isEmergencyCanonical(REPO) ? 'replica' : 'canonical'
 const db = openDb(DB_PATH)
 const [cmd, a1, a2, a3] = process.argv.slice(2)
 
@@ -36,6 +38,24 @@ if (cmd === 'conflicts') {
   if (availability.state === 'unknown') process.exitCode = 3
 } else if (cmd === 'context') {
   console.log(JSON.stringify(getDatabaseContext(db, DB_ROLE), null, 2))
+} else if (cmd === 'move') {
+  const id = Number(a1)
+  const startMs = Date.parse(a2 || '')
+  const endMs = Date.parse(a3 || '')
+  if (!Number.isInteger(id) || Number.isNaN(startMs) || Number.isNaN(endMs) || endMs <= startMs) {
+    console.error('usage: db-appointment.ts move <id> <start-iso> <end-iso>')
+    process.exit(1)
+  }
+  const appt = db.prepare(
+    'SELECT id, selection_id AS selectionId, title, flexible, external_id AS externalId FROM appointment WHERE id = ?',
+  ).get(id) as { id: number; selectionId: number; title: string; flexible: number; externalId: string } | undefined
+  if (!appt) throw new Error(`予定が見つかりません: #${id}`)
+  if (appt.flexible !== 1) throw new Error(`固定予定はmoveできません: #${id}`)
+  if (appt.externalId) throw new Error(`カレンダー反映済みです。外部予定を先に移動し、calendar-syncでDBへ戻してください: #${id}`)
+  db.prepare('UPDATE appointment SET at = ?, end_at = ? WHERE id = ?')
+    .run(new Date(startMs).toISOString(), new Date(endMs).toISOString(), id)
+  addEvent(db, appt.selectionId, '予定更新', `${appt.title}を空き時間へ移動`, 'db-appointment')
+  console.log(JSON.stringify({ moved: true, appointmentId: id, at: new Date(startMs).toISOString(), endAt: new Date(endMs).toISOString() }))
 } else if (cmd === 'cancel') {
   const id = Number(a1)
   if (!Number.isInteger(id)) {
@@ -76,13 +96,13 @@ if (cmd === 'conflicts') {
 } else {
   const date = cmd === 'list' ? a1 : cmd
   const rows = db.prepare(`
-    SELECT a.id, a.at, a.kind, a.title, a.status, c.name company
+    SELECT a.id, a.at, a.kind, a.title, a.status, a.flexible, c.name company
     FROM appointment a
     JOIN selection s ON s.id = a.selection_id
     JOIN company c ON c.id = s.company_id
     ${date ? "WHERE a.at LIKE ? || '%'" : "WHERE a.at >= datetime('now') AND a.status = '予定'"}
     ORDER BY a.at LIMIT 30
   `).all(...(date ? [date] : [])) as Row[]
-  for (const r of rows) console.log(`#${r.id} ${r.at} | ${r.kind} | ${r.company} | ${r.title} | ${r.status}`)
+  for (const r of rows) console.log(`#${r.id} ${r.at} | ${r.kind} | ${r.company} | ${r.title} | ${r.status}${r.flexible ? ' | 時間変更可' : ''}`)
   console.log(`--- ${rows.length}件`)
 }

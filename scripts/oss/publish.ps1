@@ -12,6 +12,7 @@
 
 param(
   [switch]$Push,
+  [string]$PushBranch = 'main',
   [string]$OssDir = '',
   [string]$OssRepo = "https://github.com/kokotatan/katazuku-shukatsu.git",
   [string]$Blocklist = "$PSScriptRoot/blocklist.txt"
@@ -40,7 +41,11 @@ if (-not (Test-Path $OssDir)) {
 }
 
 Write-Host "`n[1/2] scan-secrets (with private blocklist)"
-$env:SCAN_BLOCKLIST = (Resolve-Path $Blocklist).Path
+if (-not (Test-Path -LiteralPath $Blocklist -PathType Leaf)) {
+  Write-Error "private blocklist is missing: $Blocklist. Refusing to run a shape-only publish gate."
+  exit 1
+}
+$env:SCAN_BLOCKLIST = (Resolve-Path -LiteralPath $Blocklist).Path
 node "$OssDir/tools/scan-secrets.mjs" $OssDir
 Assert-LastExit "scan-secrets"
 
@@ -55,7 +60,7 @@ try {
 
 if ($Push) {
   Write-Host "`nGate passed. Pushing to OSS."
-  git -C $OssDir push origin main
+  git -C $OssDir push origin $PushBranch
   Assert-LastExit "git push"
 } else {
   Write-Host "`nGate passed (scan + test). Re-run with -Push to publish."

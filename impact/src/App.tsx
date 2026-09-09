@@ -1,70 +1,134 @@
-import { formatDate } from '@katazuku/data'
+import { useMemo, useState, type KeyboardEvent } from 'react'
+import { FaAngleLeftIcon, FaAngleRightIcon } from 'smarthr-ui'
 import { AppNav } from './components/AppNav'
 import { DataState } from './components/DataState'
 import { useKatazukuData } from './lib/useKatazukuData'
+import {
+  activityCategories, buildActivityTimeline, dayLabel, entriesOnDay, monthDays, recordTime,
+  safeReferenceUrl, shiftDay, shiftMonth, todayInJapan, validDay,
+  type ActivityFilter, type TimelineEntry,
+} from './lib/activity'
+
+const weekdays = ['日', '月', '火', '水', '木', '金', '土']
+
+function Record({ entry, day }: { entry: TimelineEntry; day: string }) {
+  const url = safeReferenceUrl(entry.reference)
+  const continued = entry.day && entry.day < day
+  const outcome = entry.details.find(item => item.label === '結果' || (entry.category === 'schedule' && item.label === '状態'))
+  return <li className="activity-row">
+    <div className="activity-time"><time dateTime={entry.day || undefined}>{continued ? '継続' : entry.time || '時刻なし'}</time></div>
+    <article className="activity-body">
+      <div className="activity-meta"><span className="activity-label">{entry.label}</span>{entry.company && <span>{entry.company}</span>}</div>
+      <h3>{entry.title}</h3>
+      {entry.summary && <p className="activity-excerpt">{entry.summary}</p>}
+      {outcome && <p className="activity-status">{outcome.label}：{outcome.value}</p>}
+      {(entry.details.length > 0 || entry.reference || entry.source) && <details className="activity-detail app-disclosure">
+        <summary><span>記録の詳細</span></summary>
+        <dl>
+          {continued && <div><dt>開始日</dt><dd>{dayLabel(entry.day, true)} {entry.time}</dd></div>}
+          {entry.details.map(item => <div key={item.label}><dt>{item.label}</dt><dd>{item.value}</dd></div>)}
+          {entry.source && <div><dt>記録元</dt><dd>{entry.source}</dd></div>}
+          {entry.reference && <div><dt>参照先</dt><dd>{url ? <a href={url} target="_blank" rel="noreferrer">元の記録を開く</a> : entry.reference}</dd></div>}
+        </dl>
+      </details>}
+    </article>
+  </li>
+}
 
 export default function App() {
   const { data, error, loading, reload, setKey } = useKatazukuData()
-  const selections = data?.selections || []
-  const automated = (data?.enrichedEvents || []).filter((event) => /daily-sync|calendar-sync|interview-digest|submit-agent/.test(String(event.source || '')))
-  const active = selections.filter((selection) => !['不合格', '辞退', '終了'].includes(selection.outcome))
-  const positive = selections.filter((selection) => ['合格', '内定'].includes(selection.outcome))
-  const submissions = data?.submissions || []
-  const activities = data?.activities || []
+  const today = todayInJapan()
+  const [selectedDay, setSelectedDay] = useState(() => {
+    const date = new URLSearchParams(location.search).get('date') || ''
+    return validDay(date) ? date : today
+  })
+  const [filter, setFilter] = useState<ActivityFilter>('all')
+  const timeline = useMemo(() => data ? buildActivityTimeline(data) : { entries: [], undated: [] }, [data])
+  const days = useMemo(() => monthDays(selectedDay), [selectedDay])
+  const counts = useMemo(() => new Map(days.map(day => [day, entriesOnDay(timeline.entries, day).length])), [days, timeline])
+  const dayEntries = entriesOnDay(timeline.entries, selectedDay)
+  const visible = filter === 'all' ? dayEntries : dayEntries.filter(entry => entry.category === filter)
+  const automatic = filter === 'all' ? dayEntries.filter(entry => entry.category === 'automation') : []
+  const mainEntries = filter === 'all' ? visible.filter(entry => entry.category !== 'automation') : visible
+  const updated = recordTime(data?.generatedAt)
 
-  return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 md:flex">
-      <AppNav current="impact" />
-      <main className="min-w-0 flex-1 px-4 py-6 pb-24 md:px-8 md:py-8">
-        <header className="mb-6 flex flex-wrap items-end justify-between gap-3">
-          <div><p className="text-xs font-bold tracking-wide text-blue-700">IMPACT</p><h1 className="mt-1 text-2xl font-bold">自動運転の効果</h1><p className="mt-1 text-sm text-slate-600">推定時間ではなく、DBに残った処理件数と結果を表示します。</p></div>
-          <button type="button" onClick={reload} className="rounded-md border border-slate-400 bg-white px-3 py-2 text-sm font-bold hover:bg-slate-100">再読込</button>
-        </header>
-        {!data ? <DataState loading={loading} error={error} onSaveKey={setKey} /> : (
-          <>
-            <section className="grid grid-cols-2 gap-3 lg:grid-cols-4" aria-label="主要指標">
-              {[
-                ['管理中トラック', selections.length],
-                ['進行中', active.length],
-                ['合格・内定', positive.length],
-                ['自動処理イベント', automated.length],
-              ].map(([label, value]) => <div key={String(label)} className="rounded-xl border border-slate-300 bg-white p-5 shadow-sm"><p className="text-xs text-slate-600">{label}</p><p className="mt-2 text-3xl font-bold">{value}</p></div>)}
-            </section>
-            <section className="mt-5 grid gap-5 xl:grid-cols-2">
-              <div className="rounded-xl border border-slate-300 bg-white p-5 shadow-sm">
-                <h2 className="font-bold">入力パイプライン</h2>
-                <dl className="mt-4 grid grid-cols-2 gap-3">
-                  {[
-                    ['メール・選考イベント', data.enrichedEvents.length],
-                    ['カレンダー予定', data.appointments.length],
-                    ['面接記録', data.interviews.length],
-                    ['提出記録', submissions.length],
-                    ['企業dossier', data.dossiers.length],
-                    ['人物', data.people.length],
-                  ].map(([label, value]) => <div key={String(label)} className="rounded-lg bg-slate-50 p-3"><dt className="text-xs text-slate-500">{label}</dt><dd className="mt-1 text-xl font-bold">{value}</dd></div>)}
-                </dl>
+  const selectDay = (day: string, focus = false, reveal = false) => {
+    setSelectedDay(day)
+    const url = new URL(location.href)
+    url.searchParams.set('date', day)
+    history.replaceState(null, '', url)
+    if (focus) requestAnimationFrame(() => document.getElementById(`activity-day-${day}`)?.focus())
+    if (reveal && matchMedia('(max-width: 1150px)').matches) requestAnimationFrame(() => document.getElementById('activity-day-title')?.scrollIntoView({ block: 'start' }))
+  }
+  const moveWithKeyboard = (event: KeyboardEvent<HTMLButtonElement>, day: string) => {
+    const offset = ({ ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 } as Record<string, number>)[event.key]
+    if (offset !== undefined) { event.preventDefault(); selectDay(shiftDay(day, offset), true) }
+    if (event.key === 'PageUp' || event.key === 'PageDown') {
+      event.preventDefault(); selectDay(shiftMonth(day, event.key === 'PageUp' ? -1 : 1), true)
+    }
+  }
+
+  return <div className="min-h-screen bg-white text-slate-900 md:flex">
+    <AppNav current="impact" />
+    <main className="app-page min-w-0 flex-1 px-4 py-6 pb-24 md:px-8 md:py-8">
+      <header className="activity-header">
+        <div><h1 className="text-2xl font-bold">活動記録</h1><p>日付を選んで、その日の出来事を振り返る。</p></div>
+        <button type="button" onClick={reload} disabled={loading} className="app-refresh" aria-live="polite">{loading ? '更新中…' : '更新'}</button>
+      </header>
+      {data && error && <p role="alert" className="mb-4 text-sm text-red-700">更新できませんでした。{error}</p>}
+      {!data ? <DataState view="impact" loading={loading} error={error} onSaveKey={setKey} /> : <>
+        <div className="activity-layout">
+          <section className="activity-calendar" aria-labelledby="activity-month">
+            <div className="activity-month-nav">
+              <h2 id="activity-month">{Number(selectedDay.slice(0, 4))}年{Number(selectedDay.slice(5, 7))}月</h2>
+              <div>
+                <button type="button" onClick={() => selectDay(shiftMonth(selectedDay, -1))} aria-label="前の月"><FaAngleLeftIcon /></button>
+                <button type="button" onClick={() => selectDay(shiftMonth(selectedDay, 1))} aria-label="次の月"><FaAngleRightIcon /></button>
+                <button type="button" className="activity-today" onClick={() => selectDay(today, false, true)}>今日</button>
               </div>
-              <div className="rounded-xl border border-slate-300 bg-white p-5 shadow-sm">
-                <h2 className="font-bold">結果内訳</h2>
-                <div className="mt-4 space-y-3">
-                  {['進行中', '合格', '内定', '不合格', '辞退'].map((outcome) => {
-                    const count = selections.filter((selection) => selection.outcome === outcome).length
-                    const width = selections.length ? Math.max(2, Math.round(count / selections.length * 100)) : 0
-                    return <div key={outcome}><div className="mb-1 flex justify-between text-sm"><span>{outcome}</span><strong>{count}</strong></div><div className="h-2 rounded-full bg-slate-200"><div className="h-2 rounded-full bg-blue-600" style={{ width: `${width}%` }} /></div></div>
-                  })}
-                </div>
-              </div>
-            </section>
-            <section className="mt-5 rounded-xl border border-slate-300 bg-white p-5 shadow-sm">
-              <div className="flex items-center justify-between gap-3"><h2 className="font-bold">活動ログ</h2><span className="text-xs text-slate-500">{activities.length}件</span></div>
-              <div className="mt-4 divide-y divide-slate-200">
-                {activities.slice(0, 30).map((activity, index) => <article key={String(activity.at || index)} className="grid gap-1 py-3 sm:grid-cols-[8rem_1fr]"><time className="text-xs text-slate-500">{formatDate(String(activity.at || ''))}</time><div><p className="text-sm font-bold">{String(activity.what || '自律処理')}</p><p className="mt-1 text-xs leading-5 text-slate-600">{[activity.why, activity.how].filter(Boolean).map(String).join(' / ')}</p></div></article>)}
-                {activities.length === 0 && <p className="py-4 text-sm text-slate-500">活動ログはまだありません。</p>}
-              </div>
-            </section>
-          </>
-        )}
-      </main>
-    </div>
-  )
+            </div>
+            <table aria-labelledby="activity-month" className="activity-month-grid">
+              <thead><tr>{weekdays.map(day => <th scope="col" key={day}>{day}</th>)}</tr></thead>
+              <tbody>{Array.from({ length: days.length / 7 }, (_, week) => <tr key={week}>{days.slice(week * 7, week * 7 + 7).map(day => {
+                const count = counts.get(day) || 0
+                return <td key={day}><button type="button" id={`activity-day-${day}`}
+                  tabIndex={day === selectedDay ? 0 : -1} onKeyDown={event => moveWithKeyboard(event, day)}
+                  className={`${day.slice(0, 7) !== selectedDay.slice(0, 7) ? 'activity-other-month' : ''}${day === today ? ' activity-current-day' : ''}`}
+                  aria-label={`${dayLabel(day, true)}、${count}件の記録`} aria-pressed={day === selectedDay}
+                  aria-current={day === today ? 'date' : undefined} onClick={() => selectDay(day, false, true)}>
+                  <span>{Number(day.slice(8))}</span><span className="activity-day-count" aria-hidden="true">{count || ''}</span>
+                </button></td>
+              })}</tr>)}</tbody>
+            </table>
+            <p className="activity-calendar-note">日付の下の数字は、同期済みの記録の件数です。</p>
+            <details className="activity-coverage app-disclosure">
+              <summary><span>表示する記録について</span></summary>
+              <p>予定、受信メール、メール対応、会話・作業メモ、面接や提出の記録を表示します。会話は保存された要約・作業記録が対象です。</p>
+              <p>過去の記録は同期されている範囲で表示します。記録がない日も、活動がなかったとは限りません。日時は日本時間です。</p>
+              {updated && <p>最終更新：{dayLabel(updated.day)} {updated.time}</p>}
+            </details>
+          </section>
+          <section className="activity-day" aria-labelledby="activity-day-title">
+            <div className="activity-day-heading"><h2 id="activity-day-title">{dayLabel(selectedDay)}</h2><span aria-live="polite">{dayEntries.length}件</span>
+              <button type="button" className="activity-back-calendar" onClick={() => document.getElementById('activity-month')?.scrollIntoView({ block: 'start' })}>日付を選ぶ</button>
+            </div>
+            <div className="activity-filters" role="group" aria-label="記録の種類">
+              {([['all', 'すべて'], ...Object.entries(activityCategories)] as [ActivityFilter, string][]).map(([value, label]) =>
+                <button type="button" key={value} onClick={() => setFilter(value)} aria-pressed={filter === value}>{label}</button>)}
+            </div>
+            {automatic.length > 0 && <details key={selectedDay} className="activity-automatic app-disclosure">
+              <summary><span>自動処理の記録</span><span>{automatic.length}件</span></summary>
+              <ol className="activity-timeline">{automatic.map(entry => <Record key={entry.id} entry={entry} day={selectedDay} />)}</ol>
+            </details>}
+            {visible.length > 0 ? <ol className="activity-timeline">{mainEntries.map(entry => <Record key={entry.id} entry={entry} day={selectedDay} />)}</ol>
+              : <div className="activity-empty" role="status"><p>{dayEntries.length ? 'この種類の記録はありません。' : 'この日に表示できる記録はありません。'}</p>
+                {filter !== 'all' && <button type="button" onClick={() => setFilter('all')}>すべての種類を表示</button>}</div>}
+          </section>
+        </div>
+        {timeline.undated.length > 0 && <details className="activity-undated app-disclosure"><summary><span>日付を確認できない記録（{timeline.undated.length}件）</span></summary>
+          <ol className="activity-timeline">{timeline.undated.map(entry => <Record key={entry.id} entry={entry} day="" />)}</ol>
+        </details>}
+      </>}
+    </main>
+  </div>
 }

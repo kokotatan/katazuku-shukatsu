@@ -78,6 +78,24 @@ export interface Dossier {
   sourceRef: string
 }
 
+export interface MeetingPreparation {
+  appointmentId: number
+  companyId: number
+  company: string
+  at: string
+  title: string
+  status: 'ready' | 'pending'
+  reasons: string[]
+  preparedAt?: string
+  summary?: string
+  counterpartResearch?: string
+  priorContext?: string
+  questionsToAsk?: string[]
+  anticipatedQuestions?: { question: string; answerOutline: string }[]
+  sources?: { title: string; url: string }[]
+  unknowns?: string[]
+}
+
 export interface Interview {
   id: number
   appointmentId?: number
@@ -91,6 +109,11 @@ export interface Interview {
 }
 
 export interface Activity {
+  ts?: string
+  by?: string
+  action?: string
+  link?: string
+  result?: string
   at?: string
   what?: string
   why?: string
@@ -113,6 +136,7 @@ export interface KatazukuData {
   interviews: Interview[]
   submissions: Record<string, unknown>[]
   dossiers: Dossier[]
+  meetingPreparations?: MeetingPreparation[]
   meetingRuns: Record<string, unknown>[]
   mailItems: MailItem[]
 }
@@ -127,16 +151,20 @@ export function saveReadKey(key: string): void {
   localStorage.setItem(READ_KEY_STORAGE, key.trim())
 }
 
-export async function fetchKatazukuData(signal?: AbortSignal): Promise<KatazukuData> {
+export async function fetchKatazukuData(signal?: AbortSignal): Promise<KatazukuData | null> {
   const key = getReadKey()
-  if (!key) throw new Error('閲覧用の合言葉を入力してください')
+  if (!key) return null
   const response = await fetch(`/api/data?key=${encodeURIComponent(key)}`, {
     signal,
     cache: 'no-store',
   })
-  if (response.status === 401) throw new Error('合言葉が違います')
+  if (response.status === 401) throw new ReadKeyError()
   if (!response.ok) throw new Error(`データ取得に失敗しました（${response.status}）`)
   return await response.json() as KatazukuData
+}
+
+export class ReadKeyError extends Error {
+  constructor() { super('合言葉が違います。入力内容を確認してください。') }
 }
 
 export function photoUrl(storageKey: string): string {

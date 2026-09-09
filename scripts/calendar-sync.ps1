@@ -8,9 +8,11 @@
 $ErrorActionPreference = 'Continue'
 $repo = Split-Path $PSScriptRoot -Parent
 Set-Location $repo
+. (Join-Path $PSScriptRoot 'katazuku-role.ps1')
+$operationalRole = Get-KatazukuOperationalRole -RepositoryRoot $repo
 $env:KATAZUKU_DB = if ($env:KATAZUKU_DB) { [IO.Path]::GetFullPath($env:KATAZUKU_DB) } else { Join-Path $repo 'data\katazuku.db' }
 if (-not $env:KATAZUKU_DB_ROLE) {
-  $env:KATAZUKU_DB_ROLE = if (Test-Path (Join-Path $repo '.katazuku-satellite')) { 'replica' } else { 'canonical' }
+  $env:KATAZUKU_DB_ROLE = $operationalRole
 }
 $logDir = Join-Path $repo 'logs'
 if (-not (Test-Path $logDir)) { New-Item -ItemType Directory $logDir | Out-Null }
@@ -42,7 +44,13 @@ try {
   Push-Location (Join-Path $repo 'sync')
   npx tsx scripts/db-apply-calendar.ts $importJson 2>&1 | Out-File -FilePath $logFile -Append -Encoding utf8
   if ($LASTEXITCODE -eq 0) {
-    if (Test-Path (Join-Path $repo '.katazuku-satellite')) {
+    # 企業へ紐付かない就活予定も消さない。応募selectionを捏造せず、支援面談の専用台帳へ
+    # upsertする。既知の支援組織aliasに当たれば自動録音対象、未解決ならreviewで停止する。
+    if (Test-Path $residueJson) {
+      npx tsx scripts/db-apply-career-calendar.ts $residueJson 2>&1 | Out-File -FilePath $logFile -Append -Encoding utf8
+      if ($LASTEXITCODE -ne 0) { throw '支援面談台帳への反映に失敗しました' }
+    }
+    if ($operationalRole -eq 'replica') {
       # 衛星機(note-pc録音担当)のDBは正本ではないため、snapshotを本番Blobへ押し込まない。
       # 実害(2026-08-14発見): minipcとnote-pcが交互にsnapshotを上書きし、アプリ表示が二重状態になっていた。
       "衛星機マーカーによりsnapshotプッシュをスキップ" | Out-File -FilePath $logFile -Append -Encoding utf8
@@ -98,6 +106,11 @@ if ($newResidue.Count -gt 0) {
 }
 
 # ---- 4. 活動ログと後始末 ----
+. (Join-Path $PSScriptRoot 'meeting-preparation-guard.ps1')
+if ($operationalRole -eq 'canonical') {
+  if (-not (Update-KatazukuMeetingPreparation -RepositoryRoot $repo)) { Log '面談準備台帳の検査に失敗。専用アラートを確認してください' }
+}
+
 & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'log-activity.ps1') `
   -By 'calendar-sync' -Action 'カレンダー予定のDB同期' `
   -Why '会議自動運転の予定を最新にするため' `

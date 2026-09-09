@@ -30,10 +30,11 @@ kotaro=okuyama.kotaro@gmail.com、robotics=okuyama.kotaro.robotics@gmail.com、p
      nextDate を当日にする。以後、完了(送信控え・先方の受領連絡)がメールで確認できるまで、毎回の実行で
      nextDate を当日へ引き直し、サマリ冒頭にも再掲する(一度通知して終わりにしない。2026-07-21のPKSHA
      フォーム依頼が通知1回きりで7日間滞留し、先方から督促が来た反省)
-   - **予定は構造化して取る(最重要)**: 面接・面談・説明会・提出締切は appointments 配列
-     `[{at(ISO・時刻まで), endAt(終了時刻。「15:00-15:30」等から。録画の自動停止に使う), kind(面接/面談/締切/説明会/テスト), title, url(Meet/Zoom/Teams/提出ページ), location, person(面接官等)}]`。
+   - **予定は構造化して取る(最重要)**: 面接・面談・説明会・提出締切・参加確定インターンは appointments 配列
+     `[{at(ISO・時刻まで), endAt(終了時刻。「15:00-15:30」等から。録画の自動停止に使う), kind(面接/面談/締切/説明会/テスト/インターン), title, url(Meet/Zoom/Teams/提出ページ), location, person(面接官等), reimbursementStatus, receiptRequired}]`。
      **会議URLと時刻は必ず拾う**(朝のページに「15:00 面接 [開く]」と出すための核)。ref にGmailメッセージIDを入れる。
      会議URLは短縮リンク(weburl.jp・bit.ly・tinyurl.com・x.gd・cutt.ly・is.gd・t.co・lnkd.in・ur0.cc・urx.nu・buff.ly・rebrand.ly 等、例 https://weburl.jp/xxx)で来ることがある。その場合も会議URLとして url に入れる(実ブラウザで開けばMeet等へリダイレクトされ、そのまま自動録画に載る)
+     インターンの交通費は本文の明記だけを根拠に、全額=`full`、一部=`partial`、定額=`fixed`、本人精算なしの企業手配=`arranged`、支給なし=`none`を`reimbursementStatus`へ入れる。領収書・利用明細等の提出が明記されている場合だけ`receiptRequired:true`。不明なら両方省略する。複数日開催の`endAt`は実際の最終日の終了時刻にする。
 3. 同じメールから次の3ファイルを作る(いずれもgitignore済み。対象なしは空配列):
    - 選考差分を sync/sheet-import-loop.json へ [{name,stage,nextAction,nextDate,industry,position,appointments,ref}]
    - Inbox表示用を sync/mail-import-loop.json へ {items:[{id,receivedAt,sender,subject,summary,category,needsAction,deadline,status,company,position,sourceRef}]}

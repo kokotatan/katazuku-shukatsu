@@ -1,0 +1,118 @@
+/* 閲覧画面共通。ロゴの青は操作と選択に使い、情報は白地と文字で整理する。 */
+@theme {
+  --font-sans: system-ui, sans-serif;
+  --font-display: system-ui, sans-serif;
+  --color-slate-50: #fafafa;
+  --color-slate-100: #f5f5f5;
+  --color-slate-200: #e8e8e8;
+  --color-slate-300: #dedede;
+  --color-slate-400: #969696;
+  --color-slate-500: #666666;
+  --color-slate-600: #666666;
+  --color-slate-700: #252525;
+  --color-slate-800: #252525;
+  --color-slate-900: #252525;
+  --color-blue-50: #f1f5ff;
+  --color-blue-100: #dce7ff;
+  --color-blue-200: #b8cfff;
+  --color-blue-500: #005afd;
+  --color-blue-600: #004bd6;
+  --color-blue-700: #0044bf;
+  --color-blue-800: #003797;
+  --color-red-50: #fff5f4;
+  --color-red-100: #ffebe8;
+  --color-red-200: #ffc9c2;
+  --color-red-500: #cc3025;
+  --color-red-600: #b42318;
+  --color-red-700: #a12219;
+  --color-red-800: #851d16;
+  --color-teal-500: #005afd;
+  --color-teal-600: #004bd6;
+  --radius-sm: 2px;
+  --radius-md: 3px;
+  --radius-lg: 4px;
+  --radius-xl: 4px;
+  --radius-2xl: 4px;
+}
+
+body { @apply bg-white text-slate-900 antialiased; }
+:focus-visible { outline: 2px solid #005afd; outline-offset: 3px; }
+button, a, input, select, summary { -webkit-tap-highlight-color: transparent; }
+input, select, textarea { box-sizing: border-box; }
+.app-page { width: 100%; max-width: 1440px; }
+.app-panel { border-top: 1px solid #dedede; padding: 24px 0; }
+.app-metrics { border-block: 1px solid #dedede; }
+.app-metric { padding: 16px 0; }
+.app-refresh { display: inline-flex; flex: none; align-items: center; justify-content: center; min-height: 44px; min-width: 80px; padding: 0 12px; border: 0; border-radius: 3px; background: transparent; color: #252525; font-size: 14px; font-weight: 600; line-height: 1.5; }
+.app-refresh:disabled { color: #666666; cursor: wait; }
+.app-refresh:not(:disabled):active { background: #e8e8e8; }
+.app-disclosure > summary { display: flex; align-items: center; gap: 12px; min-height: 48px; list-style: none; cursor: pointer; }
+.app-disclosure > summary::-webkit-details-marker { display: none; }
+.app-disclosure > summary::after { content: ''; flex: none; width: 7px; height: 7px; margin: 0 3px 0 auto; border-right: 1.5px solid #666666; border-bottom: 1.5px solid #666666; transform: rotate(-45deg); transition: transform 120ms ease; }
+.app-disclosure[open] > summary::after { transform: rotate(45deg); }
+.app-disclosure > summary > span { min-width: 0; }
+.app-page input[type='search'] { scroll-margin-block: 24px; }
+.app-page h1, .app-page h2, .app-page h3, .app-page p, .app-page a { overflow-wrap: anywhere; }
+.app-page time { font-variant-numeric: tabular-nums; }
+/* 認証前は画面の構成のみ表示する。装飾の線は常に静止し、実データを置かない。 */
+.access-state { position: relative; min-height: 620px; overflow: hidden; }
+.access-layout { position: absolute; inset: 0; overflow: hidden; pointer-events: none; user-select: none; color: #969696; opacity: .58; }
+.access-layout p { margin: 0; font-size: 12px; line-height: 1.6; }
+.access-line { display: block; height: 10px; width: 76%; max-width: 280px; margin: 12px 0; border-radius: 2px; background: #dedede; }
+.access-line-short { width: 34%; max-width: 104px; }
+.access-value { display: block; width: 36px; height: 28px; margin-top: 16px; border-radius: 2px; background: #dedede; }
+.access-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 24px; padding: 20px 0; border-block: 1px solid #dedede; }
+.access-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px; }
+.access-section { padding: 24px 0; border-top: 1px solid #dedede; }
+.access-metrics + .access-columns { margin-top: 24px; }
+.access-section h3 { margin: 0 0 20px; color: #666666; font-size: 14px; font-weight: 600; }
+.access-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 24px; }
+.access-fields > div { min-width: 0; padding: 12px 0; border-bottom: 1px solid #e8e8e8; }
+.access-chart-row { margin-bottom: 18px; }
+.access-chart-track { display: block; height: 8px; margin-top: 8px; border: 1px solid #dedede; border-radius: 4px; }
+.access-calendar-layout { display: grid; grid-template-columns: 350px minmax(0, 1fr); gap: 36px; }
+.access-calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); margin-top: 20px; text-align: center; font-size: 12px; }
+.access-calendar-grid > span { padding-bottom: 16px; }
+.access-calendar-grid > i { display: flex; align-items: center; justify-content: center; height: 58px; border-top: 1px solid #e8e8e8; }
+.access-calendar-grid > i > span { width: 12px; height: 8px; border-radius: 2px; background: #dedede; }
+@media (max-width: 1150px) { .access-calendar-layout { grid-template-columns: minmax(0, 1fr); gap: 24px; } .access-calendar-grid { max-width: 440px; } }
+.access-row { display: flex; align-items: center; gap: 20px; min-height: 80px; padding: 12px 0; border-bottom: 1px solid #e8e8e8; }
+.access-row > .access-line { width: 64px; flex: none; }
+.access-row-body { min-width: 0; flex: 1; }
+.access-avatar { display: block; width: 48px; height: 48px; flex: none; border-radius: 4px; background: #e8e8e8; }
+.access-portrait { width: 72px; height: 88px; }
+.access-tabs { display: flex; gap: 32px; padding: 12px 0 20px; border-bottom: 1px solid #dedede; font-size: 14px; }
+.access-mail { padding: 20px 0; border-bottom: 1px solid #dedede; }
+.access-mail .access-line { margin-block: 18px; }
+.access-split { display: grid; grid-template-columns: minmax(180px, .7fr) minmax(0, 1.3fr); gap: 32px; }
+.access-search { min-height: 48px; padding: 14px 12px; border: 1px solid #dedede; border-radius: 4px; font-size: 12px; }
+.access-detail-title { padding-bottom: 24px; }
+.access-detail-title .access-line { height: 22px; }
+.access-entry { position: relative; display: flex; justify-content: center; padding: 132px 16px 64px; background: linear-gradient(180deg, transparent 32px, rgb(255 255 255 / .32) 132px, rgb(255 255 255 / .32) 460px, transparent); }
+.access-form { width: 100%; max-width: 360px; height: fit-content; padding: 24px; border: 1px solid #dedede; border-radius: 4px; background: #fff; box-shadow: 0 4px 20px rgb(0 0 0 / .035); }
+.access-lock { display: flex; width: 32px; height: 32px; align-items: center; justify-content: center; margin-bottom: 14px; color: #666666; border: 1px solid #e8e8e8; border-radius: 4px; }
+.access-form h2 { margin: 0; font-size: 18px; font-weight: 700; }
+.access-form > p { margin: 8px 0 20px; font-size: 13px; line-height: 1.7; color: #666666; }
+.access-form input { width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid #969696; border-radius: 3px; background: #fff; font-size: 16px; }
+.access-form button { width: 100%; min-height: 44px; margin-top: 12px; padding: 10px 16px; border: 0; border-radius: 3px; color: #fff; background: #004bd6; font-size: 14px; font-weight: 600; }
+.access-form button:disabled { color: #666666; background: #f5f5f5; cursor: default; }
+.access-form button:not(:disabled):hover { background: #0044bf; }
+.access-form > .access-error { margin: 10px 0 0; color: #a12219; }
+@media (max-width: 639px) {
+  .access-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; padding-block: 16px; }
+  .access-columns, .access-split { grid-template-columns: minmax(0, 1fr); gap: 20px; }
+  .access-entry { padding: 156px 0 48px; }
+  .access-form { padding: 20px; }
+}
+@media (hover: hover) {
+  .app-refresh:not(:disabled):hover { background: #f5f5f5; }
+  .app-disclosure > summary:hover { color: #004bd6; }
+}
+.app-dialog { width: min(480px, calc(100% - 32px)); max-height: calc(100dvh - 48px); margin: auto; padding: 0; overflow-y: auto; color: #252525; background: #fff; border: 0; border-radius: 4px; box-shadow: 0 12px 48px rgb(0 0 0 / .15); }
+.app-dialog::backdrop { background: rgb(0 0 0 / .3); }
+@media (min-width: 1024px) { .app-page { padding: 40px 48px; } }
+@media (max-width: 767px) {
+  .app-sheet { width: 100%; max-width: none; max-height: 85dvh; margin: auto 0 0; padding-bottom: env(safe-area-inset-bottom); border-radius: 8px 8px 0 0; }
+  main { padding-bottom: calc(100px + env(safe-area-inset-bottom)) !important; }
+}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0s !important; } }

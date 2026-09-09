@@ -770,6 +770,8 @@ export interface AdapterOptions {
   /** web.search capability要求時にcodex execへ渡す引数。CLI版差を吸収するためadapter内に閉じ込める */
   webSearchArgs?: string[]
   voiceboxMcpUrl?: string
+  /** Codex CLIへnative structured-output schemaを渡す。全property requiredのschemaだけ明示的に有効化する。 */
+  nativeOutputSchema?: boolean
 }
 
 // 現行のcodex execは`--search`を持たず、web検索はconfig override(tools.web_search)で有効化する。
@@ -808,7 +810,12 @@ export function createCodexAdapter(options: AdapterOptions, id: 'codex' | 'codex
         args.push('-c', `mcp_servers.voicebox.url=${JSON.stringify(options.voiceboxMcpUrl)}`)
         args.push('-c', 'mcp_servers.voicebox.http_headers={"X-Voicebox-Client-Id"="codex"}')
       }
-      if (request.outputSchemaPath) args.push('--output-schema', resolve(request.outputSchemaPath))
+      // Codex/OpenAIのnative structured outputは、objectの全propertiesをrequiredへ列挙する制約がある。
+      // katazukuの業務schemaは任意項目を持つため、そのまま渡すと実行前にinvalid_json_schemaで落ちる。
+      // 通常はプロンプトでJSONを要求し、既存のprovider非依存validateOutputで同じschemaを強制する。
+      if (request.outputSchemaPath && options.nativeOutputSchema) {
+        args.push('--output-schema', resolve(request.outputSchemaPath))
+      }
       if (options.profile) args.push('--profile', options.profile)
       if (options.model) args.push('--model', options.model)
       if (id === 'codex-oss') args.push('--oss', '--local-provider', options.localProvider ?? 'ollama')
@@ -963,6 +970,7 @@ export async function createDefaultAdapters(
       extraCapabilities: codexExtraCapabilities,
       webSearchArgs: parseWebSearchArgs(env.KATAZUKU_CODEX_WEB_SEARCH),
       voiceboxMcpUrl: env.KATAZUKU_VOICEBOX_MCP_URL,
+      nativeOutputSchema: env.KATAZUKU_CODEX_NATIVE_OUTPUT_SCHEMA === '1',
     }),
     createClaudeAdapter({
       command: commands.claude,
@@ -976,6 +984,7 @@ export async function createDefaultAdapters(
       extraCapabilities: env.KATAZUKU_CODEX_OSS_CAPABILITIES,
       webSearchArgs: parseWebSearchArgs(env.KATAZUKU_CODEX_OSS_WEB_SEARCH ?? env.KATAZUKU_CODEX_WEB_SEARCH),
       localProvider: env.KATAZUKU_LOCAL_PROVIDER === 'lmstudio' ? 'lmstudio' : 'ollama',
+      nativeOutputSchema: env.KATAZUKU_CODEX_NATIVE_OUTPUT_SCHEMA === '1',
     }, 'codex-oss'),
   ]
 }

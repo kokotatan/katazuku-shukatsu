@@ -4,8 +4,11 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "check:recording": "tsx scripts/check-recording-eligibility.ts",
+    "check:activity-calendar": "tsx scripts/check-activity-calendar.ts",
+    "check:data-access": "tsx scripts/check-data-access.ts",
     "check": "tsx scripts/check-sheet.ts",
-    "check:db": "tsx scripts/check-db.ts",
+    "check:db": "tsx scripts/check-db.ts && tsx scripts/check-meeting-preparation.ts",
     "check:application": "tsx scripts/check-application.ts",
     "check:mobility": "tsx scripts/check-mobility.ts",
     "check:agent-runtime": "tsx scripts/check-agent-runtime.ts",

@@ -6,12 +6,16 @@
   # origin + テナントパスまでを適用範囲として記録する(例 https://axol.jp/zw/s/ey_28/mypage/login)
   [string]$AllowedUrl = '',
   [Parameter(Mandatory = $true)][string]$OutputPath,
+  # agent/別プロセスから標準入力で「ID改行、パスワード改行」を渡す非対話経路。
+  # 秘密値をコマンドライン引数や環境変数へ載せないために使う。
+  [switch]$ReadFromStdin,
   [switch]$Fixture
 )
 
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Security
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+[Console]::InputEncoding = [System.Text.UTF8Encoding]::new($false)
 
 if ($PortalId -notmatch '^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$') { throw 'PortalIdが不正です。' }
 
@@ -23,7 +27,7 @@ if ($AllowedUrl) {
   # 共有ATS向け: ログインページURLから origin + テナントパス(ディレクトリ境界まで)を導出する
   $urlUri = [Uri]$AllowedUrl
   $isLoopbackFixture = $Fixture -and $urlUri.Scheme -eq 'http' -and @('127.0.0.1', 'localhost') -contains $urlUri.Host
-  if ($urlUri.Query -or $urlUri.Fragment -or ($urlUri.Scheme -ne 'https' -and -not $isLoopbackFixture)) {
+  if ($urlUri.UserInfo -or $urlUri.Query -or $urlUri.Fragment -or ($urlUri.Scheme -ne 'https' -and -not $isLoopbackFixture)) {
     throw 'AllowedUrlはクエリ・フラグメントを含まないHTTPS URLで指定してください。'
   }
   $normalizedOrigin = $urlUri.GetLeftPart([UriPartial]::Authority)
@@ -34,7 +38,7 @@ if ($AllowedUrl) {
 else {
   $originUri = [Uri]$AllowedOrigin
   $isLoopbackFixture = $Fixture -and $originUri.Scheme -eq 'http' -and @('127.0.0.1', 'localhost') -contains $originUri.Host
-  if ($originUri.AbsolutePath -ne '/' -or $originUri.Query -or $originUri.Fragment -or ($originUri.Scheme -ne 'https' -and -not $isLoopbackFixture)) {
+  if ($originUri.UserInfo -or $originUri.AbsolutePath -ne '/' -or $originUri.Query -or $originUri.Fragment -or ($originUri.Scheme -ne 'https' -and -not $isLoopbackFixture)) {
     throw 'AllowedOriginはパスを含まないHTTPS originで指定してください。'
   }
   $normalizedOrigin = $originUri.GetLeftPart([UriPartial]::Authority)
@@ -58,6 +62,13 @@ if ($Fixture) {
   $username = 'fixture-user@example.test'
   $passwordPlain = 'fixture-password-42'
 }
+elseif ($ReadFromStdin) {
+  $username = [Console]::In.ReadLine()
+  $passwordPlain = [Console]::In.ReadLine()
+  if ([string]::IsNullOrWhiteSpace($username) -or [string]::IsNullOrEmpty($passwordPlain)) {
+    throw '標準入力のログインIDまたはパスワードが空です。'
+  }
+}
 else {
   $username = Read-Host 'ログインIDまたはメールアドレス'
   $passwordSecure = Read-Host 'パスワード' -AsSecureString
@@ -80,7 +91,12 @@ try {
   }
   $parent = Split-Path -Parent $OutputPath
   if ($parent) { New-Item -ItemType Directory -Force -Path $parent | Out-Null }
-  $record | ConvertTo-Json | Set-Content -LiteralPath $OutputPath -Encoding UTF8
+  $temporaryPath = "$OutputPath.$([Guid]::NewGuid().ToString('N')).tmp"
+  try {
+    $record | ConvertTo-Json | Set-Content -LiteralPath $temporaryPath -Encoding UTF8
+    Move-Item -LiteralPath $temporaryPath -Destination $OutputPath -Force
+  }
+  finally { if (Test-Path -LiteralPath $temporaryPath) { Remove-Item -LiteralPath $temporaryPath -Force } }
   [pscustomobject]@{ status = 'stored'; portalId = $PortalId; allowedOrigin = $normalizedOrigin } | ConvertTo-Json -Compress
 }
 finally {

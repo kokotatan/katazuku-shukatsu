@@ -11,6 +11,8 @@ import {
   validateDailySyncResult,
   type DailySyncResult,
 } from './daily-sync-apply'
+import { evaluateSubmissionReadiness } from '../src/submission-readiness'
+import { listSubmissionRequirements } from '../src/submission-requirement'
 
 let failed = 0
 function check(label: string, cond: boolean, detail = '') {
@@ -33,6 +35,7 @@ function base(overrides: Partial<DailySyncResult> = {}): DailySyncResult {
     selections: [],
     mailItems: [],
     submissions: [],
+    requirements: [],
     ...overrides,
   }
 }
@@ -61,6 +64,25 @@ check('schema: 正常な最小結果は通る', (() => {
     return false
   }
 })())
+check('schema: インターン交通費情報を受理する', (() => {
+  try {
+    validateDailySyncResult(base({ selections: [{
+      name: '交通費テスト社',
+      stage: 'intern',
+      appointments: [{
+        at: '2026-10-06T11:00:00+09:00',
+        endAt: '2026-10-06T18:30:00+09:00',
+        kind: 'インターン',
+        title: '1dayインターン',
+        reimbursementStatus: 'full',
+        receiptRequired: true,
+      }],
+    }] }))
+    return true
+  } catch {
+    return false
+  }
+})())
 
 // --- 反映(1接続で束ねる) ---
 const db: DatabaseSync = openDb(':memory:')
@@ -82,6 +104,56 @@ check('選考が追加される', s1.selections.added.includes('テスト商事'
 check('メールが1件追加される', s1.mail.created === 1, JSON.stringify(s1.mail))
 check('提出結果が1件追加される', s1.submissions.created === 1, JSON.stringify(s1.submissions))
 check('最優先メールがそのまま渡る', s1.priorityMails.length === 1 && s1.priorityMails[0].subject.includes('人事面談'))
+
+// --- 日立ケース回帰: 複数成果物を別々に保持し、1件だけ残っても追跡を止めない ---
+const hitachi = openDb(':memory:')
+const initialHitachi = base({
+  generatedAt: '2026-08-08T00:00:00Z',
+  selections: [{ name: '株式会社日立製作所', stage: 'intern', position: '研究開発グループ 夏季特別インターン' }],
+  mailItems: [{
+    id: 'hitachi:request', receivedAt: '2026-08-07T05:51:58Z',
+    subject: '夏季特別インターンシップ詳細', company: '株式会社日立製作所',
+    position: '研究開発グループ 夏季特別インターン', needsAction: true, deadline: '2026-08-23',
+  }],
+  requirements: [
+    { sourceRef: 'hitachi:request', company: '株式会社日立製作所', position: '研究開発グループ 夏季特別インターン', kind: 'pledge', title: '誓約書', deadline: '2026-08-23', status: 'required' },
+    { sourceRef: 'hitachi:request', company: '株式会社日立製作所', position: '研究開発グループ 夏季特別インターン', kind: 'insurance_certificate', title: '賠償責任・傷害保険の加入証明書', deadline: '2026-08-23', status: 'required' },
+    { sourceRef: 'hitachi:request', company: '株式会社日立製作所', position: '研究開発グループ 夏季特別インターン', kind: 'self_intro', title: '自己紹介スライド', deadline: '2026-08-23', status: 'required' },
+  ],
+})
+const h1 = applyDailySyncResult(hitachi, initialHitachi)
+check('日立回帰: 3成果物を別々に台帳化する', h1.requirements.created === 3, JSON.stringify(h1.requirements))
+const confirmation = base({
+  generatedAt: '2026-08-24T00:45:22Z',
+  requirements: [
+    { sourceRef: 'hitachi:confirm', company: '株式会社日立製作所', position: '研究開発グループ 夏季特別インターン', kind: 'pledge', title: '誓約書', status: 'completed' },
+    { sourceRef: 'hitachi:confirm', company: '株式会社日立製作所', position: '研究開発グループ 夏季特別インターン', kind: 'self_intro', title: '自己紹介スライド', status: 'completed' },
+  ],
+})
+const h2 = applyDailySyncResult(hitachi, confirmation)
+check('日立回帰: 確認済み2件だけを完了にする', h2.requirements.completed === 2, JSON.stringify(h2.requirements))
+const openHitachi = listSubmissionRequirements(hitachi, { openOnly: true })
+check('日立回帰: 保険加入証明書だけが未完了で残る',
+  openHitachi.length === 1 && openHitachi[0].kind === 'insurance_certificate', JSON.stringify(openHitachi))
+applyDailySyncResult(hitachi, initialHitachi)
+const afterBackfill = listSubmissionRequirements(hitachi, { openOnly: true })
+check('日立回帰: 古い依頼メールのbackfillで完了済み2件を未完了へ戻さない',
+  afterBackfill.length === 1 && afterBackfill[0].kind === 'insurance_certificate', JSON.stringify(afterBackfill))
+const proactive = evaluateSubmissionReadiness(hitachi, new Date('2026-08-08T00:00:00Z'))
+check('日立回帰: 締切15日前でも受信直後から準備対象になる',
+  proactive.length === 1 && proactive[0].severity === 'prepare', JSON.stringify(proactive))
+const urgent = evaluateSubmissionReadiness(hitachi, new Date('2026-08-22T00:00:00+09:00'))
+check('日立回帰: 48時間以内はurgentへ昇格する',
+  urgent.length === 1 && urgent[0].severity === 'urgent', JSON.stringify(urgent))
+
+const sameBatch = openDb(':memory:')
+const sameBatchResult = applyDailySyncResult(sameBatch, base({
+  selections: [{ name: '同時処理社', stage: 'entried', position: '本選考' }],
+  requirements: [{ sourceRef: 'same:req', company: '同時処理社', position: '本選考', kind: 'es', title: 'ES', deadline: '2026-09-10', status: 'required' }],
+  submissions: [{ sourceRef: 'same:submitted', company: '同時処理社', position: '本選考', kind: 'ES', submittedAt: '2026-09-01T10:00:00+09:00' }],
+}))
+check('同一同期内の提出根拠で要求台帳を完了し、未完了へ戻さない',
+  sameBatchResult.submissions.created === 1 && listSubmissionRequirements(sameBatch, { openOnly: true }).length === 0)
 
 // --- 冪等性(同じ結果を2回反映しても増殖しない) ---
 const s2 = applyDailySyncResult(db, result)

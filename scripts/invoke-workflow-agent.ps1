@@ -10,7 +10,10 @@ param(
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path $PSScriptRoot -Parent
 $sync = Join-Path $repo 'sync'
-$npx = if ($IsWindows -or $env:OS -eq 'Windows_NT') { 'npx.cmd' } else { 'npx' }
+. (Join-Path $PSScriptRoot 'tsx-command.ps1')
+$tsxLaunch = Get-KatazukuTsxCommand -SyncDirectory $sync
+$tsxCommand = $tsxLaunch.Command
+$tsxPrefix = $tsxLaunch.Prefix
 $contractPath = if ([IO.Path]::IsPathRooted($Contract)) { [IO.Path]::GetFullPath($Contract) } else { [IO.Path]::GetFullPath((Join-Path $repo $Contract)) }
 $promptPath = if ([IO.Path]::IsPathRooted($PromptFile)) { [IO.Path]::GetFullPath($PromptFile) } else { [IO.Path]::GetFullPath((Join-Path $repo $PromptFile)) }
 $outputPath = if ([IO.Path]::IsPathRooted($OutputFile)) { [IO.Path]::GetFullPath($OutputFile) } else { [IO.Path]::GetFullPath((Join-Path $repo $OutputFile)) }
@@ -19,7 +22,7 @@ if ($Store) { $storeArgs = @('--store', $Store) }
 function Invoke-Control([string[]]$Arguments) {
   Push-Location $sync
   try {
-    $result = & $npx tsx scripts/workflow-control.ts @Arguments
+    $result = & $tsxCommand @tsxPrefix scripts/workflow-control.ts @Arguments
     $exitCode = $LASTEXITCODE
   } finally { Pop-Location }
   if ($exitCode -ne 0) { throw "workflow制御に失敗しました: $($Arguments -join ' ')" }

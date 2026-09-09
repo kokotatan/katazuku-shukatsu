@@ -242,6 +242,9 @@ if ($DryRun) {
   return
 }
 
+try { & (Join-Path $PSScriptRoot 'start-recording-status.ps1') }
+catch { Log ('録音状態の表示を起動できません: ' + $_.Exception.Message) }
+
 # 開始時刻まで待つ(最大60秒スリープの分割待ち)
 while ($true) {
   $rem = ($recStart - (Get-Date)).TotalSeconds

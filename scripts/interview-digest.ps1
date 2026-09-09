@@ -19,6 +19,9 @@ param(
   [Alias('AudioPath')]
   [string]$InputPath,
   [int]$AppointmentId = 0,
+  # 応募企業ではなく、就活エージェント/イベント運営者との面談を専用台帳へ結び付ける。
+  [int]$CareerMeetingId = 0,
+  [string]$Organization = '',
   # 既定では議事録が取れたら中間ファイル(チャンク)と巨大な元録画を消してディスクを節約する。
   # 元動画を残したいときだけ -KeepSource を付ける。聞き直し用の16kHz wavと文字起こしtxtは常に残る。
   [switch]$KeepSource,
@@ -30,10 +33,11 @@ param(
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path $PSScriptRoot -Parent
 Set-Location $repo
+. (Join-Path $PSScriptRoot 'katazuku-role.ps1')
 
 # 衛星機マーカー: このマシンの data/katazuku.db は正本ではない(正本はminipc)。
 # マーカーファイルがあれば、明示指定がなくてもDB反映はminipcへ送る(record-audio経由の自動呼出しを含む)。
-if (-not $RemoteApply -and (Test-Path (Join-Path $repo '.katazuku-satellite'))) { $RemoteApply = $true }
+if (-not $RemoteApply -and (Get-KatazukuOperationalRole -RepositoryRoot $repo) -eq 'replica') { $RemoteApply = $true }
 
 if (-not (Test-Path $InputPath)) { Write-Error "input file not found: $InputPath"; exit 1 }
 $InputPath = (Resolve-Path $InputPath).Path
@@ -130,7 +134,7 @@ if (-not (Test-Path $rawTxt)) {
 # Feed the base prompt + the (ASCII) transcript marker to the provider-independent runner.
 $prompt = Get-Content -Raw (Join-Path $PSScriptRoot 'interview-digest-prompt.md')
 $dbJson = Join-Path $intDir ($stem + '-db.json')
-$prompt = $prompt + "`n`nTRANSCRIPT_RAW=" + $rawTxt + "`nCHUNK_COUNT=" + $chunkCount + "`nSOURCE_FILE=" + $InputPath + "`nAPPOINTMENT_ID=" + $AppointmentId + "`nDB_JSON=" + $dbJson + "`n"
+$prompt = $prompt + "`n`nTRANSCRIPT_RAW=" + $rawTxt + "`nCHUNK_COUNT=" + $chunkCount + "`nSOURCE_FILE=" + $InputPath + "`nAPPOINTMENT_ID=" + $AppointmentId + "`nCAREER_MEETING_ID=" + $CareerMeetingId + "`nORGANIZATION=" + $Organization + "`nDB_JSON=" + $dbJson + "`n"
 
 # providerの診断出力はstderrにも流れるため、この呼出しだけ継続し、下の完了マーカーで成否を判定する。
 $prevEAP = $ErrorActionPreference
@@ -138,7 +142,7 @@ $previousVoiceboxUrl = $env:KATAZUKU_VOICEBOX_MCP_URL
 $ErrorActionPreference = 'Continue'
 $env:KATAZUKU_VOICEBOX_MCP_URL = 'http://127.0.0.1:17493/mcp'
 $safeStem = $stem -replace '[^a-zA-Z0-9._-]', '-'
-$digestRunId = if ($AppointmentId -gt 0) { 'appointment-' + $AppointmentId } else { 'recording-' + $safeStem }
+$digestRunId = if ($AppointmentId -gt 0) { 'appointment-' + $AppointmentId } elseif ($CareerMeetingId -gt 0) { 'career-meeting-' + $CareerMeetingId } else { 'recording-' + $safeStem }
 try {
   & (Join-Path $PSScriptRoot 'invoke-agent.ps1') `
     -Workflow 'interview-digest' -RunId $digestRunId -PromptText $prompt `
@@ -167,6 +171,9 @@ if ($ok) {
       Add-Type -AssemblyName System.IO.Compression, System.IO.Compression.FileSystem
       $zipName = ('bridge-' + $safeStem + '.zip')
       $zipPath = Join-Path ([System.IO.Path]::GetTempPath()) $zipName
+      # Game Barの標準名は「... 2026-08-29 15-10-18」のように空白区切りで、従来の
+      # YYYY-MM-DD_HHmm抽出ではDB JSONを再発見できない。適用用JSONだけASCII固定名でも同梱する。
+      $remoteDbRel = 'logs/handoff-in/interview-' + [guid]::NewGuid().ToString('N') + '.json'
       if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
       $zip = [System.IO.Compression.ZipFile]::Open($zipPath, 'Create')
       try {
@@ -177,6 +184,7 @@ if ($ok) {
           [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $abs, $rel) | Out-Null
         }
         & $addFile $dbJson
+        [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $dbJson, $remoteDbRel) | Out-Null
         if ($meta.transcriptPath) {
           $tp = $meta.transcriptPath
           if (-not [IO.Path]::IsPathRooted($tp)) { $tp = Join-Path $repo $tp }
@@ -226,12 +234,10 @@ if ($ok) {
           "npx tsx scripts/db-meeting-run.ts transition $AppointmentId " + '$s; done'
         ssh -o BatchMode=yes minipc $walk 2>&1 | Out-File -FilePath $logFile -Append -Encoding utf8
       }
-      # 日本語・空白を含むdb.json名をssh引数へ載せず、末尾のASCII日時スタンプでリモート側から引く。
-      $stamp = if ($stem -match '(\d{4}-\d{2}-\d{2}_\d{4})$') { $Matches[1] } else { '' }
-      if (-not $stamp) { throw ('stemから日時スタンプを取れませんでした: {0}' -f $stem) }
       $applyCmd = 'cd ~/' + $remoteRepoName + '/sync && ' +
-        'f=$(ls ../logs/interviews/*' + $stamp + '-db.json | head -1) && ' +
-        'npx tsx scripts/db-apply-interview.ts "$f" && npx tsx scripts/photo-sync.ts && npx tsx scripts/db-snapshot.ts'
+        'npx tsx scripts/db-apply-interview.ts ../' + $remoteDbRel +
+        ' && rm -f ../' + $remoteDbRel +
+        ' && npx tsx scripts/photo-sync.ts && npx tsx scripts/db-snapshot.ts'
       ssh -o BatchMode=yes minipc $applyCmd 2>&1 | Out-File -FilePath $logFile -Append -Encoding utf8
       if ($LASTEXITCODE -ne 0) { throw 'minipc側でのDB反映に失敗しました' }
     } finally { $ErrorActionPreference = $prevEAPr }

@@ -4,8 +4,8 @@
  * agentがDBに書くたびプッシュされるので、数秒後にはここに最新が映る。
  */
 
-export const READ_KEY_STORAGE = 'katazuku/read-key'
-const API = '/api/data'
+import { fetchKatazukuData } from '../../../shared/src/index'
+export { READ_KEY_STORAGE } from '../../../shared/src/index'
 
 export interface Track {
   id: number
@@ -89,18 +89,16 @@ interface RawSnapshot {
     outcome?: string; steps?: string[]; nextAction?: string; nextDate?: string; submitted?: boolean; esUrl?: string; memo?: string
   }[]
   appointments?: { selectionId?: number; company?: string; at?: string; kind?: string; title?: string; url?: string; location?: string; person?: string; status?: string }[]
-  activities?: { ts?: string; by?: string; action?: string; why?: string; how?: string; link?: string; result?: string }[]
+  activities?: { ts?: unknown; by?: unknown; action?: unknown; why?: unknown; how?: unknown; link?: unknown; result?: unknown }[]
 }
 
-/** 合言葉が未設定・不一致のとき 'KEY' を投げる(呼び手が入力画面を出す) */
-export async function fetchAll(): Promise<AllData> {
-  const key = localStorage.getItem(READ_KEY_STORAGE) ?? ''
-  if (!key) throw new Error('KEY')
-  const res = await fetch(`${API}?key=${encodeURIComponent(key)}`)
-  if (res.status === 401) throw new Error('KEY')
-  if (!res.ok) throw new Error(`データ取得に失敗 (${res.status})`)
-  const raw = (await res.json()) as RawSnapshot
+/** 合言葉が未設定ならnull、設定済みなら認証APIから取得する。 */
+export async function fetchAll(): Promise<AllData | null> {
+  const raw = await fetchKatazukuData()
+  return raw ? snapshotToAllData(raw) : null
+}
 
+export function snapshotToAllData(raw: RawSnapshot): AllData {
   const tracks: Track[] = (raw.selections ?? []).map((s) => {
     const deadline = s.nextDate ?? ''
     return {
@@ -148,7 +146,7 @@ export async function fetchAll(): Promise<AllData> {
     .sort((x, y) => (x.atDate?.getTime() ?? 0) - (y.atDate?.getTime() ?? 0))
 
   const activities: Activity[] = (raw.activities ?? [])
-    .map((a) => ({ ts: a.ts ?? '', by: a.by ?? '', action: a.action ?? '', why: a.why ?? '', how: a.how ?? '', link: a.link ?? '', result: a.result ?? '' }))
+    .map((a) => ({ ts: String(a.ts ?? ''), by: String(a.by ?? ''), action: String(a.action ?? ''), why: String(a.why ?? ''), how: String(a.how ?? ''), link: String(a.link ?? ''), result: String(a.result ?? '') }))
     .reverse()
 
   return {

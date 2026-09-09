@@ -1,6 +1,6 @@
 // Web Push手動送信(spec16の垂直スライス2)。デプロイ済みの /api/push-send を叩く。
 //   node scripts/push-send.mjs --title "katazuku" --body "テスト通知です" --url /insight/
-//   node scripts/push-send.mjs --base https://<preview>.vercel.app --body "..."
+//   node scripts/push-send.mjs --base https://<preview-host> --body "..."
 // 認証は repo直下 .env の KATAZUKU_WRITE_SECRET(db-snapshot.tsと同じ)。
 // 通知本文はロック画面に出るため、企業名・個人名を細かく載せない(要約レベル)。
 import { readFileSync, existsSync } from 'node:fs'

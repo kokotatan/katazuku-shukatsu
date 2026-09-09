@@ -6,7 +6,9 @@
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { openDb, listAppointments, sameAppointment, type AppointmentRow } from '../src/db'
+import { listCareerMeetings } from '../src/career-support'
 import { isMeetingUrl } from '../src/meeting-url'
+import { isAutomaticRecordingEligible } from '../src/recording-eligibility'
 import { resolveDatabasePath } from '../src/database-path'
 
 const DB_PATH = resolveDatabasePath()
@@ -39,19 +41,21 @@ function dedupe(rows: AppointmentRow[]): AppointmentRow[] {
 
 const now = Date.now()
 const H = 3600_000
-const items = dedupe(listAppointments(db))
+const selectionItems = dedupe(listAppointments(db))
   .filter((a) => a.status === '予定')
-  .filter((a) => a.kind !== '締切') // 締切は「時間に参加する」ものではないので開く/録るの対象外
+  .filter((a) => isAutomaticRecordingEligible({ ...a, startAt: a.at }))
   .map((a) => {
     const start = Date.parse(a.at.replace(/\//g, '-'))
     if (isNaN(start)) return null
     const end = a.endAt ? Date.parse(a.endAt.replace(/\//g, '-')) : start + H
     return {
       id: a.id,
+      scope: 'selection' as const,
       company: a.company,
       title: a.title,
       kind: a.kind,
       url: a.url,
+      location: a.location,
       // 直リンク/短縮リンクなど「開いて録る」対象と判定できたか(短縮リンクは実ブラウザが解決する)
       openable: isMeetingUrl(a.url),
       person: a.person,
@@ -63,4 +67,30 @@ const items = dedupe(listAppointments(db))
   // 直近2時間前〜48時間先だけが司令対象
   .filter((a) => Date.parse(a.startIso) > now - 2 * H && Date.parse(a.startIso) < now + 48 * H)
 
-console.log(JSON.stringify(items))
+// 就活エージェント・イベント運営者との面談は応募選考へ混ぜず、同じ自動運転だけを利用する。
+// review状態は誤録音を避けるため司令に出さず、組織が確定したscheduledだけを対象にする。
+const supportItems = listCareerMeetings(db)
+  .filter((meeting) => meeting.status === 'scheduled' && meeting.recordable && isAutomaticRecordingEligible(meeting))
+  .map((meeting) => {
+    const start = Date.parse(meeting.startAt)
+    if (Number.isNaN(start)) return null
+    const parsedEnd = meeting.endAt ? Date.parse(meeting.endAt) : Number.NaN
+    const end = Number.isNaN(parsedEnd) || parsedEnd <= start ? start + H : parsedEnd
+    return {
+      id: meeting.id,
+      scope: 'career-support' as const,
+      company: meeting.organization,
+      title: meeting.title,
+      kind: meeting.kind,
+      url: meeting.url,
+      location: meeting.location,
+      openable: isMeetingUrl(meeting.url),
+      person: '',
+      startIso: new Date(start).toISOString(),
+      endIso: new Date(end).toISOString(),
+    }
+  })
+  .filter((item): item is NonNullable<typeof item> => item !== null)
+  .filter((item) => Date.parse(item.startIso) > now - 2 * H && Date.parse(item.startIso) < now + 48 * H)
+
+console.log(JSON.stringify([...selectionItems, ...supportItems].sort((a, b) => Date.parse(a.startIso) - Date.parse(b.startIso))))

@@ -1,4 +1,4 @@
-# katazuku 毎朝の選考同期(Phase B / spec14「副作用の分離」版)
+﻿# katazuku 毎朝の選考同期(Phase B / spec14「副作用の分離」版)
 #
 # 従来の daily-sync.ps1 は「モデルが抽出もDB書き込みもミラーも全部やる」モデル直接apply型。
 # この v2 は spec14 のとおり2段に割る:
@@ -11,7 +11,11 @@
 # それらは従来 daily-sync.ps1 側に残す(Phase B.2 で別executorへ分離予定)。
 param(
   [ValidateSet('auto', 'codex', 'claude', 'codex-oss')][string]$Agent = 'auto',
-  [switch]$Force
+  [switch]$Force,
+  # 障害復旧時は退役DB以降のメールを再取得する。通常運転は1日のまま。
+  [ValidateRange(1, 30)][int]$LookbackDays = 1,
+  # MCP障害時にgmail-fetch.tsで保存した読み取り専用JSONを使う。
+  [string]$MailInputPath = ''
 )
 $ErrorActionPreference = 'Continue'
 $repo = Split-Path $PSScriptRoot -Parent
@@ -24,10 +28,44 @@ $ts = Get-Date -Format 'yyyy-MM-dd_HHmmss'
 $logFile = Join-Path $logDir ("daily-sync-v2-{0}.log" -f $ts)
 $extractJson = Join-Path $logDir ("daily-sync-extract-{0}.local.json" -f $ts)
 $alertFile = Join-Path $logDir 'alert-daily-sync.txt'
-$promptFile = Join-Path $PSScriptRoot 'daily-sync-extract-prompt.md'
+$successMarker = Join-Path $logDir 'daily-sync-last-success.local.txt'
+# 通常の1日固定では、PCが数日停止した後のStartWhenAvailable実行で停止中のメールを落とす。
+# 明示指定がない場合は前回成功時刻から取得期間を自動拡張し、最大30日をcatch-upする。
+if (-not $PSBoundParameters.ContainsKey('LookbackDays')) {
+  if (Test-Path -LiteralPath $successMarker) {
+    $lastSuccessText = (Get-Content -LiteralPath $successMarker -Raw -Encoding UTF8).Trim()
+    $lastSuccess = [datetimeoffset]::MinValue
+    if ([datetimeoffset]::TryParse($lastSuccessText, [ref]$lastSuccess)) {
+      $elapsedDays = [math]::Ceiling(([datetimeoffset]::Now - $lastSuccess).TotalDays) + 1
+      $LookbackDays = [math]::Min(30, [math]::Max(1, [int]$elapsedDays))
+    } else {
+      $LookbackDays = 7
+    }
+  } else {
+    $LookbackDays = 7
+  }
+}
+$basePromptFile = Join-Path $PSScriptRoot 'daily-sync-extract-prompt.md'
+$promptFile = $basePromptFile
+if ($LookbackDays -gt 1 -or $MailInputPath) {
+  $promptFile = Join-Path $logDir ("daily-sync-extract-prompt-{0}.local.md" -f $ts)
+  $promptText = Get-Content -LiteralPath $basePromptFile -Raw -Encoding UTF8
+  $promptText = $promptText.Replace('直近1日(`newer_than:1d`)', ("直近{0}日(`newer_than:{0}d`)" -f $LookbackDays))
+  $directive = "障害復旧バックフィルです。指定期間を省略せず、既読メールも含めて再取得してください。"
+  if ($MailInputPath) {
+    $MailInputPath = [IO.Path]::GetFullPath($MailInputPath)
+    if (-not (Test-Path -LiteralPath $MailInputPath)) { throw "MailInputPathがありません: $MailInputPath" }
+    $directive += (" Gmail MCPは使わず、次のローカルJSONだけを読み、messages配列をメール本文として抽出してください: {0}" -f $MailInputPath)
+  }
+  $promptText = ($directive + "`r`n`r`n" + $promptText)
+  [IO.File]::WriteAllText($promptFile, $promptText, (New-Object Text.UTF8Encoding($false)))
+}
 $runId = "daily-sync:$ts"
 $workflowContract = Join-Path $sync 'workflows\daily-sync.json'
-$npx = if ($IsWindows -or $env:OS -eq 'Windows_NT') { 'npx.cmd' } else { 'npx' }
+. (Join-Path $PSScriptRoot 'tsx-command.ps1')
+$tsxLaunch = Get-KatazukuTsxCommand -SyncDirectory $sync
+$tsxCommand = $tsxLaunch.Command
+$tsxPrefix = $tsxLaunch.Prefix
 
 function Write-Log([string]$msg) { $msg | Out-File -FilePath $logFile -Append -Encoding utf8 }
 function Set-Alert([string]$reason) {
@@ -37,7 +75,7 @@ function Set-Alert([string]$reason) {
 function Invoke-WorkflowControl([string[]]$Arguments) {
   Push-Location $sync
   try {
-    & $npx tsx scripts/workflow-control.ts @Arguments --contract $workflowContract --run-id $runId *>&1 |
+    & $tsxCommand @tsxPrefix scripts/workflow-control.ts @Arguments --contract $workflowContract --run-id $runId *>&1 |
       Tee-Object -FilePath $logFile -Append | Out-Null
     $controlExit = $LASTEXITCODE
   } finally { Pop-Location }
@@ -58,6 +96,7 @@ function Fail-ExecutorStep([string]$Step, [string]$Reason) {
 }
 
 Write-Log ("===== {0} daily-sync(v2) 開始 =====" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'))
+Write-Log ("メール取得期間: 直近{0}日" -f $LookbackDays)
 
 # workflow契約で正本DB、工程順、ownerを固定する。実行台帳はlogs内のlocal DBへ置く。
 Invoke-WorkflowControl @('start')
@@ -86,7 +125,7 @@ try {
   Start-ExecutorStep 'validate'
   Push-Location $sync
   try {
-    & $npx tsx scripts/daily-sync-apply.ts $extractJson --validate-only *>&1 |
+    & $tsxCommand @tsxPrefix scripts/daily-sync-apply.ts $extractJson --validate-only *>&1 |
       Tee-Object -FilePath $logFile -Append | Out-Null
     $validateExit = $LASTEXITCODE
   } finally { Pop-Location }
@@ -100,12 +139,12 @@ try {
 }
 
 # --- 3) 決定論的apply(schema検証 → 既存 db-apply-* を1接続で束ねる) ---
-$applyArgs = @('tsx', 'scripts/daily-sync-apply.ts', $extractJson)
+$applyArgs = @('scripts/daily-sync-apply.ts', $extractJson)
 if ($Force) { $applyArgs += '--force' }
 Start-ExecutorStep 'apply'
 Push-Location $sync
 try {
-  & $npx @applyArgs *>&1 | Tee-Object -FilePath $logFile -Append
+  & $tsxCommand @tsxPrefix @applyArgs *>&1 | Tee-Object -FilePath $logFile -Append
   $applyExit = $LASTEXITCODE
 } finally { Pop-Location }
 if ($applyExit -ne 0) {
@@ -120,7 +159,7 @@ Complete-ExecutorStep 'apply'
 Start-ExecutorStep 'snapshot'
 Push-Location $sync
 try {
-  & $npx tsx scripts/db-snapshot.ts *>&1 | Tee-Object -FilePath $logFile -Append
+  & $tsxCommand @tsxPrefix scripts/db-snapshot.ts *>&1 | Tee-Object -FilePath $logFile -Append
   $snapshotExit = $LASTEXITCODE
 } finally { Pop-Location }
 if ($snapshotExit -ne 0) {
@@ -141,9 +180,11 @@ Start-ExecutorStep 'audit'
 Complete-ExecutorStep 'audit'
 
 if (Test-Path $alertFile) { Remove-Item $alertFile -Force }
+[IO.File]::WriteAllText($successMarker, [datetimeoffset]::Now.ToString('o'), (New-Object Text.UTF8Encoding($false)))
 Write-Log "=== daily-sync DONE ==="
 Write-Output "=== daily-sync DONE ==="
 
 # 30日より古い v2 ログ・抽出JSONは掃除する
 Get-ChildItem $logDir -Filter 'daily-sync-v2-*.log' | Where-Object { $_.LastWriteTime -lt (Get-Date).AddDays(-30) } | Remove-Item -Force
 Get-ChildItem $logDir -Filter 'daily-sync-extract-*.local.json' | Where-Object { $_.LastWriteTime -lt (Get-Date).AddDays(-30) } | Remove-Item -Force
+Get-ChildItem $logDir -Filter 'daily-sync-extract-prompt-*.local.md' | Where-Object { $_.LastWriteTime -lt (Get-Date).AddDays(-30) } | Remove-Item -Force

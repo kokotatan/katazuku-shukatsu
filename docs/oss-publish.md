@@ -23,6 +23,10 @@ pwsh scripts/oss/publish.ps1          # scan + test のゲートだけ回す(pus
 pwsh scripts/oss/publish.ps1 -Push    # ゲート通過時のみ OSS へ push
 ```
 
+mainが保護されている場合は、公開する変更を `codex/` ブランチへコミットし、
+`-Push -PushBranch codex/<変更名>` で同じゲートを通す。GitHubでPRを作成し、必須CIの成功後に反映する。
+ゲート内のpullに備え、初回push前のブランチには `origin/main` をupstreamとして設定しておく。
+
 公開する中核の編集は兄弟フォルダ `C:\Users\okuya\katazuku-shukatsu-oss` 側で行い、上のゲートを通して push する。
 
 ## リポジトリ配置

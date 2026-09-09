@@ -22,7 +22,7 @@ export interface ThirdPartyEmailAction {
     inReplyTo?: string
     references?: string
     attachments?: { path: string; filename: string; mimeType: string }[]
-    scheduleCommitments: { startAt: string; endAt: string }[]
+    scheduleCommitments: { startAt: string; endAt: string; appointmentId?: number }[]
   }
   effectiveAt: 'immediate'
   notification: string
@@ -48,6 +48,23 @@ const DISCLOSURE_PATTERNS: { pattern: RegExp; label: string }[] = [
 
 export function professionalEmailIssues(body: string): string[] {
   const issues: string[] = []
+  const normalized = body.replace(/\r\n/g, '\n').trim()
+  const lines = normalized.split('\n').map((line) => line.trim()).filter(Boolean)
+  const greetingIndex = lines.findIndex((line) => /お世話になっております/.test(line))
+  const closingIndex = lines.findIndex((line) => /よろしく(?:お願いいたします|お願い申し上げます)/.test(line))
+  const signatureIndex = lines.findIndex((line, index) => index > closingIndex && /奥山\s*彪太郎/.test(line))
+
+  if (!lines.slice(0, greetingIndex >= 0 ? greetingIndex : 3).some((line) => /(?:様|御中)$/.test(line))) {
+    issues.push('採用担当宛メールには冒頭の宛名（様または御中）が必要です')
+  }
+  if (greetingIndex < 0) issues.push('採用担当宛メールには「お世話になっております」の挨拶が必要です')
+  if (!/東北大学/.test(normalized) || !/奥山\s*彪太郎/.test(normalized)) {
+    issues.push('採用担当宛メールには大学名と氏名を含む名乗りが必要です')
+  }
+  if (closingIndex < 0) issues.push('採用担当宛メールには結びの挨拶が必要です')
+  if (closingIndex >= 0 && signatureIndex < 0) issues.push('結びの後に氏名を記載した署名が必要です')
+  if (!/^TEL\s*[:：]/mi.test(normalized)) issues.push('署名にはTELが必要です')
+  if (!/^Mail\s*[:：]/mi.test(normalized)) issues.push('署名にはMailが必要です')
   for (const item of DISCLOSURE_PATTERNS) if (item.pattern.test(body)) issues.push(`${item.label}を本文へ書かないでください`)
   if (/御社/.test(body)) issues.push('書き言葉では「御社」でなく「貴社」を使ってください')
   if (/了解しました/.test(body)) issues.push('「了解しました」でなく「承知いたしました」を使ってください')
@@ -71,7 +88,6 @@ export function buildWorkspaceSendCall(action: ThirdPartyEmailAction): { name: s
     body_format: 'plain',
     thread_id: action.content.threadId,
     include_signature: false,
-    quote_original: false,
   }
   if (action.target.cc?.length) args.cc = action.target.cc.join(', ')
   if (action.target.bcc?.length) args.bcc = action.target.bcc.join(', ')
@@ -121,7 +137,29 @@ export function preflightThirdPartyEmail(
     issues.push('日時を約束する文面なのにscheduleCommitmentsがありません')
   }
   for (const commitment of action.content.scheduleCommitments) {
+    // 既に確保された予定への承諾では、その予定自身だけを衝突判定から除く。
+    // IDだけで除外せず、企業・選考・開始終了の一致を正本で検証する。
+    let excludeAppointmentId: number | undefined
+    if (commitment.appointmentId !== undefined) {
+      const appointment = db.prepare(`
+        SELECT a.id, a.selection_id AS selectionId, s.company_id AS companyId,
+               a.at AS startAt, a.end_at AS endAt, a.status
+        FROM appointment a JOIN selection s ON s.id = a.selection_id WHERE a.id = ?
+      `).get(commitment.appointmentId) as {
+        id: number; selectionId: number; companyId: number; startAt: string; endAt: string; status: string
+      } | undefined
+      if (!appointment || appointment.status !== '予定' || appointment.companyId !== companyId ||
+          (action.target.selectionId && appointment.selectionId !== action.target.selectionId) ||
+          (mail?.selectionId && appointment.selectionId !== mail.selectionId) ||
+          Date.parse(appointment.startAt) !== Date.parse(commitment.startAt) ||
+          Date.parse(appointment.endAt) !== Date.parse(commitment.endAt)) {
+        issues.push(`承諾対象の予定が企業・選考・日時と一致しません: ${commitment.appointmentId}`)
+      } else {
+        excludeAppointmentId = appointment.id
+      }
+    }
     const availability = getScheduleAvailability(db, commitment.startAt, commitment.endAt, {
+      excludeAppointmentId,
       now: options.now,
       requireCanonical: true,
       requireCalendarFreshness: true,

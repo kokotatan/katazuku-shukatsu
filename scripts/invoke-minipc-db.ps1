@@ -13,9 +13,10 @@
 param(
   [Parameter(Mandatory = $true)]
   [ValidateSet(
-    'agenda', 'appointment-times',
+    'agenda', 'appointment-times', 'calendar-conflicts',
     'meeting-ensure', 'meeting-transition', 'meeting-done',
-    'apply-selection', 'apply-submission', 'apply-mail', 'apply-calendar',
+    'career-meeting-ensure', 'career-meeting-transition', 'career-meeting-done',
+    'apply-selection', 'apply-submission', 'apply-mail', 'apply-calendar', 'apply-career-calendar',
     'apply-research', 'apply-person',
     'email-prepare', 'email-approve', 'email-reject', 'email-send', 'email-status'
   )]
@@ -23,6 +24,10 @@ param(
   [string]$InputPath = '',
   [string]$RunId = '',
   [int]$AppointmentId = 0,
+  [int]$CareerMeetingId = 0,
+  [string]$StartIso = '',
+  [string]$EndIso = '',
+  [int]$ExcludeAppointmentId = 0,
   [ValidateSet('', 'armed', 'opened', 'recording', 'stopping', 'digesting', 'done', 'failed')]
   [string]$State = '',
   [string]$Message = '',
@@ -69,6 +74,10 @@ function Require-AppointmentId {
   if ($AppointmentId -le 0) { throw "$Operation には -AppointmentId が必要です" }
 }
 
+function Require-CareerMeetingId {
+  if ($CareerMeetingId -le 0) { throw "$Operation には -CareerMeetingId が必要です" }
+}
+
 Warn-VersionDifference
 $remoteSync = 'cd ~/' + $RemoteRepoName + '/sync && '
 
@@ -87,6 +96,27 @@ switch ($Operation) {
     $appointment = @($agendaJson | ConvertFrom-Json) | Where-Object { [int]$_.id -eq $AppointmentId } | Select-Object -First 1
     if (-not $appointment) { throw "予定 $AppointmentId はMiniPCの直近agendaにありません" }
     [ordered]@{ startIso = $appointment.startIso; endIso = $appointment.endIso } | ConvertTo-Json -Compress
+    return
+  }
+  'calendar-conflicts' {
+    $isoPattern = '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?(?:Z|[+-]\d{2}:\d{2})$'
+    if ($StartIso -notmatch $isoPattern -or $EndIso -notmatch $isoPattern) {
+      throw 'calendar-conflicts にはタイムゾーン付きISO形式の -StartIso / -EndIso が必要です'
+    }
+    if ($ExcludeAppointmentId -lt 0) { throw 'ExcludeAppointmentId は0以上で指定してください' }
+
+    # 候補提示・確定の直前は、Google CalendarをMiniPCの正本DBへ同期してから判定する。
+    Invoke-Remote ('cd ~/' + $RemoteRepoName +
+      ' && powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/calendar-sync.ps1')
+
+    $conflictCommand = $remoteSync + "npx tsx scripts/db-appointment.ts conflicts '$StartIso' '$EndIso'"
+    if ($ExcludeAppointmentId -gt 0) { $conflictCommand += ' ' + $ExcludeAppointmentId }
+    $conflictOutput = @(& ssh -o BatchMode=yes -o ConnectTimeout=10 $SshHost $conflictCommand)
+    $conflictExit = $LASTEXITCODE
+    $conflictOutput | Write-Output
+    if ($conflictExit -notin @(0, 2, 3)) {
+      throw "MiniPC上の空き判定に失敗しました(exit=$conflictExit)"
+    }
     return
   }
   'meeting-ensure' {
@@ -108,6 +138,27 @@ switch ($Operation) {
   'meeting-done' {
     Require-AppointmentId
     Invoke-Remote ($remoteSync + 'npx tsx scripts/db-meeting-done.ts ' + $AppointmentId + ' && npx tsx scripts/db-snapshot.ts')
+    return
+  }
+  'career-meeting-ensure' {
+    Require-CareerMeetingId
+    Invoke-Remote ($remoteSync + 'npx tsx scripts/db-career-meeting-run.ts ensure ' + $CareerMeetingId)
+    return
+  }
+  'career-meeting-transition' {
+    Require-CareerMeetingId
+    if (-not $State) { throw 'career-meeting-transition には -State が必要です' }
+    $command = $remoteSync + 'npx tsx scripts/db-career-meeting-run.ts transition ' + $CareerMeetingId + ' ' + $State
+    if ($Message) {
+      if ($Message.Contains("'")) { throw "Message に単一引用符は使えません" }
+      $command += " '$Message'"
+    }
+    Invoke-Remote $command
+    return
+  }
+  'career-meeting-done' {
+    Require-CareerMeetingId
+    Invoke-Remote ($remoteSync + 'npx tsx scripts/db-career-meeting-done.ts ' + $CareerMeetingId + ' && npx tsx scripts/db-snapshot.ts')
     return
   }
 }
@@ -145,6 +196,7 @@ $applyScripts = @{
   'apply-submission' = 'db-apply-submission.ts'
   'apply-mail'       = 'db-apply-mail.ts'
   'apply-calendar'   = 'db-apply-calendar.ts'
+  'apply-career-calendar' = 'db-apply-career-calendar.ts'
   'apply-research'   = 'db-apply-research.ts'
   'apply-person'     = 'db-apply-person.ts'
 }

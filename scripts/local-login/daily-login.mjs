@@ -10,7 +10,7 @@
 //
 // 使い方: node scripts/local-login/daily-login.mjs --portal <id> [--headful] [--manual] [--timeout-ms N]
 // 既定はheadless。初回はMFA等を本人が通すため --headful を推奨(READMEを参照)。
-// --manual は authMode=sso のポータル専用で、remote-debuggingを付けない素のChromeを開いて
+// --manual は remote-debuggingを付けない素のChromeを開いて
 // 本人がIdP(Google等)でサインインするための入口(セッションは隔離プロファイルに残る)。
 
 import { spawn } from 'node:child_process'
@@ -18,6 +18,7 @@ import { access, mkdir, readFile, appendFile, rm, constants } from 'node:fs/prom
 import { join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
+import { scheduledPortalIds, readRegistry, credentialRecordPath, profileDirectoryId } from './settings.mjs'
 import {
   analyzeDeterministically,
   brokerFill,
@@ -38,6 +39,7 @@ function parseArgs(argv) {
     if (key === '--headful') { result.headful = true; continue }
     if (key === '--manual') { result.manual = true; continue }
     if (key === '--keep-open') { result.keepOpen = true; continue }
+    if (key === '--scheduled') { result.scheduled = true; continue }
     if (!key.startsWith('--') || index + 1 >= argv.length) throw new Error(`引数が不正です: ${key}`)
     result[key.slice(2)] = argv[index + 1]
     index += 1
@@ -142,7 +144,7 @@ async function runSso(portalId, portal, { headful, timeoutMs, manual, keepOpen }
   const loginUrl = portal.loginUrl
   const allowedOrigin = normalizeAllowedOrigin(new URL(loginUrl).origin)
   const chrome = await findChrome()
-  const userDataDir = join(repoRoot, 'logs', 'local-login-profiles', portalId)
+  const userDataDir = join(repoRoot, 'logs', 'local-login-profiles', profileDirectoryId(portalId, portal))
   await mkdir(userDataDir, { recursive: true })
 
   const baseArgs = [
@@ -158,6 +160,7 @@ async function runSso(portalId, portal, { headful, timeoutMs, manual, keepOpen }
   // ことがあるため、remote-debuggingを付けずに素のChromeとして開き、操作は本人に委ねる。
   if (manual) {
     const chromeProcess = spawn(chrome, [...baseArgs, loginUrl], { detached: true, stdio: 'ignore' })
+    await new Promise((resolve, reject) => { chromeProcess.once('spawn', resolve); chromeProcess.once('error', reject) })
     chromeProcess.unref()
     return { status: 'manual_launched', portalId, origin: allowedOrigin, reason: 'sign_in_then_close_window' }
   }
@@ -193,12 +196,14 @@ async function runSso(portalId, portal, { headful, timeoutMs, manual, keepOpen }
 }
 
 async function run(portalId, { headful, timeoutMs, manual, keepOpen }) {
-  const registry = JSON.parse(await readFile(join(scriptDir, 'portals.json'), 'utf8'))
-  const portalEntry = registry.portals?.[portalId]
+  const registry = await readRegistry(repoRoot)
+  const portalEntry = registry[portalId]
   if (!portalEntry) return { status: 'error', portalId, origin: null, reason: 'portal_not_in_registry' }
+  // ID・パスワード方式も本人が専用Chromeで初回認証できる。資格情報が未登録でも開ける。
+  if (manual) return runSso(portalId, portalEntry, { headful, timeoutMs, manual: true, keepOpen })
   if (portalEntry.authMode === 'sso') return runSso(portalId, portalEntry, { headful, timeoutMs, manual, keepOpen })
 
-  const credentialPath = join(repoRoot, 'credential-store', `${portalId}.json`)
+  const credentialPath = credentialRecordPath(repoRoot, portalId, portalEntry)
   if (!(await exists(credentialPath))) {
     return { status: 'skipped', portalId, origin: null, reason: 'no_credential_record' }
   }
@@ -212,7 +217,7 @@ async function run(portalId, { headful, timeoutMs, manual, keepOpen }) {
   }
 
   const chrome = await findChrome()
-  const userDataDir = join(repoRoot, 'logs', 'local-login-profiles', portalId)
+  const userDataDir = join(repoRoot, 'logs', 'local-login-profiles', profileDirectoryId(portalId, portalEntry))
   await mkdir(userDataDir, { recursive: true })
 
   const args = [
@@ -273,7 +278,11 @@ async function main() {
 
   let outcome
   try {
-    outcome = await run(portalId, { headful, timeoutMs, manual, keepOpen })
+    if (args.scheduled && !(await scheduledPortalIds(repoRoot)).includes(portalId)) {
+      outcome = { status: 'skipped', portalId, origin: null, reason: 'disabled_in_settings' }
+    } else {
+      outcome = await run(portalId, { headful, timeoutMs, manual, keepOpen })
+    }
   } catch (error) {
     outcome = { status: 'error', portalId, origin: null, reason: error.message }
   }

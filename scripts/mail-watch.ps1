@@ -25,6 +25,21 @@ $prompt = Get-Content -Raw -Encoding UTF8 -Path (Join-Path $PSScriptRoot 'mail-w
 
 ("`n===== {0} mail-watch 開始 =====" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss')) | Out-File $logFile -Append -Encoding utf8
 
+# 未読・processed状態とは独立して、未完了提出物を毎回全件再評価する。
+# PC停止後のcatch-upでもsubmission_requirementが残るため、同じ提出物を期限まで追い続けられる。
+try {
+  Push-Location (Join-Path $repo 'sync')
+  $npx = if ($IsWindows -or $env:OS -eq 'Windows_NT') { 'npx.cmd' } else { 'npx' }
+  & $npx tsx scripts/submission-readiness.ts list `
+    --write ..\logs\submission-readiness.local.json `
+    --alert ..\logs\submission-readiness-alert.local.txt | Out-Null
+  if ($LASTEXITCODE -ne 0) { throw "submission-readiness exit=$LASTEXITCODE" }
+} catch {
+  ("提出物ガードの更新に失敗: {0}" -f $_.Exception.Message) | Out-File $logFile -Append -Encoding utf8
+} finally {
+  Pop-Location
+}
+
 # headless実行。ツールは監視・下書き・カレンダー登録に必要な最小限だけ許可する。
 # プロンプトは stdin 経由で渡す。本文中のハイフン語や引用符を PowerShell が引数へ
 # 分割し、providerが未知オプションとして誤認する事故を避ける(daily-sync と同じ方式)。
@@ -34,7 +49,7 @@ try {
   & $invoke -Workflow 'mail-watch' -RunId $runId `
     -PromptFile (Join-Path $PSScriptRoot 'mail-watch-prompt.md') `
     -Risk 'external-draft' -SideEffectMode 'reconcile' `
-    -Capability @('workspace.read', 'workspace.write', 'shell', 'gmail.read', 'gmail.draft', 'calendar.read', 'calendar.write') `
+    -Capability @('workspace.read', 'workspace.write', 'shell', 'web.search', 'gmail.read', 'gmail.draft', 'calendar.read', 'calendar.write') `
     -TimeoutMs 900000 `
     *>&1 | Out-File -FilePath $logFile -Append -Encoding utf8
 } catch {

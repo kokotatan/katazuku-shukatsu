@@ -4,7 +4,14 @@
 目的: ルーチン・雑務を自動運転し、本人は「考える・受ける・認証する・決める」だけに集中する。
 返答・コメント・コミットは日本語。絵文字禁止。
 
+## インターンのスライド作成（2026-09-07 本人訂正）
+
+- インターンのスライドは画像生成で作る。本人だけでなく、他のメンバーも同じ方法で作れるようにする。
+- 共有するMarkdown（`.md`）には、画像生成の手順・共通デザイン・コピペできるプロンプト・修正方法をまとめる。各メンバーが内容を差し替えて再現できる形にする。
+
 ## 端末の役割分担
+
+- 自動録音は**会議URLのある予定**を対象にし、面接・面談に加えて説明会・セミナー等も含める。インターン参加、宿泊、対面、終日・24時間以上の予定は除外する。インターンの選考面接・面談・説明会は対象にする。個人用とOSSで同じ判定・合成テストを維持する。詳細は `docs/RECORDING-POLICY.md`。
 
 - MiniPC（Windowsホスト名 `KOKOTATANPC`）は常時運転・バックグラウンド処理用、ノートPCは本人の認証・確認・手入力用とする。
 - パスワード、パスキー、OAuth同意、メール/SMSコード、CAPTCHA、本人確認など、本人操作が必要になり得るブラウザ作業は、接続中ChromeのうちノートPC上で本人が開いたタブを明示参照してもらったインスタンスを優先する。`KOKOTATANPC` と表示されるローカルprobeはMiniPCの識別子であり、ノートPC判定には使わない。
@@ -23,12 +30,22 @@ data/katazuku.db(正本・SQLite/node:sqlite・gitignore)
 ```
 
 - **DBに書いたら必ず `cd sync && npx tsx scripts/db-snapshot.ts` を実行**(アプリへの即時反映)。合言葉は repo直下 .env
+- **面談・面接の予約を扱ったら、その作業内で事前調査と面談準備も行う。** 本人の追加依頼や48時間前を待たず、
+  `scripts/meeting-preparation-prompt.md` に従い、企業・相手の一次情報、前回記録、本人の回答素材、逆質問を揃える。
+  `sync/scripts/meeting-preparation.ts` が今後の予定を全件再評価し、成果物・出典・現在の根拠hashが揃ったものだけreadyにする。
+  通信等で未完了なら理由を台帳に残し、朝の処理・前夜ブリーフで再試行する。予定や相手の変更、48時間以内の最終確認も対象。
+  カレンダー登録、既読/processed、完了センチネル、既存descriptionだけで準備済みとしない。詳細は `docs/INTERVIEW-PREPARATION.md`。
 - **外部サイトで面接・面談・イベントの日程を確定する直前は、必ずカレンダー同期を実行してから正本DBを照合する**。
   `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/calendar-sync.ps1` の成功後、
   `cd sync && npx tsx scripts/db-appointment.ts conflicts <開始ISO> <終了ISO>` が
   `state: "available"`、`available: true`、`database.role: "canonical"` の場合だけ確定する。
   `unknown`は空きではない。Calendar同期失敗・10分超の鮮度切れ・同期期間外・replica DBはすべて`unknown`として停止する。
-  Googleカレンダーの画面だけ、会話要約だけ、記憶だけで空きと判断しない。複数日・終日予定も占有として扱う。
+  Googleカレンダーの画面だけ、会話要約だけ、記憶だけで空きと判断しない。通常の複数日・終日予定は占有として扱う。
+  **候補日時を本人や相手へ提示する段階でも同じ判定を使う。** ただし宿泊予定は滞在期間全体を占有せず、
+  Calendar上の宿泊マーカーを `availability=FREE` / `busy=0` とする。チェックイン・チェックアウト、集合時刻と、
+  その前後の実移動だけを、時刻付き予定・`appointment_mobility`・`travel_segment`で占有する。
+  agentが予定名だけから空きを推測してはならないが、宿泊マーカーが誤ってbusyなら、本人の指示またはカレンダー入力を
+  根拠に通常経路でfree/busyと移動データを訂正し、再同期後の正本判定で空きを決める。
 - **第三者への確定操作を一律禁止しない。必ずkatazukuの事前検査済みExecutorを通す**。
   メール送信、フォーム提出、日程回答、予約確定、取消・変更通知は、本人が宛先・本文・日時・通知内容を
   確認して「送って」「提出して」「任せる」等と指示した後、同じaction hashの操作をExecutorが実行してよい。
@@ -39,6 +56,13 @@ data/katazuku.db(正本・SQLite/node:sqlite・gitignore)
   日程変更理由は必要な場合だけ「大学・研究上の都合」等の中立表現にする。
   「他社の選考」「他のインターン」「面接があるため」など、相手に不要な第三者情報は本文へ書かない。
   headlessのmail-watchは本人へactionを提示できないため下書きで止め、対話セッションのExecutorへ引き継ぐ。
+- **締切付き提出物は、通知やカレンダー登録だけで対応済みにしない。** メールを受けた時点で誓約書・証明書・
+  スライド等を成果物1件ずつ `submission_requirement` へ分解し、提出先の公式手続、必要項目、添付物、所要営業日を
+  調べ、本人の最終承認直前まで前倒しで準備する。本人には原則「この内容で提出してよいか」だけを求める。
+  `mail-watch-state.json` のprocessed、既読化、カレンダー登録、別成果物の提出をもって完了扱いにしてはならない。
+  外部フォーム・メール・予約の確定だけは、内容を固定して本人承認後にExecutorで実行する。
+  提出完了メール、受付画面、相手の受領確認等の根拠がある場合だけ `completed`、不要の明示がある場合だけ
+  `waived` とする。MiniPC停止後の復旧時も `submission-readiness.ts` が未完了全件を再評価する。
 - スキーマ: company(name=正式名称/short_name) / selection(+outcome列挙) / **appointment(面接・締切の日時/URL/場所/相手)** /
   event(+ref=元メールID) / company_alias / pending_review / mail_item / submission / company_dossier /
   interview_note / meeting_run / person / person_note / appointment_person / person_photo / profile_basic / profile_suggestion

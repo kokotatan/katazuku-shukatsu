@@ -7,6 +7,7 @@
 - `KOKOTATANPC` はMiniPCであり、正本DBと定常タスクを持つ。
 - ノートPCから正本側の処理が必要な場合だけ、SSHでMiniPCの許可済み入口を呼ぶ。
 - Chrome拡張を経由した別端末のリモートファイル添付は使わない。
+- MiniPC障害時の期限付き暫定正本は `docs/EMERGENCY-FAILOVER.md` に従う。衛星機マーカーを手で消さない。
 
 ## 初回セットアップ（ノートPCで実行）
 
@@ -24,6 +25,37 @@ ssh KOKOTATANPC
 ```
 
 パスワードや秘密鍵の内容はリポジトリ・チャット・ログへ保存しない。
+
+## ノートPCの録音状態表示
+
+`powershell -NoProfile -ExecutionPolicy Bypass -File scripts/register-recording-status.ps1` で、
+画面右下の常駐表示とログイン時の自動起動を設定する。ドラッグで位置を変えられ、次回も復元する。
+**Ctrl + Alt + Shift + R** で、他のアプリを使っていても表示・非表示を切り替えられる。
+「−」は表示を隠すだけ。通知領域のアイコンをダブルクリック、または右クリックの「表示 / 非表示」でも切り替える。
+録音開始時は自動表示する。その録音中に本人が隠した場合は、通常の状態更新や見張りの録り直しでは表示を戻さず、
+次の録音を検出したときに再表示する。
+
+Ctrl + Alt + Rは実機で競合したため、Shift付きで固定した。使用中のキーは通知領域のメニューにも表示する。
+登録状況は診断JSONの `hotKeyRegistered` / `hotKey` に保存する。
+運用からは `start-recording-status.ps1 -Action Show|Hide|Toggle` で指定でき、省略時はShow。
+
+小窓と右クリックメニューはWindowsの `WDA_EXCLUDEFROMCAPTURE` で画面共有・録画から除外し、
+タスクバーには表示しない。本人のモニター上の表示は維持する。除外設定ができない環境では小窓を隠し、
+通知領域だけに留める。除外状態は `logs/recording-display.local.json` の `captureExcluded` で確認する。
+これはWindowsのキャプチャAPIによる除外であり、共有ソフト独自の取り込み方法すべてを保証するものではない。
+
+- 「録音中」: katazukuのffmpeg録音プロセスが存在し、音声ファイルの増加を確認済み。経過時間を表示。
+- 「録音停止中」: 対象の録音プロセスが存在しない。
+- 「録音開始を確認中」: 音声ファイルへの書き込みをまだ確認していない。
+- 「録音を確認」: プロセスは存在するが、15秒以上ファイルが増えていない。
+- 「録音状態を確認できません」: プロセスを照会できない、または監視結果が10秒以上更新されていない。
+
+対象は `record-vac.ps1` / `record-audio.ps1` の録音と、見張りによる録り直し。Game Bar等の別アプリの
+録画状態や発話の内容・音質は判定しない。表示を終了しても録音は続く。
+診断は `recording-status.ps1 -Once`、判定の回帰確認は `check-recording-status.ps1`、切替と自動表示の回帰確認は
+`check-recording-display.ps1`、表示部品の描画確認は
+`render-recording-status.ps1`。状態と位置だけを `logs/recording-display.local.json` に保存し、
+会議名・音声・録音ファイル名をDBやsnapshotへ追加しない。
 
 ## 許可済みのリモート操作
 

@@ -3,7 +3,8 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { DatabaseContext } from '../src/db'
-import { openDb } from '../src/db'
+import { addAppointment, openDb } from '../src/db'
+import { applyScheduleProjection } from '../src/schedule'
 import { validateJsonSchema } from '../src/agent-runtime'
 import {
   buildWorkspaceSendCall,
@@ -247,7 +248,7 @@ try {
       },
       content: {
         subject: 'Re: 食事会のご案内',
-        body: 'GO株式会社\n新卒採用担当者様\n\nお世話になっております。東北大学大学院の奥山彪太郎です。\n\nご案内いただきありがとうございます。\nご確認のほど、よろしくお願いいたします。',
+        body: 'GO株式会社\n新卒採用担当者様\n\nお世話になっております。\n東北大学大学院の奥山彪太郎です。\n\nご案内いただきありがとうございます。\nご確認のほど、よろしくお願いいたします。\n\n奥山 彪太郎\n東北大学大学院工学研究科ロボティクス専攻 修士1年\nTEL: 090-0000-0000\nMail: okuyama.kotaro.career@gmail.com',
         threadId: 'thread-go-dinner',
         sourceMessageId: 'mail-go-dinner',
         scheduleCommitments: [],
@@ -264,6 +265,17 @@ try {
     check('日時を約束しないメールへ不要なCalendar検査を要求しない', !hasScheduleCommitmentLanguage(emailAction))
     check('他社選考や訪中情報を文面検査で拒否する',
       professionalEmailIssues('他社の選考と訪中団からの帰国があるため変更希望です').length >= 2)
+    const oneLineIssues = professionalEmailIssues('宿泊先とチェックイン方法をご教示いただけますと幸いです。')
+    check('宛名・挨拶・名乗り・結び・署名のない一文メールを拒否する',
+      oneLineIssues.some((issue) => issue.includes('宛名')) &&
+      oneLineIssues.some((issue) => issue.includes('挨拶')) &&
+      oneLineIssues.some((issue) => issue.includes('名乗り')) &&
+      oneLineIssues.some((issue) => issue.includes('署名')))
+    const missingContactIssues = professionalEmailIssues(
+      'GO株式会社\n新卒採用担当者様\n\nお世話になっております。\n東北大学大学院の奥山彪太郎です。\n\nご確認のほど、よろしくお願いいたします。\n\n奥山 彪太郎')
+    check('連絡先のない不完全な署名を拒否する',
+      missingContactIssues.some((issue) => issue.includes('TEL')) &&
+      missingContactIssues.some((issue) => issue.includes('Mail')))
     const scheduleWithoutFacts: ThirdPartyEmailAction = {
       ...emailAction,
       content: { ...emailAction.content, body: '9月24日18時30分から参加を希望いたします。' },
@@ -271,6 +283,35 @@ try {
     const schedulePreflight = preflightThirdPartyEmail(db, scheduleWithoutFacts)
     check('日時を約束するのに予定情報がないactionを拒否する',
       !schedulePreflight.ok && schedulePreflight.issues.some((issue) => issue.includes('scheduleCommitments')))
+
+    const selectionId = (db.prepare('SELECT id FROM selection WHERE company_id = ?').get(companyId) as { id: number }).id
+    const heldId = addAppointment(db, { selectionId, at: '2026-08-25T18:00:00+09:00',
+      endAt: '2026-08-25T19:15:00+09:00', title: '承諾対象', status: '予定' }).id
+    applyScheduleProjection(db, { syncStates: [{ source: 'google-calendar', accountId: 'test@example.com',
+      scopeId: 'primary', status: 'success', coveredFrom: '2026-08-25T00:00:00Z',
+      coveredUntil: '2026-08-26T00:00:00Z', attemptedAt: now }] })
+    const confirmation: ThirdPartyEmailAction = { ...emailAction, target: { ...emailAction.target, selectionId },
+      content: { ...emailAction.content, scheduleCommitments: [{ appointmentId: heldId,
+        startAt: '2026-08-25T18:00:00+09:00', endAt: '2026-08-25T19:15:00+09:00' }] } }
+    const confirmationResult = preflightThirdPartyEmail(db, confirmation, { now: new Date(now) })
+    check('企業・選考・日時が一致する既存予定への承諾では自身を衝突扱いしない',
+      confirmationResult.ok, confirmationResult.issues.join(' / '))
+    check('既存予定への承諾でもCalendar同期が古ければ拒否する',
+      !preflightThirdPartyEmail(db, confirmation, { now: new Date('2026-08-25T01:11:00Z') }).ok)
+    const mismatchedTime = { ...confirmation, content: { ...confirmation.content,
+      scheduleCommitments: [{ ...confirmation.content.scheduleCommitments[0], endAt: '2026-08-25T20:00:00+09:00' }] } }
+    check('既存予定と異なる日時を約束する除外は拒否する',
+      !preflightThirdPartyEmail(db, mismatchedTime, { now: new Date(now) }).ok)
+    db.prepare('UPDATE selection SET company_id = ? WHERE id = ?').run(
+      Number(db.prepare('INSERT INTO company (name, updated_at) VALUES (?, ?)').run('別企業株式会社', now).lastInsertRowid), selectionId)
+    check('別企業の予定を指定した除外は拒否する',
+      !preflightThirdPartyEmail(db, confirmation, { now: new Date(now) }).ok)
+    db.prepare('UPDATE selection SET company_id = ? WHERE id = ?').run(companyId, selectionId)
+    addAppointment(db, { selectionId, at: '2026-08-25T18:30:00+09:00', endAt: '2026-08-25T19:00:00+09:00',
+      title: '同時刻の別予定', status: '予定' })
+    const otherConflict = preflightThirdPartyEmail(db, confirmation, { now: new Date(now) })
+    check('承諾対象以外の予定との重複は同じ企業でも拒否する',
+      !otherConflict.ok && otherConflict.schedule[0].conflicts.some(item => item.title === '同時刻の別予定'))
   } finally {
     db.close()
   }

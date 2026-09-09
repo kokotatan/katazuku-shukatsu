@@ -1,0 +1,11 @@
+{
+  "name": "katazuku-public-site",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "check": "node check.mjs",
+    "preview": "node preview.mjs",
+    "deploy": "npm run build && npm run check && wrangler deploy --config wrangler.jsonc"
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "katazuku-shukatsu",
+  "main": "./cloudflare/worker.ts",
+  "compatibility_date": "2026-08-29",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "routes": [
+    { "pattern": "katazuku-app.kotalabo.com", "custom_domain": true }
+  ],
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "html_handling": "auto-trailing-slash",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+  "r2_buckets": [
+    {
+      "binding": "PRIVATE_DATA",
+      "bucket_name": "katazuku-private"
+    }
+  ],
+  "secrets": {
+    "required": [
+      "KATAZUKU_READ_SECRET",
+      "KATAZUKU_WRITE_SECRET",
+      "KATAZUKU_VAPID_PUBLIC_KEY",
+      "KATAZUKU_VAPID_PRIVATE_KEY",
+      "KATAZUKU_VAPID_SUBJECT"
+    ]
+  },
+  "observability": {
+    "enabled": true,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1
+    },
+    "traces": {
+      "enabled": true,
+      "head_sampling_rate": 0.05
+    }
+  }
+}

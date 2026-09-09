@@ -1,21 +1,22 @@
-import { StrictMode } from 'react'
+import { lazy, StrictMode, Suspense } from 'react'
 import { createRoot } from 'react-dom/client'
-// smarthr-ui のスタイルは自前の index.css より先に読み込む。
-// smarthr-ui.css には body/button などの素の要素リセットが含まれるため、
-// あとから index.css(katazuku の配色トークン)を当てて既存の見た目を保つ。
-import 'smarthr-ui/smarthr-ui.css'
+// 基本スタイルはindex.cssのbaseレイヤーに読み込み、アプリの文字色・余白を優先する。
 import './index.css'
 import { ThemeProvider, createTheme, IntlProvider } from 'smarthr-ui'
 import App from './App'
+const LocalLoginSettings = lazy(() => import('./LocalLoginSettings'))
 
-// smarthr-ui のデフォルトテーマ(SmartHR Blue #0077c7 系)。独自色では上書きしない。
-const theme = createTheme()
+// 基本部品はSmartHR、操作色はネクタイロゴの青。
+const theme = createTheme({ color: { MAIN: '#005afd', TEXT_LINK: '#004bd6', BRAND: '#005afd', BACKGROUND: '#ffffff', BORDER: '#dedede', TEXT_BLACK: '#252525', TEXT_GREY: '#666666', OUTLINE: '#005afd' } })
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <IntlProvider locale="ja">
       <ThemeProvider theme={theme}>
-        <App />
+        <Suspense fallback={<p className="p-6 text-sm">設定画面を読み込んでいます…</p>}>
+          {window.location.pathname.replace(/\/$/, '') === '/board/local-login' || new URLSearchParams(window.location.search).get('settings') === 'local-login'
+            ? <LocalLoginSettings /> : <App />}
+        </Suspense>
       </ThemeProvider>
     </IntlProvider>
   </StrictMode>,

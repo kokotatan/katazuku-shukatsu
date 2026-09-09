@@ -16,6 +16,7 @@ import {
   type ScheduleProjectionResult,
 } from '../src/schedule'
 import { resolveDatabasePath } from '../src/database-path'
+import { isAutomaticRecordingEligible, type AutomaticRecordingCandidate } from '../src/recording-eligibility'
 
 interface CalendarEvent {
   externalId: string
@@ -168,7 +169,11 @@ export function applyCalendar(
         db.prepare('INSERT OR IGNORE INTO appointment_person (appointment_id, person_id, role) VALUES (?, ?, ?)')
           .run(appointmentId, personId, attendee.role || '')
       }
-      if (/面接|面談/.test(event.kind || event.title)) {
+      const recordingCandidate = db.prepare(`
+        SELECT kind, title, url, location, at AS startAt, end_at AS endAt, status
+        FROM appointment WHERE id = ?
+      `).get(appointmentId) as AutomaticRecordingCandidate
+      if (isAutomaticRecordingEligible(recordingCandidate)) {
         db.prepare(`
           INSERT OR IGNORE INTO meeting_run (id, appointment_id, state, updated_at)
           VALUES (?, ?, 'armed', ?)

@@ -364,6 +364,18 @@ try {
     assert(preview.args.includes('web_search') && !preview.args.includes('tools.web_search=true'), 'webSearchArgsの差し替えが効いていません')
   })
 
+  await check('任意項目を持つ業務schemaはCodex native schemaへ無条件に渡さない', () => {
+    const schemaRequest = request({ outputSchemaPath: join(workDir, 'optional.schema.json') })
+    const safePreview = commandPreview(createCodexAdapter({ command: 'codex' }), schemaRequest, join(workDir, 'safe.txt'))
+    assert(!safePreview.args.includes('--output-schema'), '任意項目schemaをnative structured outputへ渡しています')
+    const nativePreview = commandPreview(
+      createCodexAdapter({ command: 'codex', nativeOutputSchema: true }),
+      schemaRequest,
+      join(workDir, 'native.txt'),
+    )
+    assert(nativePreview.args.includes('--output-schema'), '明示opt-in時にoutput schemaが渡りません')
+  })
+
   await check('起動時の引数エラーは副作用前として次providerへ切り替える', async () => {
     const calls: { command: string; args: string[]; stdin?: string }[] = []
     const execute = queuedExecutor([

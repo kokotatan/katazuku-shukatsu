@@ -1,0 +1,87 @@
+[
+  {
+    "path": "/",
+    "title": "就活のあれこれ、一緒に片づけよう。",
+    "description": "katazuku 就活は、締切・企業研究・会った人の記録を手元にまとめるオープンソース。初めての方向けチュートリアルと、就活でのAI活用記事を公開しています。"
+  },
+  {
+    "path": "/start/",
+    "title": "はじめての方へ",
+    "description": "katazuku 就活の始め方。初めての方はGitHubの閲覧アプリから、開発者はnpmのコアライブラリから試せます。"
+  },
+  {
+    "path": "/guide/first-run/",
+    "title": "はじめての起動：Windows・Macの導入チュートリアル",
+    "description": "Node.jsの準備、ターミナルの開き方、GitHubからの取得、架空データの表示、終了と再起動までを順番に案内します。"
+  },
+  {
+    "path": "/guide/daily-use/",
+    "title": "日々の使い方：企業研究・面談・振り返り",
+    "description": "朝の確認から、面談前の企業研究、面談後のメモまで。公開版の対応範囲と、手元のAIに依頼する文章も案内します。"
+  },
+  {
+    "path": "/guide/cloudflare/",
+    "title": "スマホ・クラウドで使う：独自ドメインなしのセルフホスト",
+    "description": "Cloudflareのworkers.dev URLなら独自ドメインは不要。公開版のAPI対応範囲と、GUI一括配置までに必要なことを整理します。"
+  },
+  {
+    "path": "/articles/",
+    "title": "読みもの：就活とAIの使い方・開発の話",
+    "description": "就活でAIを使う方法、しんどい日の整理、自動化の境界、開発設計、就活日記。役立つ手順と考え方を日本語で紹介します。"
+  },
+  {
+    "path": "/articles/ai-shukatsu-how-to/",
+    "title": "就活でAIをどう使う？ 企業研究・ES・面接準備の始め方",
+    "description": "企業研究、ESの整理、面接の振り返り。AIに渡す材料と、最後に自分で確認することを場面ごとに紹介します。"
+  },
+  {
+    "path": "/articles/shukatsu-overwhelmed/",
+    "title": "就活がつらいとき、今日やることを一つにする",
+    "description": "締切も情報も多くて動けないときに。予定を見渡し、今日の一つを選び、休む余地を作るための整理方法です。"
+  },
+  {
+    "path": "/articles/shukatsu-automation/",
+    "title": "就活はどこまで自動化できる？ 任せる作業と自分で決めること",
+    "description": "締切整理や企業研究と、応募・受験・意思決定を分けて考える。katazukuの公開機能と、これから作る機能も整理します。"
+  },
+  {
+    "path": "/articles/why-local-first/",
+    "title": "katazukuの開発設計：なぜデータの正本を、自分のPCに置くのか",
+    "description": "就活の情報を一つのSQLiteにまとめ、アプリは見る窓にする。公開コードにある設計と、その理由を紹介します。"
+  },
+  {
+    "path": "/articles/ai-safety/",
+    "title": "就活でAIに任せないこと。ES・Webテスト・個人情報の扱い方",
+    "description": "経験の創作、受験の代行、確認前の送信を避けるために。就活でAIを使うときの確認点と、katazukuの方針です。"
+  },
+  {
+    "path": "/articles/job-hunting-journal/",
+    "title": "就活日記をAIと作る。活動記録から、事実と気持ちを分けて振り返る",
+    "description": "面接や企業研究のメモを日記にまとめるためのテンプレート。AIに気持ちや成果を創作させない書き方を紹介します。"
+  },
+  {
+    "path": "/contribute/",
+    "title": "開発に参加する：Star・Issue・Pull Request",
+    "description": "コードを書けなくても参加できます。感想、Star、文章の修正、Pull Requestまで、katazuku 就活への参加方法を案内します。"
+  },
+  {
+    "path": "/about/",
+    "title": "開発について・記事の編集方針",
+    "description": "Kotaro Design Lab.によるkatazuku 就活の開発目的、オープンソースへの考え方、AIを使用した記事の編集方針を紹介します。"
+  },
+  {
+    "path": "/privacy/",
+    "title": "プライバシー",
+    "description": "公開HP、クリップボード操作、外部サービス、OSSのデータの扱いについて。"
+  },
+  {
+    "path": "/google/",
+    "title": "Google連携",
+    "description": "katazukuのGmail・カレンダー・Drive・スプレッドシート連携の機能と提供状況。"
+  },
+  {
+    "path": "/google/privacy/",
+    "title": "Google連携のプライバシーポリシー",
+    "description": "Google連携で取得するデータ、利用目的、AI・クラウドへの送信、保存と削除について。"
+  }
+]

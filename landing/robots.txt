@@ -1,4 +1,4 @@
-# katazuku は奥山彪太郎さん個人用。検索エンジンにインデックスさせない。
+# private版は検索エンジンにインデックスさせない。
 # landing/ は assemble.mjs で dist/ 直下にコピーされるため、このファイルは公開サイトの
 # ルート(katazuku.kotalabo.com/robots.txt)として配信される。
 User-agent: *

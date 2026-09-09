@@ -76,6 +76,11 @@ if (Test-Path $lock) {
 }
 Set-Content -LiteralPath $lock -Value $PID -Encoding ascii
 
+# 表示を閉じていた場合も、次の録音では状態を確認できるようにする。
+# 表示の故障で録音本体を停止させない。
+try { & (Join-Path $PSScriptRoot 'start-recording-status.ps1') }
+catch { Log ('録音状態の表示を起動できません: ' + $_.Exception.Message) }
+
 $endAt = ConvertTo-LocalTime $EndIso
 
 # -StartIso を省略されたらDBから補完する(2026-08-17に踏んだ)。
@@ -90,7 +95,8 @@ if (-not $StartIso) {
   $ErrorActionPreference = 'Continue'
   $timesJson = ''
   try {
-    if (Test-Path (Join-Path $repo '.katazuku-satellite')) {
+    . (Join-Path $PSScriptRoot 'katazuku-role.ps1')
+    if ((Get-KatazukuOperationalRole -RepositoryRoot $repo) -eq 'replica') {
       $timesJson = & (Join-Path $PSScriptRoot 'invoke-minipc-db.ps1') -Operation appointment-times -AppointmentId $AppointmentId 2>$null | Select-Object -Last 1
     } else {
       $timesJson = & node (Join-Path $PSScriptRoot 'appointment-times.mjs') $AppointmentId 2>$null | Select-Object -Last 1

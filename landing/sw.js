@@ -1,8 +1,8 @@
 // katazuku Service Worker(最小構成)
 // 役割: (1) PWAインストール可能要件を満たす (2) Web Push受信と通知表示
 // キャッシュはランディングのシェルのみ。/api/ と各アプリの正本データには一切触らない(spec16)
-const SHELL_CACHE = 'katazuku-shell-v1'
-const SHELL_URLS = ['/', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon-512.png']
+const SHELL_CACHE = 'katazuku-shell-v5-details'
+const SHELL_URLS = ['/', '/manifest.webmanifest', '/icons/necktie-192.png', '/icons/necktie-512.png']
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -35,8 +35,7 @@ self.addEventListener('push', (event) => {
   event.waitUntil(
     self.registration.showNotification(title, {
       body: data.body || '',
-      icon: '/icons/icon-192.png',
-      badge: '/icons/icon-192.png',
+      icon: '/icons/necktie-192.png',
       data: { url: data.url || '/insight/' },
     }),
   )

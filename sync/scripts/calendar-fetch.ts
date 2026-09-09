@@ -85,6 +85,8 @@ interface GEvent {
   hangoutLink?: string
   recurringEventId?: string
   transparency?: 'opaque' | 'transparent'
+  /** 本プロジェクトでは8=グレー=辞退・不合格・不参加で、予定表には履歴として残す。 */
+  colorId?: string
   calendarId?: string
   accountId?: string
 }
@@ -282,6 +284,7 @@ function main() {
     // titleはローカル正本にだけ保存され、snapshot/ログへは出さない。
     const scheduleBlocks = raw.flatMap((e) => {
       if (!e.id) return []
+      const inactive = e.status === 'cancelled' || e.colorId === '8'
       const allDay = Boolean(e.start?.date)
       const startAt = e.start?.dateTime || (e.start?.date ? `${e.start.date}T00:00:00+09:00` : '')
       if (!startAt) return []
@@ -300,7 +303,9 @@ function main() {
         endAt,
         title: (e.summary || '').trim(),
         allDay,
-        busy: e.transparency !== 'transparent',
+        // グレーの終了系イベントは履歴として残すだけで、実際には参加しない。
+        // Calendarのtransparencyがopaqueのままでも空き判定を占有させない。
+        busy: !inactive && e.transparency !== 'transparent',
         status: e.status === 'cancelled' ? 'cancelled' as const : 'active' as const,
       }]
     })
@@ -356,6 +361,7 @@ function main() {
       }
 
       const kind = KIND_RULES.find(([re]) => re.test(title))?.[1] || 'その他'
+      const inactive = e.status === 'cancelled' || e.colorId === '8'
       const attendees = (e.attendees || [])
         .map((a) => ({ name: (a.displayName || a.email || '').trim() }))
         .filter((a) => a.name && !ACCOUNTS.some((acc) => a.name.includes(acc)))
@@ -371,7 +377,7 @@ function main() {
         kind,
         url: pickMeetingUrl(e),
         location: e.location || undefined,
-        status: e.status === 'cancelled' ? '中止' : '予定',
+        status: inactive ? '中止' : '予定',
         attendees: attendees.length ? attendees : undefined,
       })
     }

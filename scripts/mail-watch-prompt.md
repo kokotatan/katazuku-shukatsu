@@ -24,11 +24,28 @@ Read / Write / PowerShell。各ツール呼び出しでは対象アカウント�
 
 ## 手順
 
+0. **未完了提出物ガードを処理する(processedより優先)**:
+   - `logs/submission-readiness.local.json` を読む。これはmail-watch起動のたび、正本DBの未完了提出物を
+     未読状態に関係なく全件再評価した結果である。
+   - items があれば、メールがprocessed済みでも絶対にスキップしない。`prepare` / `due_soon` / `urgent` /
+     `overdue` / `blocked` / `awaiting_approval` のすべてを対応対象とする。
+   - preparationStatus が `not_started` / `researching` の提出物は、sourceRefの元メールを読み、Web検索は
+     **大学・企業・保険者等の公式サイトだけ**を根拠に、取得・提出の手続先、必要項目、添付物、所要営業日を調べる。
+   - `logs/submission-prep/<id>.local.md` に、公式URL、入力内容、必要添付、残る本人操作をまとめる。
+     可能な準備は済ませ、本人には原則「この内容で提出してよいか」だけを聞く。
+   - 外部フォームの送信、企業・大学へのメール送信、予約確定はこのheadless工程では実行しない。
+     送信内容が固定できた場合だけ、次を実行して最終承認待ちにする。
+     `cd sync; npx tsx scripts/submission-readiness.ts mark --id <id> --status ready_for_approval --ref ../logs/submission-prep/<id>.local.md`
+   - 認証、本人しか答えられない事実、添付不足などで準備を完了できない場合は `blocked` とし、理由を記録する。
+     `cd sync; npx tsx scripts/submission-readiness.ts mark --id <id> --status blocked --blocker "<理由>" --ref ../logs/submission-prep/<id>.local.md`
+   - この実行で新たにready_for_approval/blockedへ遷移したものだけTOASTへ追記する。単なる再掲で毎時通知を増殖させない。
+   - 実際の提出完了メール、アップロード完了画面等を確認できた場合だけcompleteへ進める。準備しただけで完了扱いにしない。
+
 1. **状態を読む**: `logs/mail-watch-state.json` を Read する。無ければ `{ "processed": [] }` として扱う。
    processed は対応済みメッセージIDの配列。
 
 2. **未読を取得**: `in:inbox is:unread newer_than:1d` を検索(最大20件)。
-   processed に含まれるIDはスキップ。残りをバッチでメタデータ取得し、緊急かどうか判定する。
+   processed に含まれるIDはスキップ。ただし手順0の未完了提出物はprocessedでも追跡を続ける。
 
 3. **緊急の判定**(いずれかに該当):
    - 面接・面談の確定/案内/日程調整/再調整(例: ベインの再受験調整、カオナビの最終面接確定)
@@ -39,6 +56,15 @@ Read / Write / PowerShell。各ツール呼び出しでは対象アカウント�
    minshu.co.jp 等)からの宣伝・スカウトは緊急ではない。判定に迷う程度のものは asa(朝のまとめ)に任せて手を出さない。
 
 4. **緊急メールだけ本文を読んで対応する**:
+   - **提出依頼・事前手続き**:
+     - 誓約書、証明書、スライド、ES、テスト、アンケート等を成果物1件ずつに分解する。複数点を1行にまとめない。
+     - `{requirements:[{sourceRef,company,position,kind,title,deadline,actionUrl,instructions,status:"required"}]}` を
+       `logs/mail-watch-requirements-<messageId>.local.json` に保存し、
+       `cd sync; npx tsx scripts/db-submission-requirement.ts ../logs/mail-watch-requirements-<messageId>.local.json`
+       で正本台帳へ即時反映する。kindは pledge / insurance_certificate / self_intro / es / assessment /
+       survey / setup / identity_document / expense_document / other のいずれか。
+     - 続けてsubmission-readinessを再生成し、手順0と同じ公式手続先の調査・準備をこの実行内で行う。
+       カレンダー登録や通知だけで対応完了にしない。
    - **返信が必要**(日程調整・出欠・確認依頼):
      - 定型・非定型を問わず send せず、draft_gmail_message で下書きに留め、本人へ通知する。
      - 日程回答の下書きは、先にカレンダー同期と正本DBの重複確認を行い、`state: "available"`かつ

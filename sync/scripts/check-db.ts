@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { openDb, upsertCompany, insertSelection, listSelections, listCompanies, listEvents, listAppointments, addAppointment, listAppointmentConflicts, outcomeOf, transition, sameCompany, samePosition, resolveCompany, addAlias, listPending, setOfficialName, normalizeAppointmentAt, sameAppointment, getDatabaseContext, SCHEMA_VERSION } from '../src/db'
 import { applyDiff } from './db-apply'
-import { savePersonPhoto } from './db-apply-interview'
+import { applyInterview, savePersonPhoto } from './db-apply-interview'
 import { applyCalendar } from './db-apply-calendar'
 import { findDuplicates } from './check-duplicate-appointments'
 import { renderMirror, PASSWORD_MASK } from './db-mirror'
@@ -17,6 +17,8 @@ import { transaction, upsertPerson } from '../src/inputs'
 import { isMeetingUrl } from '../src/meeting-url'
 import { applyScheduleProjection, getScheduleAvailability } from '../src/schedule'
 import { resolveDatabasePath } from '../src/database-path'
+import { EMERGENCY_CANONICAL_FILE, inspectEmergencyCanonicalLease } from '../src/emergency-canonical'
+import { listCareerMeetings, upsertCareerMeeting, upsertCareerOrganization } from '../src/career-support'
 
 let failed = 0
 function check(label: string, cond: boolean, detail = '') {
@@ -34,6 +36,34 @@ writeFileSync(join(satelliteRoot, '.katazuku-satellite'), 'laptop\n', 'utf8')
 let ownerGuardError = ''
 try { openDb(join(satelliteRoot, 'data', 'katazuku.db')) } catch (e) { ownerGuardError = (e as Error).message }
 check('衛星機は既定の正本DBを開けない', ownerGuardError.includes('ノートPC実行拠点'))
+const now = new Date()
+writeFileSync(join(satelliteRoot, EMERGENCY_CANONICAL_FILE), JSON.stringify({
+  schemaVersion: 1,
+  status: 'active',
+  failoverId: 'test-failover',
+  host: 'test-notebook',
+  canonicalHost: 'KOKOTATANPC',
+  sourceDatabaseId: 'test-database',
+  sourcePath: 'test-source.db',
+  activatedAt: now.toISOString(),
+  leaseExpiresAt: new Date(now.getTime() + 15 * 60_000).toISOString(),
+  hardExpiresAt: new Date(now.getTime() + 24 * 60 * 60_000).toISOString(),
+  reason: 'test',
+}), 'utf8')
+check('緊急正本リースは端末名不一致なら無効',
+  inspectEmergencyCanonicalLease(satelliteRoot, { host: 'wrong-host', now }).reason === 'lease_host_mismatch')
+check('有効な緊急正本リースは衛星機の正本DBを期限付きで許可',
+  inspectEmergencyCanonicalLease(satelliteRoot, { host: 'test-notebook', now }).active)
+const originalComputerName = process.env.COMPUTERNAME
+process.env.COMPUTERNAME = 'test-notebook'
+const emergencyDb = openDb(join(satelliteRoot, 'data', 'katazuku.db'))
+check('緊急正本リース中はDB contextがcanonical', getDatabaseContext(emergencyDb).role === 'canonical')
+emergencyDb.close()
+check('期限切れリースは無効', !inspectEmergencyCanonicalLease(satelliteRoot, {
+  host: 'test-notebook', now: new Date(now.getTime() + 16 * 60_000),
+}).active)
+if (originalComputerName === undefined) delete process.env.COMPUTERNAME
+else process.env.COMPUTERNAME = originalComputerName
 const nonCanonicalDb = openDb(join(satelliteRoot, 'data', 'test.db'))
 check('衛星機でも明示したテストDBは使える', (nonCanonicalDb.prepare('PRAGMA user_version').get() as { user_version: number }).user_version === SCHEMA_VERSION)
 nonCanonicalDb.close()
@@ -224,6 +254,48 @@ check('appointment: start/endを同じUTC形式で保存する',
   listAppointments(db).find((a) => a.id === allDay.id)?.endAt === normalizeAppointmentAt('2026-09-05T00:00:00+09:00'))
 check('予定衝突: 複数日の終日予定の途中を検出する',
   listAppointmentConflicts(db, '2026-09-04T18:00:00+09:00', '2026-09-04T18:30:00+09:00').some((a) => a.id === allDay.id))
+
+// 交通費支給インターンは、終了翌日の領収書送付タスクを自動生成する。
+// endAt=9/5 00:00は終日予定のexclusive endなので、実開催最終日9/4の翌日=9/5 09:00が正しい。
+const reimbursedIntern = addAppointment(db, {
+  selectionId: apSel.id,
+  at: '2026-09-02T00:00:00+09:00',
+  endAt: '2026-09-05T00:00:00+09:00',
+  kind: 'インターン',
+  title: '交通費支給3daysインターン',
+  reimbursementStatus: 'full',
+  receiptRequired: true,
+})
+const receiptTask = listAppointments(db).find((a) =>
+  a.parentAppointmentId === reimbursedIntern.id && a.taskType === 'transportation_receipt_submission')
+check('交通費: 支給インターンの翌日に領収書送付タスクを作る',
+  receiptTask?.at === '2026-09-05T00:00:00.000Z'
+  && receiptTask.endAt === '2026-09-05T00:15:00.000Z'
+  && receiptTask.flexible)
+check('交通費: 領収書送付タスクは固定予定の空き判定を妨げない',
+  !listAppointmentConflicts(db, '2026-09-05T09:00:00+09:00', '2026-09-05T09:15:00+09:00')
+    .some((a) => a.id === receiptTask?.id))
+addAppointment(db, {
+  selectionId: apSel.id,
+  at: '2026-09-02T00:00:00+09:00',
+  endAt: '2026-09-05T00:00:00+09:00',
+  kind: 'インターン',
+  title: '交通費支給3daysインターン',
+  reimbursementStatus: 'full',
+  receiptRequired: true,
+})
+check('交通費: 同じ案内の再同期で領収書送付タスクを増殖させない',
+  listAppointments(db).filter((a) => a.parentAppointmentId === reimbursedIntern.id).length === 1)
+const arrangedIntern = addAppointment(db, {
+  selectionId: apSel.id,
+  at: '2026-10-06T11:00:00+09:00',
+  endAt: '2026-10-06T18:30:00+09:00',
+  kind: 'インターン',
+  title: '企業手配インターン',
+  reimbursementStatus: 'arranged',
+})
+check('交通費: 本人精算なしの企業手配では領収書送付タスクを作らない',
+  !listAppointments(db).some((a) => a.parentAppointmentId === arrangedIntern.id))
 check('予定衝突: 終了境界直後は空きとして扱う',
   !listAppointmentConflicts(db, '2026-09-05T00:00:00+09:00', '2026-09-05T00:30:00+09:00').some((a) => a.id === allDay.id))
 
@@ -252,6 +324,41 @@ const freeSlot = getScheduleAvailability(
   { now: new Date(scheduleNow), requireCanonical: false },
 )
 check('schedule: 同期済み期間内で衝突なしの場合だけavailable', freeSlot.state === 'available' && freeSlot.available)
+
+// 宿泊のカレンダー予定は滞在期間を表すメモであり、availability=FREEを正とする。
+// appointmentにも同じ期間が残っていてもfallbackで再び全期間を占有してはならない。
+const freeLodging = addAppointment(db, {
+  selectionId: apSel.id,
+  at: '2026-10-20T00:00:00+09:00',
+  endAt: '2026-10-23T00:00:00+09:00',
+  kind: '宿泊',
+  title: '宿泊: テストホテル(手配済み)',
+})
+db.prepare('UPDATE appointment SET external_id = ?, calendar_id = ? WHERE id = ?')
+  .run('free-lodging-1', 'primary', freeLodging.id)
+applyScheduleProjection(db, {
+  blocks: [{
+    provider: 'google-calendar', accountId: 'personal@example.com', calendarId: 'primary',
+    externalId: 'free-lodging-1', title: '宿泊: テストホテル(手配済み)',
+    startAt: '2026-10-20T00:00:00+09:00', endAt: '2026-10-23T00:00:00+09:00',
+    allDay: true, busy: false,
+  }, {
+    provider: 'google-calendar', accountId: 'personal@example.com', calendarId: 'primary',
+    externalId: 'private-block-1', title: '大学の予定',
+    startAt: '2026-10-10T13:00:00+09:00', endAt: '2026-10-10T15:00:00+09:00',
+  }],
+  syncStates: [{
+    source: 'google-calendar', accountId: 'personal@example.com', scopeId: 'primary', status: 'success',
+    coveredFrom: '2026-09-24T00:00:00.000Z', coveredUntil: '2026-11-30T00:00:00.000Z', attemptedAt: scheduleNow,
+  }],
+  replaceSyncSources: true,
+})
+const freeLodgingSlot = getScheduleAvailability(
+  db, '2026-10-21T14:00:00+09:00', '2026-10-21T14:30:00+09:00',
+  { now: new Date(scheduleNow), requireCanonical: false },
+)
+check('schedule: availability=FREEの宿泊予定は滞在期間全体を占有しない',
+  freeLodgingSlot.state === 'available' && freeLodgingSlot.available)
 applyScheduleProjection(db, {
   syncStates: [{
     source: 'google-calendar', accountId: 'personal@example.com', scopeId: 'primary', status: 'failed',
@@ -354,7 +461,8 @@ check('track: 既存1本がposition空欄なら具体名へ昇格して重複し
 
 // --- 6入力の共通DB基盤 ---
 const appointmentColumns = (db.prepare('PRAGMA table_info(appointment)').all() as { name: string }[]).map((column) => column.name)
-check('calendar: external_id/end_at/source_hashを保持', ['external_id', 'end_at', 'source_hash'].every((name) => appointmentColumns.includes(name)))
+check('calendar: external_id/end_at/source_hash/flexibleを保持',
+  ['external_id', 'end_at', 'source_hash', 'flexible'].every((name) => appointmentColumns.includes(name)))
 
 const personId1 = upsertPerson(db, { name: '面接 テスト', company: '予定テスト社', role: '採用担当' })
 const personId2 = upsertPerson(db, { name: '面接 テスト', company: '予定テスト社', role: '別表記' })
@@ -413,6 +521,46 @@ check('meeting-url: 偽装ホスト(weburl.jp.evil.com)は受理しない', !isM
 const requiredTables = ['meeting_run', 'interview_note', 'submission', 'company_dossier', 'mail_item', 'appointment_person', 'database_identity', 'source_sync_state', 'schedule_block']
 const schemaTables = (db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as { name: string }[]).map((row) => row.name)
 check('6入力: 必要な専用テーブルが揃う', requiredTables.every((name) => schemaTables.includes(name)))
+
+// --- 応募先と分離した就活エージェント/イベント面談 ---
+const selectionCountBeforeSupport = (db.prepare('SELECT count(*) AS n FROM selection').get() as { n: number }).n
+upsertCareerOrganization(db, {
+  name: '支援テスト株式会社', shortName: '支援テスト', kind: 'career_agent', aliases: ['無料就活サービス'],
+})
+const support = upsertCareerMeeting(db, {
+  externalId: 'support-calendar-1', calendarId: 'career@example.com', title: '無料就活サービス 初回面談',
+  startAt: '2026-08-29T15:00:00+09:00', endAt: '2026-08-29T15:30:00+09:00', kind: '面談',
+  url: 'https://zoom.us/j/123456789',
+})
+const supportRow = listCareerMeetings(db).find((row) => row.id === support.id)
+check('career-support: aliasから支援組織を解決してscheduledにする',
+  supportRow?.organization === '支援テスト' && supportRow.status === 'scheduled' && supportRow.recordable)
+check('career-support: 支援組織を応募selectionへ混ぜない',
+  (db.prepare('SELECT count(*) AS n FROM selection').get() as { n: number }).n === selectionCountBeforeSupport)
+const unresolvedSupport = upsertCareerMeeting(db, {
+  externalId: 'support-calendar-2', calendarId: 'career@example.com', title: '正体不明の就活面談',
+  startAt: '2026-08-30T10:00:00+09:00', kind: '面談',
+})
+check('career-support: 未解決の就活面談を捨てずreviewで止める', unresolvedSupport.status === 'review')
+upsertCareerMeeting(db, {
+  externalId: 'support-calendar-1', calendarId: 'career@example.com', title: '無料就活サービス 初回面談',
+  startAt: '2026-08-29T15:00:00+09:00', endAt: '2026-08-29T15:45:00+09:00', kind: '面談',
+})
+check('career-support: カレンダー再同期で重複せず更新する',
+  listCareerMeetings(db).filter((row) => row.externalId === 'support-calendar-1').length === 1
+  && listCareerMeetings(db).find((row) => row.externalId === 'support-calendar-1')?.endAt === '2026-08-29T06:45:00.000Z')
+const supportInterview = applyInterview({
+  runId: 'career-meeting-support-test', careerMeetingId: support.id, contextKind: 'career_support',
+  organization: '支援テスト株式会社', occurredAt: '2026-08-29T15:30:00+09:00',
+  title: '初回面談', summary: 'キャリア相談を実施', people: [], profileSuggestions: [], followUps: ['次回候補を確認'],
+}, db)
+const storedSupportInterview = db.prepare(`
+  SELECT selection_id AS selectionId, company_id AS companyId, organization_id AS organizationId,
+    career_meeting_id AS careerMeetingId FROM interview_note WHERE id = ?
+`).get(supportInterview.interviewId) as { selectionId: number | null; companyId: number | null; organizationId: number | null; careerMeetingId: number }
+check('career-support: 議事録もselection/companyを捏造せず支援組織へ結び付く',
+  storedSupportInterview.selectionId === null && storedSupportInterview.companyId === null
+  && Boolean(storedSupportInterview.organizationId) && storedSupportInterview.careerMeetingId === support.id)
 
 if (failed) {
   console.error(`\n${failed}件失敗`)

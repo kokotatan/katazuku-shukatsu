@@ -2,13 +2,13 @@
 
 重複作成を防ぐための一次情報。新しいクラウド資源や定常タスクを作る前に必ず確認する。
 
-最終更新: 2026-07-18
+最終更新: 2026-09-08
 
 ## 正本DBと配信
 
 - 正本: `data/katazuku.db`（ローカルSQLite / node:sqlite / gitignore）
-- スナップショット: `data/snapshot.json`（gitignore）を `api/push.ts` からVercel Private Blobの `snapshot.json` へ上書き
-- 読取: `api/data.ts?key=...`。環境変数 `KATAZUKU_READ_SECRET`
+- スナップショット: `data/snapshot.json`（gitignore）をCloudflare Workerの `/api/push` からPrivate R2の `snapshot.json` へ上書き
+- 読取: Workerの `/api/data?key=...`。環境変数 `KATAZUKU_READ_SECRET`
 - 書込認証: `KATAZUKU_WRITE_SECRET`。ローカルはrepo直下 `.env`
 - 人物・証明写真: `data/private/photos` → `photo-sync.ts` → Private Blob `private-photos/*`
   - 配信は `api/photo.ts`、投入は `api/photo-push.ts`
@@ -17,13 +17,31 @@
 
 Neon/Postgresは使っていない。新設しない。
 
-## Vercel / ドメイン
+## Vercel / 旧ドメイン
 
-- 本番: `katazuku.kotalabo.com`
+- 旧配信先: `katazuku.kotalabo.com`。2026-09-08の新UIはCloudflareの `katazuku-app.kotalabo.com` へ配置
 - ホスティング: Vercel（Cloudflare CNAME）
 - Functions: `api/data`、`api/push`、`api/photo`、`api/photo-push`、`api/push-subscribe`、`api/push-send`
 - Blobはprivate。署名なしURLを公開しない
   - `snapshot.json`（正本のスナップショット）、`private-photos/*`、`push-subscriptions.json`（Web Push購読・個人データ）
+
+## Cloudflare（私用GUIと公開HPを分離）
+
+- 移行先: Workers Static Assets + Worker API + Private R2 bucket `katazuku-private`
+- 構成の正本: `wrangler.jsonc`、Worker実装: `cloudflare/worker.ts`
+- `/api/data`、`/api/push`、写真、Web Push、studioのURL互換を維持する
+- 2026-08-29にWorker `katazuku-shukatsu`、R2 bucket `katazuku-private`、必要secretを作成・デプロイ済み
+- 2026-09-02に `workers.dev` の `/api/push` へのsnapshot書込みと `/api/data` からの読み戻しを実データで確認済み。
+  repo直下 `.env` の `KATAZUKU_PUSH_URL` はCloudflare Workerを指す
+- 私用GUI: `https://katazuku-app.kotalabo.com`。Worker `katazuku-shukatsu` のcustom domainとして2026-09-08に接続。
+  ネクタイロゴと閲覧中心UIを反映し、認証付きデータ・写真200、未認証401を確認。従来のworkers.dev URLも同期先として維持。
+- 2026-09-08の本人訂正により、架空データを使う表示例は撤去。8つの閲覧画面は未入力時に見出し・列・行と静止した灰色の線だけを薄く表示し、合言葉入力欄を重ねる。未入力時のAPI通信なし、データ・写真APIの未認証401を維持。version `86c6f976-a0db-4e97-a194-e80d087cedb7` で反映を確認。
+- 2026-09-08に活動記録を月のカレンダー・日別記録へ変更。version `4272b864-c383-4573-bb75-6801ce10cce0` で8画面のアセット一致と未認証401を確認。既存snapshotの読取のみで、新しい保存先・会話全文の収集経路は追加していない。
+- `katazuku.kotalabo.com` はVercel向けCNAMEが残る。現在のWrangler OAuthにDNS編集権限がなく、既存CNAMEとの競合で切替できなかったため、新しい私用ドメインを採用。旧Vercel deploymentは保持。
+- 公開HP: `https://katazuku-shukatsu.kotalabo.com`。別Worker `katazuku-shukatsu-site`、設定は `site/wrangler.jsonc`。
+  `site/dist/` の静的HTMLだけを配信し、R2・秘密値・私用データのバインディングは付けない。
+- 公開HPは15ページ（紹介・導入・使い方・記事6本・参加方法等）と404。私用GUIのrobotsは全拒否、公開HPはクロール許可とサイトマップを設定。
+- Cloudflare側でWeb Analyticsのbeaconが自動挿入される。公開HPのプライバシーページへ記載済み。
 
 ## PWA / Web Push（spec16、2026-07-28）
 
@@ -68,6 +86,12 @@ Neon/Postgresは使っていない。新設しない。
 | katazuku-watchdog | 08:35〜20:35、4時間ごと | `run-watchdog.vbs` |
 | katazuku-evening-brief | 毎晩20:15 | `run-evening-brief.vbs` |
 
+ノートPCの録音状態は、`register-recording-status.ps1` が本人のStartupフォルダーへ登録する
+`katazuku-recording-status.lnk` でログイン時に常駐表示する（2026-09-08追加）。実体は
+`recording-status.ps1`。録音プロセスと音声ファイルの増加をローカルで確認し、停止中・開始確認中・
+録音中・保存停止・状態不明を表示する。録音開始時も `start-recording-status.ps1` で表示を戻す。
+多重起動は名前付きMutexで抑止し、録音制御・DB・クラウド同期には依存しない。
+
 `katazuku-watchdog` は番犬(AI非依存の純PowerShell)。活動ログの by別最終実行時刻と
 provider-health を監視し、定常タスクの停止・Claude/Codex両方の枠切れを検知したときだけ
 トースト+`logs/alert-daily-sync.txt` 追記(asaが翌朝メールで報告)。正常時は無音。
@@ -75,6 +99,17 @@ provider-health を監視し、定常タスクの停止・Claude/Codex両方の�
 
 登録スクリプトは `scripts/register-*.ps1`。タスク登録はOS側権限が必要。
 旧 `katazuku-meeting-opener` はmeeting-autopilotと二重起動するため無効化する。
+
+### 自動ログインの端末内設定（2026-09-08）
+
+- 既存タスク `\katazuku-local-login` を再利用する。設定画面を開く際は照会だけを行い、保存操作で時刻・有効状態を更新する。
+- ノートPC `OKUYAMA` では停止中・07:40を照会済み。今回の開発・回帰確認では実タスクの状態を変更していない。
+- 起動: `scripts/open-local-login-settings.vbs` または `npm run local-login:settings`。
+- 画面: `http://127.0.0.1:18471/board/local-login/`。`settings-server.mjs` がローカルの `board/dist` だけを配信する。
+- 自動起動タスクは追加しない。設定サーバーは必要時に起動し、日次処理は既存タスクで独立して動く。
+- 設定: `logs/local-login-settings.local.json`、接続先: `logs/local-login-portals.local.json`、資格情報: `credential-store/<id>-<設定世代>.json`（DPAPI CurrentUser、旧レコードは `<id>.json`）。端末間転送・snapshotへの追加は行わない。
+- 配布する `portals.json` は空。既存5件は端末内設定へ保持し、サービス候補は `portal-presets.json` の正式名称10件から選ぶ。URL・認証方法は本人がGUIで入力する。
+- クラウドGUIからの接続は別タブの起動案内のみ。クラウドへの設定API、リモートのMiniPC操作は追加していない。設定画面とAPIはローカル実装。2026-09-08の表示例追加時に、クラウドGUI側の起動案内も反映済み。
 
 **この表は実態と一致していること。2026-07-24に台帳と実態のずれが原因で事故が起きた**:
 `katazuku-calendar-sync` は表に載っていたが**実際には未登録**で、7/19以降カレンダーが

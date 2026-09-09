@@ -3,7 +3,7 @@
   "title": "daily-sync 抽出結果(モデルは抽出のみ・DB反映はしない)",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "selections", "mailItems", "submissions"],
+  "required": ["schemaVersion", "selections", "mailItems", "submissions", "requirements"],
   "properties": {
     "schemaVersion": { "const": 1 },
     "generatedAt": { "type": "string" },
@@ -18,6 +18,10 @@
     "submissions": {
       "type": "array",
       "items": { "$ref": "#/$defs/submission" }
+    },
+    "requirements": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/requirement" }
     },
     "priorityMails": {
       "type": "array",
@@ -58,7 +62,11 @@
         "title": { "type": "string", "minLength": 1 },
         "url": { "type": "string" },
         "location": { "type": "string" },
-        "person": { "type": "string" }
+        "person": { "type": "string" },
+        "reimbursementStatus": {
+          "enum": ["unknown", "none", "full", "partial", "fixed", "arranged"]
+        },
+        "receiptRequired": { "type": "boolean" }
       }
     },
     "mailItem": {
@@ -92,6 +100,24 @@
         "submittedAt": { "type": "string", "minLength": 1 },
         "result": { "type": "string" },
         "detail": { "type": "string" }
+      }
+    },
+    "requirement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceRef", "company", "kind", "title", "status"],
+      "properties": {
+        "sourceRef": { "type": "string", "minLength": 1 },
+        "company": { "type": "string", "minLength": 1 },
+        "position": { "type": "string" },
+        "kind": {
+          "enum": ["pledge", "insurance_certificate", "self_intro", "es", "assessment", "survey", "setup", "identity_document", "expense_document", "other"]
+        },
+        "title": { "type": "string", "minLength": 1 },
+        "deadline": { "type": "string" },
+        "actionUrl": { "type": "string" },
+        "instructions": { "type": "string" },
+        "status": { "enum": ["required", "completed", "waived"] }
       }
     },
     "priorityMail": {

@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useMemo } from 'react'
 import { AnchorButton, Button, StatusLabel } from 'smarthr-ui'
 import { AppNav } from './components/AppNav'
-import { daysLeft, fetchAll, READ_KEY_STORAGE, type AllData, type Appointment, type Track } from './lib/data'
+import { daysLeft, snapshotToAllData, type Appointment, type Track } from './lib/data'
+import { DataState } from './components/DataState'
+import { useKatazukuData } from './lib/useKatazukuData'
 
 /**
  * 今日やること(To Do) — 朝いちばんに開くページ。
@@ -29,12 +31,12 @@ function TrackSection({ title, tracks, urgent }: { title: string; tracks: Track[
     <section className="mb-8">
       <h2 className="mb-2 flex items-baseline gap-2 border-b border-slate-200 pb-1.5">
         <span className={`text-base font-semibold ${urgent ? 'text-red-600' : 'text-slate-800'}`}>{title}</span>
-        <span className="text-sm text-slate-400">{tracks.length}</span>
+        <span className="text-sm text-slate-500">{tracks.length}</span>
       </h2>
       <ul>
         {tracks.map((t, i) => (
-          <li key={i} className="flex items-center gap-3 border-b border-slate-100 py-2.5">
-            <span className="w-28 shrink-0">
+          <li key={i} className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-slate-100 py-3">
+            <span className="shrink-0 sm:w-28">
               {t.deadlineDate ? (
                 <StatusLabel type={urgent ? 'error' : 'grey'} bold={urgent}>
                   {dueLabel(t)}
@@ -44,11 +46,11 @@ function TrackSection({ title, tracks, urgent }: { title: string; tracks: Track[
                 <StatusLabel type="grey">待ち</StatusLabel>
               )}
             </span>
-            <span className="shrink-0 text-sm font-semibold text-slate-800">
+            <span className="min-w-0 break-words text-sm font-semibold text-slate-800">
               {t.company}
-              {t.position && <span className="font-normal text-slate-400">({t.position})</span>}
+              {t.position && <span className="font-normal text-slate-500">({t.position})</span>}
             </span>
-            <span className="min-w-0 flex-1 truncate text-sm text-slate-500">{t.nextAction || t.status}</span>
+            <span className="min-w-0 basis-full text-sm text-slate-500 sm:flex-1">{t.nextAction || t.status}</span>
             <AnchorButton size="S" variant="text" href="/board/">
               開く
             </AnchorButton>
@@ -60,34 +62,8 @@ function TrackSection({ title, tracks, urgent }: { title: string; tracks: Track[
 }
 
 export default function App() {
-  const [keyInput, setKeyInput] = useState('')
-  const [needKey, setNeedKey] = useState(false)
-  const [data, setData] = useState<AllData | null>(null)
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
-
-  const load = useCallback(async () => {
-    setLoading(true)
-    setError('')
-    try {
-      setData(await fetchAll())
-      setNeedKey(false)
-    } catch (err) {
-      if (err instanceof Error && err.message === 'KEY') setNeedKey(true)
-      else setError(err instanceof Error ? err.message : String(err))
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    void load()
-  }, [load])
-
-  const saveKey = () => {
-    localStorage.setItem(READ_KEY_STORAGE, keyInput.trim())
-    void load()
-  }
+  const { data: snapshot, error, loading, reload, setKey } = useKatazukuData()
+  const data = useMemo(() => snapshot ? snapshotToAllData(snapshot) : null, [snapshot])
 
   const active = (data?.tracks ?? []).filter((t) => t.outcome !== '不合格' && t.outcome !== '辞退')
   const appts = data?.appointments ?? []
@@ -104,63 +80,43 @@ export default function App() {
   )
 
   return (
-    <div className="flex min-h-screen">
+    <div className="min-h-screen md:flex">
       <AppNav current="insight" />
-      <main className="mx-auto w-full max-w-3xl p-6">
-        <header className="mb-6 flex items-center gap-3">
+      <main className="app-page min-w-0 flex-1 px-4 py-6 md:px-8 md:py-8">
+        <header className="mb-6 flex flex-wrap items-center gap-3">
           <div>
             <h1 className="text-xl font-bold text-slate-800">今日やること</h1>
-            <p className="text-xs text-slate-400">朝いちばんに開くページ。DBの生きた予定と締切だけ</p>
+            <p className="text-xs text-slate-500"></p>
           </div>
-          <span className="ml-auto text-xs text-slate-400">
+          <span className="ml-auto text-xs text-slate-500">
             {data?.generatedAt
-              ? `DB ${data.generatedAt.toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })} 時点`
+              ? `更新 ${data.generatedAt.toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })} 時点`
               : ''}
           </span>
-          {!needKey && (
-            <Button size="S" variant="secondary" onClick={() => load()} disabled={loading}>
+          <Button size="S" variant="secondary" onClick={reload} disabled={loading}>
               {loading ? '読込中…' : '更新'}
             </Button>
-          )}
         </header>
 
-        {needKey && (
-          <div className="flex max-w-md flex-col gap-3">
-            <p className="text-sm text-slate-500">合言葉を入れると表示されます(この端末では今回だけ)。</p>
-            <input
-              className="rounded border border-slate-300 p-2 text-sm"
-              type="password"
-              value={keyInput}
-              onChange={(e) => setKeyInput(e.target.value)}
-              placeholder="合言葉"
-            />
-            <div>
-              <Button variant="primary" onClick={saveKey} disabled={!keyInput.trim()}>
-                表示する
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {error && <p className="mb-4 rounded bg-red-50 p-3 text-sm text-red-700">{error}</p>}
-        {!needKey && !data && !error && <p className="p-8 text-center text-sm text-slate-400">読み込んでいます…</p>}
+        {!data && <DataState view="insight" loading={loading} error={error} onSaveKey={setKey} />}
+        {data && error && <p role="alert" className="mb-4 text-sm text-red-700">更新できませんでした。{error}</p>}
 
         {data && (
           <>
             {(todayAppts.length > 0 || upcomingAppts.length > 0) && (
               <section className="mb-8">
                 <h2 className="mb-2 border-b border-slate-200 pb-1.5 text-base font-semibold text-slate-800">
-                  予定 <span className="text-sm font-normal text-slate-400">面接・締切・説明会</span>
+                  予定 <span className="text-sm font-normal text-slate-500">面接・締切・説明会</span>
                 </h2>
                 {[...todayAppts, ...upcomingAppts].map((a, i) => (
-                  <div key={i} className="flex items-center gap-3 border-b border-slate-100 py-2.5">
-                    <span className="w-36 shrink-0">
+                  <div key={i} className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-slate-100 py-3">
+                    <span className="shrink-0 sm:w-36">
                       <StatusLabel type={daysLeft(a.atDate!) <= 0 ? 'error' : 'grey'} bold={daysLeft(a.atDate!) <= 0}>
                         {fmtAt(a)}
                       </StatusLabel>
                     </span>
-                    <span className="shrink-0 text-sm font-semibold text-slate-800">{a.company}</span>
-                    <span className="min-w-0 flex-1 truncate text-sm text-slate-500">
+                    <span className="min-w-0 break-words text-sm font-semibold text-slate-800">{a.company}</span>
+                    <span className="min-w-0 basis-full text-sm text-slate-500 sm:flex-1">
                       {a.title}
                       {a.person && ` / ${a.person}`}
                       {a.location && ` @${a.location}`}
@@ -179,8 +135,8 @@ export default function App() {
             <TrackSection title="今週" tracks={week} />
             <TrackSection title="待ち(結果・案内)" tracks={waiting} />
             {overdue.length + soon.length + todayAppts.length === 0 && (
-              <p className="rounded-lg bg-green-50 p-4 text-sm text-slate-600">
-                直近の締切・予定はありません。自動運転が監視中です。
+              <p className="border-t border-slate-200 py-6 text-sm text-slate-500">
+                直近の締切・予定はありません。
               </p>
             )}
             {data.activities.length > 0 && (
@@ -190,8 +146,8 @@ export default function App() {
                 </h2>
                 {data.activities.slice(0, 5).map((a, i) => (
                   <p key={i} className="border-b border-slate-100 py-1.5 text-xs text-slate-500">
-                    <span className="text-slate-400">{a.ts}</span> {a.action}
-                    {a.result && <span className="text-slate-400"> — {a.result}</span>}
+                    <span className="text-slate-500">{a.ts}</span> {a.action}
+                    {a.result && <span className="text-slate-500"> — {a.result}</span>}
                   </p>
                 ))}
               </section>

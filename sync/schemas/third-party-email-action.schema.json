@@ -50,6 +50,7 @@
             "additionalProperties": false,
             "required": ["startAt", "endAt"],
             "properties": {
+              "appointmentId": { "type": "integer", "minimum": 1 },
               "startAt": { "type": "string", "minLength": 1 },
               "endAt": { "type": "string", "minLength": 1 }
             }

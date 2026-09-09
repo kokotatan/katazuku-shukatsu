@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { openDb } from '../src/db'
 import { resolveDatabasePath } from '../src/database-path'
+import { evaluateMeetingPreparation } from '../src/meeting-preparation'
 
 const DB_PATH = resolveDatabasePath()
 const db = openDb(DB_PATH)
@@ -17,6 +18,7 @@ function jstDate(offsetDays: number): string {
   return d.toISOString().slice(0, 10)
 }
 const date = process.argv[2] ?? jstDate(1)
+const preparation = evaluateMeetingPreparation(db)
 
 type Row = Record<string, unknown>
 
@@ -61,6 +63,7 @@ const out = appts.map((a) => {
     companyPeople: withNotes(companyPeople),
     pastInterviews,
     recentEvents,
+    preparation: preparation.find(p => p.appointmentId === a.id) ?? null,
   }
 })
 

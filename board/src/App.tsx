@@ -1,16 +1,19 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Button } from 'smarthr-ui'
-import { daysLeft, fetchAll, READ_KEY_STORAGE, type AllData, type Appointment, type Track } from './lib/data'
+import LocalLoginGuide from './LocalLoginGuide'
+import { daysLeft, snapshotToAllData, type Appointment, type Track } from './lib/data'
+import { DataState } from './components/DataState'
+import { useKatazukuData } from './lib/useKatazukuData'
 
 /**
  * katazuku 管理画面。正本DBのスナップショット(/api/data)を読むだけ。
  * サインイン不要 — 合言葉を初回に1回。agentが書けば数秒後にここに映る。
  */
 
-type Tab = 'today' | 'tracks' | 'companies' | 'log'
+type Tab = 'today' | 'tracks' | 'companies' | 'log' | 'settings'
 
 function statusClass(s: string, outcome: string): string {
-  if (outcome === '不合格' || outcome === '辞退') return 'bg-slate-100 text-slate-400'
+  if (outcome === '不合格' || outcome === '辞退') return 'bg-slate-100 text-slate-500'
   if (/要確認|結果待ち/.test(s)) return 'bg-amber-50'
   if (outcome === '合格' || outcome === '内定') return 'bg-green-50'
   return 'bg-white'
@@ -34,61 +37,10 @@ function DeadlineBadge({ t }: { t: Track }) {
 }
 
 export default function App() {
-  const [keyInput, setKeyInput] = useState('')
-  const [needKey, setNeedKey] = useState(false)
-  const [data, setData] = useState<AllData | null>(null)
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
+  const { data: snapshot, error, loading, reload, setKey } = useKatazukuData()
+  const data = useMemo(() => snapshot ? snapshotToAllData(snapshot) : null, [snapshot])
   const [tab, setTab] = useState<Tab>('today')
   const [openCompany, setOpenCompany] = useState<string | null>(null)
-
-  const load = useCallback(async () => {
-    setLoading(true)
-    setError('')
-    try {
-      setData(await fetchAll())
-      setNeedKey(false)
-    } catch (err) {
-      if (err instanceof Error && err.message === 'KEY') setNeedKey(true)
-      else setError(err instanceof Error ? err.message : String(err))
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    void load()
-  }, [load])
-
-  const saveKey = () => {
-    localStorage.setItem(READ_KEY_STORAGE, keyInput.trim())
-    void load()
-  }
-
-  if (needKey) {
-    return (
-      <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-4 p-6">
-        <div className="flex items-center gap-3">
-          <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-teal-500 text-xl font-bold text-white">片</span>
-          <div>
-            <h1 className="text-lg font-bold text-slate-800">katazuku 管理画面</h1>
-            <p className="text-xs text-slate-500">合言葉を入れると表示されます(この端末では今回だけ)</p>
-          </div>
-        </div>
-        <input
-          className="rounded border border-slate-300 p-2 text-sm"
-          type="password"
-          value={keyInput}
-          onChange={(e) => setKeyInput(e.target.value)}
-          placeholder="合言葉"
-        />
-        <Button variant="primary" onClick={saveKey} disabled={!keyInput.trim()}>
-          表示する
-        </Button>
-        {error && <p className="rounded bg-red-50 p-3 text-sm text-red-700">{error}</p>}
-      </div>
-    )
-  }
 
   const tracks = data?.tracks ?? []
   const active = tracks.filter((t) => t.outcome !== '不合格' && t.outcome !== '辞退')
@@ -118,40 +70,44 @@ export default function App() {
   return (
     <div className="mx-auto max-w-3xl p-3 pb-16">
       <header className="mb-3 flex items-center gap-2">
-        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-teal-500 font-bold text-white">片</span>
-        <h1 className="font-bold text-slate-800">katazuku</h1>
-        <span className="ml-auto text-xs text-slate-400">
+        <a href="/" aria-label="ホームに戻る" className="flex shrink-0 items-center gap-2">
+          <img src="/icons/necktie-192.png" alt="" width={40} height={40} className="h-10 w-10 shrink-0 rounded-md" />
+          <h1 className="font-bold text-slate-800">katazuku</h1>
+        </a>
+        <span className="ml-auto text-xs text-slate-500">
           {data?.generatedAt
-            ? `DB ${data.generatedAt.toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })} 時点`
+            ? `更新 ${data.generatedAt.toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })} 時点`
             : ''}
         </span>
-        <Button size="S" variant="secondary" onClick={() => load()} disabled={loading}>
+        <Button size="S" variant="secondary" onClick={reload} disabled={loading}>
           {loading ? '読込中…' : '更新'}
         </Button>
       </header>
 
       <nav className="sticky top-0 z-10 mb-3 flex gap-1 rounded-lg bg-slate-100 p-1">
         <TabBtn k="today" label="きょう" />
-        <TabBtn k="tracks" label={`選考 ${active.length}`} />
+        <TabBtn k="tracks" label={data ? `選考 ${active.length}` : '選考'} />
         <TabBtn k="companies" label="企業" />
         <TabBtn k="log" label="ログ" />
+        <TabBtn k="settings" label="設定" />
       </nav>
 
-      {error && <p className="mb-3 rounded bg-red-50 p-3 text-sm text-red-700">{error}</p>}
-      {!data && !error && <p className="p-8 text-center text-sm text-slate-400">読み込んでいます…</p>}
+      {!data && tab !== 'settings' && <DataState view={tab === 'tracks' ? 'status' : tab === 'companies' ? 'prep' : tab === 'log' ? 'impact' : 'insight'} loading={loading} error={error} onSaveKey={setKey} />}
+      {data && error && <p role="alert" className="mb-4 text-sm text-red-700">更新できませんでした。{error}</p>}
+      {tab === 'settings' && <LocalLoginGuide />}
 
       {data && tab === 'today' && (
         <div className="flex flex-col gap-4">
           <section>
             <h2 className="mb-1 text-sm font-bold text-slate-500">予定(面接・締切)</h2>
-            {upcoming.length === 0 && <p className="text-sm text-slate-400">14日以内の予定はありません</p>}
+            {upcoming.length === 0 && <p className="text-sm text-slate-500">14日以内の予定はありません</p>}
             {upcoming.map((a, i) => (
-              <div key={i} className="mb-1 flex items-center gap-2 rounded-lg border border-slate-300 bg-white p-2">
+              <div key={i} className="mb-1 flex flex-wrap items-center gap-2 rounded-lg border border-slate-300 bg-white p-2">
                 <span className={`shrink-0 rounded px-1.5 py-0.5 text-xs font-bold ${daysLeft(a.atDate!) <= 1 ? 'bg-red-50 text-red-700' : 'bg-slate-100 text-slate-500'}`}>
                   {fmtAt(a)}
                 </span>
                 <span className="text-sm font-bold text-slate-800">{a.company}</span>
-                <span className="min-w-0 flex-1 truncate text-xs text-slate-500">
+                <span className="min-w-0 basis-full text-xs text-slate-500 sm:flex-1">
                   {a.title}
                   {a.person && ` / ${a.person}`}
                   {a.location && ` @${a.location}`}
@@ -168,7 +124,7 @@ export default function App() {
             <h2 className="mb-1 text-sm font-bold text-slate-500">締切(トラック)</h2>
             {withDeadline.map((t, i) => (
               <div key={i} className={`mb-1 rounded-lg border border-slate-300 p-2 ${statusClass(t.status, t.outcome)}`}>
-                <div className="flex items-center text-sm font-bold text-slate-800">
+                <div className="flex flex-wrap items-center text-sm font-bold text-slate-800">
                   {t.company}
                   {t.position && <span className="ml-1 font-normal text-slate-500">({t.position})</span>}
                   <DeadlineBadge t={t} />
@@ -182,7 +138,7 @@ export default function App() {
             {waiting.map((t, i) => (
               <p key={i} className="mb-0.5 text-sm text-slate-600">
                 <b>{t.company}</b>
-                {t.position && <span className="text-slate-400">({t.position})</span>} — {t.status}
+                {t.position && <span className="text-slate-500">({t.position})</span>} — {t.status}
               </p>
             ))}
           </section>
@@ -193,13 +149,13 @@ export default function App() {
         <div>
           {tracks.map((t, i) => (
             <div key={i} className={`mb-1 rounded-lg border border-slate-300 p-2 ${statusClass(t.status, t.outcome)}`}>
-              <div className="flex items-baseline gap-1 text-sm">
+              <div className="flex flex-wrap items-baseline gap-1 text-sm">
                 <b className="text-slate-800">{t.company}</b>
                 <span className="text-xs text-slate-500">{t.period}{t.position && `・${t.position}`}</span>
                 <DeadlineBadge t={t} />
               </div>
               <p className="text-xs text-slate-600">{t.status}</p>
-              {t.steps.length > 0 && <p className="text-xs text-slate-400">{t.steps.join(' → ')}</p>}
+              {t.steps.length > 0 && <p className="text-xs text-slate-500">{t.steps.join(' → ')}</p>}
               {t.nextAction && <p className="text-xs text-blue-700">次: {t.nextAction}</p>}
             </div>
           ))}
@@ -216,22 +172,22 @@ export default function App() {
               >
                 <span>
                   {c.name}
-                  <span className="ml-1 text-xs font-normal text-slate-400">
+                  <span className="ml-1 text-xs font-normal text-slate-500">
                     {c.master?.industry} {c.tracks.length > 1 ? `/ ${c.tracks.length}トラック` : ''}
                   </span>
                 </span>
-                <span className="text-slate-400">{openCompany === c.name ? '−' : '+'}</span>
+                <span className="text-slate-500">{openCompany === c.name ? '−' : '+'}</span>
               </button>
               {openCompany === c.name && (
                 <div className="border-t border-slate-200 p-2 text-xs text-slate-600">
                   {c.master?.officialName && c.master.officialName !== c.name && (
-                    <p className="mb-1 text-slate-400">正式名称: {c.master.officialName}</p>
+                    <p className="mb-1 text-slate-500">正式名称: {c.master.officialName}</p>
                   )}
                   {c.tracks.map((t, i) => (
                     <p key={i} className="mb-1">
                       <span className="font-semibold">{t.period}{t.position && `・${t.position}`}</span>: {t.status}
-                      {t.steps.length > 0 && <span className="text-slate-400"> ({t.steps.join('→')})</span>}
-                      {t.memo && <span className="block text-slate-400">{t.memo}</span>}
+                      {t.steps.length > 0 && <span className="text-slate-500"> ({t.steps.join('→')})</span>}
+                      {t.memo && <span className="block text-slate-500">{t.memo}</span>}
                     </p>
                   ))}
                   {c.master?.mypageUrl && (
@@ -239,11 +195,11 @@ export default function App() {
                       <a className="text-blue-700 underline" href={c.master.mypageUrl} target="_blank" rel="noreferrer">
                         マイページを開く
                       </a>
-                      {c.master.loginId && <span className="ml-2 text-slate-400">ID: {c.master.loginId}</span>}
+                      {c.master.loginId && <span className="ml-2 text-slate-500">ID: {c.master.loginId}</span>}
                     </p>
                   )}
-                  {!c.master?.mypageUrl && c.master?.loginId && <p className="text-slate-400">ID: {c.master.loginId}</p>}
-                  {c.master?.memo && <p className="mt-1 text-slate-400">{c.master.memo}</p>}
+                  {!c.master?.mypageUrl && c.master?.loginId && <p className="text-slate-500">ID: {c.master.loginId}</p>}
+                  {c.master?.memo && <p className="mt-1 text-slate-500">{c.master.memo}</p>}
                 </div>
               )}
             </div>
@@ -253,12 +209,12 @@ export default function App() {
 
       {data && tab === 'log' && (
         <div>
-          {data.activities.length === 0 && <p className="text-sm text-slate-400">活動ログはまだありません</p>}
+          {data.activities.length === 0 && <p className="text-sm text-slate-500">活動ログはまだありません</p>}
           {data.activities.map((a, i) => (
             <div key={i} className="mb-2 rounded-lg border border-slate-300 bg-white p-2 text-xs">
               <p className="font-bold text-slate-800">
                 {a.action}
-                <span className="ml-2 font-normal text-slate-400">{a.ts} / {a.by}</span>
+                <span className="ml-2 font-normal text-slate-500">{a.ts} / {a.by}</span>
               </p>
               {a.why && <p className="text-slate-500">なぜ: {a.why}</p>}
               {a.how && <p className="text-slate-500">どう: {a.how}</p>}

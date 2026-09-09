@@ -1,0 +1,14 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "katazuku-shukatsu-site",
+  "compatibility_date": "2026-09-08",
+  "workers_dev": false,
+  "assets": {
+    "directory": "./dist",
+    "html_handling": "auto-trailing-slash",
+    "not_found_handling": "404-page"
+  },
+  "routes": [
+    { "pattern": "katazuku-shukatsu.kotalabo.com", "custom_domain": true }
+  ]
+}

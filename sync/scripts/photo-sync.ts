@@ -1,5 +1,5 @@
 /**
- * data/private/photos の写真を認証付きAPI経由でPrivate Blobへ同期する。
+ * data/private/photos の写真を認証付きAPI経由で非公開オブジェクトストレージへ同期する。
  */
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { dirname, extname, join, relative } from 'node:path'

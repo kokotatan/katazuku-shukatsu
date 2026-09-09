@@ -28,9 +28,10 @@ if (-not $env:MCP_TIMEOUT) { $env:MCP_TIMEOUT = '180000' }
 if (-not $env:MCP_TOOL_TIMEOUT) { $env:MCP_TOOL_TIMEOUT = '180000' }
 $repo = Split-Path $PSScriptRoot -Parent
 $sync = Join-Path $repo 'sync'
+. (Join-Path $PSScriptRoot 'katazuku-role.ps1')
 $env:KATAZUKU_DB = if ($env:KATAZUKU_DB) { [IO.Path]::GetFullPath($env:KATAZUKU_DB) } else { Join-Path $repo 'data\katazuku.db' }
 if (-not $env:KATAZUKU_DB_ROLE) {
-  $env:KATAZUKU_DB_ROLE = if (Test-Path (Join-Path $repo '.katazuku-satellite')) { 'replica' } else { 'canonical' }
+  $env:KATAZUKU_DB_ROLE = Get-KatazukuOperationalRole -RepositoryRoot $repo
 }
 $runner = Join-Path $sync 'scripts\agent-runner.ts'
 $temporaryPrompt = $null
@@ -92,9 +93,18 @@ if ($OutputSchema) { $argsList += @('--output-schema', $OutputSchema) }
 if ($OutputFile) { $argsList += @('--output-file', $OutputFile) }
 if ($DryRun) { $argsList += '--dry-run' }
 
-$npx = if ($IsWindows -or $env:OS -eq 'Windows_NT') { 'npx.cmd' } else { 'npx' }
-if (-not (Get-Command $npx -ErrorAction SilentlyContinue)) {
-  throw "npxが見つかりません。Node.jsをセットアップしてください。"
+$node = Get-Command node -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+$localTsx = Join-Path $sync 'node_modules/tsx/dist/cli.mjs'
+if ($node -and (Test-Path -LiteralPath $localTsx)) {
+  # インストール済みの同じtsxを直接起動し、毎回のnpm初期化を省く。
+  $launcher = $node.Source
+  $argsList[0] = 'node_modules/tsx/dist/cli.mjs'
+} else {
+  # 依存未導入の環境では従来のnpxによる解決を維持する。
+  $launcher = if ($IsWindows -or $env:OS -eq 'Windows_NT') { 'npx.cmd' } else { 'npx' }
+  if (-not (Get-Command $launcher -ErrorAction SilentlyContinue)) {
+    throw "npxが見つかりません。Node.jsをセットアップしてください。"
+  }
 }
 # runnerを子プロセスとして起動し、ハードデッドラインで「プロセスツリーごと」殺す。
 # `& $npx` の直接呼び出しでは親が返るまで待ち続けるしかなく、provider CLIが固まると
@@ -105,7 +115,7 @@ $exitCode = -1
 $killed = $false
 Push-Location $sync
 try {
-  $proc = Start-Process -FilePath $npx -ArgumentList $argsList -NoNewWindow -PassThru `
+  $proc = Start-Process -FilePath $launcher -ArgumentList $argsList -WindowStyle Hidden -PassThru `
     -RedirectStandardOutput $stdoutFile -RedirectStandardError $stderrFile
   # Start-Process -PassThru が返す Process は ExitCode を保持しないことがある(実害 2026-07-31:
   # 成功したrunがexit空で失敗扱いになった)。ハンドルを開いておくとOSが終了情報を保持する。

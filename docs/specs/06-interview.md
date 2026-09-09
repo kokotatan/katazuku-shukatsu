@@ -8,8 +8,8 @@
 
 ## 実装
 
-1. `meeting-autopilot.ps1` がDBのappointmentを見て、開始5分後に `record-audio.ps1` を予定ID付きで起動する。
-2. ffmpegでマイクとシステム音声を16kHz mono wavへ録音する。
+1. `meeting-autopilot.ps1` がDBのappointmentを見て、会議URLのある予定（面接・面談・説明会等）を選び、開始5分前に `record-vac.ps1` を予定ID付きで起動する。インターン参加、宿泊、対面、終日・24時間以上の予定は対象外。[録音対象の規則](../RECORDING-POLICY.md)を参照。
+2. ffmpegでシステム音声とマイクを16kHz stereo wavの別チャンネルへ録音する。
 3. `interview-digest.ps1` が30秒チャンクに分割し、Voicebox Whisperで全チャンクを文字起こしする。
 4. `interview-digest-prompt.md` が全文ノートと厳格JSONを生成する。
 5. `db-apply-interview.ts` が1トランザクションで次へ反映する。

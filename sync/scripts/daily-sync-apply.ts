@@ -18,6 +18,10 @@ import { validateJsonSchema } from '../src/agent-runtime'
 import { applyDiff, MAX_APPLY_CHANGES, type DiffItem } from './db-apply'
 import { applyMail } from './db-apply-mail'
 import { applySubmission } from './db-apply-submission'
+import {
+  applySubmissionRequirements,
+  type SubmissionRequirementInput,
+} from '../src/submission-requirement'
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 export const DAILY_SYNC_SCHEMA_PATH = join(scriptDir, '..', 'schemas', 'daily-sync-result.schema.json')
@@ -53,6 +57,7 @@ export interface DailySyncResult {
   selections: DiffItem[]
   mailItems: MailItemInput[]
   submissions: SubmissionEntry[]
+  requirements?: SubmissionRequirementInput[]
   priorityMails?: { id?: string; subject: string; reason: string }[]
   notes?: string
 }
@@ -73,6 +78,7 @@ export interface DailySyncApplySummary {
   selections: { updated: string[]; added: string[]; skipped: string[]; pending: string[] }
   mail: { created: number; updated: number }
   submissions: { created: number; duplicate: number; errors: string[] }
+  requirements: { created: number; updated: number; completed: number; errors: string[] }
   priorityMails: { subject: string; reason: string }[]
   notes?: string
 }
@@ -94,6 +100,19 @@ export function applyDailySyncResult(
   }
   const selections = applyDiff(db, result.selections)
   const mail = applyMail({ items: result.mailItems }, db)
+  // 要求台帳を先に作り、その後の提出根拠で同じ選考・種別だけを完了させる。
+  // 同一daily-sync結果に依頼メールと提出完了メールが含まれても未完了へ戻さない。
+  const requirements = { created: 0, updated: 0, completed: 0, errors: [] as string[] }
+  for (const requirement of result.requirements ?? []) {
+    try {
+      const applied = applySubmissionRequirements(db, [requirement])
+      requirements.created += applied.created
+      requirements.updated += applied.updated
+      requirements.completed += applied.completed
+    } catch (error) {
+      requirements.errors.push(`${requirement.company}/${requirement.title}: ${(error as Error).message}`)
+    }
+  }
   const submissions = { created: 0, duplicate: 0, errors: [] as string[] }
   for (const entry of result.submissions) {
     try {
@@ -113,6 +132,7 @@ export function applyDailySyncResult(
     },
     mail,
     submissions,
+    requirements,
     priorityMails: (result.priorityMails ?? []).map((p) => ({ subject: p.subject, reason: p.reason })),
     notes: result.notes,
   }
@@ -146,6 +166,11 @@ if (invokedDirectly) {
     `  選考: 更新 ${summary.selections.updated.length} / 追加 ${summary.selections.added.length}` +
       ` / 保留 ${summary.selections.skipped.length} / 名寄せ要確認 ${summary.selections.pending.length}`,
   )
+  console.log(
+    `  未完了提出物: 追加 ${summary.requirements.created} / 更新 ${summary.requirements.updated}` +
+      ` / 完了反映 ${summary.requirements.completed}` +
+      (summary.requirements.errors.length ? ` / 失敗 ${summary.requirements.errors.length}` : ''),
+  )
   console.log(`  メール: 追加 ${summary.mail.created} / 更新 ${summary.mail.updated}`)
   console.log(
     `  提出結果: 追加 ${summary.submissions.created} / 既反映 ${summary.submissions.duplicate}` +
@@ -156,6 +181,9 @@ if (invokedDirectly) {
   }
   if (summary.submissions.errors.length) {
     for (const e of summary.submissions.errors) console.log(`  提出失敗: ${e}`)
+  }
+  if (summary.requirements.errors.length) {
+    for (const e of summary.requirements.errors) console.log(`  提出物台帳失敗: ${e}`)
   }
   if (summary.priorityMails.length) {
     console.log('  最優先メール(既読化せず要確認):')

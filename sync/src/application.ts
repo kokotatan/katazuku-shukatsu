@@ -150,6 +150,7 @@ export interface CalendarOutboxRow {
   url: string
   location: string
   person: string
+  flexible: boolean
 }
 
 export interface CalendarLinkInput {
@@ -742,16 +743,17 @@ export function listWebAssessments(db: DatabaseSync): Record<string, unknown>[] 
 export function listCalendarOutbox(db: DatabaseSync, now = new Date()): CalendarOutboxRow[] {
   const earliest = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString()
   const latest = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000).toISOString()
-  return db.prepare(
+  const rows = db.prepare(
     'SELECT a.id AS appointmentId, a.selection_id AS selectionId, ' +
     'c.name AS company, s.position, a.at, a.end_at AS endAt, ' +
-    'a.kind, a.title, a.url, a.location, a.person ' +
+    'a.kind, a.title, a.url, a.location, a.person, a.flexible ' +
     'FROM appointment a JOIN selection s ON s.id = a.selection_id ' +
     'JOIN company c ON c.id = s.company_id ' +
     "WHERE a.status = '予定' AND a.external_id = '' " +
     'AND julianday(a.at) >= julianday(?) AND julianday(a.at) <= julianday(?) ' +
     'ORDER BY a.at, a.id',
-  ).all(earliest, latest) as unknown as CalendarOutboxRow[]
+  ).all(earliest, latest) as unknown as (Omit<CalendarOutboxRow, 'flexible'> & { flexible: number })[]
+  return rows.map((row) => ({ ...row, flexible: row.flexible === 1 }))
 }
 
 export function linkCalendarAppointment(

@@ -1,6 +1,10 @@
 node_modules
 dist
 .vercel
+.wrangler/
+cloudflare/.dev.vars*
+worker-configuration.d.ts
+worker-configuration.d.ts.tmp
 
 # Discord通知の設定・状態(Webhook URLは秘密情報)
 notify-config.json
@@ -66,6 +70,7 @@ credential-store/
 .codex/
 codex-windows-sandbox-setup.exe
 .katazuku-satellite
+.katazuku-emergency-canonical.local.json
 
 # record-vac の二重起動ガード用ロック(実行時の一時ファイル)
 logs/record-vac-*.lock
@@ -76,3 +81,21 @@ scripts/oss/blocklist.txt
 sync/*-diff.json
 # カレンダー突合の一時生成物
 sync/.calendar-residue-tmp/
+# Gmail障害時のローカル読取専用バックフィル（メール本文・ヘッダーを含む）
+sync/gmail-backfill-*.json
+
+# Google OAuthの秘密情報
+/credentials/
+
+# 端末ローカルの作業ファイル(実メール本文・使い捨てスクリプト・一時出力)。両機とも同じ規則にする
+*.local.json
+*.local.cjs
+*.local.mjs
+*.local.txt
+*.local.env
+.tmp/
+output/
+outputs/
+%SystemDrive%/
+NUL
+*.pub

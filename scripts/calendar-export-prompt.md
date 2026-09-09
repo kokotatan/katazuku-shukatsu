@@ -9,6 +9,12 @@
 3. 各予定を本人の就活用カレンダーへ作成する
    - タイトル: 【就活】会社名 予定タイトル
    - 開始・終了: at / endAt。endAt が空なら面接・面談は60分、締切は時刻どおり
+   - `kind=タスク`は通常色で作成し、タイトルどおりの本人対応タスクとして扱う
+   - `flexible=true`は固定予定ではない。開始時刻が他のbusy予定と重なる場合、同じ日の09:00〜20:00を
+     15分刻みで確認し、最も早い空き15分へ移す。作成前なら
+     `npx tsx scripts/db-appointment.ts move <appointmentId> <開始ISO> <終了ISO>`でDBを先に更新し、outboxを再取得する。
+   - `flexible=true`のカレンダー予定はavailability=FREE（予定ありにしない）で作る。後から面接等の固定予定と
+     重なった場合は、本人確認なしで同日中の空き15分へ移動してよい。
    - 場所: location
    - 説明: 職種、種別、相手、URL、DBのappointmentId
    - オンラインURLは説明にも残す

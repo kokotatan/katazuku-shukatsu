@@ -5,7 +5,7 @@
  *   npx tsx scripts/db-snapshot.ts           # 生成 + ローカルバックアップ + プッシュ
  *   npx tsx scripts/db-snapshot.ts --no-push # 生成のみ(オフライン時)
  *
- * プッシュ先: /api/push (Vercel)。認証は repo直下 .env の KATAZUKU_WRITE_SECRET。
+ * プッシュ先: /api/push (現在の配信基盤)。認証は repo直下 .env の KATAZUKU_WRITE_SECRET。
  * スナップショットに**パスワード列は含めない**(クラウドに置くため)。
  */
 import { copyFileSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync, existsSync } from 'node:fs'
@@ -98,23 +98,36 @@ async function main() {
     console.log('KATAZUKU_WRITE_SECRET が .env に無いためプッシュはスキップ(生成のみ)')
     return
   }
-  let res: Response
-  try {
-    res = await fetch(url, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${secret}` },
-      body: JSON.stringify(snap),
-    })
-  } catch (error) {
-    console.error(`警告: プッシュ接続失敗: ${error instanceof Error ? error.message : String(error)}`)
-    return
-  }
-  if (!res.ok) {
+  const body = JSON.stringify(snap)
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    let res: Response
+    try {
+      res = await fetch(url, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${secret}` },
+        body,
+      })
+    } catch (error) {
+      if (attempt < 3) {
+        await new Promise((resolve) => setTimeout(resolve, attempt * 1000))
+        continue
+      }
+      console.error(`警告: プッシュ接続失敗: ${error instanceof Error ? error.message : String(error)}`)
+      return
+    }
+    if (res.ok) {
+      console.log('クラウドへプッシュ完了(アプリは数秒後に最新を表示)')
+      return
+    }
+    const detail = (await res.text()).slice(0, 200)
+    if ((res.status === 429 || res.status >= 500) && attempt < 3) {
+      await new Promise((resolve) => setTimeout(resolve, attempt * 1000))
+      continue
+    }
     // 輸送はベストエフォート(未設定・オフラインでもDB本体の処理は成功扱い)。ただし警告は残す
-    console.error(`警告: プッシュ失敗 (${res.status}): ${(await res.text()).slice(0, 200)}`)
+    console.error(`警告: プッシュ失敗 (${res.status}): ${detail}`)
     return
   }
-  console.log('クラウドへプッシュ完了(アプリは数秒後に最新を表示)')
 }
 
 main().catch((e) => {

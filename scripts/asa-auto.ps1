@@ -9,6 +9,22 @@ Set-Location $repo
 $logDir = Join-Path $repo 'logs'
 if (-not (Test-Path $logDir)) { New-Item -ItemType Directory $logDir | Out-Null }
 $logFile = Join-Path $logDir ("asa-{0}.log" -f (Get-Date -Format 'yyyy-MM-dd_HHmm'))
+. (Join-Path $PSScriptRoot 'meeting-preparation-guard.ps1')
+$null = Update-KatazukuMeetingPreparation -RepositoryRoot $repo
+
+# 未完了提出物は未読メールと別台帳で保持し、毎朝必ず全件再評価する。
+try {
+  Push-Location (Join-Path $repo 'sync')
+  $npx = if ($IsWindows -or $env:OS -eq 'Windows_NT') { 'npx.cmd' } else { 'npx' }
+  & $npx tsx scripts/submission-readiness.ts list `
+    --write ..\logs\submission-readiness.local.json `
+    --alert ..\logs\submission-readiness-alert.local.txt | Out-Null
+  if ($LASTEXITCODE -ne 0) { throw "submission-readiness exit=$LASTEXITCODE" }
+} catch {
+  ("提出物ガードの更新に失敗: {0}" -f $_.Exception.Message) | Out-File $logFile -Append -Encoding utf8
+} finally {
+  Pop-Location
+}
 
 $base = Get-Content -Raw -Encoding UTF8 -Path (Join-Path $PSScriptRoot 'asa-prompt.md')
 
@@ -32,7 +48,7 @@ $runId = 'asa:' + (Get-Date -Format 'yyyy-MM-dd')
 try {
   & $invoke -Workflow 'asa' -RunId $runId -PromptText $prompt `
     -Risk 'external-commit' -SideEffectMode 'reconcile' `
-    -Capability @('workspace.read', 'workspace.write', 'shell', 'gmail.read', 'gmail.draft', 'gmail.labels', 'gmail.send.self', 'calendar.read', 'calendar.write', 'drive.read', 'sheets.read') `
+    -Capability @('workspace.read', 'workspace.write', 'shell', 'web.search', 'gmail.read', 'gmail.draft', 'gmail.labels', 'gmail.send.self', 'calendar.read', 'calendar.write', 'drive.read', 'sheets.read') `
     *>&1 | Out-File -FilePath $logFile -Encoding utf8
 } catch {
   $_ | Out-File -FilePath $logFile -Append -Encoding utf8
@@ -46,9 +62,12 @@ try {
 $alertFile = Join-Path $logDir 'alert-asa.txt'
 . (Join-Path $PSScriptRoot 'agent-sentinel.ps1')
 $done = Test-AgentSentinel -Sentinel '===\s*asa\s*DONE\s*===' -LogDir $logDir -RunId $runId -LogFile $logFile
+$preparationOk = Update-KatazukuMeetingPreparation -RepositoryRoot $repo -RequireReady
 $logSize = if (Test-Path $logFile) { (Get-Item $logFile).Length } else { 0 }
 $failReason = $null
-if ($done) {
+if ($done -and -not $preparationOk) {
+  $failReason = '朝の処理は終了したが面談準備が未完了(専用台帳から次回再試行)'
+} elseif ($done) {
   # 成功。何もしない(下で alert を消す)
 } elseif ($logSize -lt 200) {
   $failReason = 'ログが空か極小(agent実行自体が失敗した可能性)'

@@ -27,6 +27,21 @@ mcp__claude_ai_* 系の使える方を使う。
   他ジョブの故障も検知されなくなるため最優先。ファイルが存在しない場合も同様に報告する。
 - 報告したらファイルを削除する(報告済みの故障を翌日また出さないため)。1件も無ければ何も出力しない。
 
+### 00.5 未完了提出物の前倒し準備【毎日・最優先】
+
+- `logs/submission-readiness.local.json` を読む。この台帳は未読メールではなく正本DBを全件再評価した結果で、
+  PC停止期間やprocessed済みメールをまたいでも、completed/waivedになるまで消えない。
+- items は期限が遠くても受信時点から準備する。「きょうはやらなくていい」へ送らない。
+- preparationStatus が `not_started` / `researching` の項目は、sourceRefの元メールを確認し、Web検索は
+  大学・企業・保険者等の**公式サイトだけ**を根拠として、手続先、必要項目、添付物、所要営業日を調べる。
+- `logs/submission-prep/<id>.local.md` に公式URL、入力内容、必要添付、残る本人操作を記録し、可能な作業を先に済ませる。
+  本人へは原則「この内容で提出してよいか」だけを求める。
+- 外部フォーム送信、企業・大学へのメール送信、予約確定は本人の最終承認前に実行しない。内容が固定できたら
+  `cd sync; npx tsx scripts/submission-readiness.ts mark --id <id> --status ready_for_approval --ref ../logs/submission-prep/<id>.local.md`
+  で承認待ちにする。認証・本人回答・添付不足なら `blocked` と理由を記録する。
+- 実際の提出完了メール、アップロード完了画面等を確認した場合だけcompleteにする。準備済みを提出済みとみなさない。
+- 未完了提出物は「きょうやること」最大3件の外側に落とさず、少なくとも「未完了提出物」欄で全件を提示する。
+
 ### 0. 送り忘れ(未送信の下書き)の検出【最優先】
 
 - Gmail MCP で `in:draft` を検索し、書いたのに送信していない下書きを全件洗い出す。
@@ -103,6 +118,9 @@ mcp__claude_ai_* 系の使える方を使う。
 - 8:23のdaily-syncで既に同じ内容が反映済みなら何もしない。未反映だけを
   `{name, stage, nextAction, nextDate, industry, season, position, appointments, ref}` の配列として
   `sync/sheet-import-asa.json` に書き、`cd sync; npx tsx scripts/db-apply.ts sheet-import-asa.json` で反映する。
+- 参加確定インターンの案内に交通費が明記されていれば、appointmentのkindを`インターン`とし、
+  `reimbursementStatus`(全額=`full`、一部=`partial`、定額=`fixed`、本人精算なしの企業手配=`arranged`、支給なし=`none`)を入れる。
+  領収書・利用明細等の提出が明記されている場合だけ`receiptRequired:true`にする。推測では設定しない。
 - 書く前に `db-inspect.ts <企業名>` で既存トラックを確認し、positionを具体的に付ける。
   複数トラックで特定できないもの、名寄せ確認が出たものは推測で書かず、本人確認事項として報告する。
 - DBへ1件でも書いたら、必ず続けて `npx tsx scripts/db-snapshot.ts` を実行し、アプリへ即時反映する。
@@ -117,9 +135,17 @@ mcp__claude_ai_* 系の使える方を使う。
 - 既存予定を再利用または新規作成できたものだけ、appointmentId、externalId、calendarIdをlinks配列の一時JSONへ書く。
 - `npx tsx scripts/db-link-calendar.ts <一時JSON>` で外部IDをDBへ戻し、`npx tsx scripts/db-snapshot.ts` を実行する。
 - 作成失敗した予定はlinkせず、次回のoutboxに残す。日時やURLを推測しない。
+- `flexible=true`の本人タスクは固定予定と重なれば、同日09:00〜20:00の最も早い空き15分へ移してよい。
+  availability=FREEで作り、面接・移動・大学予定などの空き判定を妨げない。詳細はscripts/calendar-export-prompt.mdに従う。
 - 反映件数を活動ログと「自動で済ませたこと」に残す。詳細はscripts/calendar-export-prompt.mdを参照する。
 
-### 6. 面接の前日準備(prepパック)
+### 6. 面談の事前調査と準備（予約日から自動実行）
+
+- `scripts/meeting-preparation-prompt.md` を読み、正本DBの未完了全件を評価し、日時順に最大3予定を処理する。今日〜48時間以内に限定しない。
+- 企業・相手の一次情報調査、前回記録・本人の回答素材、逆質問と想定問答を保存し、DBとsnapshotまで反映する。
+- 通信等で未完了なら理由を台帳へ残し、出力に件数と阻害要因を含める。朝のメール送信成功だけを準備完了としない。
+
+以下は48時間以内の直前サマリに含める内容。初回調査を開始する条件ではない。
 
 - 今日〜48時間以内にカレンダー上で面接・面談・座談会があれば、その企業のprepパックを作る:
   1. 企業の事業概要と直近の主要ニュース(2〜3行)
@@ -135,7 +161,7 @@ mcp__claude_ai_* 系の使える方を使う。
      風土(テック/人の良さ/エンジニア・デザイナー/ことに向かう)・
      経営陣(タイミング/新しい世界を見せてくれるか)」
 - 出力に含め、可能ならカレンダーイベントの description 末尾にも「--- prep ---」として追記する。
-  既に「--- prep ---」がある場合は再生成しない。
+  既に「--- prep ---」がある場合も、正本DBの準備状態がpendingなら再確認・更新する。
 
 ### 7. 締切48時間以内のエスカレーション
 
@@ -161,6 +187,9 @@ mcp__claude_ai_* 系の使える方を使う。
 ## きょうやること(最大3件)
 1. (動詞で始める。例: 送る — トヨタ日程調整の返信。下書き作成済み、Gmailの下書きから送信するだけ)
 2. ...
+
+## 未完了提出物
+(submission-readiness.local.json の全件。準備済みなら承認するだけ、blockedなら不足している本人操作を1行で示す。0件なら「なし」)
 
 ## 自動で済ませたこと
 (表: 種別 / 内容 / どこに置いたか。カレンダー登録・作業ブロック・返信下書き・prep)
