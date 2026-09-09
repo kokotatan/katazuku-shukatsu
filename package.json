@@ -49,12 +49,13 @@
     "node": ">=22.5.0"
   },
   "scripts": {
+    "test:recording": "tsx tests/check-recording-eligibility.ts",
     "check": "npm run scan && npm run typecheck && npm run build && npm test && npm run cloudflare:check",
     "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
     "build": "npm run clean && tsc -p tsconfig.build.json",
     "prepack": "npm run build",
     "scan": "node tools/scan-secrets.mjs",
-    "test": "npm run test:core && npm run test:application && npm run test:mobility && npm run test:agent-runtime && npm run test:platform && npm run test:migration && npm run test:write-layer && npm run test:api && npm run test:schema",
+    "test": "npm run test:core && npm run test:application && npm run test:mobility && npm run test:agent-runtime && npm run test:platform && npm run test:migration && npm run test:write-layer && npm run test:api && npm run test:schema && npm run test:recording",
     "test:core": "tsx tests/check-core.ts",
     "test:schema": "tsx tests/check-schema.ts",
     "test:platform": "tsx tests/check-platform.ts",

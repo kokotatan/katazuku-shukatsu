@@ -7,6 +7,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { DatabaseSync } from 'node:sqlite'
+import { isAutomaticRecordingEligible, type AutomaticRecordingCandidate } from './recording-eligibility.js'
 import { addEvent, findAppointmentMatch, openDb } from './db.js'
 import { resolveSelectionId, transaction, upsertPerson } from './inputs.js'
 
@@ -161,7 +162,11 @@ export function applyCalendar(
         db.prepare('INSERT OR IGNORE INTO appointment_person (appointment_id, person_id, role) VALUES (?, ?, ?)')
           .run(appointmentId, personId, attendee.role || '')
       }
-      if (/面接|面談/.test(event.kind || event.title)) {
+      const recordingCandidate = db.prepare(`
+        SELECT kind, title, url, location, at AS startAt, end_at AS endAt, status
+        FROM appointment WHERE id = ?
+      `).get(appointmentId) as AutomaticRecordingCandidate
+      if (isAutomaticRecordingEligible(recordingCandidate)) {
         db.prepare(`
           INSERT OR IGNORE INTO meeting_run (id, appointment_id, state, updated_at)
           VALUES (?, ?, 'armed', ?)
