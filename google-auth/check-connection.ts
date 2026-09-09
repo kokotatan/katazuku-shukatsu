@@ -19,7 +19,7 @@ let expectedChallenge = '';
 let exchanges = 0;
 const googleFetch: typeof fetch = async (request, init) => {
   const url = String(request);
-  assert.equal(init?.redirect, 'error');
+  assert.equal(init?.redirect, url === GOOGLE_TOKEN_URL ? 'manual' : 'error');
   if (url === GOOGLE_TOKEN_URL) {
     exchanges++;
     const fields = init?.body as URLSearchParams;

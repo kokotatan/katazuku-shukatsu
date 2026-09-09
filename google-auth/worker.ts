@@ -174,8 +174,13 @@ export async function handleRequest(request: Request, env: OAuthEnv, dependencie
       fields.set('refresh_token', string(input.refresh_token));
     } else throw new RequestError('unsupported_grant_type');
     let upstream: Response;
-    try { upstream = await fetcher(GOOGLE_TOKEN_URL, { method: 'POST', body: fields, redirect: 'error', signal: AbortSignal.timeout(20_000) }); }
+    // Workersはredirect: 'error'を受け付けない。転送は追わず、この場で拒否する。
+    try { upstream = await fetcher(GOOGLE_TOKEN_URL, { method: 'POST', body: fields, redirect: 'manual', signal: AbortSignal.timeout(20_000) }); }
     catch { throw new RequestError('oauth_unavailable', 503); }
+    if (upstream.status >= 300 && upstream.status < 400) {
+      await upstream.body?.cancel();
+      throw new RequestError('unexpected_oauth_redirect', 502);
+    }
     let token: Record<string, unknown>;
     try { token = record(JSON.parse(await boundedText(upstream))); }
     catch { throw new RequestError('invalid_oauth_response', 502); }

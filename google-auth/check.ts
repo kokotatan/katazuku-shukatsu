@@ -17,7 +17,7 @@ let exchanges = 0;
 const usedCodes = new Set<string>();
 const fetcher: typeof fetch = async (request, init) => {
   assert.equal(String(request), GOOGLE_TOKEN_URL);
-  assert.equal(init?.redirect, 'error');
+  assert.equal(init?.redirect, 'manual');
   assert.ok(init?.signal);
   assert.ok(init?.body instanceof URLSearchParams);
   assert.equal(init.body.get('client_secret'), env.GOOGLE_CLIENT_SECRET);
@@ -94,4 +94,20 @@ assert.equal((await handleRequest(overflow, env, deps)).status, 413);
 assert.equal((await handleRequest(post('/token', { ...tokenInput, grant_type: 'password' }), env, deps)).status, 400);
 assert.equal((await handleRequest(post('/token', { client_id: env.GOOGLE_CLIENT_ID, grant_type: 'refresh_token', refresh_token: 'example-refresh' }), env,
   { now: clock, fetcher: async () => { throw new Error('example-private-network-detail'); } })).status, 503);
-console.log('共通Google認証: PKCE・署名state・期限・宛先制限・再利用・拒否・秘密非出力・本文上限を検証しました。');
+for (const status of [301, 302, 303, 307, 308]) {
+  let redirectCalls = 0;
+  const result = await handleRequest(post('/token', { client_id: env.GOOGLE_CLIENT_ID, grant_type: 'refresh_token', refresh_token: 'example-refresh' }), env, {
+    now: clock,
+    fetcher: async (request, init) => {
+      assert.equal(String(request), GOOGLE_TOKEN_URL);
+      assert.equal(init?.redirect, 'manual');
+      redirectCalls++;
+      return new Response(JSON.stringify({ access_token: 'example-private-redirect-token', token_type: 'Bearer', expires_in: 3600 }),
+        { status, headers: { Location: 'https://outside.example.com/token' } });
+    },
+  });
+  assert.equal(result.status, 502);
+  assert.deepEqual(await result.json(), { error: 'unexpected_oauth_redirect' });
+  assert.equal(redirectCalls, 1);
+}
+console.log('共通Google認証: PKCE・署名state・期限・宛先制限・再利用・転送拒否・秘密非出力・本文上限を検証しました。');
