@@ -10,6 +10,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { mkdirSync, rmSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { ensurePlatformSchema } from './platform.js'
+import { ensureCareerSupportSchema } from './career-support-schema.js'
 
 export interface Selection {
   id?: number
@@ -36,6 +37,9 @@ export interface CompanyInfo {
   loginId: string
   password: string
   memo: string
+  /** listCompanies は資格情報の実値を返さない。設定の有無だけをこの真偽値で示す(実値は getCompanyCredential) */
+  hasLoginId?: boolean
+  hasPassword?: boolean
 }
 
 export function openDb(path: string): DatabaseSync {
@@ -128,7 +132,7 @@ export function openDb(path: string): DatabaseSync {
 }
 
 /** 現行スキーマの版。マイグレーションを足すたびに +1 し、`MIGRATIONS` に1本足す */
-export const SCHEMA_VERSION = 2
+export const SCHEMA_VERSION = 3
 
 /**
  * 版ゲート方式のマイグレーション(#10)。
@@ -186,6 +190,12 @@ const MIGRATIONS: Migration[] = [
     description: '人物・プロフィール・移動などの拡張スキーマ(platform)を版の管理下に入れる',
     destructive: false,
     up: (db) => ensurePlatformSchema(db),
+  },
+  {
+    version: 3,
+    description: '応募先企業と分離した就活支援組織・支援面談を追加',
+    destructive: false,
+    up: (db) => ensureCareerSupportSchema(db),
   },
 ]
 
@@ -354,6 +364,10 @@ export function transition(current: string, stage: Stage): string | null {
   const cur = current.trim()
   if (cur === want) return null
   if (FINAL_NEG.test(cur)) return null // 終了済は動かさない
+  // 内定(offer)を不合格で自動的に潰さない。内定取り消しは稀で、別トラックの不合格メールを
+  // 誤って本トラックに割り当てると内定が破壊されるため、要人間確認に回す(触らない)。
+  // 辞退(closed)は本人意思なので内定からでも確定してよい(内定辞退)。
+  if (stage === 'rejected' && /内定/.test(cur)) return null
   if (stage === 'closed' || stage === 'rejected') return want // 終了の根拠は最優先で確定
   if (stage === 'offer') return want // 内定の根拠は途中経過の「合格」表記に関係なく確定
   if (stage === 'intern') {
@@ -574,8 +588,14 @@ export function findAppointmentMatch(db: DatabaseSync, m: AppointmentMatch): num
 /** 予定を追加する。同一の会議(findAppointmentMatch の規則)は重複させず、空欄だけ補完する */
 export function addAppointment(db: DatabaseSync, a: Appointment): { id: number; created: boolean } {
   const now = new Date().toISOString()
+  // 日時はISOで保存する。date-only/TZ無しは正規化で吸収し、解釈不能な文字列(「来週火曜」等)は
+  // 黙って保存するとカレンダー送信待ち(outbox)の julianday 判定から静かに脱落するので、例外にして可視化する。
+  const at = normalizeAppointmentAt(a.at)
+  if (a.at && a.at.trim() && Number.isNaN(Date.parse(at))) {
+    throw new Error(`予定の日時がISOとして解釈できません: ${a.at}`)
+  }
   const matchId = findAppointmentMatch(db, {
-    selectionId: a.selectionId, at: a.at, title: a.title, url: a.url, kind: a.kind,
+    selectionId: a.selectionId, at, title: a.title, url: a.url, kind: a.kind,
   })
   const dup = matchId === undefined
     ? undefined
@@ -593,7 +613,7 @@ export function addAppointment(db: DatabaseSync, a: Appointment): { id: number; 
   }
   const r = db.prepare(
     'INSERT INTO appointment (selection_id, at, end_at, kind, title, url, location, person, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-  ).run(a.selectionId, a.at, a.endAt ?? '', a.kind || 'その他', a.title, a.url ?? '', a.location ?? '', a.person ?? '', a.status ?? '予定', now)
+  ).run(a.selectionId, at, a.endAt ?? '', a.kind || 'その他', a.title, a.url ?? '', a.location ?? '', a.person ?? '', a.status ?? '予定', now)
   return { id: Number(r.lastInsertRowid), created: true }
 }
 
@@ -714,6 +734,10 @@ export function listSelections(db: DatabaseSync): SelectionRow[] {
   }))
 }
 
+/**
+ * 企業一覧。**資格情報(login_id / password)の実値は返さない**(平文の広域露出を防ぐ)。
+ * 設定済みかどうかだけを hasLoginId / hasPassword で示す。実値が要る場合は getCompanyCredential を使う。
+ */
 export function listCompanies(db: DatabaseSync): CompanyInfo[] {
   const rows = db.prepare('SELECT * FROM company ORDER BY id').all() as Record<string, unknown>[]
   return rows.map((r) => ({
@@ -721,10 +745,23 @@ export function listCompanies(db: DatabaseSync): CompanyInfo[] {
     shortName: (r.short_name as string) ?? '',
     industry: r.industry as string,
     mypageUrl: r.mypage_url as string,
-    loginId: r.login_id as string,
-    password: r.password as string,
+    loginId: '',
+    password: '',
+    hasLoginId: !!(r.login_id as string),
+    hasPassword: !!(r.password as string),
     memo: r.memo as string,
   }))
+}
+
+/**
+ * 企業のログイン資格情報の実値を1社ぶんだけ取り出す。ログイン自動化など、実値が本当に必要な
+ * 呼び手だけがこれを使う(一覧に混ぜて広域に漏らさないための専用アクセサ)。
+ */
+export function getCompanyCredential(db: DatabaseSync, companyId: number): { loginId: string; password: string } | undefined {
+  const r = db.prepare('SELECT login_id, password FROM company WHERE id = ?').get(companyId) as
+    | { login_id: string; password: string }
+    | undefined
+  return r ? { loginId: r.login_id, password: r.password } : undefined
 }
 
 /** 正式名称(株式会社/Inc.付き)へ昇格する。従来の名前は通称(short_name)として残る */

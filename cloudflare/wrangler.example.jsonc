@@ -1,0 +1,30 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "katazuku-self-hosted",
+  "main": "./worker.ts",
+  "compatibility_date": "2026-09-03",
+  "compatibility_flags": ["nodejs_compat"],
+  "r2_buckets": [
+    {
+      "binding": "PRIVATE_DATA",
+      "bucket_name": "katazuku-private"
+    }
+  ],
+  "secrets": {
+    "required": [
+      "KATAZUKU_READ_SECRET",
+      "KATAZUKU_WRITE_SECRET"
+    ]
+  },
+  "observability": {
+    "enabled": true,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1
+    },
+    "traces": {
+      "enabled": true,
+      "head_sampling_rate": 0.05
+    }
+  }
+}

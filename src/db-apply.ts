@@ -35,16 +35,21 @@ export interface ApplyResult {
   added: string[]
   skipped: string[] // 複数トラックがあって特定できず触らなかった企業
   pending: string[] // 名寄せが怪しく、本人確認待ちに積んだ企業(DBには書かない)
+  errors: string[] // 反映中に例外が出て、その1件だけロールバックした企業(他は確定する)
 }
 
 export function applyDiff(db: DatabaseSync, items: DiffItem[], by = 'daily-sync'): ApplyResult {
   const now = new Date().toISOString()
-  const res: ApplyResult = { updated: [], added: [], skipped: [], pending: [] }
+  const res: ApplyResult = { updated: [], added: [], skipped: [], pending: [], errors: [] }
 
-  // バッチ全体を1トランザクションに(半適用を防ぐ。busy_timeoutはopenDbで設定済み)
+  // バッチ全体を1トランザクションに(半適用を防ぐ。busy_timeoutはopenDbで設定済み)。
+  // ただし1件が例外を投げても、その1件だけ SAVEPOINT で巻き戻し、残りは確定させる
+  // (1件の異物で「その日の同期が丸ごと失われる」のを防ぐ)。
   db.exec('BEGIN IMMEDIATE')
   try {
   for (const it of items) {
+    db.exec('SAVEPOINT it')
+    try {
     const name = (it.name ?? '').trim()
     if (!name) continue
 
@@ -140,6 +145,13 @@ export function applyDiff(db: DatabaseSync, items: DiffItem[], by = 'daily-sync'
       changed = true
     }
     if (changed) res.updated.push(name)
+    } catch (itErr) {
+      // この1件だけ巻き戻し、残りは活かす。原因は errors に残して後から追える。
+      db.exec('ROLLBACK TO it')
+      res.errors.push(`${(it.name ?? '').trim() || '(無名)'}: ${(itErr as Error).message}`)
+    } finally {
+      db.exec('RELEASE it')
+    }
   }
   db.exec('COMMIT')
   } catch (err) {

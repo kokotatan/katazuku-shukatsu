@@ -1,6 +1,6 @@
 {
   "name": "katazuku-shukatsu",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Local-first, human-in-the-loop automation core for Japanese shukatsu (new-grad job hunting). SQLite single-writer data model, semantic layer, and a schema-driven settings UI.",
   "license": "Apache-2.0",
   "author": "kokotatan",
@@ -21,6 +21,9 @@
     "url": "https://github.com/kokotatan/katazuku-shukatsu/issues"
   },
   "homepage": "https://github.com/kokotatan/katazuku-shukatsu#readme",
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -46,13 +49,15 @@
     "node": ">=22.5.0"
   },
   "scripts": {
-    "check": "npm run scan && npm run typecheck && npm run build && npm test",
+    "test:recording": "tsx tests/check-recording-eligibility.ts",
+    "check": "npm run scan && npm run typecheck && npm run build && npm test && npm run cloudflare:check",
     "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
     "build": "npm run clean && tsc -p tsconfig.build.json",
     "prepack": "npm run build",
     "scan": "node tools/scan-secrets.mjs",
-    "test": "npm run test:core && npm run test:application && npm run test:mobility && npm run test:agent-runtime && npm run test:platform && npm run test:migration && npm run test:write-layer && npm run test:api",
+    "test": "npm run test:core && npm run test:application && npm run test:mobility && npm run test:agent-runtime && npm run test:platform && npm run test:migration && npm run test:write-layer && npm run test:api && npm run test:schema && npm run test:recording",
     "test:core": "tsx tests/check-core.ts",
+    "test:schema": "tsx tests/check-schema.ts",
     "test:platform": "tsx tests/check-platform.ts",
     "test:api": "tsx tests/check-api.ts",
     "test:application": "tsx tests/check-application.ts",
@@ -63,12 +68,18 @@
     "backup": "node tools/backup.mjs",
     "typecheck": "tsc --noEmit",
     "snapshot": "tsx scripts/snapshot.ts",
+    "snapshot:push": "tsx scripts/push-snapshot.ts",
+    "cloudflare:types": "wrangler types --config cloudflare/wrangler.example.jsonc cloudflare/worker-configuration.d.ts",
+    "cloudflare:check": "npm run cloudflare:types && tsc -p cloudflare/tsconfig.json && wrangler deploy --config cloudflare/wrangler.example.jsonc --dry-run",
+    "cloudflare:deploy": "wrangler deploy --config cloudflare/wrangler.jsonc",
     "test:write-layer": "tsx tests/check-write-layer.ts",
-    "test:migration": "tsx tests/check-migration.ts"
+    "test:migration": "tsx tests/check-migration.ts",
+    "release:check": "npm run check && npm pack --dry-run && node tools/check-npm-release.mjs"
   },
   "devDependencies": {
-    "@types/node": "^26.2.0",
+    "@types/node": "^26.3.0",
     "tsx": "^4.20.0",
-    "typescript": "~7.0.2"
+    "typescript": "~7.0.2",
+    "wrangler": "^4.128.0"
   }
 }

@@ -2,7 +2,7 @@
  * エントリーから面接予定確定までを、根拠付きの1本のrunとして記録する。
  * ES本文や適性検査の問題・解答は保存しない。
  */
-import { createHash, randomUUID } from 'node:crypto'
+import { createHash, createHmac, randomUUID, timingSafeEqual } from 'node:crypto'
 import type { DatabaseSync } from 'node:sqlite'
 import {
   addAppointment,
@@ -116,6 +116,8 @@ export interface ApplicationEventInput {
   summary?: string
   sourceRef?: string
   approvedByUser?: boolean
+  /** 偽造不能な承認トークン(#21)。KATAZUKU_APPROVAL_SECRET 設定時はこれを必須にする。createApprovalToken で生成 */
+  approvalToken?: string
   materials?: ApplicationMaterialInput[]
   assessment?: AssessmentInput
   appointment?: AppointmentInput
@@ -367,14 +369,35 @@ export function startApplication(
   })
 }
 
+/**
+ * 遷移の妥当性チェック(#22)。**副作用ハンドラより前**に呼び、段階の飛ばしや
+ * paused/failed 中の不正イベントを、状態を変える前に拒否する。
+ */
+function assertTransition(current: ApplicationState, type: ApplicationEventType): void {
+  if ((current === 'paused' || current === 'failed') && !['resumed', 'note', 'failed'].includes(type)) {
+    throw new Error('run は ' + current + ' です。先に resumed を記録してください')
+  }
+  // 高リスクな遷移(提出・面接予定・適性完了)は、対応する前段を経ていない限り拒否する。
+  // 取り込んだイベントで「提出済み」「面接予定」等の進捗を捏造できないようにする。
+  const PREREQ: Partial<Record<ApplicationEventType, ApplicationState[]>> = {
+    entry_submitted: ['entry_review'],
+    es_submitted: ['es_review'],
+    entry_es_submitted: ['started', 'entry_review', 'es_review'],
+    assessment_ready: ['assessment_pending'],
+    assessment_completed: ['assessment_pending', 'assessment_ready'],
+    interview_scheduled: ['awaiting_interview', 'entry_submitted', 'es_submitted'],
+  }
+  const allowedFrom = PREREQ[type]
+  if (allowedFrom && !allowedFrom.includes(current)) {
+    throw new Error(`イベント ${type} は状態 ${current} からは実行できません(段階の飛ばしを禁止)。許可される前段: ${allowedFrom.join(' / ')}`)
+  }
+}
+
 function nextState(
   current: ApplicationState,
   previous: string,
   type: ApplicationEventType,
 ): { state: ApplicationState; previousState: string } {
-  if ((current === 'paused' || current === 'failed') && !['resumed', 'note', 'failed'].includes(type)) {
-    throw new Error('run は ' + current + ' です。先に resumed を記録してください')
-  }
   if (type === 'paused') return { state: 'paused', previousState: current }
   if (type === 'failed') return { state: 'failed', previousState: current === 'failed' ? previous : current }
   if (type === 'resumed') {
@@ -447,9 +470,34 @@ function recordMaterials(
   return materials.length
 }
 
+/**
+ * 偽造不能な承認トークン(#21)。本人側のハーネスだけが持つローカルシークレットで、
+ * runId・イベント種別・根拠(sourceRef)に束ねた HMAC を作る。シークレットを見られない
+ * モデル/プロバイダはこのトークンを生成できないため、承認を偽造できない。
+ */
+export function createApprovalToken(secret: string, params: { runId: string; type: string; sourceRef?: string }): string {
+  return createHmac('sha256', secret).update(`${params.runId}:${params.type}:${params.sourceRef ?? ''}`).digest('hex')
+}
+
+function equalHex(a: string, b: string): boolean {
+  if (a.length !== b.length) return false
+  try { return timingSafeEqual(Buffer.from(a, 'hex'), Buffer.from(b, 'hex')) } catch { return false }
+}
+
 function requireApproval(event: ApplicationEventInput): void {
+  const secret = process.env.KATAZUKU_APPROVAL_SECRET
+  if (secret) {
+    // シークレット設定時は「偽造不能なトークン」を必須にする。モデルが立てる真偽値では通さない。
+    const expected = createApprovalToken(secret, { runId: event.runId, type: event.type, sourceRef: event.sourceRef })
+    if (!event.approvalToken || !equalHex(event.approvalToken, expected)) {
+      throw new Error(event.type + ' は本人の承認トークン(approvalToken)が必要です。モデルは生成できません')
+    }
+    return
+  }
+  // 承認シークレット未設定時は従来の真偽値にフォールバック(ローカル簡易)。
+  // KATAZUKU_APPROVAL_SECRET を設定すると、承認は偽造不能なトークン検証になる(推奨)。
   if (event.approvedByUser !== true) {
-    throw new Error(event.type + ' は本人の最終承認 approvedByUser=true が必要です')
+    throw new Error(event.type + ' は本人の最終承認 approvedByUser=true が必要です(KATAZUKU_APPROVAL_SECRET 設定で偽造不能なトークン承認になる)')
   }
 }
 
@@ -545,7 +593,7 @@ export function applyApplicationEvent(
   assertAllowedKeys(
     event,
     [
-      'eventId', 'runId', 'type', 'at', 'summary', 'sourceRef', 'approvedByUser',
+      'eventId', 'runId', 'type', 'at', 'summary', 'sourceRef', 'approvedByUser', 'approvalToken',
       'materials', 'assessment', 'appointment', 'error',
     ],
     'event',
@@ -569,6 +617,9 @@ export function applyApplicationEvent(
     } | undefined
     if (!run) throw new Error('application run が見つかりません: ' + event.runId)
     if (duplicate) return { applied: false, runId: run.id, state: run.state }
+
+    // 副作用を起こす前に遷移の妥当性を確認する(#22。段階の飛ばし・paused中の不正イベントを拒否)
+    assertTransition(run.state, event.type)
 
     const at = event.at || new Date().toISOString()
     const sourceRef = event.sourceRef?.trim() || event.eventId

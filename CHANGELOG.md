@@ -5,6 +5,45 @@
 
 ## [Unreleased]
 
+### Added
+
+- npm Trusted Publishing用のGitHub Actionsと、タグ・version・公開先を検査するリリースゲート。
+
+### Security
+
+- npmパスワードや長期トークンをリポジトリ／GitHub Secretsへ置かず、OIDCで公開できる手順を追加。
+- リポジトリ直下の `.npmrc` をgitignoreし、CLI認証情報の誤コミットを防止。
+
+## [0.3.0] - 2026-09-03
+
+### Added
+
+- 就活エージェント・就活メディア・イベント運営者を、応募先企業とは別の
+  `career_organization` / `career_meeting` として保持する。未解決の面談は捨てず `review` で停止する。
+- 支援面談のカレンダー取込み、録音run、議事録反映。氏名不明の人物は人物マスタへ登録しない。
+- Cloudflare Worker + R2を使う任意のセルフホスト。作者のアカウントに依存せず、
+  利用者が自分のCloudflareへ配置する。
+- 公開ロードマップと、`good first issue` / Discussionsから参加できる導線。
+- npm package `katazuku-shukatsu` の配布設定。
+
+### Security
+
+- Cloudflareの読み取り用と書き込み用秘密値を分離し、未設定・32 byte未満・同一値ならfail-closedにする。
+- スナップショットをストリーミングしながら16 MiBで制限し、宣言サイズの詐称でも超過を防ぐ。
+- Bearer認証を別オリジンの閲覧アプリから使えるよう、CORS preflightを追加する。
+
+### Changed
+
+- 就活支援組織・支援面談をschema v3の非破壊migrationで追加する。
+- 公式の配布経路としてnpmを追加する。
+
+### Fixed
+- 内定(offer)を不合格で自動的に潰さない。別トラックの不合格メールの誤割当から内定を保護する(#5)
+- 予定の日時が解釈不能な文字列のとき例外にし、カレンダー送信待ち(outbox)からの沈黙脱落を防ぐ(#6)
+- カレンダー更新で予定を別トラックへ勝手に付け替えない(トラック乗っ取り防止。#4)
+- カレンダー再同期が「完了」だけでなく「中止」も「予定」へ巻き戻さない
+- applyDiff を per-item SAVEPOINT 化し、1件の例外でその日の反映が全損しないようにする
+
 ## [0.2.0] - 2026-08-17
 
 最初の公開リリース。0.1.0 は内部で切ったところまでで、タグは打っていません。
@@ -88,5 +127,6 @@
 - 環境診断 `npm run doctor`、匿名の1例 `npm run seed`
 - 公開ゲート: 漏洩スキャナ `tools/scan-secrets.mjs` と GitHub Actions CI(scan + test)
 
-[Unreleased]: https://github.com/kokotatan/katazuku-shukatsu/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/kokotatan/katazuku-shukatsu/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/kokotatan/katazuku-shukatsu/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/kokotatan/katazuku-shukatsu/releases/tag/v0.2.0

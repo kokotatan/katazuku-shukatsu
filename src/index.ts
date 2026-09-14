@@ -31,6 +31,7 @@ export {
   insertSelection,
   listSelections,
   listCompanies,
+  getCompanyCredential,
   addEvent,
   listEvents,
   // 予定と冪等な突合
@@ -62,12 +63,31 @@ export { applyDiff, MAX_APPLY_CHANGES } from './db-apply.js'
 export type { DiffItem, ApplyResult } from './db-apply.js'
 export { applyCalendar } from './db-apply-calendar.js'
 export { applyInterview, savePersonPhoto } from './db-apply-interview.js'
+export { applyCareerCalendar } from './db-apply-career-calendar.js'
+export type { CareerCalendarCandidate, CareerCalendarInput, CareerCalendarResult } from './db-apply-career-calendar.js'
+
+// ---- 就活エージェント・イベント運営者(応募企業とは分離) ----
+export {
+  ensureCareerSupportSchema,
+  normalizeOrganizationAlias,
+  upsertCareerOrganization,
+  resolveCareerOrganization,
+  upsertCareerMeeting,
+  listCareerMeetings,
+} from './career-support.js'
+export type {
+  CareerOrganizationKind,
+  CareerMeetingStatus,
+  CareerMeetingInput,
+  CareerMeetingRow,
+} from './career-support.js'
 
 // ---- 応募の状態機械 ----
 export {
   ensureApplicationSchema,
   startApplication,
   applyApplicationEvent,
+  createApprovalToken,
   listApplicationRuns,
   listWebAssessments,
   listCalendarOutbox,
@@ -148,6 +168,8 @@ export type {
 
 // ---- 会議URLの許可リスト ----
 export { isMeetingUrl, MEETING_HOSTS, SHORTENER_HOSTS } from './meeting-url.js'
+export { isAutomaticRecordingEligible } from './recording-eligibility.js'
+export type { AutomaticRecordingCandidate } from './recording-eligibility.js'
 
 // ---- 人物・プロフィール・企業研究・メール ----
 export {

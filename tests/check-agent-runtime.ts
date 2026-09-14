@@ -11,6 +11,7 @@ import {
   detectCodexExtraCapabilities,
   detectProcessFailure,
   executeProcess,
+  buildProviderEnv,
   mayFallback,
   parseQuotaResetAt,
   parseProviderOrder,
@@ -388,6 +389,45 @@ try {
     assert(result.status === 'succeeded' && result.provider === 'codex', JSON.stringify(result))
     assert(result.attempts[0].failure === 'quota_exhausted', 'Claudeの利用枠切れが記録されていません')
     assert(calls[1].stdin?.includes('Gmail、Calendar、Drive、DB'), '外部状態の再照合指示が渡っていません')
+  })
+
+  await check('#19: 子プロセスへホストの全環境を渡さない(無関係な秘密を遮断)', () => {
+    process.env.KATAZUKU_TEST_UNRELATED_SECRET = 'should-not-pass'
+    process.env.ANTHROPIC_API_KEY = 'provider-key'
+    try {
+      const env = buildProviderEnv({ EXTRA_FROM_INVOCATION: '1' })
+      assert(env.KATAZUKU_TEST_UNRELATED_SECRET === undefined, '無関係な秘密が子へ漏れています')
+      assert(env.ANTHROPIC_API_KEY === 'provider-key', 'プロバイダ関連の変数が通っていません')
+      assert(env.EXTRA_FROM_INVOCATION === '1', 'invocation.env が反映されていません')
+      assert(env.PATH !== undefined || env.Path !== undefined, 'PATH が通っていません')
+      const allowed = buildProviderEnv({}, ['KATAZUKU_TEST_UNRELATED_SECRET'])
+      assert(allowed.KATAZUKU_TEST_UNRELATED_SECRET === 'should-not-pass', 'envAllowlist で明示した変数が通りません')
+    } finally {
+      delete process.env.KATAZUKU_TEST_UNRELATED_SECRET
+      delete process.env.ANTHROPIC_API_KEY
+    }
+  })
+
+  await check('#23: 同じrunIdの再試行は二重起動せず、既存結果を冪等に返す', async () => {
+    const calls: { command: string; args: string[]; stdin?: string }[] = []
+    const execute = queuedExecutor([processResult({ stdout: 'one' }), processResult({ stdout: 'two' })], calls)
+    const req = () => request({ runId: 'idempotent-run', risk: 'db-write', sideEffectMode: 'reconcile', providerOrder: ['claude'] })
+    const opts = { adapters: [fakeAdapter('claude')], artifactDir: workDir, execute }
+    const first = await runAgent(req(), opts)
+    const callsAfterFirst = calls.length
+    const second = await runAgent(req(), opts)
+    assert(second.runId === first.runId && second.status === first.status, '再試行が既存結果を返していません')
+    assert(calls.length === callsAfterFirst, '再試行で provider を二重起動しています')
+  })
+
+  await check('#23: 実行中(終端台帳なし)の同runIdは拒否して二重起動を防ぐ', async () => {
+    await mkdir(join(workDir, 'in-progress-run'), { recursive: true })
+    let threw = false
+    try {
+      await runAgent(request({ runId: 'in-progress-run', risk: 'db-write', sideEffectMode: 'reconcile', providerOrder: ['claude'] }),
+        { adapters: [fakeAdapter('claude')], artifactDir: workDir, execute: queuedExecutor([processResult({ stdout: 'x' })], []) })
+    } catch { threw = true }
+    assert(threw, '実行中の同runIdを二重起動してしまいました')
   })
 
   await check('週制限を記録し、復活まではClaudeを飛ばす', async () => {

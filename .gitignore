@@ -50,6 +50,9 @@ web_modules/
 # Optional npm cache directory
 .npm
 
+# npm認証情報はユーザー領域だけに置き、リポジトリへ入れない
+.npmrc
+
 # Optional eslint cache
 .eslintcache
 
@@ -69,6 +72,10 @@ web_modules/
 .env
 .env.*
 !.env.example
+.dev.vars
+.wrangler/
+cloudflare/wrangler.jsonc
+cloudflare/worker-configuration.d.ts
 
 # parcel-bundler cache (https://parceljs.org/)
 .cache

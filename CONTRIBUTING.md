@@ -2,11 +2,20 @@
 
 ありがとうございます。小さな改善でも歓迎します。
 
+## 最初の参加
+
+- [good first issue](https://github.com/kokotatan/katazuku-shukatsu/labels/good%20first%20issue) から選ぶ
+- 作業を始める前にIssueへ一言コメントし、重複を避ける
+- 仕様がまだ曖昧なら[Discussions](https://github.com/kokotatan/katazuku-shukatsu/discussions)で相談する
+
+就活経験者の用語レビュー、Windows以外でのquickstart確認、ドキュメントの修正も
+コード貢献と同じくらい歓迎します。現在の優先順は[ROADMAP.md](./ROADMAP.md)を参照してください。
+
 ## 開発
 
 ```sh
 npm install
-npm test        # 全チェック(依存ゼロの自前assert)
+npm run check   # 個人情報scan + 型検査 + build + 全テスト
 npm run seed    # 架空データで動作確認
 ```
 
@@ -21,6 +30,7 @@ npm run seed    # 架空データで動作確認
 - コメント・UI文言・コミットメッセージは日本語で構いません。
 - 外部への確定操作を扱う変更は、[SECURITY.md](./SECURITY.md) の安全境界を壊さないこと。
   送信・辞退・削除などの操作には承認ゲートと冪等性・監査を必ず残してください。
+- ブラウザ操作・資格情報・認証境界の変更は、実装前にIssueで脅威モデルと停止条件を合意してください。
 
 ## Pull Request
 

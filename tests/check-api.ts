@@ -18,15 +18,18 @@ const EXPECTED = [
   // db
   'openDb', 'SCHEMA_VERSION', 'transition', 'STATUS_FOR', 'outcomeOf',
   'resolveCompany', 'sameCompany', 'samePosition', 'addAlias', 'addPending', 'listPending', 'setOfficialName',
-  'upsertCompany', 'insertSelection', 'listSelections', 'listCompanies', 'addEvent', 'listEvents',
+  'upsertCompany', 'insertSelection', 'listSelections', 'listCompanies', 'getCompanyCredential', 'addEvent', 'listEvents',
   'addAppointment', 'listAppointments', 'sameAppointment', 'findAppointmentMatch',
   'normalizeAppointmentAt', 'normalizeAppointmentUrl',
   // inputs
   'resolveSelectionId', 'upsertPerson', 'transaction',
   // 書き込み層
-  'applyDiff', 'MAX_APPLY_CHANGES', 'applyCalendar', 'applyInterview', 'savePersonPhoto',
+  'applyDiff', 'MAX_APPLY_CHANGES', 'applyCalendar', 'applyInterview', 'savePersonPhoto', 'applyCareerCalendar',
+  // 応募企業と分離した支援組織・支援面談
+  'ensureCareerSupportSchema', 'normalizeOrganizationAlias', 'upsertCareerOrganization',
+  'resolveCareerOrganization', 'upsertCareerMeeting', 'listCareerMeetings',
   // 応募の状態機械
-  'ensureApplicationSchema', 'startApplication', 'applyApplicationEvent', 'listApplicationRuns',
+  'ensureApplicationSchema', 'startApplication', 'applyApplicationEvent', 'createApprovalToken', 'listApplicationRuns',
   'listWebAssessments', 'listCalendarOutbox', 'linkCalendarAppointment',
   // 移動
   'upsertPlace', 'setMobilityProfile', 'setAppointmentMobility', 'upsertRouteEstimate',
@@ -38,6 +41,7 @@ const EXPECTED = [
   'DEFAULT_CAPABILITY_TOOLS', 'DEFAULT_ABORT_PATTERNS',
   // 会議URL
   'isMeetingUrl', 'MEETING_HOSTS', 'SHORTENER_HOSTS',
+  'isAutomaticRecordingEligible',
   // platform
   'ensurePlatformSchema', 'listPlatformSnapshot', 'saveBasicProfile', 'getBasicProfile',
   'upsertCompanyDossier', 'upsertMailItem', 'listActionableMail',

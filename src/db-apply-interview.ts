@@ -8,8 +8,9 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, extname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { DatabaseSync } from 'node:sqlite'
-import { addEvent, openDb } from './db.js'
+import { addEvent, openDb, sameCompany } from './db.js'
 import { resolveSelectionId, transaction, upsertPerson } from './inputs.js'
+import { ensureCareerSupportSchema, upsertCareerOrganization } from './career-support.js'
 
 export interface InterviewPerson {
   name: string
@@ -31,7 +32,10 @@ export interface ProfileSuggestion {
 export interface InterviewInput {
   runId: string
   appointmentId?: number
-  company: string
+  careerMeetingId?: number
+  contextKind?: 'selection' | 'career_support'
+  company?: string
+  organization?: string
   position?: string
   occurredAt: string
   title: string
@@ -73,9 +77,11 @@ export function savePersonPhoto(db: DatabaseSync, personId: number, imagePath: s
 function validate(input: unknown): asserts input is InterviewInput {
   if (!input || typeof input !== 'object') throw new Error('入力はオブジェクトです')
   const value = input as InterviewInput
-  for (const field of ['runId', 'company', 'occurredAt', 'title', 'summary'] as const) {
+  for (const field of ['runId', 'occurredAt', 'title', 'summary'] as const) {
     if (!String(value[field] || '').trim()) throw new Error(`${field} は必須です`)
   }
+  const support = value.contextKind === 'career_support' || Boolean(value.careerMeetingId) || Boolean(value.organization?.trim())
+  if (!support && !value.company?.trim()) throw new Error('選考面接ではcompanyが必須です')
   if (Number.isNaN(Date.parse(value.occurredAt))) throw new Error('occurredAt が不正です')
   if (value.people && !Array.isArray(value.people)) throw new Error('people は配列です')
   if (value.profileSuggestions && !Array.isArray(value.profileSuggestions)) throw new Error('profileSuggestions は配列です')
@@ -90,24 +96,47 @@ export function applyInterview(
   db: DatabaseSync = openDb(DB_PATH),
   photoRoot = PHOTO_ROOT,
 ): { created: boolean; interviewId: number; photos: number } {
+  ensureCareerSupportSchema(db)
   return transaction(db, () => {
     let photos = 0
     const duplicate = db.prepare('SELECT id FROM interview_note WHERE source_ref = ?')
       .get(input.runId) as { id: number } | undefined
     if (duplicate) return { created: false, interviewId: duplicate.id, photos }
 
-    let selectionId: number
-    let companyId: number
+    let selectionId: number | undefined
+    let companyId: number | undefined
+    let organizationId: number | undefined
+    let organizationName = input.organization?.trim() || ''
     if (input.appointmentId) {
       const appointment = db.prepare(`
-        SELECT a.selection_id AS selectionId, s.company_id AS companyId
-        FROM appointment a JOIN selection s ON s.id = a.selection_id WHERE a.id = ?
-      `).get(input.appointmentId) as { selectionId: number; companyId: number } | undefined
+        SELECT a.selection_id AS selectionId, s.company_id AS companyId, c.name AS companyName
+        FROM appointment a JOIN selection s ON s.id = a.selection_id JOIN company c ON c.id = s.company_id WHERE a.id = ?
+      `).get(input.appointmentId) as { selectionId: number; companyId: number; companyName: string } | undefined
       if (!appointment) throw new Error(`appointmentId が見つかりません: ${input.appointmentId}`)
+      // 所有権(#18): 渡された appointmentId が、宣言された会社の予定であることを確認する。
+      // 検証しないと、任意の予定IDを渡して別会社の予定に議事録を紐づけられてしまう。
+      if (input.company && !sameCompany(appointment.companyName, input.company)) {
+        throw new Error(
+          `appointmentId ${input.appointmentId} は「${appointment.companyName}」の予定で、宣言された会社「${input.company}」と一致しません`,
+        )
+      }
       selectionId = appointment.selectionId
       companyId = appointment.companyId
+    } else if (input.careerMeetingId) {
+      const meeting = db.prepare(`
+        SELECT m.organization_id AS organizationId, o.name AS organization
+        FROM career_meeting m LEFT JOIN career_organization o ON o.id = m.organization_id
+        WHERE m.id = ?
+      `).get(input.careerMeetingId) as { organizationId: number | null; organization: string | null } | undefined
+      if (!meeting) throw new Error(`careerMeetingId が見つかりません: ${input.careerMeetingId}`)
+      organizationId = meeting.organizationId ?? undefined
+      organizationName = meeting.organization || organizationName
+      if (!organizationId && organizationName) organizationId = upsertCareerOrganization(db, { name: organizationName })
+    } else if (input.contextKind === 'career_support' || organizationName) {
+      if (!organizationName) throw new Error('支援面談ではorganizationが必須です')
+      organizationId = upsertCareerOrganization(db, { name: organizationName })
     } else {
-      const resolved = resolveSelectionId(db, input.company, input.position)
+      const resolved = resolveSelectionId(db, input.company || '', input.position)
       selectionId = resolved.selectionId
       companyId = resolved.companyId
     }
@@ -119,25 +148,27 @@ export function applyInterview(
     const inserted = db.prepare(`
       INSERT INTO interview_note
         (appointment_id, selection_id, company_id, occurred_at, title, summary,
-         transcript_path, source_ref, data_json, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         transcript_path, source_ref, data_json, created_at, organization_id, career_meeting_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
-      input.appointmentId ?? null, selectionId, companyId, input.occurredAt,
+      input.appointmentId ?? null, selectionId ?? null, companyId ?? null, input.occurredAt,
       input.title, input.summary, input.transcriptPath || '', input.runId,
-      JSON.stringify(detail), new Date().toISOString(),
+      JSON.stringify(detail), new Date().toISOString(), organizationId ?? null, input.careerMeetingId ?? null,
     )
     const interviewId = Number(inserted.lastInsertRowid)
 
     for (const person of input.people || []) {
+      if (/^(姓|氏名|名前)?不明$|^unknown$/i.test(person.name.trim())) continue
       const personId = upsertPerson(db, {
         name: person.name,
         companyId,
-        company: person.company || input.company,
+        company: person.company || input.company || organizationName,
         role: person.role || '',
         category: person.category || '面接官',
         metAt: input.occurredAt,
         howMet: input.title,
       })
+      if (organizationId) db.prepare('UPDATE person SET organization_id = COALESCE(organization_id, ?) WHERE id = ?').run(organizationId, personId)
       if (input.appointmentId) {
         db.prepare('INSERT OR IGNORE INTO appointment_person (appointment_id, person_id, role) VALUES (?, ?, ?)')
           .run(input.appointmentId, personId, person.role || '')
@@ -173,13 +204,20 @@ export function applyInterview(
       `).run(suggestion.field, value, input.runId, suggestion.confidence ?? 0.7, new Date().toISOString())
     }
 
-    addEvent(db, selectionId, '面接記録', input.summary, 'interview-digest', input.occurredAt, input.runId)
+    if (selectionId) addEvent(db, selectionId, '面接記録', input.summary, 'interview-digest', input.occurredAt, input.runId)
     if (input.appointmentId) {
       db.prepare("UPDATE appointment SET status = '完了' WHERE id = ?").run(input.appointmentId)
       db.prepare(`
         UPDATE meeting_run SET state = 'done', ended_at = CASE WHEN ended_at = '' THEN ? ELSE ended_at END,
           digest_applied_at = ?, last_error = '', updated_at = ? WHERE appointment_id = ?
       `).run(input.occurredAt, new Date().toISOString(), new Date().toISOString(), input.appointmentId)
+    } else if (input.careerMeetingId) {
+      const now = new Date().toISOString()
+      db.prepare("UPDATE career_meeting SET status = 'completed', updated_at = ? WHERE id = ?").run(now, input.careerMeetingId)
+      db.prepare(`
+        UPDATE career_meeting_run SET state = 'done', ended_at = CASE WHEN ended_at = '' THEN ? ELSE ended_at END,
+          digest_applied_at = ?, last_error = '', updated_at = ? WHERE career_meeting_id = ?
+      `).run(input.occurredAt, now, now, input.careerMeetingId)
     }
     return { created: true, interviewId, photos }
   })
