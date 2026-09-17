@@ -2,7 +2,7 @@
   "$schema": "../node_modules/wrangler/config-schema.json",
   "name": "katazuku-self-hosted",
   "main": "./worker.ts",
-  "compatibility_date": "2026-09-07",
+  "compatibility_date": "2026-09-18",
   "compatibility_flags": ["nodejs_compat"],
   // 手動デプロイ前に build:apps を実行し、directory を ../web-dist にする。
   // 公開ゲートでは、Gitにある初期設定画面だけでも型検査・dry-runできる。

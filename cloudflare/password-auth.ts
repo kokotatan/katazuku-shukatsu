@@ -1,12 +1,8 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
 
 /** 個人用・OSS共通。保存先を所有するPCだけが初期設定／再設定を開始できる。 */
-export interface PasswordEnv {
-  PRIVATE_DATA: R2Bucket
-  KATAZUKU_WRITE_SECRET: string
-  KATAZUKU_READ_SECRET: string
-  AUTH_LIMIT: { limit(options: { key: string }): Promise<{ success: boolean }> }
-}
+// binding名と型はwrangler設定から生成したEnvを正本にし、手書きで複製しない。
+export type PasswordEnv = Pick<Env, 'PRIVATE_DATA' | 'KATAZUKU_WRITE_SECRET' | 'KATAZUKU_READ_SECRET' | 'AUTH_LIMIT'>
 type PasswordRecord = { scheme: string; salt: string; hash: string; revision: string; deviceName: string; owner: string }
 type Access = { origin: string; expires: number; owner: string; revision: string; deviceName?: string; passwordSalt?: string }
 const CONFIG = 'auth-v2/password.json'

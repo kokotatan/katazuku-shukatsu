@@ -92,9 +92,9 @@
   "devDependencies": {
     "@types/node": "^26.3.0",
     "esbuild": "0.28.2",
-    "miniflare": "5.20260831.0-alpha",
+    "miniflare": "^5.20260917.0-alpha",
     "tsx": "^4.20.0",
     "typescript": "~7.0.2",
-    "wrangler": "^4.128.0"
+    "wrangler": "^4.134.0"
   }
 }
