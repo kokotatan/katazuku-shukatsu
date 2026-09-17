@@ -41,18 +41,22 @@ Googleの同意を途中で取り消した場合や、別のアカウントを�
 
 既存のMCPクライアントから[Google Workspace MCP](https://github.com/taylorwilsdon/google_workspace_mcp)を使えます。
 共通接続はその資格情報形式で保存し、更新先を共通サービスの `/token` に設定します。
-MCP側の更新・再認証との実機結合確認は進行中です。共通接続で使うクライアント秘密鍵をPCへ設定しないでください。
+共通接続で使うクライアント秘密鍵をPCへ設定しないでください。
 
-最初の読み取り確認には、バージョンを固定して起動します。
+共通接続を保存した後、uvをインストールしたPCで専用のMCP入口を起動します。
+MCPクライアントのcommandに `node`、argsに次のスクリプトの絶対パスとアカウントを設定します。
 
 ```sh
-uvx workspace-mcp==1.23.0 --tools gmail calendar drive sheets --read-only
+node tools/google-workspace/mcp.mjs --account person@example.com
 ```
 
-アカウントは `USER_GOOGLE_EMAIL`、保存先を変えた場合は `WORKSPACE_MCP_CREDENTIALS_DIR` を設定します。
-共通接続の再認証には本ガイドの接続画面を使います。MCPが別のOAuth認証を要求する場合は続行せず、接続設定を確認してください。
-読み取り設定ではメール送信・予定作成・シート更新はできません。これらは、必要な権限の追加と
-本人確認・Executorによる確定処理を組み込んでから利用してください。
+保存先を分けた場合は同じ `--credentials-dir <directory>` を指定します。
+専用入口はworkspace-mcp 1.23.0を隔離して起動し、9権限を使うGmail・Calendar・Drive・Sheetsのツールを公開します。
+古いOAuth設定や秘密鍵を引き継がず、別アカウントへのアクセス、Gmail設定変更、カレンダー自体の作成などは拒否します。
+接続の失効時は本ガイドの共通接続画面へ戻るよう案内し、MCP独自のOAuthフローは開始しません。
+この入口は読み取り専用ではありません。メール送信・予定変更等には、本人確認とExecutorによる確定処理を組み込んでください。
+架空資格情報で更新・失効・権限境界と実MCPプロセスの48ツールを検証済みです。
+共通接続の実Google同意・実APIによる最終確認は継続中で、審査完了を意味しません。
 MCP接続だけでは、定期同期やkatazukuのDBへの書き込みは始まりません。
 取得内容を各 `src/db-apply*.ts` の入力へ変換し、エージェントの処理に接続する必要があります。
 
@@ -61,6 +65,14 @@ MCP接続だけでは、定期同期やkatazukuのDBへの書き込みは始ま�
 `GOOGLE_OAUTH_CLIENT_SECRET` を保存します。作者のトークンや秘密鍵は配布しません。
 
 ## 接続を診断する
+
+開発時の隔離試験は次のコマンドで実行できます。架空資格情報のみを使用します。
+Python側の更新試験はGoogleへの通信を模擬し、MCPプロセス試験はツール一覧と拒否される呼び出しを確認します。
+
+```sh
+uvx --from workspace-mcp==1.23.0 python tools/google-workspace/check_mcp_runtime.py
+node tools/google-workspace/check-mcp-process.mjs
+```
 
 Google Workspace MCPの保存済み資格情報を読み、状態だけを表示します。
 トークンやAPI応答のメール本文・ファイル名は表示しません。

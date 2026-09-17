@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
+import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { commonMcpLaunch, WORKSPACE_MCP_VERSION } from './mcp.mjs';
 import { credentialPath, inspectCredential, checkOnline, tokenEndpoint } from './doctor.mjs';
-import { DEFAULT_BROKER_ORIGIN, GOOGLE_TOKEN_URL } from './scopes.mjs';
+import { DEFAULT_BROKER_ORIGIN, GOOGLE_TOKEN_URL, GOOGLE_SCOPES } from './scopes.mjs';
 
 const account = 'person@example.com';
 const stored = { client_id: '123-example.apps.googleusercontent.com', client_secret: 'example-secret', refresh_token: 'example-refresh',
@@ -51,3 +55,29 @@ assert.equal(result.services.find(s => s.service === 'sheets').state, 'connected
 result = await checkOnline(stored, account, { fetcher: fake(), spreadsheetId: '../outside?token=x' });
 assert.equal(result.reason, 'invalid_spreadsheet_id');
 console.log('Google接続診断: アカウント照合・送信先固定・失効・権限・読み取り限定・秘密非出力を検証しました。');
+
+const mcpFixture = mkdtempSync(join(tmpdir(), 'katazuku-common-mcp-'));
+try {
+  const common = { ...stored, client_secret: '', token_uri: DEFAULT_BROKER_ORIGIN + '/token', scopes: [...GOOGLE_SCOPES] };
+  const write = value => writeFileSync(credentialPath(account, mcpFixture), JSON.stringify(value));
+  write(common);
+  const launch = commonMcpLaunch({ account, credentialsDirectory: mcpFixture, environment: {
+    PATH: 'test-path', GOOGLE_OAUTH_CLIENT_SECRET: 'old-secret', GOOGLE_APPLICATION_CREDENTIALS: 'old-service-account.json',
+    MCP_ENABLE_OAUTH21: 'true', WORKSPACE_EXTERNAL_URL: 'https://old.example.test',
+  } });
+  assert.equal(launch.env.PATH, 'test-path');
+  assert.equal(launch.env.GOOGLE_OAUTH_CLIENT_SECRET, '');
+  assert.equal(launch.env.GOOGLE_APPLICATION_CREDENTIALS, undefined);
+  assert.equal(launch.env.WORKSPACE_EXTERNAL_URL, undefined);
+  assert.equal(launch.env.MCP_ENABLE_OAUTH21, 'false');
+  assert.deepEqual(JSON.parse(launch.env.KATAZUKU_COMMON_GOOGLE_SCOPES), GOOGLE_SCOPES);
+  assert.ok(launch.args.includes(`workspace-mcp==${WORKSPACE_MCP_VERSION}`));
+  for (const invalid of [stored, { ...common, scopes: [...common.scopes, 'https://www.googleapis.com/auth/drive'] },
+    { ...common, scopes: common.scopes.slice(1) }, { ...common, scopes: [...common.scopes.slice(1), common.scopes[1]] },
+    { ...common, token_uri: 'https://outside.example.test/token' }, { ...common, refresh_token: '' }]) {
+    write(invalid);
+    assert.throws(() => commonMcpLaunch({ account, credentialsDirectory: mcpFixture }));
+  }
+  assert.throws(() => commonMcpLaunch({ account: 'someone@example.com', credentialsDirectory: mcpFixture }));
+} finally { rmSync(mcpFixture, { recursive: true }); }
+console.log('共通MCP起動: 旧秘密の除外・9権限・保存先・旧接続の拒否を検証しました。');
