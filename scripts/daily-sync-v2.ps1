@@ -12,6 +12,8 @@
 param(
   [ValidateSet('auto', 'codex', 'claude', 'codex-oss')][string]$Agent = 'auto',
   [switch]$Force,
+  # 抽出済み最小情報をJevへ送り、既存判定との不一致をshadow評価する。DB判断は上書きしない。
+  [switch]$EnableJevShadow,
   # 障害復旧時は退役DB以降のメールを再取得する。通常運転は1日のまま。
   [ValidateRange(1, 30)][int]$LookbackDays = 1,
   # MCP障害時にgmail-fetch.tsで保存した読み取り専用JSONを使う。
@@ -154,6 +156,30 @@ if ($applyExit -ne 0) {
   exit 1
 }
 Complete-ExecutorStep 'apply'
+
+# --- Jev shadow評価(任意・助言のみ) ---
+# APIキーと明示switchの両方があるときだけ外部送信する。失敗しても正本処理は止めない。
+if ($EnableJevShadow) {
+  if (-not $env:TYPESAFE_API_KEY) {
+    Write-Log 'Jev shadow評価を省略: TYPESAFE_API_KEYが未設定'
+  } else {
+    $jevJson = Join-Path $logDir ("daily-sync-jev-{0}.local.json" -f $ts)
+    Push-Location $sync
+    try {
+      & $tsxCommand @tsxPrefix scripts/jev-assess-daily-sync.ts $extractJson --allow-external --output $jevJson *>&1 |
+        Tee-Object -FilePath $logFile -Append | Out-Null
+      if ($LASTEXITCODE -eq 0) {
+        $jevResult = Get-Content -LiteralPath $jevJson -Raw -Encoding UTF8 | ConvertFrom-Json
+        $jevReviewCount = @($jevResult.items | Where-Object { $_.route -eq 'review' }).Count
+        Write-Log ("Jev shadow評価完了: {0}件中review={1} / 結果={2}" -f @($jevResult.items).Count, $jevReviewCount, (Split-Path $jevJson -Leaf))
+      } else {
+        Write-Log ("Jev shadow評価失敗(exit={0})。daily-sync本体は継続" -f $LASTEXITCODE)
+      }
+    } catch {
+      Write-Log ('Jev shadow評価で例外。daily-sync本体は継続: ' + $_.Exception.Message)
+    } finally { Pop-Location }
+  }
+}
 
 # --- 4) スナップショット(アプリ即時反映+日次バックアップ) ---
 Start-ExecutorStep 'snapshot'
