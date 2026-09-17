@@ -166,6 +166,30 @@ export type {
   ProviderHealthDocument,
 } from './agent-runtime.js'
 
+// ---- 原子的判断とconfidence gate（通常LLM / 任意Jev adapter） ----
+export {
+  DECISION_BACKENDS,
+  DEFAULT_DECISION_POLICY,
+  renderLlmDecisionPrompt,
+  parseLlmDecisionResult,
+  routeAtomicDecision,
+  routeDecisionResult,
+  resolveDecisionControlConfig,
+  LlmAtomicDecisionEvaluator,
+  TypeSafeJevDecisionEvaluator,
+} from './decision-control.js'
+export type {
+  DecisionBackend,
+  DecisionValue,
+  AtomicDecisionQuestion,
+  AtomicDecisionRequest,
+  AtomicDecisionAnswer,
+  AtomicDecisionResult,
+  AtomicDecisionEvaluator,
+  DecisionControlPolicy,
+  DecisionControlConfig,
+} from './decision-control.js'
+
 // ---- 会議URLの許可リスト ----
 export { isMeetingUrl, MEETING_HOSTS, SHORTENER_HOSTS } from './meeting-url.js'
 export { isAutomaticRecordingEligible } from './recording-eligibility.js'

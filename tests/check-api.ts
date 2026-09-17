@@ -39,6 +39,10 @@ const EXPECTED = [
   'parseProviderOrder', 'classifyFailure', 'mayFallback', 'parseQuotaResetAt', 'validateJsonSchema',
   'executeProcess', 'PROVIDER_IDS', 'DEFAULT_CODEX_WEB_SEARCH_ARGS',
   'DEFAULT_CAPABILITY_TOOLS', 'DEFAULT_ABORT_PATTERNS',
+  // 原子的判断制御
+  'DECISION_BACKENDS', 'DEFAULT_DECISION_POLICY', 'renderLlmDecisionPrompt', 'parseLlmDecisionResult',
+  'routeAtomicDecision', 'routeDecisionResult', 'resolveDecisionControlConfig',
+  'LlmAtomicDecisionEvaluator', 'TypeSafeJevDecisionEvaluator',
   // 会議URL
   'isMeetingUrl', 'MEETING_HOSTS', 'SHORTENER_HOSTS',
   'isAutomaticRecordingEligible',

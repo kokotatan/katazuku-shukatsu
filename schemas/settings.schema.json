@@ -79,6 +79,42 @@
           "description": "外部への確定操作をせず、計画だけ出します。初回はONを推奨します。",
           "type": "boolean",
           "default": true
+        },
+        "decision_control": {
+          "title": "判断制御",
+          "description": "複雑な生成と分離し、原子的な選択・確率・閾値でLLMの動きを制御します。JevのAPIキーは設定JSONへ保存しません。",
+          "type": "object",
+          "properties": {
+            "backend": {
+              "title": "判断バックエンド",
+              "type": "string",
+              "enum": ["llm", "jev", "off"],
+              "enumTitles": ["通常LLM（推奨）", "TypeSafe Jev", "無効"],
+              "default": "llm",
+              "x-display": "radio"
+            },
+            "min_confidence": {
+              "title": "最低確信度",
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "default": 0.65
+            },
+            "autonomous_threshold": {
+              "title": "自動判断の閾値",
+              "description": "未満の判断はreviewへ送ります。安全規則や本人承認はこの値に関係なく維持されます。",
+              "type": "number",
+              "minimum": 0.5,
+              "maximum": 1,
+              "default": 0.85
+            },
+            "jev_model": {
+              "title": "Jevモデル",
+              "type": "string",
+              "default": "jev-latest",
+              "maxLength": 80
+            }
+          }
         }
       }
     },

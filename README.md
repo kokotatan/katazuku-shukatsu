@@ -66,6 +66,19 @@ npm run seed      # スキーマの1例で正本DBを組み立てて表示
 
 設定GUIを見る場合は `examples/config-gui.html` をブラウザで開いてください。
 
+### 判断バックエンド
+
+既定は`llm`です。通常のエージェントを文章生成から分離し、原子的なChoice / Boolean / Scoreと確率だけを返させ、
+閾値未満をreviewへ送ります。TypeSafe Jevを使う場合は設定GUIの「判断バックエンド」で`jev`を選び、APIキーを
+設定JSONへ書かず、端末側の`TYPESAFE_API_KEY`またはOS keychainへ保存してください。
+
+```powershell
+$env:TYPESAFE_API_KEY = '<端末内だけに保存したキー>'
+$env:KATAZUKU_DECISION_BACKEND = 'jev'
+```
+
+`off`を選んでも、本人承認、状態遷移、冪等化などの安全規則は無効になりません。
+
 ## アプリ群（読み取り専用の「見る窓」）
 
 正本DBの状態を見るためのUIです。**どのアプリもDBへ書き込みません**。状態を変えるのは
