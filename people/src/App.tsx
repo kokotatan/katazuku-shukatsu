@@ -28,7 +28,7 @@ export default function App() {
       <AppHeading
         caption="PEOPLE"
         title="人"
-        description="面接官・社員・OBOGを、出会った根拠と追記専用メモで管理します。"
+        description="出会った人と、話したことや次に話したいことを振り返れます。"
         generatedAt={data?.generatedAt}
         onReload={reload}
         loading={loading}

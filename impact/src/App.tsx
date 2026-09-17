@@ -38,7 +38,7 @@ export default function App() {
       <AppHeading
         caption="IMPACT"
         title="自動運転の効果"
-        description="推定時間ではなく、DBに残った処理件数と結果を表示します。"
+        description="記録に残った処理の件数や、選考の結果を確認できます。"
         generatedAt={data?.generatedAt}
         onReload={reload}
         loading={loading}

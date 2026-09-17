@@ -1,0 +1,4 @@
+{
+  "_comment": "配布時の接続先は空。サービス名はportal-presets.jsonから選び、本人のログインURL・認証方法はGUIから端末内のlogs/local-login-portals.local.jsonに保存する。",
+  "portals": {}
+}

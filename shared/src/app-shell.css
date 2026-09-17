@@ -7,6 +7,7 @@
 body {
   margin: 0;
   background-color: #f8f7f6;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
 .ktz-app {
@@ -309,3 +310,70 @@ body {
   border-radius: 9999px;
   background-color: #0077c7;
 }
+.access-state { position: relative; min-height: 620px; overflow: hidden; }
+.access-layout { position: absolute; inset: 0; overflow: hidden; pointer-events: none; user-select: none; color: #969696; opacity: .58; }
+.access-layout p { margin: 0; font-size: 12px; line-height: 1.6; }
+.access-line { display: block; height: 10px; width: 76%; max-width: 280px; margin: 12px 0; border-radius: 2px; background: #dedede; }
+.access-line-short { width: 34%; max-width: 104px; }
+.access-value { display: block; width: 36px; height: 28px; margin-top: 16px; border-radius: 2px; background: #dedede; }
+.access-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 24px; padding: 20px 0; border-block: 1px solid #dedede; }
+.access-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px; }
+.access-section { padding: 24px 0; border-top: 1px solid #dedede; }
+.access-metrics + .access-columns { margin-top: 24px; }
+.access-section h3 { margin: 0 0 20px; color: #666666; font-size: 14px; font-weight: 600; }
+.access-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 24px; }
+.access-fields > div { min-width: 0; padding: 12px 0; border-bottom: 1px solid #e8e8e8; }
+.access-chart-row { margin-bottom: 18px; }
+.access-chart-track { display: block; height: 8px; margin-top: 8px; border: 1px solid #dedede; border-radius: 4px; }
+.access-calendar-layout { display: grid; grid-template-columns: 350px minmax(0, 1fr); gap: 36px; }
+.access-calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); margin-top: 20px; text-align: center; font-size: 12px; }
+.access-calendar-grid > span { padding-bottom: 16px; }
+.access-calendar-grid > i { display: flex; align-items: center; justify-content: center; height: 58px; border-top: 1px solid #e8e8e8; }
+.access-calendar-grid > i > span { width: 12px; height: 8px; border-radius: 2px; background: #dedede; }
+@media (max-width: 1150px) { .access-calendar-layout { grid-template-columns: minmax(0, 1fr); gap: 24px; } .access-calendar-grid { max-width: 440px; } }
+.access-row { display: flex; align-items: center; gap: 20px; min-height: 80px; padding: 12px 0; border-bottom: 1px solid #e8e8e8; }
+.access-row > .access-line { width: 64px; flex: none; }
+.access-row-body { min-width: 0; flex: 1; }
+.access-avatar { display: block; width: 48px; height: 48px; flex: none; border-radius: 4px; background: #e8e8e8; }
+.access-portrait { width: 72px; height: 88px; }
+.access-tabs { display: flex; gap: 32px; padding: 12px 0 20px; border-bottom: 1px solid #dedede; font-size: 14px; }
+.access-mail { padding: 20px 0; border-bottom: 1px solid #dedede; }
+.access-mail .access-line { margin-block: 18px; }
+.access-split { display: grid; grid-template-columns: minmax(180px, .7fr) minmax(0, 1.3fr); gap: 32px; }
+.access-search { min-height: 48px; padding: 14px 12px; border: 1px solid #dedede; border-radius: 4px; font-size: 12px; }
+.access-detail-title { padding-bottom: 24px; }
+.access-detail-title .access-line { height: 22px; }
+.access-entry { position: relative; display: flex; justify-content: center; padding: 132px 16px 64px; background: linear-gradient(180deg, transparent 32px, rgb(255 255 255 / .32) 132px, rgb(255 255 255 / .32) 460px, transparent); }
+.access-form { width: 100%; max-width: 360px; height: fit-content; padding: 24px; border: 1px solid #dedede; border-radius: 4px; background: #fff; box-shadow: 0 4px 20px rgb(0 0 0 / .035); }
+.access-lock { display: flex; width: 32px; height: 32px; align-items: center; justify-content: center; margin-bottom: 14px; color: #666666; border: 1px solid #e8e8e8; border-radius: 4px; }
+.access-form h2 { margin: 0; font-size: 18px; font-weight: 700; }
+.access-form > p { margin: 8px 0 20px; font-size: 13px; line-height: 1.7; color: #666666; }
+.access-form input { width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid #969696; border-radius: 3px; background: #fff; font-size: 16px; }
+.access-form button { width: 100%; min-height: 44px; margin-top: 12px; padding: 10px 16px; border: 0; border-radius: 3px; color: #fff; background: #004bd6; font-size: 14px; font-weight: 600; }
+.access-form button:disabled { color: #666666; background: #f5f5f5; cursor: default; }
+.access-form button:not(:disabled):hover { background: #0044bf; }
+.access-form > .access-error { margin: 10px 0 0; color: #a12219; }
+@media (max-width: 639px) {
+  .access-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; padding-block: 16px; }
+  .access-columns, .access-split { grid-template-columns: minmax(0, 1fr); gap: 20px; }
+  .access-entry { padding: 156px 0 48px; }
+  .access-form { padding: 20px; }
+}
+.connection-status { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 12px; color: #666; font-size: 13px; }
+.connection-status p { flex-basis: 100%; margin: 0; color: #a12219; }
+.connection-advanced { margin-top: 24px; border-top: 1px solid #dedede; padding-top: 16px; font-size: 13px; }
+.connection-advanced summary { cursor: pointer; min-height: 32px; }
+.connection-advanced p { line-height: 1.7; color: #666; }
+.connection-advanced label { display: block; margin: 12px 0 6px; }
+.connection-guide { display: inline-flex; align-items: center; min-height: 44px; color: #004bd6; }
+.ktz-mark { background: transparent; border-radius: 0; object-fit: contain; }
+.ktz-side-link { border-radius: 4px; }
+dialog.ktz-sheet:not([open]) { display: none; }
+dialog.ktz-sheet { border: 0; padding: 0; width: min(100%, 640px); max-width: 100%; max-height: 85dvh; height: fit-content; inset: auto 0 0; margin: auto auto 0; background: white; }
+dialog.ktz-sheet::backdrop { background: rgb(0 0 0 / .3); }
+dialog.ktz-sheet .ktz-sheet-body { position: static; }
+.access-state { min-height: 650px; }
+.access-form { box-sizing: border-box; max-width: 400px; }
+.access-form input { box-sizing: border-box; }
+.ktz-app :focus-visible { outline: 3px solid #004bd6; outline-offset: 3px; }
+@media (max-width: 639px) { .connection-status { justify-content: flex-start; } .access-entry { padding-top: 120px; } }

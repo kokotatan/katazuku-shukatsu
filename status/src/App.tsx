@@ -55,7 +55,7 @@ export default function App() {
       <AppHeading
         caption="STATUS"
         title="選考管理"
-        description="DB正本の選考トラックを読み取り専用で表示します。"
+        description="企業ごとの選考状況と、次にすることを確認できます。"
         generatedAt={data?.generatedAt}
         onReload={reload}
         loading={loading}

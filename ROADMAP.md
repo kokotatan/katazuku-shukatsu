@@ -12,6 +12,7 @@ katazuku-shukatsu は、完成品を一括公開するのではなく、安全�
 - 応募企業と就活支援組織を混同しないデータモデル
 - 読み取り専用アプリ8本
 - 任意のCloudflare Worker + R2セルフホスト
+- Windows向けの自動ログインGUI、本人が入力するログインURL、専用Chrome、DPAPI保存、毎日の実行予約（Gitリポジトリのみ）
 
 ## 次に作るもの
 
@@ -19,7 +20,7 @@ katazuku-shukatsu は、完成品を一括公開するのではなく、安全�
 
 - `BrowserDriver` interfaceとdry-run可能な操作計画
 - `SecretStore` interface。モデルへパスワード文字列を渡さず、参照IDで扱う
-- Windows DPAPI、macOS Keychain、Linux Secret Serviceのadapter
+- 既存のWindows DPAPIログイン処理を共通interfaceへ接続し、macOS Keychain・Linux Secret Serviceのadapterを追加
 - CAPTCHA、MFA、本人確認へ到達したら停止して本人へ引き渡すcheckpoint
 - 送信・予約・辞退の直前に、表示内容と承認hashを再検証するexecutor
 

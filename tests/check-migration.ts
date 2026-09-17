@@ -5,7 +5,7 @@
  * スナップショットが残ること、未来の版のDBを古いコードで開かないことを確かめる。
  *   npm run test:migration
  */
-import { existsSync, mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, readdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
@@ -35,23 +35,25 @@ check('v3: 議事録と人物が支援組織を参照できる', (() => {
     && interview.some((row) => row.name === 'career_meeting_id')
     && person.some((row) => row.name === 'organization_id')
 })())
+fresh.close()
 
-// --- ファイルDB: 破壊的な版の前にスナップショットが残る ---
+// --- 既存のファイルDB: 更新前にスナップショットが残る ---
 const dir = mkdtempSync(join(tmpdir(), 'katazuku-migration-'))
 const path = join(dir, 'katazuku.db')
 const first = openDb(path)
 upsertCompany(first, { name: '株式会社サンプルA' })
+first.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 1}`)
 first.close()
-check('破壊的な版の適用前スナップショットが残る', existsSync(`${path}.v1.bak`))
 
 // --- 再オープンで再適用しない ---
 const reopened = openDb(path)
+const backups = readdirSync(dir).filter(name => name.startsWith('katazuku.db.before-'))
+check('既存DBの適用前スナップショットが残る', backups.length === 1)
 check('再オープンしても版は変わらない', userVersion(reopened) === SCHEMA_VERSION)
 check('再オープンでデータが消えない', listCompanies(reopened).some((c) => c.name === '株式会社サンプルA'))
-rmSync(`${path}.v1.bak`, { force: true })
 reopened.close()
 const third = openDb(path)
-check('適用済みの版はスナップショットを取り直さない(=再実行していない)', !existsSync(`${path}.v1.bak`))
+check('適用済みの版はスナップショットを取り直さない(=再実行していない)', readdirSync(dir).filter(name => name.startsWith('katazuku.db.before-')).length === backups.length)
 third.close()
 
 // --- 未来の版のDBは開かない ---

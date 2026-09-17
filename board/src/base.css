@@ -1,0 +1,3 @@
+/* 基本スタイルをbaseへ置き、端末設定画面の余白指定も反映できるようにする。 */
+@layer theme, base, components, utilities;
+@import "smarthr-ui/smarthr-ui.css" layer(base);

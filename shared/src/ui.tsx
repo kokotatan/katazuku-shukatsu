@@ -1,10 +1,14 @@
-import { useState, type ComponentType, type ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, useRef, type ComponentType, type ReactNode } from 'react'
 import {
-  Center, Cluster, FaCalendarCheckIcon, FaChartLineIcon, FaCommentsIcon, FaEllipsisIcon,
+  Cluster, FaCalendarCheckIcon, FaChartLineIcon, FaCommentsIcon, FaEllipsisIcon,
   FaHouseIcon, FaIdCardIcon, FaInboxIcon, FaTableColumnsIcon, FaUsersIcon,
-  Heading, InformationPanel, Loader, Stack, Text,
+  Heading, Stack, Text,
 } from 'smarthr-ui'
 import './app-shell.css'
+import { ConnectionPanel, ConnectionStatus } from './ConnectionPanel'
+import { LayoutOutline } from './layout-outline'
+import { viewer } from './connection'
+const AppContext = createContext<AppKey>('board')
 
 /**
  * アプリ群の共通シェル(ナビ・見出し・読み込み状態)。
@@ -30,7 +34,7 @@ type Item = {
  * 開発サーバー(アプリごとに別ポート)ではアプリ間リンクは飛べない — 本体と同じ制約。
  */
 const ITEMS: Item[] = [
-  { key: 'board', href: '../board/', label: 'ボード', mobileLabel: 'ボード', caption: 'Board', icon: FaHouseIcon },
+  { key: 'board', href: '../board/', label: 'ホーム', mobileLabel: 'ホーム', caption: 'Board', icon: FaHouseIcon },
   { key: 'inbox', href: '../inbox/', label: 'メール', mobileLabel: 'メール', caption: 'Inbox', icon: FaInboxIcon },
   { key: 'status', href: '../status/', label: '選考管理', mobileLabel: '選考', caption: 'Status', icon: FaTableColumnsIcon },
   { key: 'insight', href: '../insight/', label: '今日やること', mobileLabel: '今日', caption: 'Insight', icon: FaCalendarCheckIcon },
@@ -45,6 +49,16 @@ const MOBILE_PRIMARY: AppKey[] = ['board', 'inbox', 'status', 'insight']
 
 export function AppNav({ current }: { current: AppKey }) {
   const [moreOpen, setMoreOpen] = useState(false)
+  const moreDialog = useRef<HTMLDialogElement>(null)
+  useEffect(() => {
+    if (moreOpen) moreDialog.current?.showModal()
+    else moreDialog.current?.close()
+  }, [moreOpen])
+  useEffect(() => {
+    const resize = () => { if (window.innerWidth >= 768) setMoreOpen(false) }
+    window.addEventListener('resize', resize)
+    return () => window.removeEventListener('resize', resize)
+  }, [])
   const primary = MOBILE_PRIMARY
     .map((key) => ITEMS.find((item) => item.key === key))
     .filter((item): item is Item => Boolean(item))
@@ -56,11 +70,11 @@ export function AppNav({ current }: { current: AppKey }) {
       {/* デスクトップ: 左サイドバー */}
       <aside className="ktz-side">
         <a className="ktz-brand" href="../board/">
-          <span aria-hidden className="ktz-mark">片</span>
-          <span className="ktz-brand-name">katazuku</span>
+          <img aria-hidden className="ktz-mark" src="./icons/necktie-192.png" alt="" />
+          <span className="ktz-brand-name">katazuku 就活</span>
         </a>
         <nav className="ktz-side-nav" aria-label="katazuku アプリ">
-          {ITEMS.map(({ key, href, label, caption, icon: Icon }) => (
+          {ITEMS.map(({ key, href, label, icon: Icon }) => (
             <a
               key={key}
               href={href}
@@ -69,7 +83,6 @@ export function AppNav({ current }: { current: AppKey }) {
             >
               <Icon />
               <span>{label}</span>
-              <span className="ktz-caption">{caption}</span>
             </a>
           ))}
         </nav>
@@ -77,11 +90,10 @@ export function AppNav({ current }: { current: AppKey }) {
       </aside>
 
       {/* モバイル: 「その他」ボトムシート */}
-      {moreOpen && (
-        <div className="ktz-sheet" role="dialog" aria-modal="true" aria-label="その他のアプリ">
-          <button type="button" aria-label="閉じる" className="ktz-sheet-scrim" onClick={() => setMoreOpen(false)} />
+        <dialog ref={moreDialog} className="ktz-sheet" aria-label="その他のアプリ" onCancel={() => setMoreOpen(false)} onClose={() => setMoreOpen(false)}>
           <div className="ktz-sheet-body">
             <p className="ktz-sheet-title">その他のアプリ</p>
+            <button className="ktz-reload" type="button" onClick={() => setMoreOpen(false)}>閉じる</button>
             <div className="ktz-sheet-grid">
               {overflow.map(({ key, href, label, icon: Icon }) => (
                 <a key={key} href={href} aria-current={key === current ? 'page' : undefined} className="ktz-sheet-item">
@@ -91,8 +103,7 @@ export function AppNav({ current }: { current: AppKey }) {
               ))}
             </div>
           </div>
-        </div>
-      )}
+        </dialog>
 
       {/* モバイル: 下タブバー(主要4+その他) */}
       <nav className="ktz-tabbar" aria-label="katazuku アプリ">
@@ -121,29 +132,15 @@ export function AppNav({ current }: { current: AppKey }) {
   )
 }
 
-/**
- * 読み込み中・失敗の表示。
- * 本体はここで閲覧用の合言葉を入力させるが、公開版はローカルのファイルを読むだけなので
- * 入力欄が要らない。代わりにスナップショットの作り方を案内する。
- */
 export function DataState({ loading, error }: { loading: boolean; error: string }) {
-  if (loading) {
-    return <Center><Loader text="正本DBのスナップショットを読み込んでいます" /></Center>
-  }
-  return (
-    <InformationPanel type="error" heading="データを読み込めません" toggleable={false}>
-      <Stack gap={0.5}>
-        <Text>{error || 'スナップショットが見つかりません。'}</Text>
-        <Text size="S" color="TEXT_GREY">
-          リポジトリのルートで <code>npm run snapshot -- --demo</code>(架空データ)または
-          <code> npm run snapshot </code>(自分の正本DB)を実行してから、再読込してください。
-        </Text>
-      </Stack>
-    </InformationPanel>
-  )
+  const view = useContext(AppContext)
+  return <section className="access-state" aria-label="PCとの連携">
+    <div className="access-layout" aria-hidden="true" inert><LayoutOutline view={view} /></div>
+    <div className="access-entry"><ConnectionPanel loading={loading} error={error} onReload={() => viewer.refresh()} /></div>
+  </section>
 }
 
-/** 各アプリの見出し。本体の「英字キャプション + タイトル + 一文」を踏襲する */
+/** 各アプリの見出しと、内容を説明する一文。 */
 export function AppHeading({
   caption, title, description, generatedAt, onReload, loading,
 }: {
@@ -157,14 +154,13 @@ export function AppHeading({
   return (
     <Cluster align="flex-end" justify="space-between" gap={1}>
       <Stack gap={0.25}>
-        <Text size="S" weight="bold" color="TEXT_LINK">{caption}</Text>
         <Heading type="blockTitle">{title}</Heading>
         <Text size="S" color="TEXT_GREY">{description}</Text>
       </Stack>
       <Cluster align="center" gap={0.5}>
         {generatedAt && (
           <Text size="S" color="TEXT_GREY">
-            DB {new Date(generatedAt).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })} 時点
+            最終更新 {new Date(generatedAt).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
           </Text>
         )}
         <ReloadButton onReload={onReload} loading={loading} />
@@ -193,12 +189,13 @@ export function Tile({ label, value, tone }: { label: string; value: ReactNode; 
 
 /** アプリの外枠(サイドバー + 本文)。全アプリで同じ */
 export function AppShell({ current, children }: { current: AppKey; children: ReactNode }) {
+  useEffect(() => { document.title = `${ITEMS.find(item => item.key === current)?.label || 'ホーム'} | katazuku 就活` }, [current])
   return (
-    <div className="ktz-app">
+    <AppContext.Provider value={current}><div className="ktz-app">
       <AppNav current={current} />
       <main className="ktz-main">
-        <Stack gap={1.5}>{children}</Stack>
+        <Stack gap={1.5}><ConnectionStatus />{children}</Stack>
       </main>
-    </div>
+    </div></AppContext.Provider>
   )
 }

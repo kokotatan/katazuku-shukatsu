@@ -9,7 +9,11 @@
 このリポジトリは個人プロジェクト katazuku から、汎用で公開できる中核を切り出したものです。
 
 > Status: early (v0.3)。コアと読み取り専用アプリ、任意のCloudflareセルフホストを公開しています。
-> ブラウザ操作とOS資格情報ストアは未実装です。安全境界から一緒に作る貢献者を募集しています。
+> Windows向けの自動ログイン設定GUIも収録しています。サービス名を選び、URLと認証情報は各自のPCで設定します。
+
+**開発経験がない方へ:** インストールと連携を画面だけで完了できる版は準備中です。
+[はじめて使う方への案内](docs/GETTING-STARTED.md)に、現在使える範囲と完成時の使い方を分けて記載しています。
+以下のコマンドは開発者向けです。
 
 [ロードマップ](./ROADMAP.md) / [参加方法](./CONTRIBUTING.md) /
 [good first issue](https://github.com/kokotatan/katazuku-shukatsu/labels/good%20first%20issue) /
@@ -27,6 +31,7 @@
 | `src/career-support.ts` | 応募先と就活支援組織・イベント運営者を分離し、面談を冪等に取り込む |
 | `schemas/` | 入出力の JSON Schema。`settings.schema.json` は設定UIを生成する唯一の真実 |
 | `examples/config-gui.html` | JSON Schema から設定フォーム・検証・出力を自動生成する設定GUI(単一HTML) |
+| `scripts/local-login/` | Windowsの自動ログイン設定GUI・専用Chrome・DPAPI資格情報保存・毎日の実行予約 |
 | `examples/seed.ts` | 架空企業だけで正本DBを組み立てるデモ |
 | `shared/` | アプリ群が共有する型・読み口・共通UI(`@katazuku/data` / `@katazuku/ui`) |
 | `board/` ほか8本 | 正本DBを見る**読み取り専用アプリ群**([SmartHR Design System](https://smarthr.design/) 準拠) |
@@ -66,6 +71,17 @@ npm run seed      # スキーマの1例で正本DBを組み立てて表示
 
 設定GUIを見る場合は `examples/config-gui.html` をブラウザで開いてください。
 
+自動ログインはWindows PCで `npm run local-login:settings` を実行すると設定できます。
+Goodfind、外資就活ドットコム、LabBase就職、ビズリーチ・キャンパス、リクナビ、ワンキャリア等の正式名称から選び、
+ログインURLは本人が入力します。候補外のサービスも追加できます。
+[起動・設定・保存先](scripts/local-login/README-daily-login.md)を参照してください。
+この機能はGitリポジトリに収録し、npmのコアライブラリには含めていません。
+
+Google Workspaceの接続手順と、保存済み資格情報を安全に確認する診断コマンドは
+[Google連携ガイド](docs/GOOGLE-WORKSPACE.md)を参照してください。
+本人用の接続成功と、Googleによる権限審査の承認は区別して確認します。
+共通の「Googleで接続」は準備中です。
+
 ### 判断バックエンド
 
 既定は`llm`です。通常のエージェントを文章生成から分離し、原子的なChoice / Boolean / Scoreと確率だけを返させ、
@@ -96,11 +112,12 @@ $env:KATAZUKU_DECISION_BACKEND = 'jev'
 | [`impact/`](./impact/) | 自動運転の効果。推定時間ではなくDBに残った件数 |
 
 ```sh
-npm run snapshot -- --demo    # 架空データのスナップショットを書き出す
+npm run snapshot             # 自分のDBから非公開の data/snapshot.json へ書き出す
 cd insight && npm install && npm run dev
 ```
 
-自分のデータで見るなら `npm run snapshot`(書き出した `snapshot.json` は gitignore 済み)。
+画面は認証付きAPIからのみ読み取ります。接続前は見出しと配置だけを示し、架空データへ切り替えません。
+`public/`へスナップショットを置くと、ビルド検査で停止します。
 
 複数端末から読み取る場合は、任意で[Cloudflareへセルフホスト](docs/CLOUDFLARE-SELF-HOSTING.md)できます。
 作者のCloudflareや認証基盤は使わず、各利用者が自分のアカウントへWorkerとR2を配置します。

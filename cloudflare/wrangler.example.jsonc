@@ -2,8 +2,20 @@
   "$schema": "../node_modules/wrangler/config-schema.json",
   "name": "katazuku-self-hosted",
   "main": "./worker.ts",
-  "compatibility_date": "2026-09-03",
+  "compatibility_date": "2026-09-07",
   "compatibility_flags": ["nodejs_compat"],
+  // 手動デプロイ前に build:apps を実行し、directory を ../web-dist にする。
+  // 公開ゲートでは、Gitにある初期設定画面だけでも型検査・dry-runできる。
+  "assets": { "directory": "../web", "binding": "ASSETS", "run_worker_first": true },
+  "vars": {
+    "KATAZUKU_ALLOWED_ORIGINS": "",
+    "KATAZUKU_DEVICE_NAME": "自分のPC"
+  },
+  "ratelimits": [
+    { "name": "AUTH_LIMIT", "namespace_id": "1001", "simple": { "limit": 5, "period": 60 } },
+    { "name": "REQUEST_LIMIT", "namespace_id": "1002", "simple": { "limit": 120, "period": 60 } }
+  ],
+  "triggers": { "crons": ["*/30 * * * *"] },
   "r2_buckets": [
     {
       "binding": "PRIVATE_DATA",

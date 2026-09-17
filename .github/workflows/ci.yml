@@ -32,6 +32,8 @@ jobs:
       - run: npm pack --dry-run
       - run: node tools/check-npm-release.mjs
       - run: npm test
+      - run: npm run cloudflare:check
+      - run: npm run check:assets
 
   apps:
     # アプリ群が腐らないように、型検査とビルドまで通す。

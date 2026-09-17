@@ -27,7 +27,7 @@ export default function App() {
       <AppHeading
         caption="PREP"
         title="面接準備"
-        description="予定・企業研究・過去面接を会社ごとに束ねます。"
+        description="企業の情報や過去の面接を見ながら、次の面接を準備できます。"
         generatedAt={data?.generatedAt}
         onReload={reload}
         loading={loading}

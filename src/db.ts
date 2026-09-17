@@ -7,10 +7,11 @@
  * - だから「上書きしない」ではなく「遷移規則で堂々と更新する」(transition() に集約)
  */
 import { DatabaseSync } from 'node:sqlite'
-import { mkdirSync, rmSync } from 'node:fs'
+import { mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { ensurePlatformSchema } from './platform.js'
 import { ensureCareerSupportSchema } from './career-support-schema.js'
+import { assertSupportedDatabase, ensureCoreIndexes, migrateDatabase } from './database-maintenance.js'
 
 export interface Selection {
   id?: number
@@ -45,10 +46,24 @@ export interface CompanyInfo {
 export function openDb(path: string): DatabaseSync {
   mkdirSync(dirname(path), { recursive: true })
   const db = new DatabaseSync(path)
+  try {
+    assertSupportedDatabase(db, SCHEMA_VERSION)
+    db.exec('PRAGMA busy_timeout = 5000; PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL;')
+    migrateDatabase(db, path, SCHEMA_VERSION, (fromVersion) => {
+      createCoreTables(db)
+      for (const migration of MIGRATIONS) {
+        if (migration.version > fromVersion) migration.up(db)
+      }
+    })
+    return db
+  } catch (error) {
+    db.close()
+    throw error
+  }
+}
+
+function createCoreTables(db: DatabaseSync): void {
   db.exec(`
-    PRAGMA journal_mode = WAL;
-    PRAGMA busy_timeout = 5000;
-    PRAGMA foreign_keys = ON;
     CREATE TABLE IF NOT EXISTS company (
       id INTEGER PRIMARY KEY,
       name TEXT NOT NULL UNIQUE,
@@ -120,19 +135,10 @@ export function openDb(path: string): DatabaseSync {
       created_at TEXT NOT NULL
     );
   `)
-  // マイグレーションに失敗したら開きっぱなしにしない。
-  // 呼び手は例外で気づくが、ハンドルが残るとファイルを掴んだままになる。
-  try {
-    migrate(db, path)
-  } catch (error) {
-    db.close()
-    throw error
-  }
-  return db
 }
 
 /** 現行スキーマの版。マイグレーションを足すたびに +1 し、`MIGRATIONS` に1本足す */
-export const SCHEMA_VERSION = 3
+export const SCHEMA_VERSION = 4
 
 /**
  * 版ゲート方式のマイグレーション(#10)。
@@ -141,14 +147,12 @@ export const SCHEMA_VERSION = 3
  * 実質未使用だった。列の追加だけなら冪等に見えるが、列DROP・データ移送が混ざった瞬間に
  * 「どこまで適用済みか」を誰も知らない状態になる。版で束ねて、番号でしか進まないようにする。
  *
- * `destructive: true` の版は、適用前に自動でスナップショット(`VACUUM INTO`)を取る。
- * 取れなければ**適用しない**。壊れてから気づく事故より、進まない方がましなので。
+ * 既存DBの更新は、書込みを止めて退避してから全ての未適用版を一括で実行する。
+ * 途中で失敗した場合はスキーマ・データ・版番号の全てを元へ戻す。
  */
 interface Migration {
   version: number
   description: string
-  /** 列DROP・データ移送を含むか。含むなら適用前にバックアップを取る */
-  destructive: boolean
   up: (db: DatabaseSync) => void
 }
 
@@ -156,8 +160,6 @@ const MIGRATIONS: Migration[] = [
   {
     version: 1,
     description: '正式名称を name へ、通称を short_name へ。outcome・event.ref・appointment.end_at を追加',
-    // 旧 official_name 列を DROP するため破壊的
-    destructive: true,
     up: (db) => {
       const cols = db.prepare('PRAGMA table_info(company)').all() as { name: string }[]
       const has = (c: string) => cols.some((x) => x.name === c)
@@ -188,45 +190,19 @@ const MIGRATIONS: Migration[] = [
   {
     version: 2,
     description: '人物・プロフィール・移動などの拡張スキーマ(platform)を版の管理下に入れる',
-    destructive: false,
     up: (db) => ensurePlatformSchema(db),
   },
   {
     version: 3,
     description: '応募先企業と分離した就活支援組織・支援面談を追加',
-    destructive: false,
     up: (db) => ensureCareerSupportSchema(db),
   },
+  {
+    version: 4,
+    description: '履歴・予定・企業参照の索引を追加し、移行を原子的に実行する',
+    up: (db) => ensureCoreIndexes(db),
+  },
 ]
-
-/** 適用前のスナップショット。`VACUUM INTO` で WAL を畳んだ1ファイルを隣に置く */
-function snapshotBeforeMigration(db: DatabaseSync, path: string, version: number): string {
-  const target = `${path}.v${version}.bak`
-  rmSync(target, { force: true })
-  db.exec(`VACUUM INTO '${target.replace(/'/g, "''")}'`)
-  return target
-}
-
-function migrate(db: DatabaseSync, path: string): void {
-  const current = (db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version
-  for (const migration of MIGRATIONS) {
-    if (migration.version <= current) continue
-    // インメモリDBはバックアップの取りようが無い(消えて困るデータも無い)ので飛ばす
-    if (migration.destructive && path !== ':memory:') {
-      const target = snapshotBeforeMigration(db, path, migration.version)
-      console.warn(`スキーマ v${migration.version} を適用します。適用前のスナップショット: ${target}`)
-    }
-    migration.up(db)
-    db.exec(`PRAGMA user_version = ${migration.version}`)
-  }
-  const after = (db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version
-  if (after > SCHEMA_VERSION) {
-    throw new Error(
-      `このDBはスキーマ v${after} です。コードが知っているのは v${SCHEMA_VERSION} まで。` +
-      '新しい版で書かれたDBを古いコードで開くとデータを壊すので、コードを更新してください。',
-    )
-  }
-}
 
 /** statusの自由文からoutcome(列挙)を機械判定する。書き込み側はstatus更新時に必ずこれも更新する */
 export function outcomeOf(status: string): string {
@@ -653,9 +629,14 @@ export interface EventRow {
   source: string
 }
 
-export function listEvents(db: DatabaseSync, selectionId?: number): EventRow[] {
-  const sql = 'SELECT selection_id, at, kind, summary, source FROM event' + (selectionId ? ' WHERE selection_id = ?' : '') + ' ORDER BY id'
-  return db.prepare(sql).all(...(selectionId ? [selectionId] : [])) as unknown as EventRow[]
+export function listEvents(db: DatabaseSync, selectionId?: number, limit?: number): EventRow[] {
+  if (limit !== undefined && (!Number.isSafeInteger(limit) || limit < 1)) throw new Error('履歴の取得件数は正の整数で指定してください。')
+  const sql = 'SELECT selection_id, at, kind, summary, source FROM event'
+    + (selectionId !== undefined ? ' WHERE selection_id = ?' : '')
+    + (limit !== undefined ? ' ORDER BY id DESC LIMIT ?' : ' ORDER BY id')
+  const args = [...(selectionId !== undefined ? [selectionId] : []), ...(limit !== undefined ? [limit] : [])]
+  const rows = db.prepare(sql).all(...args) as unknown as EventRow[]
+  return limit !== undefined ? rows.reverse() : rows
 }
 
 // ---- 読み書きヘルパー ----

@@ -10,8 +10,10 @@
 import { DatabaseSync } from 'node:sqlite'
 import { existsSync, mkdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
+import { createDatabaseBackup } from '../dist/database-maintenance.js'
+import { desktopConfig } from '../dist/desktop-config.js'
 
-const src = process.argv[2] ?? join('data', 'katazuku.db')
+const src = process.argv[2] ?? process.env.KATAZUKU_DB ?? desktopConfig()?.database ?? join('data', 'katazuku.db')
 if (!existsSync(src)) {
   console.error(`正本が見つかりません: ${src}\n  src を引数で指定するか、data/katazuku.db を用意してください。`)
   process.exit(1)
@@ -26,7 +28,6 @@ if (!dest) {
 }
 mkdirSync(dirname(dest), { recursive: true })
 
-const db = new DatabaseSync(src)
-db.exec(`VACUUM INTO '${dest.replace(/'/g, "''")}'`)
-db.close()
+const db = new DatabaseSync(src, { readOnly: true })
+try { createDatabaseBackup(db, dest) } finally { db.close() }
 console.log(`バックアップを作成しました: ${dest}`)

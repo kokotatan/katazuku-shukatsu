@@ -53,4 +53,5 @@ AIコーディングエージェント(および使い方を尋ねられたAI)�
 - **どう動かす?** `npm install && npm run doctor && npm test`、次に `npm run seed`。
 - **自分のデータを入れるには?** 正本DBのパスは環境変数 `KATAZUKU_DB`。書き込みは `src/db-apply*.ts` 経由(エージェントが書き手)。
 - **設定は?** `examples/config-gui.html` をブラウザで開く。設定は `schemas/settings.schema.json` が唯一の真実。
+- **自動ログインは?** Windows PCで `npm run local-login:settings`。サービス名の候補だけを配布し、URL・認証方法は本人がGUIで設定する。端末設定の検証は `scripts/local-login/settings.mjs` に集約し、正本DBへは書き込まない。詳細は `scripts/local-login/README-daily-login.md`。
 - **複数デバイスは?** 単一デバイス前提。移送は `npm run backup` の1ファイルで(クラウド同期フォルダ直下に正本を置かない)。

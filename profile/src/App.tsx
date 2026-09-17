@@ -29,7 +29,7 @@ export default function App() {
       <AppHeading
         caption="PROFILE"
         title="個人マスタ"
-        description="確定情報はDB正本から表示し、面接由来の情報は候補として分離します。"
+        description="登録した基本情報と、面接で話した内容からの候補を確認できます。"
         generatedAt={data?.generatedAt}
         onReload={reload}
         loading={loading}

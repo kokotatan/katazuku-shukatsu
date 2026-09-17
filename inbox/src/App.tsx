@@ -19,7 +19,7 @@ export default function App() {
       <AppHeading
         caption="INBOX"
         title="メールと更新"
-        description="メール抽出結果をDBから読む画面です。人がここで状態を書き換えることはありません。"
+        description="届いたメールの要約と、対応が必要なことを確認できます。"
         generatedAt={data?.generatedAt}
         onReload={reload}
         loading={loading}

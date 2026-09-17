@@ -1,12 +1,12 @@
+import { privateAssetsGuard } from '../tools/vite-private-assets.mjs'
 import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-// 本体はアプリ群を katazuku.kotalabo.com/<app>/ 配下で配信する。
-// 公開版はサーバを持たないので、どこに置いても開けるよう相対パスで出す。
+// セルフホスト先の /<app>/ 配下で配信できるよう、相対パスで出す。
 export default defineConfig({
   base: './',
-  plugins: [react()],
+  plugins: [privateAssetsGuard(), react()],
   resolve: {
     alias: {
       // 共有層。ビルドせず TypeScript のまま読む(本体の構成と同じ)

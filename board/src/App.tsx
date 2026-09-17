@@ -264,24 +264,18 @@ export default function App() {
       <AppHeading
         caption="BOARD"
         title="ボード"
-        description="正本DBの状態を見るための、読み取り専用の窓。"
+        description="予定、選考、メールなど、就活の記録をまとめて確認できます。"
         generatedAt={data?.generatedAt}
         onReload={reload}
         loading={loading}
       />
 
+      <Cluster>
+        <AnchorButton size="S" href="?settings=local-login">自動ログイン設定</AnchorButton>
+      </Cluster>
+
       {!data ? <DataState loading={loading} error={error} /> : (
         <>
-          {data.demo && (
-            <InformationPanel type="warning" heading="デモデータを表示しています" toggleable={false}>
-              <Text>
-                架空の企業・予定・ログです。自分のデータを見るには、リポジトリのルートで
-                <code> npm run snapshot </code>
-                を実行してから「再読込」を押してください(書き出した snapshot.json はコミットされません)。
-              </Text>
-            </InformationPanel>
-          )}
-
           <SegmentedControl
             options={options}
             value={tab}

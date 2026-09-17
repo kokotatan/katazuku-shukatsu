@@ -84,7 +84,7 @@ export default function App() {
       <AppHeading
         caption="INSIGHT"
         title="今日やること"
-        description="朝いちばんに開くページ。DBの生きた予定と締切だけ。"
+        description="近づいている予定や締切から、今日することを確認できます。"
         generatedAt={data?.generatedAt}
         onReload={reload}
         loading={loading}

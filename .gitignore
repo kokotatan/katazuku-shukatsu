@@ -74,6 +74,7 @@ web_modules/
 !.env.example
 .dev.vars
 .wrangler/
+web-dist/
 cloudflare/wrangler.jsonc
 cloudflare/worker-configuration.d.ts
 
@@ -159,6 +160,10 @@ logs/
 .env.*
 service-account.json
 credential-store/
+credentials/
+*.local.json
+runtime/
+desktop-dist/
 mirror-out.json
 *-import-*.json
 *-export-*.json
@@ -167,3 +172,4 @@ mirror-out.json
 *.db-wal
 *.db-shm
 *.db-journal
+*.db.*.partial

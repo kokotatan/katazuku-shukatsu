@@ -18,11 +18,13 @@
     "styled-components": "^5.3.11"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
     "@types/node": "^24.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@types/styled-components": "^5.1.34",
     "@vitejs/plugin-react": "^5.0.0",
+    "tailwindcss": "^4.3.3",
     "typescript": "~5.9.0",
     "vite": "^7.0.0"
   }

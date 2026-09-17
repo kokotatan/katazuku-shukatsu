@@ -16,7 +16,7 @@ import { join, extname, relative } from 'node:path'
 
 const ROOT = process.argv[2] ?? '.'
 const SCAN_EXT = new Set(['.ts', '.tsx', '.js', '.mjs', '.json', '.md', '.html', '.css', '.ps1', '.txt', '.yml', '.yaml'])
-const SKIP_DIR = new Set(['node_modules', '.git', 'dist', 'build'])
+const SKIP_DIR = new Set(['node_modules', '.git', 'dist', 'build', 'desktop-dist'])
 const SKIP_FILE = new Set(['package-lock.json', 'pnpm-lock.yaml', 'yarn.lock']) // 完全性ハッシュで誤検出するため除外
 
 // 形ベースの検出パターン(実名を書かずにPIIの形を捕まえる)
