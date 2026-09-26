@@ -186,3 +186,10 @@ export type { PlatformSnapshot, CompanyDossier, MailItemInput } from './platform
 // ---- 重複予定の検出 ----
 export { findDuplicates } from './check-duplicate-appointments.js'
 export type { DuplicatePair } from './check-duplicate-appointments.js'
+
+// ---- Sparkへの非同期引き渡し ----
+export { SPARK_KINDS, createSparkJob, sparkPrompt, validateSparkResponse } from './spark-handoff.js'
+export type { SparkKind, SparkJob } from './spark-handoff.js'
+export { SparkQueue, validSparkTaskUrl } from './spark-queue.js'
+export type { SparkState, SparkQueueRow } from './spark-queue.js'
+export { sparkRpc, sparkTools } from './spark-mcp.js'

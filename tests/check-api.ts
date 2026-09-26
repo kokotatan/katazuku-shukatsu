@@ -47,6 +47,9 @@ const EXPECTED = [
   'upsertCompanyDossier', 'upsertMailItem', 'listActionableMail',
   // 重複検出
   'findDuplicates',
+  // Sparkの依頼キューとMCP
+  'SPARK_KINDS', 'SparkQueue', 'createSparkJob', 'sparkPrompt', 'validateSparkResponse',
+  'validSparkTaskUrl', 'sparkRpc', 'sparkTools',
 ].sort()
 
 /** 内部実装。公開面から漏れていたら落とす */
