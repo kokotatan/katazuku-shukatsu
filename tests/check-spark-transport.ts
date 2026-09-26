@@ -1,12 +1,19 @@
 import assert from 'node:assert/strict'
 import { randomBytes } from 'node:crypto'
-import { spawn } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { createServer } from 'node:net'
 import { request as httpRequest } from 'node:http'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, rmSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+
+if (process.platform === 'win32') {
+  let registration = fileURLToPath(new URL('../scripts/register-spark-worker.ps1', import.meta.url))
+  if (!existsSync(registration)) registration = fileURLToPath(new URL('../../scripts/register-spark-worker.ps1', import.meta.url))
+  const parsed = spawnSync('powershell.exe', ['-NoProfile', '-Command', `$t=$null;$e=$null;[System.Management.Automation.Language.Parser]::ParseFile('${registration.replace(/'/g, "''")}',[ref]$t,[ref]$e)>$null;if($e.Count){exit 1}`])
+  assert.equal(parsed.status, 0, 'Windows PowerShellで登録スクリプトを解析できること')
+}
 
 const dir = mkdtempSync(join(tmpdir(), 'spark-mcp-'))
 const reserve = createServer()

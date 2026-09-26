@@ -1,4 +1,4 @@
-$ErrorActionPreference = 'Stop'
+﻿$ErrorActionPreference = 'Stop'
 $repo = Split-Path $PSScriptRoot -Parent
 if (Test-Path -LiteralPath (Join-Path $repo '.katazuku-satellite')) { throw '定常workerは正本PCへ登録してください' }
 $launcher = Join-Path $PSScriptRoot 'run-spark-worker.vbs'
