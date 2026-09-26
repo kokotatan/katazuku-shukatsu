@@ -3,7 +3,7 @@ import { randomBytes } from 'node:crypto'
 import { spawn, spawnSync } from 'node:child_process'
 import { createServer } from 'node:net'
 import { request as httpRequest } from 'node:http'
-import { mkdtempSync, rmSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, rmSync, existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -20,6 +20,19 @@ if (process.platform === 'win32') {
     const failed = spawnSync('cscript.exe', ['//Nologo', join(fixture, 'run-spark-worker.vbs')])
     assert.equal(failed.status, 7, 'workerの失敗をタスクスケジューラへ伝えること')
   } finally { rmSync(fixture, { recursive: true, force: true }) }
+  const nativeFixture = mkdtempSync(join(tmpdir(), 'spark-native-'))
+  try {
+    mkdirSync(join(nativeFixture, 'scripts'), { recursive: true })
+    const launcher = readFileSync(registration.replace('register-spark-worker.ps1', 'run-spark-worker.ps1'), 'utf8')
+    const cliPath = launcher.includes('sync\\node_modules') ? 'sync/node_modules/tsx/dist' : 'node_modules/tsx/dist'
+    mkdirSync(join(nativeFixture, cliPath), { recursive: true })
+    writeFileSync(join(nativeFixture, 'scripts/run-spark-worker.ps1'), launcher)
+    for (const code of [0, 7]) {
+      writeFileSync(join(nativeFixture, cliPath, 'cli.mjs'), `console.error('synthetic warning'); process.exit(${code})`)
+      const native = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', join(nativeFixture, 'scripts/run-spark-worker.ps1')])
+      assert.equal(native.status, code, 'stderrの警告で成功を失敗扱いせず実際の終了コードを返すこと')
+    }
+  } finally { rmSync(nativeFixture, { recursive: true, force: true }) }
 }
 
 const dir = mkdtempSync(join(tmpdir(), 'spark-mcp-'))
