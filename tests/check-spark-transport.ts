@@ -3,7 +3,7 @@ import { randomBytes } from 'node:crypto'
 import { spawn, spawnSync } from 'node:child_process'
 import { createServer } from 'node:net'
 import { request as httpRequest } from 'node:http'
-import { mkdtempSync, rmSync, existsSync } from 'node:fs'
+import { mkdtempSync, rmSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -13,6 +13,13 @@ if (process.platform === 'win32') {
   if (!existsSync(registration)) registration = fileURLToPath(new URL('../../scripts/register-spark-worker.ps1', import.meta.url))
   const parsed = spawnSync('powershell.exe', ['-NoProfile', '-Command', `$t=$null;$e=$null;[System.Management.Automation.Language.Parser]::ParseFile('${registration.replace(/'/g, "''")}',[ref]$t,[ref]$e)>$null;if($e.Count){exit 1}`])
   assert.equal(parsed.status, 0, 'Windows PowerShellで登録スクリプトを解析できること')
+  const fixture = mkdtempSync(join(tmpdir(), 'spark-launcher-'))
+  try {
+    writeFileSync(join(fixture, 'run-spark-worker.ps1'), 'exit 7')
+    writeFileSync(join(fixture, 'run-spark-worker.vbs'), readFileSync(registration.replace('register-spark-worker.ps1', 'run-spark-worker.vbs')))
+    const failed = spawnSync('cscript.exe', ['//Nologo', join(fixture, 'run-spark-worker.vbs')])
+    assert.equal(failed.status, 7, 'workerの失敗をタスクスケジューラへ伝えること')
+  } finally { rmSync(fixture, { recursive: true, force: true }) }
 }
 
 const dir = mkdtempSync(join(tmpdir(), 'spark-mcp-'))
