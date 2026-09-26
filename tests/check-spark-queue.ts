@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { SparkQueue, validSparkTaskUrl } from '../src/spark-queue.js'
 import { sparkRpc } from '../src/spark-mcp.js'
+import { allowedSparkRemoteRequest, filterSparkRemoteResponse } from '../src/spark-remote-policy.js'
 let now = Date.parse('2026-09-26T03:00:00Z')
 const dir = mkdtempSync(join(tmpdir(), 'spark-queue-'))
 const q = new SparkQueue(join(dir, 'queue.db'), () => now)
@@ -55,5 +56,12 @@ try {
   assert.equal(rpc('tools/call', { name: 'spark_list', arguments: { approved: true } }).error.code, -32602)
   assert.equal(sparkRpc(q, { jsonrpc: '2.0', method: 'notifications/initialized' }), undefined)
   assert.equal(rpc('tools/call', { name: 'spark_list' }).result.isError, false)
+  for (const name of ['spark_claim', 'spark_report', 'shell', 'approve', 'send']) {
+    assert.equal(allowedSparkRemoteRequest({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name } }), false)
+  }
+  assert.equal(allowedSparkRemoteRequest({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'spark_enqueue' } }), true)
+  assert.equal(allowedSparkRemoteRequest([]), false)
+  const remote = filterSparkRemoteResponse(rpc('tools/list')) as any
+  assert.deepEqual(remote.result.tools.map((t: any) => t.name), ['spark_enqueue', 'spark_status', 'spark_list'])
   console.log('Spark queue/MCP: 冪等・二重claim・リース・クラッシュ回復・期限・URL・入力境界 OK')
 } finally { q.close(); q2.close(); rmSync(dir, { recursive: true, force: true }) }

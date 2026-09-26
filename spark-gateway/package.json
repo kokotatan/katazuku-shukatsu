@@ -1,0 +1,8 @@
+{
+  "name": "katazuku-spark-gateway",
+  "private": true,
+  "type": "module",
+  "scripts": { "precheck": "wrangler types --config wrangler.example.jsonc", "check": "tsc --noEmit && node check.mjs", "deploy": "wrangler deploy" },
+  "dependencies": { "@cloudflare/workers-oauth-provider": "1.1.0" },
+  "devDependencies": { "typescript": "~5.8.3", "wrangler": "4.141.0" }
+}
