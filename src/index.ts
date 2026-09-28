@@ -192,4 +192,7 @@ export { SPARK_KINDS, createSparkJob, sparkPrompt, validateSparkResponse } from 
 export type { SparkKind, SparkJob } from './spark-handoff.js'
 export { SparkQueue, validSparkTaskUrl } from './spark-queue.js'
 export type { SparkState, SparkQueueRow } from './spark-queue.js'
-export { sparkRpc, sparkTools } from './spark-mcp.js'
+export { sparkRpc, sparkTools, sparkIcons, SPARK_INSTRUCTIONS, SPARK_READ_TOOLS } from './spark-mcp.js'
+export type { SparkReader } from './spark-mcp.js'
+export { quickRead, openDbReadOnly } from './quick-read.js'
+export type { QuickCommand } from './quick-read.js'

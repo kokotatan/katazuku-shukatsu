@@ -1,7 +1,8 @@
 import { readFileSync, existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { SparkQueue } from '../src/spark-queue.js'
-import { sparkRpc } from '../src/spark-mcp.js'
+import { sparkRpc, type SparkReader } from '../src/spark-mcp.js'
+import { openDbReadOnly, quickRead } from '../src/quick-read.js'
 import { allowedSparkRemoteRequest, filterSparkRemoteResponse } from '../src/spark-remote-policy.js'
 
 const root = new URL('../', import.meta.url)
@@ -12,6 +13,15 @@ const origin = new URL(config.origin)
 if (origin.protocol !== 'https:' || origin.username || origin.password || origin.search || origin.hash || origin.pathname !== '/') throw new Error('HTTPS originが必要です')
 if (!/^[A-Za-z0-9_-]{43,128}$/.test(config.token)) throw new Error('bridge tokenが不正です')
 const queue = new SparkQueue(config.queue || fileURLToPath(new URL('logs/spark-queue.local.db', root)))
+// 正本DBは要求ごとに読み取り専用で開いて閉じる(書き手の定常処理とロックを取り合わない)。
+// DBの場所やSQLの詳細はSparkへ返さない。
+const dbPath = process.env.KATAZUKU_DB || fileURLToPath(new URL('data/katazuku.db', root))
+const reader: SparkReader | undefined = existsSync(dbPath) ? (cmd, arg) => {
+  let db: ReturnType<typeof openDbReadOnly> | undefined
+  try { db = openDbReadOnly(dbPath); return quickRead(db, cmd, arg) }
+  catch { throw new Error('就活DBを読めませんでした') }
+  finally { db?.close() }
+} : undefined
 let stopped = false, socket: WebSocket | undefined, retry = 1000
 const seen = new Set<string>()
 function connect() {
@@ -33,7 +43,9 @@ function connect() {
       seen.add(message.id); if (seen.size > 1000) seen.delete(seen.values().next().value!)
       const input = JSON.parse(message.body)
       if (!allowedSparkRemoteRequest(input)) return
-      const result = filterSparkRemoteResponse(sparkRpc(queue, input))
+      // Sparkが実際にどのツールを使ったかを後から確かめるため、操作名だけを残す(引数・結果は残さない)
+      if (input.method === 'tools/call') console.log(`${new Date().toISOString()} tools/call ${String(input.params?.name)}`)
+      const result = filterSparkRemoteResponse(sparkRpc(queue, input, reader, origin.origin))
       current.send(JSON.stringify({ id: message.id, result, notification: result === undefined }))
     } catch { console.error('Spark bridge request rejected') }
   })

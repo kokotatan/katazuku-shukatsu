@@ -67,7 +67,7 @@ try {
   assert.equal((await fetch(url + '?token=' + token, { headers })).status, 404)
   assert.equal((await call({ jsonrpc: '2.0', method: 'notifications/initialized' })).status, 202)
   const init = await (await call({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18' } })).json()
-  assert.equal(init.result.serverInfo.name, 'katazuku-spark')
+  assert.equal(init.result.serverInfo.name, 'katazuku-shukatsu')
   const invoke = async (name: string, args: unknown) => (await call({ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name, arguments: args } })).json()
   const queued = await invoke('spark_enqueue', { requestKey: 'example:http', kind: 'document', input: '架空資料' })
   assert.equal(queued.result.isError, false)

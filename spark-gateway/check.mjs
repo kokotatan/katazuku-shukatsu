@@ -34,6 +34,15 @@ try {
   const params = new URLSearchParams({ client_id: client.client_id, redirect_uri: 'https://client.example/callback', response_type: 'code', resource: origin + '/mcp', scope: 'spark:tasks', state: 'synthetic-test', code_challenge: digest(verifier), code_challenge_method: 'S256' })
   const page = await req('/authorize?' + params)
   assert.equal(page.status, 200)
+  // no-referrerだとブラウザがフォームPOSTのOriginをnullにし、同意が必ずinvalid_originになる
+  assert.equal(page.headers.get('Referrer-Policy'), 'same-origin')
+  for (const path of ['/icon-192.png', '/favicon.ico']) {
+    const icon = await req(path)
+    assert.equal(icon.status, 200)
+    assert.equal(icon.headers.get('Content-Type'), 'image/png')
+    assert.deepEqual([...new Uint8Array(await icon.arrayBuffer()).slice(0, 4)], [0x89, 0x50, 0x4e, 0x47])
+  }
+  assert.equal((await req('/icon-192.png?x=1')).status, 404)
   const html = await page.text()
   assert.ok(!html.includes('<script>悪意'))
   const handle = html.match(/name="handle" value="([^"]+)"/)[1]

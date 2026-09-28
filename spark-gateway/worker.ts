@@ -1,6 +1,7 @@
 import { DurableObject } from 'cloudflare:workers'
 import { OAuthProvider, type OAuthHelpers, type OAuthResourceContext } from '@cloudflare/workers-oauth-provider'
 import { allowedSparkRemoteRequest } from '../src/spark-remote-policy'
+import { ICONS } from './icons'
 
 type Bindings = Env & { OAUTH_PROVIDER: OAuthHelpers }
 const headers = { 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer', 'X-Content-Type-Options': 'nosniff' }
@@ -102,8 +103,10 @@ const authHandler = {
       const consent = await oauth.beginConsent(auth)
       consent.headers.set('Content-Type', 'text/html; charset=utf-8')
       consent.headers.set('Cache-Control', 'no-store')
-      consent.headers.set('Referrer-Policy', 'no-referrer')
-      return new Response(`<!doctype html><html lang="ja"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>katazuku Spark 接続</title><h1>katazuku Spark 接続</h1><p>接続アプリ: ${escape(details.clientName)}（アプリ名は自己申告です）</p><p>戻り先: ${escape(details.redirectHost)}</p><p>許可する操作: 調査・草案の依頼追加、依頼一覧・進捗・結果の取得。</p><p>メール送信・予約確定・コマンド実行は含みません。</p><form method="post"><input type="hidden" name="handle" value="${escape(consent.handle)}"><label>専用の接続キー <input type="password" name="ownerKey" autocomplete="current-password" required></label><p><button name="decision" value="approve">接続を許可</button><button name="decision" value="deny" formnovalidate>キャンセル</button></p></form></html>`, { headers: consent.headers })
+      // no-referrer だとChromeはフォームPOSTのOriginをnullにし、下のOrigin照合で必ず弾かれる。
+      // same-originなら自分宛てにだけOriginが付き、戻り先(外部)へは何も送らない。
+      consent.headers.set('Referrer-Policy', 'same-origin')
+      return new Response(`<!doctype html><html lang="ja"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>katazuku Spark 接続</title><link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png"><h1>katazuku Spark 接続</h1><p>接続アプリ: ${escape(details.clientName)}（アプリ名は自己申告です）</p><p>戻り先: ${escape(details.redirectHost)}</p><p>許可する操作: 調査・草案の依頼追加、依頼一覧・進捗・結果の取得。</p><p>メール送信・予約確定・コマンド実行は含みません。</p><form method="post"><input type="hidden" name="handle" value="${escape(consent.handle)}"><label>専用の接続キー <input type="password" name="ownerKey" autocomplete="current-password" required></label><p><button name="decision" value="approve">接続を許可</button><button name="decision" value="deny" formnovalidate>キャンセル</button></p></form></html>`, { headers: consent.headers })
     }
     if (request.method !== 'POST' || request.headers.get('Origin') !== env.PUBLIC_ORIGIN) return json({ error: 'invalid_origin' }, 403)
     if (!await env.RELAY.getByName('owner').rate('login', 10)) return json({ error: 'rate_limited' }, 429)
@@ -127,6 +130,9 @@ export default {
     try {
       const url = new URL(request.url)
       if (url.origin !== env.PUBLIC_ORIGIN) return json({ error: 'invalid_host' }, 403)
+      // アイコンは公開情報。認証前に返す(Geminiのアプリ一覧と同意画面のファビコン)
+      const icon = request.method === 'GET' || request.method === 'HEAD' ? ICONS[url.pathname] : undefined
+      if (icon && !url.search) return new Response(request.method === 'HEAD' ? null : icon, { headers: { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400', 'X-Content-Type-Options': 'nosniff' } })
       if (url.pathname === '/bridge') {
         if (request.method !== 'GET' || url.search || request.headers.has('Origin')) return json({ error: 'forbidden' }, 403)
         const protocols = request.headers.get('Sec-WebSocket-Protocol')?.split(',').map(p => p.trim()) || []
