@@ -4,6 +4,9 @@ Sparkのカスタムアプリに`https://<専用ホスト>/mcp`を登録し(PC�
 常駐PC(自宅のミニPC等)のbridgeが外向きに接続するので、ルーターや常駐PCの待受ポートを公開しない。
 OAuth用KVと中継用Durable Objectだけを使用する。正本DB・写真・既存アプリのストレージはバインドしない。
 
+通常はリポジトリ直下で `npm run spark:setup` を実行すれば、以下の初期設定がすべて自動で終わります([docs/GEMINI-SPARK.md](../docs/GEMINI-SPARK.md))。
+この節は手作業で組む場合や、中身を確認したい場合のための記録です。
+
 ## 初期設定
 
 1. このディレクトリで`npm ci`を実行する。
