@@ -71,7 +71,11 @@ try {
     assert.equal(response.result.synthetic, true)
   } else {
     const response = await (await post('/mcp', { jsonrpc: '2.0', id: 3, method: 'tools/list' }, auth)).json()
-    assert.deepEqual(response.result.tools.map(t => t.name), ['spark_enqueue', 'spark_status', 'spark_list'])
+    assert.deepEqual(response.result.tools.map(t => t.name), ['katazuku_today', 'katazuku_next', 'katazuku_conflicts', 'katazuku_status', 'spark_enqueue', 'spark_status', 'spark_list'])
+    // 常駐PCの正本DBを読めること(内容は環境ごとに違うので見出し行だけ見る)
+    const today = await (await post('/mcp', { jsonrpc: '2.0', id: 5, method: 'tools/call', params: { name: 'katazuku_today', arguments: {} } }, auth)).json()
+    assert.equal(today.result.isError, false)
+    assert.match(today.result.content[0].text, /^今日 .* の予定 \d+件/)
     const requestKey = 'spark-gateway-smoke-' + Date.now()
     const call = { jsonrpc: '2.0', id: 4, method: 'tools/call', params: { name: 'spark_enqueue', arguments: { requestKey, kind: 'document', input: '合成テストです。個人情報を使わず「Spark接続テスト成功」という短い文書を作成してください。外部サイトの操作は不要です。' } } }
     const result = await (await post('/mcp', call, auth)).json()

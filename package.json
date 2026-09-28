@@ -67,6 +67,8 @@
     "spark:queue": "tsx scripts/spark-queue.ts",
     "spark:worker": "tsx scripts/spark-worker.ts",
     "spark:mcp": "tsx scripts/spark-mcp.ts",
+    "spark:setup": "node scripts/spark-setup.mjs",
+    "spark:bridge": "tsx scripts/spark-bridge.ts",
     "quick": "tsx scripts/db-quick.ts",
     "seed": "tsx examples/seed.ts",
     "doctor": "node tools/doctor.mjs",

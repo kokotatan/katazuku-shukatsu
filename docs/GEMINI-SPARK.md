@@ -53,45 +53,56 @@
 
 ## 導入手順
 
-### 1. gateway を自分の Cloudflare にデプロイする
+### 1. セットアップを実行する(1コマンド)
 
-手順と鍵の扱いは [spark-gateway/README.md](../spark-gateway/README.md) にあります。
-終わると次の2つが手元に残ります(どちらも git 管理外)。
-
-- `spark-gateway/owner-key.local.txt` — Spark と接続するときに本人確認で入力する**接続キー**
-- `BRIDGE_TOKEN` — 常駐 PC の bridge が gateway へ接続するためのトークン
-
-### 2. 常駐 PC で bridge と worker を動かす
+正本DBを置いている PC(常駐 PC)で、リポジトリ直下から実行します。
 
 ```powershell
-# bridge: gateway への常駐接続
-# logs/spark-bridge.local.json に {"origin":"https://<gatewayのホスト>","token":"<BRIDGE_TOKEN>"} を保存してから
-powershell -File scripts/register-spark-bridge.ps1
-
-# worker: Chrome の Spark へ依頼を渡す(5分間隔)
-# logs/spark-worker.local.json に {"enabled":true,"account":"<Sparkで使うGoogleアカウント>"} を保存してから
-powershell -File scripts/register-spark-worker.ps1
+npm run spark:setup
 ```
 
-`logs/` は gitignore 済みです。トークンを含むファイルは、読取権限を自分のユーザーだけに絞ってください。
-worker はブラウザ操作用のツールだけを許可して起動し、既存の MCP 設定やシェルは読み込みません。
-ログイン・MFA・権限追加が必要になった場合は自動では操作せず、その依頼を `blocked` にして止めます。
+次のことを自動で行います。何度実行しても安全で、作成済みのものは作り直しません。
 
-### 3. Spark に接続する(PC のブラウザで1回だけ)
+1. Cloudflare へのログインを確認する(未ログインならブラウザが開きます。無料プランで動きます)
+2. OAuth 用の KV と `spark-gateway/wrangler.jsonc` を作る(Worker 名は重複しないよう乱数付き)
+3. **接続キー**と bridge トークンを生成する(`spark-gateway/*.local.*`。git 対象外で、画面には出しません)
+4. gateway を `https://katazuku-spark-xxxxxx.<あなたのサブドメイン>.workers.dev` にデプロイする
+5. bridge の設定を書き、常駐登録する(Windows。macOS / Linux は `npm run spark:bridge` を launchd / systemd で起動)
+6. Gemini に貼る URL と、接続キーの場所を表示する(Windows ではブラウザと接続キーのファイルも開きます)
+
+| オプション | 用途 |
+| --- | --- |
+| `--domain spark.example.com` | Cloudflare で管理している自分のドメインに立てる |
+| `--no-register` | bridge を常駐登録しない(`npm run spark:bridge` を自分で起動する) |
+| `--no-open` | 最後にブラウザと接続キーのファイルを開かない |
+
+正本DBがまだ無い場合は、`npm run seed -- data/katazuku.db` でデモDBを作って試せます。
+
+### 2. Spark に接続する(PC のブラウザで1回だけ)
 
 カスタムアプリの追加は **PC ブラウザの gemini.google.com でしかできません**。スマホの Gemini アプリ・Spark 画面(チャット一覧だけが出る)には追加欄がありません。
 PC で一度接続すれば、同じ Google アカウントのスマホからも使えます。
 
-1. PC のブラウザで `https://gemini.google.com/apps`(アプリ連携)を開き、ページ下部の「Spark のカスタムアプリ」欄に `https://<gatewayのホスト>/mcp` を入れて「次へ」
-2. Google 側の同意のあと、gateway の同意画面で**接続キー**を入力する
-3. スマホの Spark で「katazuku にテスト用の document 依頼を1件入れて、一覧を見せて」などと頼み、常駐 PC のキューに入ることを確認する
-
-```powershell
-npm run spark:queue -- list
-```
+1. PC のブラウザで `https://gemini.google.com/apps`(アプリ連携)を開き、ページ最下部の「Spark のカスタムアプリ」欄に、セットアップが表示した `https://…/mcp` を入れて「次へ」
+2. Google 側の同意のあと、gateway の同意画面で**接続キー**を入力して「接続を許可」
+3. Spark で「@Katazuku Shukatsu 今日の就活の予定を教えて」と聞く
 
 接続キーはパスワードマネージャーなどに保管し、Spark のチャット欄やタスク本文には貼らないでください。
 接続をやめるときは Spark 側で連携を解除し、gateway の OAuth grant も失効させます(方法は gateway の README)。
+手作業で組みたい場合や、鍵の扱いの詳細は [spark-gateway/README.md](../spark-gateway/README.md) にあります。
+
+### 3. (任意)依頼を Spark に自動で渡す worker
+
+`spark_enqueue` で積んだ依頼を、常駐 PC の Chrome の Spark 画面へ自動で渡す仕組みです。予定・選考状況を読むだけなら不要です。
+Claude Code CLI と Claude in Chrome 拡張が必要です。
+
+```powershell
+# logs/spark-worker.local.json に {"enabled":true,"account":"<Sparkで使うGoogleアカウント>"} を保存してから
+powershell -File scripts/register-spark-worker.ps1
+```
+
+worker はブラウザ操作用のツールだけを許可して起動し、既存の MCP 設定やシェルは読み込みません。
+ログイン・MFA・権限追加が必要になった場合は自動では操作せず、その依頼を `blocked` にして止めます。
 
 ## 依頼できる用途
 
