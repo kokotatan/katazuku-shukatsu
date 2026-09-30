@@ -7,6 +7,7 @@
 
 ### Added
 
+- 「clone してすぐ分かる」導線: README を「使いたい人 / 開発に参加したい人」の2本立てに書き直し、資格情報ゼロの `npm run demo`、docs/SETUP.md、docs/ROADMAP.md(good first issue 候補)、セットアップ相談用の Issue テンプレートを追加。
 - npm Trusted Publishing用のGitHub Actionsと、タグ・version・公開先を検査するリリースゲート。
 
 ### Security

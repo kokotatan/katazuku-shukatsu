@@ -52,7 +52,8 @@ AIコーディングエージェント(および使い方を尋ねられたAI)�
 
 ## よくある質問(AIが即答できるように)
 
-- **どう動かす?** `npm install && npm run doctor && npm test`、次に `npm run seed`。
+- **どう動かす?** まず `npm run demo`(架空データで閲覧アプリを開く)。開発は `npm install && npm run doctor && npm test`。
+- **自分のデータで使うには?** [docs/SETUP.md](docs/SETUP.md) の順に、設定ファイル・Google・AI・定期実行。
 - **自分のデータを入れるには?** 正本DBのパスは環境変数 `KATAZUKU_DB`。書き込みは `src/db-apply*.ts` 経由(エージェントが書き手)。
 - **設定は?** `examples/config-gui.html` をブラウザで開く。設定は `schemas/settings.schema.json` が唯一の真実。
 - **複数デバイスは?** 単一デバイス前提。移送は `npm run backup` の1ファイルで(クラウド同期フォルダ直下に正本を置かない)。

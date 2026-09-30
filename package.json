@@ -49,6 +49,7 @@
     "node": ">=22.5.0"
   },
   "scripts": {
+    "demo": "node scripts/demo.mjs",
     "test:recording": "tsx tests/check-recording-eligibility.ts",
     "check": "npm run scan && npm run typecheck && npm run build && npm test && npm run cloudflare:check",
     "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",

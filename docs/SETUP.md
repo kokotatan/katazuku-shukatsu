@@ -1,0 +1,136 @@
+# セットアップ(自分のデータで使う)
+
+所要時間の目安は30〜60分です(Google Cloud の画面操作がいちばん長い)。
+途中で詰まったら、[Issue の「セットアップで困った」](https://github.com/kokotatan/katazuku-shukatsu/issues/new/choose) で気軽に聞いてください。
+
+まだなら、先に [5分デモ](../README.md#5分で試す資格情報ゼロ) で画面を見ておくと、何ができるようになるかが分かります。
+
+## 0. 必要なもの
+
+- Node.js 22.5 以上(推奨 24): <https://nodejs.org/>
+- Git
+- Google アカウント(就活用のもの)
+- AIのどれか1つ: ChatGPT のプラン / Claude Code / Codex / API キー(→ [4. AIを選ぶ](#4-aiを選ぶ))
+
+```sh
+git clone https://github.com/kokotatan/katazuku-shukatsu.git
+cd katazuku-shukatsu
+npm install
+npm run doctor     # OS・Node・node:sqlite が使えるかの診断
+```
+
+## 1. 設定ファイルを作る
+
+```sh
+cp katazuku.config.example.json katazuku.config.json      # Windows(PowerShell)なら Copy-Item
+```
+
+`katazuku.config.json` を開いて、少なくとも次を自分の値にします(このファイルは gitignore 済みで、コミットされません)。
+
+- `profile.displayName` — ブリーフでの呼び名
+- `profile.signature` — 返信下書きの署名(1行ずつ)
+- `google.accounts` — 就活用の Google アカウント。`primary: true` を1つだけ
+- `agent.providerOrder` — 使うAIの順番(4で決める)
+
+秘密値(API キーなど)は設定ファイルに書かず、`.env` に書きます(`.env.example` をコピー)。
+
+## 2. Google につなぐ(自分の OAuth クライアント)
+
+katazuku は Google のログイン画面を持ちません。**あなた自身の Google Cloud プロジェクト**で OAuth クライアントを作り、
+Gmail・カレンダーの読み書きを、あなたのPCの中だけで許可します。
+
+1. <https://console.cloud.google.com/> で新しいプロジェクトを作る(名前は何でもよい)。
+2. 「API とサービス」→「ライブラリ」で **Gmail API** と **Google Calendar API** を有効にする。
+3. 「OAuth 同意画面」を作る。ユーザーの種類は「外部」、公開ステータスは「テスト」のままでよい。
+   「テストユーザー」に自分の就活用アカウントを追加する(テスト中は追加した人しかログインできない=自分専用)。
+4. 「認証情報」→「OAuth クライアント ID を作成」→ 種類は **デスクトップアプリ**。クライアントIDとシークレットを控える。
+   これらは `.env`(`GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET`)にだけ書き、コミットしない。
+5. [google-workspace MCP(workspace-mcp)](https://github.com/taylorwilsdon/google_workspace_mcp) を、
+   そのクライアントIDとシークレットで Claude Code / Codex に登録し、就活用アカウントで一度ログインする。
+   ログインすると `~/.google_workspace_mcp/credentials/<メールアドレス>.json` にトークンが保存され、
+   katazuku の決定的な取得スクリプト(Gmail・カレンダーの読み取り)もそれを再利用します
+   (置き場所を変えたら `google.credentialsDir` に書く)。
+
+補足:
+- テスト中の OAuth クライアントのトークンは、Google の仕様で一定期間ごとに再ログインが必要になることがあります。
+  番犬(watchdog)が取得失敗を検知したら、5 の手順でログインし直してください。
+- 多くの人に配る「公開」クライアントにするには Google の審査(OAuth 検証)が必要です。自分用なら不要です。
+
+確認:
+
+```sh
+npx tsx scripts/gmail-fetch.ts logs/check-mail.local.json --days 1     # 取得できた件数が出れば成功(読み取りのみ)
+```
+
+## 3. 正本DBを作る
+
+最初の日次同期が自動で作ります。すでに手元の選考情報がある場合は、会話でエージェントに頼んで
+`src/db-apply.ts` 経由で入れてもらうのが安全です(遷移規則と名寄せを通るため)。
+
+## 4. AIを選ぶ
+
+いちばんかんたんなのは ChatGPT のプランです(ブラウザで許可するだけ)。全部の機能をAIに任せるなら、
+ツールを使える Claude Code か Codex を1つ入れてください。詳しい比較は [AI-PROVIDERS.md](AI-PROVIDERS.md)。
+
+```sh
+npm run chatgpt -- signin      # ChatGPT プラン: ブラウザで「Continue with ChatGPT」→ 許可
+claude                         # Claude Code: 本人がログイン(katazuku はログインを扱わない)
+codex login                    # Codex: 本人がログイン
+```
+
+`katazuku.config.json` の例:
+
+```json
+{ "agent": { "providerOrder": ["claude-cli", "codex-cli", "chatgpt-siwc"] } }
+```
+
+## 5. 外に触れずに確認する
+
+```sh
+npm run workflow -- mail-watch --dry-run
+npm run workflow -- daily-sync --dry-run
+npm run workflow -- asa --dry-run
+```
+
+使うAIの順番・渡す能力・プロンプトが表示されます。ここで、アカウント一覧や署名が自分の値になっているかを確認します。
+
+## 6. 毎日のワークフローを登録する
+
+```sh
+# Windows
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\register-tasks.ps1
+
+# macOS / Linux(出力を確認してから自分で貼る)
+npm run schedule:print -- cron
+```
+
+登録後、次の朝に `logs/briefs/` に「きょうやること」ができていれば動いています。
+ワークフローごとの時刻・中身・止め方は [WORKFLOWS.md](WORKFLOWS.md)。
+
+## 7. アプリで見る
+
+```sh
+npm run snapshot                 # 正本DB → 各アプリの public/snapshot.json(gitignore 済み)
+cd board && npm ci && npm run dev
+```
+
+ワークフローは実行のたびにスナップショットを更新します。
+
+## 8. バックアップ
+
+```sh
+npm run backup    # 正本DBを1ファイルに退避(クラウド同期フォルダ直下に正本を置かない)
+```
+
+## やめるとき
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\register-tasks.ps1 -Unregister
+```
+
+```sh
+npm run chatgpt -- signout       # ChatGPT のセッションを失効させる
+```
+
+データは `data/`・`logs/` にだけあります。フォルダごと消せば残りません
+(Google 側の許可は <https://myaccount.google.com/permissions> から取り消せます)。
