@@ -7,7 +7,6 @@
 
 ### Added
 
-- 開発者でなくても使えるデスクトップアプリの設計(docs/DESKTOP-APP.md)と骨組み(desktop/、Electron・ローカル動作)。
 - npm Trusted Publishing用のGitHub Actionsと、タグ・version・公開先を検査するリリースゲート。
 
 ### Security
