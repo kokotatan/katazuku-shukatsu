@@ -167,3 +167,6 @@ mirror-out.json
 *.db-wal
 *.db-shm
 *.db-journal
+
+# 自動運転ワークフローの個人設定(雛形は katazuku.config.example.json)
+katazuku.config.json

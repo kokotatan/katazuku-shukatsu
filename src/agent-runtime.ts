@@ -2,8 +2,17 @@ import { spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { access, mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises'
 import { delimiter, dirname, join, resolve } from 'node:path'
+import { createAnthropicApiAdapter } from './providers/anthropic-api.js'
+import { createChatGptPlanAdapter } from './providers/chatgpt-siwc.js'
+import { createOpenAiApiAdapter } from './providers/openai-api.js'
 
-export const PROVIDER_IDS = ['codex', 'claude', 'codex-oss'] as const
+/**
+ * 実行できる provider。
+ * - claude / codex / codex-oss: 利用者が自分でログインしたローカルCLIを子プロセスとして動かす(ツールあり)
+ * - anthropic-api / openai-api: 利用者自身のAPIキーでHTTPを呼ぶ(ツールなし・文章生成だけ)
+ * - chatgpt-siwc: 「Sign in with ChatGPT」で許可された本人のChatGPTプランを使う(ローカル完結・ツールなし)
+ */
+export const PROVIDER_IDS = ['codex', 'claude', 'codex-oss', 'anthropic-api', 'openai-api', 'chatgpt-siwc'] as const
 export type ProviderId = (typeof PROVIDER_IDS)[number]
 export type AgentRisk = 'read-only' | 'db-write' | 'external-draft' | 'external-commit'
 /**
@@ -57,6 +66,8 @@ export interface ProcessResult {
   timedOut: boolean
   errorCode?: string
   durationMs: number
+  /** HTTP型 provider が層の内側で確定した失敗の分類。あれば本文の文言から推測しない */
+  failureHint?: FailureCode
 }
 
 export type ProcessExecutor = (invocation: ProcessInvocation, timeoutMs: number) => Promise<ProcessResult>
@@ -79,6 +90,11 @@ export interface AgentAdapter {
   buildInvocation(request: AgentRunRequest, paths: AdapterPaths): ProcessInvocation
   readOutput(result: ProcessResult, paths: AdapterPaths): Promise<string>
   detectPossibleSideEffect(result: ProcessResult): boolean
+  /**
+   * 子プロセスではなく自前で実行する provider(HTTP API 等)だけが実装する。
+   * あれば runAgent は buildInvocation / execute の代わりにこれを呼ぶ(buildInvocation は表示用)。
+   */
+  run?(request: AgentRunRequest, paths: AdapterPaths, timeoutMs: number): Promise<ProcessResult>
 }
 
 export interface AgentAttempt {
@@ -137,6 +153,7 @@ const CLAUDE_EXTRA_CAPABILITIES = [
   'gmail.draft',
   'gmail.labels',
   'gmail.send',
+  'gmail.send.self',
   'calendar.read',
   'calendar.write',
   'drive.read',
@@ -156,7 +173,8 @@ const CLAUDE_EXTRA_CAPABILITIES = [
 export const DEFAULT_CAPABILITY_TOOLS: Record<string, string[]> = {
   'workspace.read': ['Read', 'Glob', 'Grep'],
   'workspace.write': ['Write', 'Edit'],
-  shell: ['PowerShell'],
+  // Windows の Claude Code は PowerShell、macOS / Linux は Bash を使う。どちらのOSでも同じ能力名で通す
+  shell: ['Bash', 'PowerShell'],
   'web.search': ['WebSearch', 'WebFetch'],
   // read 能力は「読み取り専用」のツール名だけに絞る(#20)。connector 全体の *gmail* 等の
   // ワイルドカードは send/modify まで含むため、read に渡すと「読むだけ」のつもりで送れてしまう。
@@ -164,13 +182,16 @@ export const DEFAULT_CAPABILITY_TOOLS: Record<string, string[]> = {
   'gmail.read': ['mcp__google-workspace__search_gmail_messages', 'mcp__google-workspace__get_gmail_*', 'mcp__google-workspace__list_gmail_*'],
   'gmail.draft': ['mcp__google-workspace__draft_gmail_message'],
   'gmail.labels': ['mcp__google-workspace__manage_gmail_label', 'mcp__google-workspace__modify_gmail_message_labels', 'mcp__google-workspace__batch_modify_gmail_message_labels'],
-  'gmail.send': ['mcp__claude_ai_Gmail__*', 'mcp__google-workspace__send_gmail_message'],
+  // 送信は2段に分ける。gmail.send.self は「本人宛の通知(朝のまとめ・前夜ブリーフ)」専用で、
+  // 第三者宛の送信は本人承認を経た別経路だけが gmail.send を使う(無人ワークフローには渡さない)。
+  'gmail.send': ['mcp__google-workspace__send_gmail_message'],
+  'gmail.send.self': ['mcp__google-workspace__send_gmail_message'],
   'calendar.read': ['mcp__google-workspace__get_events', 'mcp__google-workspace__list_calendars', 'mcp__google-workspace__query_freebusy'],
-  'calendar.write': ['mcp__claude_ai_Google_Calendar__*', 'mcp__google-workspace__manage_event', 'mcp__google-workspace__create_calendar'],
+  'calendar.write': ['mcp__google-workspace__manage_event', 'mcp__google-workspace__create_calendar'],
   'drive.read': ['mcp__google-workspace__search_drive_files', 'mcp__google-workspace__get_drive_file_content', 'mcp__google-workspace__list_drive_items'],
   'sheets.read': ['mcp__google-workspace__read_sheet_values', 'mcp__google-workspace__get_spreadsheet_info', 'mcp__google-workspace__list_spreadsheets'],
-  'sheets.write': ['mcp__claude_ai_Google_Drive__*', 'mcp__google-workspace__modify_sheet_values', 'mcp__google-workspace__append_table_rows'],
-  'browser.interact': ['mcp__claude-in-chrome__*', 'mcp__claude_ai_Chrome__*'],
+  'sheets.write': ['mcp__google-workspace__modify_sheet_values', 'mcp__google-workspace__append_table_rows'],
+  'browser.interact': ['mcp__claude-in-chrome__*'],
   'voice.transcribe': ['mcp__voicebox__*'],
 }
 
@@ -178,11 +199,15 @@ function unique<T>(items: T[]): T[] {
   return [...new Set(items)]
 }
 
+/** 利用者に見せる名前(何で動くかが分かる名前)を実行契約のIDへ寄せる */
+const PROVIDER_ALIASES: Record<string, ProviderId> = { 'claude-cli': 'claude', 'codex-cli': 'codex' }
+
 export function parseProviderOrder(value?: string): ProviderId[] {
   const values = (value ?? '')
     .split(',')
     .map((item) => item.trim())
     .filter(Boolean)
+    .map((item) => PROVIDER_ALIASES[item] ?? item)
   const invalid = values.filter((item) => !PROVIDER_IDS.includes(item as ProviderId))
   if (invalid.length) throw new Error('未知のproviderです: ' + invalid.join(', '))
   const order = unique(values as ProviderId[])
@@ -208,6 +233,38 @@ function hasBlockingRateLimitEvent(text: string): boolean {
   return false
 }
 
+/**
+ * 利用枠判定に使ってよいprovider由来の信号だけを取り出す。
+ *
+ * CodexのJSONLには command_execution の aggregated_output として、agentが読んだソースや
+ * コマンド出力も入る。そこにドキュメントの「weekly limit」説明があるだけで枠切れと誤判定すると、
+ * 正常runの後にprovider-healthが汚染され、定常処理が数日止まる。
+ * stderr、非JSONの旧CLI出力、明示的なエラー/rate-limit eventだけを信頼する。
+ */
+function quotaSignalText(result: ProcessResult): string {
+  const signals = [result.stderr]
+  for (const line of result.stdout.split(/\r?\n/).filter(Boolean)) {
+    try {
+      const event = JSON.parse(line) as { type?: unknown; is_error?: unknown; item?: { type?: unknown } }
+      const type = typeof event.type === 'string' ? event.type.toLowerCase() : ''
+      const itemType = typeof event.item?.type === 'string' ? event.item.type.toLowerCase() : ''
+      if (
+        type === 'rate_limit_event' ||
+        type === 'error' ||
+        type === 'turn.failed' ||
+        (type === 'result' && event.is_error === true) ||
+        (type === 'item.completed' && itemType === 'error')
+      ) {
+        signals.push(line)
+      }
+    } catch {
+      // 旧CLIの非構造化出力ではprovider本文とtool出力を分離できないため従来どおり読む。
+      signals.push(line)
+    }
+  }
+  return signals.join('\n').toLowerCase()
+}
+
 function classifyKnownFailure(result: ProcessResult): FailureCode | undefined {
   if (result.errorCode === 'ENOENT') return 'command_missing'
   if (result.timedOut) return 'timeout'
@@ -217,9 +274,10 @@ function classifyKnownFailure(result: ProcessResult): FailureCode | undefined {
   if (/unexpected argument|unrecognized (option|argument|subcommand)|invalid value for|for more information, try '--help'/.test(text)) {
     return 'command_missing'
   }
+  const quotaText = quotaSignalText(result)
   if (
-    /weekly limit|usage limit|quota( has been)? exceeded|credit balance|out of extra usage|maximum.*usage/.test(text) ||
-    hasBlockingRateLimitEvent(text)
+    /weekly limit|usage limit|quota( has been)? exceeded|credit balance|out of extra usage|maximum.*usage/.test(quotaText) ||
+    hasBlockingRateLimitEvent(quotaText)
   ) {
     return 'quota_exhausted'
   }
@@ -260,6 +318,7 @@ export function detectProcessFailure(
   result: ProcessResult,
   abortPatterns: RegExp[] = DEFAULT_ABORT_PATTERNS,
 ): FailureCode | undefined {
+  if (result.failureHint) return result.failureHint
   const known = classifyKnownFailure(result)
   if (result.exitCode === 0 && !result.signal && !result.errorCode) {
     // Codexは途中で回復したtool errorもJSON eventへ残す。最終終了が成功なら、それを
@@ -480,6 +539,23 @@ export function buildProviderEnv(invocationEnv?: NodeJS.ProcessEnv, allowlist: s
   return { ...out, ...invocationEnv }
 }
 
+/**
+ * プロセスツリーごと止める。provider CLIがMCPの承認待ち等で固まると、親だけ殺しても
+ * 孫(node / MCPサーバ)が孤児として残り、次の定期実行を塞ぐ。
+ */
+function killProcessTree(child: ReturnType<typeof spawn>): void {
+  if (!child.pid) return
+  try {
+    if (process.platform === 'win32') {
+      spawn('taskkill', ['/PID', String(child.pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' })
+    } else {
+      process.kill(-child.pid, 'SIGTERM')
+    }
+  } catch {
+    child.kill()
+  }
+}
+
 export const executeProcess: ProcessExecutor = async (invocation, timeoutMs) => {
   const started = Date.now()
   let command = invocation.command
@@ -516,6 +592,8 @@ export const executeProcess: ProcessExecutor = async (invocation, timeoutMs) => 
         cwd: invocation.cwd,
         env: buildProviderEnv(invocation.env, invocation.envAllowlist),
         windowsHide: true,
+        // POSIXでは独立したプロセスグループにし、時間切れ時に孫(MCPサーバ等)まで落とせるようにする
+        detached: process.platform !== 'win32',
         stdio: ['pipe', 'pipe', 'pipe'],
       })
     } catch (error) {
@@ -524,7 +602,7 @@ export const executeProcess: ProcessExecutor = async (invocation, timeoutMs) => 
     }
     timer = setTimeout(() => {
       timedOut = true
-      child.kill()
+      killProcessTree(child)
     }, timeoutMs)
     // stdio は 'pipe' で spawn しているため各ストリームは非nullだが、型上は null 許容なので明示する。
     child.stdout?.on('data', (chunk) => { stdout += String(chunk) })
@@ -718,6 +796,7 @@ const GOOGLE_WORKSPACE_CAPABILITIES = [
   'gmail.draft',
   'gmail.labels',
   'gmail.send',
+  'gmail.send.self',
   'calendar.read',
   'calendar.write',
   'drive.read',
@@ -782,6 +861,8 @@ export interface AdapterOptions {
    * どのMCPサーバを入れているかは環境ごとに違うので、ここで差し替える(#8)。
    */
   capabilityTools?: Record<string, string[]>
+  /** Codex CLIへnative structured-output schemaを渡す(全propertyがrequiredのschemaだけで有効化する) */
+  nativeOutputSchema?: boolean
 }
 
 // 現行のcodex execは`--search`を持たず、web検索はconfig override(tools.web_search)で有効化する。
@@ -820,7 +901,12 @@ export function createCodexAdapter(options: AdapterOptions, id: 'codex' | 'codex
         args.push('-c', `mcp_servers.voicebox.url=${JSON.stringify(options.voiceboxMcpUrl)}`)
         args.push('-c', 'mcp_servers.voicebox.http_headers={"X-Voicebox-Client-Id"="codex"}')
       }
-      if (request.outputSchemaPath) args.push('--output-schema', resolve(request.outputSchemaPath))
+      // Codex/OpenAIのnative structured outputは、objectの全propertiesをrequiredへ列挙する制約がある。
+      // katazukuの業務schemaは任意項目を持つため、そのまま渡すと実行前に invalid_json_schema で落ちる。
+      // 通常はプロンプトでJSONを要求し、provider非依存の validateOutput で同じschemaを強制する。
+      if (request.outputSchemaPath && options.nativeOutputSchema) {
+        args.push('--output-schema', resolve(request.outputSchemaPath))
+      }
       if (options.profile) args.push('--profile', options.profile)
       if (options.model) args.push('--model', options.model)
       if (id === 'codex-oss') args.push('--oss', '--local-provider', options.localProvider ?? 'ollama')
@@ -859,7 +945,20 @@ export function createClaudeAdapter(options: AdapterOptions): AgentAdapter {
       const args = ['-p', '--output-format', 'stream-json', '--verbose']
       if (tools.length) args.push('--allowedTools', ...tools)
       if (options.model) args.push('--model', options.model)
-      return { command: options.command, args, stdin: request.prompt, cwd: request.cwd }
+      // claude.ai 側のコネクタ(Gmail/Calendar等)は katazuku と別認証で、未接続のまま読み込まれると
+      // 自動実行のたびに接続を促す通知が本人へ飛ぶ。Googleは google-workspace MCP だけを使う。
+      // MCPサーバの起動が既定の待ち時間に収まらず接続失敗する事故があったため、待ち時間も延ばす。
+      return {
+        command: options.command,
+        args,
+        stdin: request.prompt,
+        cwd: request.cwd,
+        env: {
+          ENABLE_CLAUDEAI_MCP_SERVERS: 'false',
+          MCP_TIMEOUT: process.env.MCP_TIMEOUT ?? '180000',
+          MCP_TOOL_TIMEOUT: process.env.MCP_TOOL_TIMEOUT ?? '180000',
+        },
+      }
     },
     async readOutput(result) {
       return readClaudeResult(result.stdout)
@@ -930,7 +1029,7 @@ async function findBundledCodex(env: NodeJS.ProcessEnv): Promise<string | undefi
   }
 }
 
-export async function resolveProviderCommands(env: NodeJS.ProcessEnv = process.env): Promise<Record<ProviderId, string>> {
+export async function resolveProviderCommands(env: NodeJS.ProcessEnv = process.env): Promise<Record<'codex' | 'claude' | 'codex-oss', string>> {
   const configuredCodex = env.KATAZUKU_CODEX_COMMAND
   const configuredClaude = env.KATAZUKU_CLAUDE_COMMAND
   let codex = configuredCodex
@@ -966,6 +1065,7 @@ export async function createDefaultAdapters(
       extraCapabilities: codexExtraCapabilities,
       webSearchArgs: parseWebSearchArgs(env.KATAZUKU_CODEX_WEB_SEARCH),
       voiceboxMcpUrl: env.KATAZUKU_VOICEBOX_MCP_URL,
+      nativeOutputSchema: env.KATAZUKU_CODEX_NATIVE_OUTPUT_SCHEMA === '1',
     }),
     createClaudeAdapter({
       command: commands.claude,
@@ -980,6 +1080,10 @@ export async function createDefaultAdapters(
       webSearchArgs: parseWebSearchArgs(env.KATAZUKU_CODEX_OSS_WEB_SEARCH ?? env.KATAZUKU_CODEX_WEB_SEARCH),
       localProvider: env.KATAZUKU_LOCAL_PROVIDER === 'lmstudio' ? 'lmstudio' : 'ollama',
     }, 'codex-oss'),
+    // HTTP型は資格情報が無ければ preflight で安全に飛ばされる(副作用前の失敗)。順番に入れたときだけ使われる
+    createAnthropicApiAdapter({ env }),
+    createOpenAiApiAdapter({ env }),
+    createChatGptPlanAdapter({ env }),
   ]
 }
 
@@ -1028,6 +1132,9 @@ export async function runAgent(request: AgentRunRequest, options: RunAgentOption
     ? await readProviderHealth(options.healthFile)
     : { schemaVersion: 1, providers: {} }
   const quotaCooldownMs = options.quotaCooldownMs ?? 6 * 60 * 60_000
+  // 復活予定の上限。週次・月次の利用枠で1週間を超える停止はあり得ないので頭を押さえる。
+  // 「resets Jul 26」を年跨ぎと誤読して約1年後を書き込み、providerを締め出し続けた実例がある。
+  const quotaCooldownCapMs = 7 * 24 * 60 * 60_000
 
   for (let index = 0; index < order.length; index += 1) {
     const provider = order[index]
@@ -1099,8 +1206,10 @@ export async function runAgent(request: AgentRunRequest, options: RunAgentOption
     }
 
     const finalOutputPath = join(runDir, attemptId + '-final.local.txt')
-    const invocation = adapter.buildInvocation(attemptRequest, { finalOutputPath })
-    const processResult = await execute(invocation, attemptRequest.timeoutMs ?? 30 * 60_000)
+    const timeoutMs = attemptRequest.timeoutMs ?? 30 * 60_000
+    const processResult = adapter.run
+      ? await adapter.run(attemptRequest, { finalOutputPath }, timeoutMs)
+      : await execute(adapter.buildInvocation(attemptRequest, { finalOutputPath }), timeoutMs)
     const failure = detectProcessFailure(processResult)
     if (failure) {
       const possibleSideEffect = adapter.detectPossibleSideEffect(processResult)
@@ -1115,9 +1224,10 @@ export async function runAgent(request: AgentRunRequest, options: RunAgentOption
         const combined = processResult.stderr + '\n' + processResult.stdout
         const parsedReset = parseQuotaResetAt(combined, now())
         // 復活直後の時計差・反映遅延で再度失敗しないよう2分だけ猶予を置く。
-        const unavailableUntil = parsedReset
+        const proposedUntil = parsedReset
           ? new Date(parsedReset.getTime() + 2 * 60_000)
           : new Date(now().getTime() + quotaCooldownMs)
+        const unavailableUntil = new Date(Math.min(proposedUntil.getTime(), now().getTime() + quotaCooldownCapMs))
         health.providers[provider] = {
           failure,
           detectedAt: now().toISOString(),
