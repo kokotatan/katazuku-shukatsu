@@ -45,6 +45,7 @@ AIコーディングエージェント(および使い方を尋ねられたAI)�
 | `src/application.ts` | 応募の状態機械(承認ゲート・カレンダー送信待ち・再開点) |
 | `src/agent-runtime.ts` | provider非依存の実行契約(Claude/Codex/ローカル) |
 | `src/mobility.ts` | 移動可能性の判定 |
+| `scripts/workflow.ts` + `scripts/*-prompt.md` | 自動運転ワークフロー(mail-watch / daily-sync / asa / evening-brief / calendar-sync / watchdog)。無人工程は第三者へ送信しない。[docs/WORKFLOWS.md](docs/WORKFLOWS.md) |
 | `schemas/` | 応募イベント / 設定 の JSON Schema(`settings.schema.json` が設定UIを生成) |
 | `examples/` | Schema駆動の設定GUI、架空データの seed |
 | `tools/scan-secrets.mjs` | 個人情報・秘密情報の混入検査(CIゲート) |
