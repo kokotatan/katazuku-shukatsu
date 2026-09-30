@@ -1,0 +1,122 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "katazuku/katazuku-config.schema.json",
+  "title": "katazuku 自動運転ワークフローの設定(katazuku.config.json)",
+  "description": "個人の値(アカウント・署名・通知先)はこのファイルにだけ書く。katazuku.config.json は gitignore 済み。雛形は katazuku.config.example.json。",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "displayName": { "type": "string", "description": "ブリーフや下書きで使う本人の呼び名" },
+        "graduationYear": { "type": "integer", "minimum": 2020, "maximum": 2100 },
+        "timezone": { "type": "string", "description": "IANA タイムゾーン。既定 Asia/Tokyo" },
+        "signature": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "返信下書きの署名(1行ずつ)。電話番号などをコードやプロンプトへ直書きしないための置き場"
+        },
+        "interviewReminders": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "前夜ブリーフの末尾に毎回そのまま載せる、自分で決めた心構え・話す核(任意)"
+        }
+      }
+    },
+    "google": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "accounts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "email"],
+            "properties": {
+              "id": { "type": "string", "pattern": "^[a-z0-9-]+$", "description": "短い識別子(例: main / school)" },
+              "email": { "type": "string" },
+              "primary": { "type": "boolean", "description": "就活予定を登録する主アカウント。1つだけ true にする" },
+              "calendars": {
+                "enum": ["all-visible", "primary"],
+                "description": "all-visible=表示中の全カレンダー(祝日等は除外) / primary=主カレンダーのみ"
+              }
+            }
+          }
+        },
+        "credentialsDir": {
+          "type": "string",
+          "description": "Google OAuth の保存済みトークン(<email>.json)の置き場。既定は workspace-mcp と同じ ~/.google_workspace_mcp/credentials"
+        },
+        "calendarPastDays": { "type": "integer", "minimum": 1, "maximum": 60 },
+        "calendarFutureDays": { "type": "integer", "minimum": 7, "maximum": 365 }
+      }
+    },
+    "agent": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "providerOrder": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1,
+          "description": "上から順に試す。claude-cli / codex-cli / codex-oss(と、対応していれば API・ChatGPT プラン系)。副作用を始める前の失敗だけ次へ回る"
+        },
+        "localModelWorkflows": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "ローカルモデル(codex-oss)に任せてよいワークフロー。ここに無いものはローカルモデルへ流さない(既定は読み物系だけ)"
+        }
+      }
+    },
+    "notify": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "selfEmail": { "type": "boolean", "description": "朝のまとめ・前夜ブリーフを主アカウントの自分宛メールで届ける。false ならファイル(logs/briefs/)とデスクトップ通知だけ" },
+        "desktop": { "type": "boolean", "description": "OSのデスクトップ通知を出す" }
+      }
+    },
+    "mail": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "searchTerms": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "日次同期でメールを拾う語。空なら既定の就活語彙"
+        },
+        "promoSenderDomains": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "宣伝・スカウト扱いにする送信元ドメイン(就活ナビなど)。受信トレイ整理と緊急判定で使う"
+        }
+      }
+    },
+    "workflows": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mailWatch": { "$ref": "#/$defs/toggle" },
+        "dailySync": { "$ref": "#/$defs/toggle" },
+        "asa": { "$ref": "#/$defs/toggle" },
+        "eveningBrief": { "$ref": "#/$defs/toggle" },
+        "calendarSync": { "$ref": "#/$defs/toggle" },
+        "inboxTidy": { "$ref": "#/$defs/toggle" },
+        "watchdog": { "$ref": "#/$defs/toggle" }
+      }
+    }
+  },
+  "$defs": {
+    "toggle": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" }
+      }
+    }
+  }
+}
