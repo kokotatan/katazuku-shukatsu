@@ -11,6 +11,7 @@ import { mkdirSync, rmSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { ensurePlatformSchema } from './platform.js'
 import { ensureCareerSupportSchema } from './career-support-schema.js'
+import { ensureWorkflowSchema } from './workflow-schema.js'
 
 export interface Selection {
   id?: number
@@ -132,7 +133,7 @@ export function openDb(path: string): DatabaseSync {
 }
 
 /** 現行スキーマの版。マイグレーションを足すたびに +1 し、`MIGRATIONS` に1本足す */
-export const SCHEMA_VERSION = 3
+export const SCHEMA_VERSION = 4
 
 /**
  * 版ゲート方式のマイグレーション(#10)。
@@ -196,6 +197,12 @@ const MIGRATIONS: Migration[] = [
     description: '応募先企業と分離した就活支援組織・支援面談を追加',
     destructive: false,
     up: (db) => ensureCareerSupportSchema(db),
+  },
+  {
+    version: 4,
+    description: '自動運転ワークフロー用: 提出物台帳・空き判定用の予定投影・外部取得の鮮度・可動タスク列',
+    destructive: false,
+    up: (db) => ensureWorkflowSchema(db),
   },
 ]
 

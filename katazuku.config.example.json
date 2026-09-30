@@ -1,0 +1,43 @@
+{
+  "$schema": "./schemas/katazuku-config.schema.json",
+  "profile": {
+    "displayName": "就活 太郎",
+    "graduationYear": 2028,
+    "timezone": "Asia/Tokyo",
+    "signature": [
+      "就活 太郎",
+      "サンプル大学 工学部 3年",
+      "Mail: you@example.com"
+    ],
+    "interviewReminders": []
+  },
+  "google": {
+    "accounts": [
+      { "id": "main", "email": "you@example.com", "primary": true, "calendars": "all-visible" }
+    ],
+    "credentialsDir": "~/.google_workspace_mcp/credentials",
+    "calendarPastDays": 7,
+    "calendarFutureDays": 60
+  },
+  "agent": {
+    "providerOrder": ["claude-cli", "codex-cli"],
+    "localModelWorkflows": ["mail-watch", "calendar-sync", "asa", "evening-brief"]
+  },
+  "notify": {
+    "selfEmail": false,
+    "desktop": true
+  },
+  "mail": {
+    "searchTerms": [],
+    "promoSenderDomains": []
+  },
+  "workflows": {
+    "mailWatch": { "enabled": true },
+    "dailySync": { "enabled": true },
+    "asa": { "enabled": true },
+    "eveningBrief": { "enabled": true },
+    "calendarSync": { "enabled": true },
+    "inboxTidy": { "enabled": false },
+    "watchdog": { "enabled": true }
+  }
+}

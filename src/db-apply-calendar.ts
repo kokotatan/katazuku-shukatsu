@@ -9,7 +9,14 @@ import { fileURLToPath } from 'node:url'
 import type { DatabaseSync } from 'node:sqlite'
 import { isAutomaticRecordingEligible, type AutomaticRecordingCandidate } from './recording-eligibility.js'
 import { addEvent, findAppointmentMatch, openDb } from './db.js'
+import { resolveDatabasePath } from './database-path.js'
 import { resolveSelectionId, transaction, upsertPerson } from './inputs.js'
+import {
+  applyScheduleProjection,
+  type ScheduleBlockInput,
+  type ScheduleProjectionResult,
+  type SourceSyncStateInput,
+} from './schedule.js'
 
 interface CalendarEvent {
   externalId: string
@@ -27,10 +34,16 @@ interface CalendarEvent {
   sourceHash?: string
 }
 
-interface CalendarInput { events: CalendarEvent[] }
+interface CalendarInput {
+  events: CalendarEvent[]
+  /** 空き判定用の全予定投影(大学・私用・終日も含む)。選考トラックは捏造しない */
+  scheduleBlocks?: ScheduleBlockInput[]
+  /** どのアカウントのどの期間を正常に取得できたか。空き判定の鮮度・被覆の根拠になる */
+  syncStates?: SourceSyncStateInput[]
+}
 
 const dbArgIndex = process.argv.indexOf('--db')
-const DB_PATH = dbArgIndex >= 0 ? resolve(process.argv[dbArgIndex + 1]) : ((process.env.KATAZUKU_DB || process.env.KATAZUKU_DB_PATH) || join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'data', 'katazuku.db'))
+const DB_PATH = resolveDatabasePath(dbArgIndex >= 0 ? process.argv[dbArgIndex + 1] : undefined)
 
 function assertInput(value: unknown): asserts value is CalendarInput {
   if (!value || typeof value !== 'object' || !Array.isArray((value as CalendarInput).events)) {
@@ -48,7 +61,7 @@ function assertInput(value: unknown): asserts value is CalendarInput {
 export function applyCalendar(
   input: CalendarInput,
   db: DatabaseSync = openDb(DB_PATH),
-): { created: number; updated: number; unchanged: number; promoted: number } {
+): { created: number; updated: number; unchanged: number; promoted: number; schedule?: ScheduleProjectionResult } {
   return transaction(db, () => {
     const result = { created: 0, updated: 0, unchanged: 0, promoted: 0 }
     for (const event of input.events) {
@@ -173,14 +186,21 @@ export function applyCalendar(
         `).run(randomUUID(), appointmentId, new Date().toISOString())
       }
     }
-    return result
+    if (!input.scheduleBlocks && !input.syncStates) return result
+    // 全カレンダー予定は選考トラックを捏造せず schedule_block へ投影する。上で作った appointment へ externalId でリンクされる。
+    const schedule = applyScheduleProjection(db, {
+      blocks: input.scheduleBlocks,
+      syncStates: input.syncStates,
+      replaceSyncSources: Boolean(input.syncStates),
+    })
+    return { ...result, schedule }
   })
 }
 
 const currentFile = fileURLToPath(import.meta.url)
 if (process.argv[1] && currentFile === resolve(process.argv[1])) {
   const file = process.argv[2]
-  if (!file) throw new Error('使い方: npx tsx scripts/db-apply-calendar.ts <calendar.json>')
+  if (!file) throw new Error('使い方: npx tsx src/db-apply-calendar.ts <calendar.json> [--db <path>]')
   const input: unknown = JSON.parse(readFileSync(resolve(file), 'utf8'))
   assertInput(input)
   console.log(JSON.stringify(applyCalendar(input), null, 2))
