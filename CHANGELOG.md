@@ -11,6 +11,8 @@
 - 提出物台帳(submission_requirement)・空き判定用の予定投影(schedule_block)・外部取得の鮮度(source_sync_state)。スキーマ v4。
 - npm Trusted Publishing用のGitHub Actionsと、タグ・version・公開先を検査するリリースゲート。
 - AIプロバイダを追加: 自分のAPIキーで動く anthropic-api / openai-api と、ChatGPT プラン利用(Sign in with ChatGPT、chatgpt-siwc。ローカル完結・フォーム不要のOSS向け手順)。provider 名の別名 claude-cli / codex-cli。[docs/AI-PROVIDERS.md](docs/AI-PROVIDERS.md)
+- 開発者でなくても使えるデスクトップアプリ(Electron)の設計書と骨組み。初回ウィザード → サインイン → Google連携 → 定期実行、の流れを想定。
+- README を「使いたい人」「開発に参加したい人」の2入口に刷新。認証なしで架空データを試せる `npm run demo`、セットアップ手順、good first issue 候補([docs/ROADMAP.md](docs/ROADMAP.md))。
 
 ### Security
 
