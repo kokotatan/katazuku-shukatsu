@@ -7,6 +7,7 @@
 
 ### Added
 
+- AIプロバイダを追加: 自分のAPIキーで動く anthropic-api / openai-api と、ChatGPT プラン利用(Sign in with ChatGPT、chatgpt-siwc。ローカル完結・フォーム不要のOSS向け手順)。provider 名の別名 claude-cli / codex-cli。[docs/AI-PROVIDERS.md](docs/AI-PROVIDERS.md)
 - npm Trusted Publishing用のGitHub Actionsと、タグ・version・公開先を検査するリリースゲート。
 
 ### Security
