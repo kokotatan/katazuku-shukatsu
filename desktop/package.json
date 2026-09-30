@@ -1,0 +1,16 @@
+{
+  "name": "katazuku-desktop",
+  "private": true,
+  "version": "0.0.0",
+  "description": "katazuku-shukatsu のデスクトップアプリ(骨組み)。初回ウィザードでAI・Google・定期実行・閲覧アプリまでをボタンで終える。すべてローカル動作。",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "main.mjs",
+  "scripts": {
+    "start": "electron .",
+    "check": "node --check main.mjs && node --check preload.cjs && node --check renderer/wizard.js"
+  },
+  "devDependencies": {
+    "electron": "^44.5.0"
+  }
+}
