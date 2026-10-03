@@ -107,7 +107,7 @@ try {
   }
   assert(helpText.includes('Google') && helpText.includes('セットアップ'))
   assert.equal(await evaluate(help, 'typeof window.katazuku'), 'undefined')
-  await help.call('Page.close')
+  await help.call('Page.close').catch(error => { if (!error.message.includes('connection closed')) throw error })
   checks.push('同梱セットアップ手順を外部アプリなしで表示')
   await evaluate(wizard, `document.querySelector('[data-panel="2"] [data-next]').click();
     document.querySelector('[name="displayName"]').value=${JSON.stringify(form.displayName)};
