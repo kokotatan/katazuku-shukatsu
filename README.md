@@ -27,8 +27,8 @@
 | 2. [docs/SETUP.md](docs/SETUP.md) の順に、Google と AI をつなぐ | 2. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) で全体像をつかむ |
 | 3. 毎日のワークフローを登録して、朝のまとめを待つ | 3. [最初の貢献ガイド](docs/FIRST-CONTRIBUTION.md) から課題を選んで参加する |
 
-ボタンだけで始められる**無料のデスクトップアプリ**(ローカル動作・オープンソース)を
-準備中です([docs/DESKTOP-APP.md](docs/DESKTOP-APP.md))。
+**Windowsポータブル試用版**は、Node/npmなしで初回設定と架空データの8画面閲覧を開けます。
+[ビルド・実機検証と対応範囲](desktop/README.md)を確認してください。Google本人認証・実同期・定期登録・コード署名は未検証または未対応です。
 
 AIの利用料は、**あなた自身の** ChatGPT プラン(Sign in with ChatGPT)・Claude Code・Codex、または API キーで払います。
 katazuku 側のサーバや課金はありません。正本DBとローカルの閲覧データは、あなたのPCに保存します。
@@ -216,7 +216,7 @@ external commitment (sending mail, submitting forms, declining offers) to you.
 
 - **Development version.** Terminal commands and your own Google Cloud OAuth setup are currently required.
 - **Two audiences.** Users: run the [fictional-data demo](#デモで試す資格情報ゼロ), then follow
-  [docs/SETUP.md](docs/SETUP.md). A free desktop app is planned ([docs/DESKTOP-APP.md](docs/DESKTOP-APP.md)).
+  [docs/SETUP.md](docs/SETUP.md). A Windows portable trial bundles the setup wizard and synthetic demo viewers; see [desktop/README.md](desktop/README.md) for build instructions and limitations.
   Contributors: start with [Your first contribution](docs/FIRST-CONTRIBUTION.md#your-first-contribution).
   Documentation reviews, platform verification reports, and English issues or pull requests are welcome.
 - **Bring your own AI.** Sign in with ChatGPT (your ChatGPT plan), your own Claude Code or Codex login, or an API key.

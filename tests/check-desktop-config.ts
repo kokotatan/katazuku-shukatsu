@@ -84,6 +84,11 @@ try {
   if (process.platform !== 'win32') check('新規設定のモードは本人だけが読み書きできる', (statSync(target).mode & 0o777) === 0o600)
   const selected = join(root, 'selected.json')
   check('KATAZUKU_CONFIGに選んだ保存先をコアと共有する', saveDesktopConfig(root, form, { KATAZUKU_CONFIG: selected }).ok && loadConfig(root, { KATAZUKU_CONFIG: selected }).source === selected)
+  const isolated = join(root, 'isolated.json')
+  const isolatedCredentials = join(root, 'isolated-google')
+  check('配布版のGoogle認証先をアプリ保存領域へ分離する', saveDesktopConfig(root, form, {
+    KATAZUKU_CONFIG: isolated, KATAZUKU_GOOGLE_CREDENTIALS_DIR: isolatedCredentials,
+  }).ok && loadConfig(root, { KATAZUKU_CONFIG: isolated }).google.credentialsDir === isolatedCredentials)
   const ordered = join(root, 'ordered.json')
   check('選択したAIの順序とChatGPTを保持する', saveDesktopConfig(root, { ...form, providerOrder: ['chatgpt-siwc', 'claude-cli'] }, { KATAZUKU_CONFIG: ordered }).ok && loadConfig(root, { KATAZUKU_CONFIG: ordered }).agent.providerOrder.join() === 'chatgpt-siwc,claude')
   const missingParent = join(root, 'missing-parent', 'do-not-print-this.json')

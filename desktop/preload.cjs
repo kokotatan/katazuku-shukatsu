@@ -3,6 +3,7 @@ const { contextBridge, ipcRenderer } = require('electron')
 
 contextBridge.exposeInMainWorld('katazuku', {
   status: () => ipcRenderer.invoke('katazuku:status'),
+  openDemo: () => ipcRenderer.invoke('katazuku:open-demo'),
   saveConfig: (input) => ipcRenderer.invoke('katazuku:save-config', input),
   chatgptSignIn: () => ipcRenderer.invoke('katazuku:chatgpt-signin'),
   chatgptStatus: () => ipcRenderer.invoke('katazuku:chatgpt-status'),

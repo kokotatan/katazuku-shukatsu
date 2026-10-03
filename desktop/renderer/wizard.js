@@ -1,5 +1,12 @@
 // 初回ウィザードの画面側。preload が渡す window.katazuku 以外の機能は使わない。
 const api = window.katazuku
+for (const id of ['open-demo', 'open-demo-again']) document.getElementById(id).addEventListener('click', async (event) => {
+  const button = event.currentTarget
+  button.disabled = true
+  try { document.getElementById('demo-result').textContent = (await api.openDemo()).output }
+  catch { document.getElementById('demo-result').textContent = '閲覧画面を開けませんでした。アプリを開き直してください。' }
+  finally { button.disabled = false }
+})
 let step = 0
 
 function show(next) {
