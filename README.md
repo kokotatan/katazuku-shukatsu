@@ -87,7 +87,7 @@ flowchart LR
 
 ## デモで試す(資格情報ゼロ)
 
-Node.js 22.5 以上(推奨 24)が必要です。
+Node.js 22.13以降の22系、または24以降(推奨 24)が必要です。
 
 ```sh
 git clone https://github.com/kokotatan/katazuku-shukatsu.git
@@ -232,7 +232,7 @@ cd katazuku-shukatsu
 npm run demo      # eight apps on one local URL; fictional data, no accounts, no AI
 ```
 
-Requirements: Node.js 22.5+ (24 recommended). Workflows run on Windows, macOS and Linux.
+Requirements: Node.js 22.13+ in the 22.x line, or 24+ (24 recommended). Workflows run on Windows, macOS and Linux.
 The first launch installs and builds all eight apps and may take several minutes. After setup, use `npm start`
 to view your own data. The viewer binds to 127.0.0.1 and does not run workflows or change to demo data silently.
 

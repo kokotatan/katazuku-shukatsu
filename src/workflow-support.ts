@@ -54,7 +54,8 @@ export function clearAlert(name: string, root?: string): void {
 }
 
 export function listAlerts(root?: string): { name: string; text: string }[] {
-  const dir = logsDir(root)
+  const dir = join(root ?? repositoryRoot(), 'logs')
+  if (!existsSync(dir)) return []
   return readdirSync(dir)
     .filter((file) => /^alert-.+\.txt$/.test(file))
     .map((file) => ({ name: file.replace(/^alert-|\.txt$/g, ''), text: readFileSync(join(dir, file), 'utf8').trim() }))
@@ -75,7 +76,7 @@ export function appendActivity(entry: ActivityEntry, root?: string, now: Date = 
 }
 
 export function readActivity(root?: string, tail = 2000): { ts: string; by: string }[] {
-  const path = join(logsDir(root), 'activity-log.jsonl')
+  const path = join(root ?? repositoryRoot(), 'logs', 'activity-log.jsonl')
   if (!existsSync(path)) return []
   return readFileSync(path, 'utf8').split(/\r?\n/).filter(Boolean).slice(-tail).flatMap((line) => {
     try {

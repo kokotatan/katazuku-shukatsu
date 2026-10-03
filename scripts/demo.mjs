@@ -27,8 +27,8 @@ if (!APPS.includes(app)) {
   process.exit(1)
 }
 const [major, minor] = process.versions.node.split('.').map(Number)
-if (major < 22 || (major === 22 && minor < 5)) {
-  console.error(`Node.js 22.5 以上が必要です(いまは ${process.versions.node})。推奨は 24 です。`)
+if (!(major >= 24 || (major === 22 && minor >= 13))) {
+  console.error(`Node.js 22.13以降の22系、または24以降が必要です(いまは ${process.versions.node})。推奨は 24 です。`)
   process.exit(1)
 }
 

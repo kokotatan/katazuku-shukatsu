@@ -11,7 +11,7 @@ AIコーディングエージェント(および使い方を尋ねられたAI)�
 
 ## セットアップと検証
 
-- Node.js 22.5+(推奨 24)。ランタイム依存ゼロ、開発のみ tsx / typescript。
+- Node.js 22.13以降の22系、または24以降(推奨 24)。ランタイム依存ゼロ、開発のみ tsx / typescript。
 - `npm install`
 - `npm run doctor` — 環境が動かせるか診断(OS・Node・node:sqlite)
 - `npm run check` — 公開ゲート(個人情報スキャン + typecheck + テスト)。**変更はこれが通ってから**

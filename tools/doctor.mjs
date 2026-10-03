@@ -11,13 +11,13 @@ import { fileURLToPath } from 'node:url'
 const problems = []
 const notes = []
 
-// 1) Node バージョン(node:sqlite は 22.5 で追加・24 で安定)
+// 1) node:sqlite の追加フラグが不要で、readOnlyに対応するNodeを使う。
 const [maj, min] = process.versions.node.split('.').map(Number)
-const nodeOk = maj > 22 || (maj === 22 && min >= 5)
-if (!nodeOk) problems.push(`Node ${process.versions.node} は非対応。22.5 以上(推奨 24)を使ってください。`)
+const nodeOk = maj >= 24 || (maj === 22 && min >= 13)
+if (!nodeOk) problems.push(`Node ${process.versions.node} は非対応。22.13以降の22系、または24以降(推奨 24)を使ってください。`)
 else if (maj < 24) notes.push(`Node ${process.versions.node}: node:sqlite は experimental 扱い。警告が出ますが動作します(推奨 24)。`)
 
-// 2) node:sqlite が読めるか(Node 22 では --experimental-sqlite が要る場合がある)
+// 2) node:sqlite が読めるか
 let sqliteOk = false
 try {
   const m = await import('node:sqlite')
@@ -30,7 +30,7 @@ try {
     db.close?.()
   } else problems.push('node:sqlite は読めましたが DatabaseSync がありません。')
 } catch (e) {
-  problems.push(`node:sqlite を読み込めません: ${e.message}\n    → Node 22 系では NODE_OPTIONS=--experimental-sqlite が必要な場合があります。Node 24 を推奨します。`)
+  problems.push(`node:sqlite を読み込めません: ${e.message}\n    → Node 22.13以降の22系、または24以降を確認してください。Node 24 を推奨します。`)
 }
 
 // 3) 環境情報

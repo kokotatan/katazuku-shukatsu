@@ -46,7 +46,7 @@
   ],
   "sideEffects": false,
   "engines": {
-    "node": ">=22.5.0"
+    "node": "^22.13.0 || >=24.0.0"
   },
   "scripts": {
     "demo": "node scripts/local-app.mjs --demo",
@@ -96,7 +96,7 @@
     "test:migration": "tsx tests/check-migration.ts",
     "release:check": "npm run check && npm pack --dry-run && node tools/check-npm-release.mjs",
     "test:spark-gateway": "npm --prefix spark-gateway ci --no-audit --no-fund && npm --prefix spark-gateway run check",
-    "test:workflows": "tsx tests/check-workflows.ts",
+    "test:workflows": "tsx tests/check-workflows.ts && tsx tests/check-workflow-dry-run.ts",
     "test:setup": "tsx tests/check-setup-doctor.ts",
     "google:connect": "tsx scripts/google-connect.ts",
     "test:google-connect": "tsx tests/check-google-connect.ts",
