@@ -1,9 +1,12 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { mkdtemp, mkdir, writeFile, rm, symlink } from 'node:fs/promises'
+import { mkdtemp, mkdir, writeFile, rm, symlink, copyFile } from 'node:fs/promises'
+import { spawn } from 'node:child_process'
+import { once } from 'node:events'
+import { fileURLToPath } from 'node:url'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { request } from 'node:http'
+import { request, createServer } from 'node:http'
 import { createViewerServer, VIEWER_APPS, readBriefs } from '../tools/viewer-server.mjs'
 
 async function fixture(t, demo, dataAvailable = true) {
@@ -72,6 +75,36 @@ test('指定DBがなければ古いsnapshotやブリーフを表示せず、モ�
   const demo = await fixture(t, true)
   await writeFile(join(demo.root, 'logs', 'viewer-demo.local.json'), JSON.stringify({ demo: false, companies: ['real-in-demo-path'] }))
   assert.equal((await fetch(demo.url + '/board/snapshot.json')).status, 409)
+})
+
+test('起動CLIの不存在DB指定は過去の閲覧データを配信しない', async (t) => {
+  const { root } = await fixture(t, false)
+  await mkdir(join(root, 'scripts'))
+  await mkdir(join(root, 'node_modules', 'tsx', 'dist'), { recursive: true })
+  await writeFile(join(root, 'node_modules', 'tsx', 'dist', 'cli.mjs'), '')
+  await copyFile(fileURLToPath(new URL('../scripts/local-app.mjs', import.meta.url)), join(root, 'scripts', 'local-app.mjs'))
+  await copyFile(fileURLToPath(new URL('../tools/viewer-server.mjs', import.meta.url)), join(root, 'tools', 'viewer-server.mjs'))
+  await writeFile(join(root, 'board', 'public', 'snapshot.json'), JSON.stringify({ demo: false, companies: ['old-db-marker'] }))
+  const reservation = createServer()
+  await new Promise(resolve => reservation.listen(0, '127.0.0.1', resolve))
+  const port = reservation.address().port
+  await new Promise(resolve => reservation.close(resolve))
+  const child = spawn(process.execPath, [join(root, 'scripts', 'local-app.mjs'), '--no-open', '--no-build', '--db', join(root, 'missing.sqlite'), '--port', String(port)], { windowsHide: true })
+  t.after(async () => { if (child.exitCode === null) { child.kill(); await once(child, 'exit') } })
+  await new Promise((resolve, reject) => {
+    let output = ''
+    const timer = setTimeout(() => reject(new Error('閲覧サーバー起動が時間切れ')), 10_000)
+    child.once('error', error => { clearTimeout(timer); reject(error) })
+    child.once('exit', () => { clearTimeout(timer); reject(new Error('閲覧サーバーが起動前に終了')) })
+    child.stdout.on('data', chunk => {
+      output += chunk
+      if (output.includes(`http://127.0.0.1:${port}/`)) { clearTimeout(timer); resolve() }
+    })
+    child.stderr.resume()
+  })
+  const response = await fetch(`http://127.0.0.1:${port}/board/snapshot.json`)
+  assert.equal(response.status, 404)
+  assert(!(await response.text()).includes('old-db-marker'))
 })
 
 test('正本や秘密、任意のログ、パストラバーサルを配信せず、書き込みも拒否する', async (t) => {
