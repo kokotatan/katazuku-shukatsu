@@ -42,6 +42,8 @@ katazuku-shukatsu は、完成品を一括公開するのではなく、安全�
 
 ## 参加してほしいところ
 
+すぐ手を付けられる具体的な課題は [docs/ROADMAP.md](docs/ROADMAP.md#good-first-issue-候補) にまとめています。
+
 初めての貢献では、[`good first issue`](https://github.com/kokotatan/katazuku-shukatsu/labels/good%20first%20issue)を見てください。
 実装前の相談は[Discussions](https://github.com/kokotatan/katazuku-shukatsu/discussions)、具体的な作業は
 [`help wanted`](https://github.com/kokotatan/katazuku-shukatsu/labels/help%20wanted)で扱います。

@@ -2,8 +2,17 @@ import { spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { access, mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises'
 import { delimiter, dirname, join, resolve } from 'node:path'
+import { createAnthropicApiAdapter } from './providers/anthropic-api.js'
+import { createChatGptPlanAdapter } from './providers/chatgpt-siwc.js'
+import { createOpenAiApiAdapter } from './providers/openai-api.js'
 
-export const PROVIDER_IDS = ['codex', 'claude', 'codex-oss'] as const
+/**
+ * 実行できる provider。
+ * - claude / codex / codex-oss: 利用者が自分でログインしたローカルCLIを子プロセスとして動かす(ツールあり)
+ * - anthropic-api / openai-api: 利用者自身のAPIキーでHTTPを呼ぶ(ツールなし・文章生成だけ)
+ * - chatgpt-siwc: 「Sign in with ChatGPT」で許可された本人のChatGPTプランを使う(ローカル完結・ツールなし)
+ */
+export const PROVIDER_IDS = ['codex', 'claude', 'codex-oss', 'anthropic-api', 'openai-api', 'chatgpt-siwc'] as const
 export type ProviderId = (typeof PROVIDER_IDS)[number]
 export type AgentRisk = 'read-only' | 'db-write' | 'external-draft' | 'external-commit'
 /**
@@ -57,6 +66,8 @@ export interface ProcessResult {
   timedOut: boolean
   errorCode?: string
   durationMs: number
+  /** HTTP型 provider が層の内側で確定した失敗の分類。あれば本文の文言から推測しない */
+  failureHint?: FailureCode
 }
 
 export type ProcessExecutor = (invocation: ProcessInvocation, timeoutMs: number) => Promise<ProcessResult>
@@ -79,6 +90,11 @@ export interface AgentAdapter {
   buildInvocation(request: AgentRunRequest, paths: AdapterPaths): ProcessInvocation
   readOutput(result: ProcessResult, paths: AdapterPaths): Promise<string>
   detectPossibleSideEffect(result: ProcessResult): boolean
+  /**
+   * 子プロセスではなく自前で実行する provider(HTTP API 等)だけが実装する。
+   * あれば runAgent は buildInvocation / execute の代わりにこれを呼ぶ(buildInvocation は表示用)。
+   */
+  run?(request: AgentRunRequest, paths: AdapterPaths, timeoutMs: number): Promise<ProcessResult>
 }
 
 export interface AgentAttempt {
@@ -183,11 +199,15 @@ function unique<T>(items: T[]): T[] {
   return [...new Set(items)]
 }
 
+/** 利用者に見せる名前(何で動くかが分かる名前)を実行契約のIDへ寄せる */
+const PROVIDER_ALIASES: Record<string, ProviderId> = { 'claude-cli': 'claude', 'codex-cli': 'codex' }
+
 export function parseProviderOrder(value?: string): ProviderId[] {
   const values = (value ?? '')
     .split(',')
     .map((item) => item.trim())
     .filter(Boolean)
+    .map((item) => PROVIDER_ALIASES[item] ?? item)
   const invalid = values.filter((item) => !PROVIDER_IDS.includes(item as ProviderId))
   if (invalid.length) throw new Error('未知のproviderです: ' + invalid.join(', '))
   const order = unique(values as ProviderId[])
@@ -298,6 +318,7 @@ export function detectProcessFailure(
   result: ProcessResult,
   abortPatterns: RegExp[] = DEFAULT_ABORT_PATTERNS,
 ): FailureCode | undefined {
+  if (result.failureHint) return result.failureHint
   const known = classifyKnownFailure(result)
   if (result.exitCode === 0 && !result.signal && !result.errorCode) {
     // Codexは途中で回復したtool errorもJSON eventへ残す。最終終了が成功なら、それを
@@ -1008,7 +1029,7 @@ async function findBundledCodex(env: NodeJS.ProcessEnv): Promise<string | undefi
   }
 }
 
-export async function resolveProviderCommands(env: NodeJS.ProcessEnv = process.env): Promise<Record<ProviderId, string>> {
+export async function resolveProviderCommands(env: NodeJS.ProcessEnv = process.env): Promise<Record<'codex' | 'claude' | 'codex-oss', string>> {
   const configuredCodex = env.KATAZUKU_CODEX_COMMAND
   const configuredClaude = env.KATAZUKU_CLAUDE_COMMAND
   let codex = configuredCodex
@@ -1059,6 +1080,10 @@ export async function createDefaultAdapters(
       webSearchArgs: parseWebSearchArgs(env.KATAZUKU_CODEX_OSS_WEB_SEARCH ?? env.KATAZUKU_CODEX_WEB_SEARCH),
       localProvider: env.KATAZUKU_LOCAL_PROVIDER === 'lmstudio' ? 'lmstudio' : 'ollama',
     }, 'codex-oss'),
+    // HTTP型は資格情報が無ければ preflight で安全に飛ばされる(副作用前の失敗)。順番に入れたときだけ使われる
+    createAnthropicApiAdapter({ env }),
+    createOpenAiApiAdapter({ env }),
+    createChatGptPlanAdapter({ env }),
   ]
 }
 
@@ -1181,8 +1206,10 @@ export async function runAgent(request: AgentRunRequest, options: RunAgentOption
     }
 
     const finalOutputPath = join(runDir, attemptId + '-final.local.txt')
-    const invocation = adapter.buildInvocation(attemptRequest, { finalOutputPath })
-    const processResult = await execute(invocation, attemptRequest.timeoutMs ?? 30 * 60_000)
+    const timeoutMs = attemptRequest.timeoutMs ?? 30 * 60_000
+    const processResult = adapter.run
+      ? await adapter.run(attemptRequest, { finalOutputPath }, timeoutMs)
+      : await execute(adapter.buildInvocation(attemptRequest, { finalOutputPath }), timeoutMs)
     const failure = detectProcessFailure(processResult)
     if (failure) {
       const possibleSideEffect = adapter.detectPossibleSideEffect(processResult)

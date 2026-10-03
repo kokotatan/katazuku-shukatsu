@@ -1,0 +1,43 @@
+name: セットアップで困った / Setup help
+description: デモやセットアップの途中で詰まったとき(開発者でなくても大丈夫です)
+labels: ["setup-help"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        詰まったところを教えてください。同じところで詰まる人のために、手順書を直します。
+        **メールアドレス・トークン・APIキー・実在の企業名・自分のメール本文は貼らないでください。**
+        ログを貼るときは、個人の情報を「(伏せ字)」に置き換えてください。
+  - type: dropdown
+    id: step
+    attributes:
+      label: どこで詰まりましたか
+      options:
+        - 5分デモ(npm run demo)
+        - 設定ファイル(katazuku.config.json)
+        - Google につなぐ(OAuth クライアント・google-workspace MCP)
+        - AI を選ぶ(ChatGPT プラン / Claude Code / Codex / API キー)
+        - ワークフローの確認(--dry-run)
+        - 定期実行の登録(タスクスケジューラ / cron / launchd / systemd)
+        - アプリで見る
+        - その他
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: OS
+      options: [Windows, macOS, Linux, その他]
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: 何をして、何が起きましたか
+      description: 実行したコマンドと、出たメッセージ(個人の情報は伏せる)
+    validations:
+      required: true
+  - type: input
+    id: node
+    attributes:
+      label: Node.js のバージョン(node -v)
