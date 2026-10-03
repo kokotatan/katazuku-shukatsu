@@ -26,7 +26,7 @@ for (let i = 0; i < argv.length; i += 1) {
 if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('--port は1〜65535で指定してください')
 if (demo && dbArg) throw new Error('デモでは --db を指定できません')
 const [major, minor] = process.versions.node.split('.').map(Number)
-if (major < 22 || (major === 22 && minor < 5)) throw new Error('Node.js 22.5以上（推奨24）が必要です')
+if (!(major >= 24 || (major === 22 && minor >= 13))) throw new Error('Node.js 22.13以降の22系、または24以降（推奨24）が必要です')
 // デモでは個人設定・.env・正本DBに触れない。
 if (!demo && existsSync(join(root, '.env'))) process.loadEnvFile(join(root, '.env'))
 const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm'

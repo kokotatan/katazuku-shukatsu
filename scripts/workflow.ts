@@ -17,6 +17,7 @@
 import { spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { DatabaseSync } from 'node:sqlite'
 import { applyCalendar } from '../src/db-apply-calendar.js'
 import type { MailInput } from '../src/daily-sync-input.js'
 import { openDb } from '../src/db.js'
@@ -45,7 +46,6 @@ import {
   describeFailure,
   hasSentinel,
   listAlerts,
-  logsDir,
   notifyDesktop,
   parseCliFlags,
   pruneFiles,
@@ -63,7 +63,7 @@ import { writeSubmissionReadiness } from './submission-readiness.js'
 const ROOT = repositoryRoot()
 // スケジューラから起動されると PATH などが最小になる。KATAZUKU_CLAUDE_COMMAND 等は gitignore 済みの .env に置く
 if (existsSync(join(ROOT, '.env'))) process.loadEnvFile(join(ROOT, '.env'))
-const LOGS = logsDir(ROOT)
+const LOGS = join(ROOT, 'logs')
 const MINUTE = 60_000
 
 interface Context {
@@ -336,6 +336,10 @@ export function checkWatchdog(config: KatazukuConfig, now: Date, root: string = 
 
 async function watchdog(ctx: Context): Promise<boolean> {
   const report = checkWatchdog(ctx.config, ctx.now)
+  if (ctx.dryRun) {
+    ctx.log('[dry-run] 番犬: ' + (report.problems.join(' / ') || '異常なし'))
+    return true
+  }
   const summaryPath = join(LOGS, 'watchdog-summary.local.txt')
   writeFileSync(join(LOGS, 'watchdog-heartbeat.txt'), ctx.now.toISOString(), 'utf8')
   if (!report.problems.length) {
@@ -396,9 +400,10 @@ async function eveningBrief(ctx: Context): Promise<boolean> {
     ctx.log('正本DBがまだ無いため、ブリーフの対象予定は0件として扱う(dry-run)')
     return true
   }
-  const db = openDb(resolveDatabasePath())
+  const db = ctx.dryRun ? new DatabaseSync(resolveDatabasePath(), { readOnly: true }) : openDb(resolveDatabasePath())
   let data
   try {
+    if (ctx.dryRun) db.exec('PRAGMA busy_timeout = 5000')
     data = getBriefData(db, date, utcOffsetFor(ctx.config.profile.timezone, ctx.now))
   } finally {
     db.close()
@@ -511,12 +516,19 @@ async function main(): Promise<void> {
     process.exit(1)
   }
   const flags = parseCliFlags(process.argv.slice(3))
+  const [major, minor] = process.versions.node.split('.').map(Number)
+  if (!(major >= 24 || (major === 22 && minor >= 13))) {
+    console.error('Node.js 22.13以降の22系、または24以降(推奨24)を使ってください。')
+    process.exitCode = 1
+    return
+  }
   const config = loadConfig(ROOT)
   if (!config.workflows[name].enabled && !flags.dryRun) {
     console.log(`${name} は katazuku.config.json で無効です`)
     return
   }
   const now = new Date()
+  if (!flags.dryRun) mkdirSync(LOGS, { recursive: true })
   const logFile = join(LOGS, `${name}-${stamp(now).slice(0, 8)}.log`)
   const log = (line: string) => {
     if (!line) return
@@ -546,9 +558,11 @@ async function main(): Promise<void> {
     process.exitCode = 1
   } finally {
     release()
-    pruneFiles(LOGS, new RegExp(`^${name}-\\d{8}\\.log$`), 30, now)
-    pruneFiles(join(LOGS, 'agent-runs'), /^(?!provider-health)/, 30, now)
-    pruneFiles(join(LOGS, 'briefs'), /\.local\.md$/, 60, now)
+    if (!flags.dryRun) {
+      pruneFiles(LOGS, new RegExp(`^${name}-\\d{8}\\.log$`), 30, now)
+      pruneFiles(join(LOGS, 'agent-runs'), /^(?!provider-health)/, 30, now)
+      pruneFiles(join(LOGS, 'briefs'), /\.local\.md$/, 60, now)
+    }
   }
 }
 

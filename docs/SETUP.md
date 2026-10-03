@@ -8,7 +8,7 @@
 
 ## 0. 必要なもの
 
-- Node.js 22.5 以上(推奨 24): <https://nodejs.org/>
+- Node.js 22.13以降の22系、または24以降(推奨 24): <https://nodejs.org/>
 - Git
 - Google アカウント(就活用のもの)
 - AIのどれか1つ: ChatGPT のプラン / Claude Code / Codex / API キー(→ [4. AIを選ぶ](#4-aiを選ぶ))
