@@ -25,7 +25,7 @@
 |---|---|
 | 1. [デモ](#デモで試す資格情報ゼロ)で画面を見る(アカウント接続なし) | 1. [CONTRIBUTING.md](CONTRIBUTING.md) を読む |
 | 2. [docs/SETUP.md](docs/SETUP.md) の順に、Google と AI をつなぐ | 2. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) で全体像をつかむ |
-| 3. 毎日のワークフローを登録して、朝のまとめを待つ | 3. [docs/ROADMAP.md](docs/ROADMAP.md) の good first issue 候補から1つ選ぶ |
+| 3. 毎日のワークフローを登録して、朝のまとめを待つ | 3. [最初の貢献ガイド](docs/FIRST-CONTRIBUTION.md) から課題を選んで参加する |
 
 ボタンだけで始められる**無料のデスクトップアプリ**(ローカル動作・オープンソース)を
 準備中です([docs/DESKTOP-APP.md](docs/DESKTOP-APP.md))。
@@ -171,7 +171,8 @@ macOS / Linux なら `npm run schedule:print` が出す cron / launchd / systemd
 小さな改善でも歓迎します。就活経験者の用語レビュー、macOS / Linux での動作確認、ドキュメントの修正も大歓迎です。
 
 - 始め方: [CONTRIBUTING.md](CONTRIBUTING.md)
-- 最初の一歩にちょうどいい課題: [docs/ROADMAP.md](docs/ROADMAP.md#good-first-issue-候補)
+- 初参加の手順(日英): [最初の貢献ガイド](docs/FIRST-CONTRIBUTION.md)
+- 募集中の初心者向け課題: [good first issue](https://github.com/kokotatan/katazuku-shukatsu/issues?q=is%3Aissue%20is%3Aopen%20label%3A%22good%20first%20issue%22)
 - 設計: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 - AIアシスタントに聞くなら: [AGENTS.md](AGENTS.md) と [llms.txt](llms.txt) を読ませると、設計と作法をすぐ答えられます
 
@@ -216,7 +217,8 @@ external commitment (sending mail, submitting forms, declining offers) to you.
 - **Development version.** Terminal commands and your own Google Cloud OAuth setup are currently required.
 - **Two audiences.** Users: run the [fictional-data demo](#デモで試す資格情報ゼロ), then follow
   [docs/SETUP.md](docs/SETUP.md). A free desktop app is planned ([docs/DESKTOP-APP.md](docs/DESKTOP-APP.md)).
-  Contributors: start with [CONTRIBUTING.md](CONTRIBUTING.md) and the good-first-issue list in [docs/ROADMAP.md](docs/ROADMAP.md).
+  Contributors: start with [Your first contribution](docs/FIRST-CONTRIBUTION.md#your-first-contribution).
+  Documentation reviews, platform verification reports, and English issues or pull requests are welcome.
 - **Bring your own AI.** Sign in with ChatGPT (your ChatGPT plan), your own Claude Code or Codex login, or an API key.
   katazuku has no server and no billing of its own. It never implements claude.ai login.
 - **Safety boundaries are enforced in code.** Unattended workflows cannot email third parties (drafts only), never
