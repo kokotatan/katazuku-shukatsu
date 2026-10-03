@@ -6,6 +6,7 @@ import { repositoryRoot } from '../src/database-path.js'
 import { credentialPath } from '../src/google-auth.js'
 import { configPath, loadConfig } from '../src/katazuku-config.js'
 import { activeLabel, credentialsDir, isSiwcEnabled, loadCredential } from '../src/providers/chatgpt-siwc.js'
+import { isGoogleAccountEmail, isPersonalProfile, isSuppliedSetting as supplied } from '../src/setup-values.js'
 
 export interface SetupCheck {
   name: string
@@ -15,10 +16,6 @@ export interface SetupCheck {
 
 function isFile(path: string): boolean {
   try { return statSync(path).isFile() } catch { return false }
-}
-
-function supplied(value: unknown): value is string {
-  return typeof value === 'string' && !!value.trim() && !/example|replace[-_ ]?me|your[-_ ]|^<.*>$/i.test(value)
 }
 
 function commandExists(command: string, env: NodeJS.ProcessEnv): boolean {
@@ -47,15 +44,12 @@ export async function inspectSetup(
     add('個人設定', false, '', 'JSONまたは設定スキーマが不正です。docs/SETUP.md の1に沿って設定を確認してください。')
     return checks
   }
-  const profileOk = supplied(config.profile.displayName) && config.profile.displayName !== '就活 太郎'
-    && config.profile.signature.some(supplied)
-    && config.profile.signature.every((line) => !/サンプル大学|就活 太郎|example\.(?:com|net|org)/i.test(line))
+  const profileOk = isPersonalProfile(config.profile.displayName, config.profile.signature)
   add('個人設定', profileOk, '設定スキーマと呼び名・署名を確認しました。', '雛形の呼び名・署名を自分の値に置き換えてください。')
   let timezoneOk = true
   try { new Intl.DateTimeFormat('ja-JP', { timeZone: config.profile.timezone }) } catch { timezoneOk = false }
   add('タイムゾーン', timezoneOk, 'タイムゾーンの形式を確認しました。', 'profile.timezone に有効なIANAタイムゾーンを指定してください。')
-  const accountsOk = config.google.accounts.length > 0 && config.google.accounts.every((account) =>
-    /^[^\s@/\\]+@[^\s@/\\]+\.[^\s@/\\]+$/.test(account.email) && !/@(?:[^@]+\.)?example\.(?:com|net|org)$/i.test(account.email))
+  const accountsOk = config.google.accounts.length > 0 && config.google.accounts.every(account => isGoogleAccountEmail(account.email))
   add('Google対象アカウント', accountsOk, '対象アカウントと主アカウントの設定を確認しました。', 'google.accounts に自分のアカウントを指定してください。雛形のアカウントは使えません。')
   if (accountsOk) {
     const tokensOk = config.google.accounts.every((account) => {

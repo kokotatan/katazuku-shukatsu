@@ -28,21 +28,39 @@ document.getElementById('chatgpt').addEventListener('click', async () => {
 document.getElementById('open-setup').addEventListener('click', () => api.openDocs('setup'))
 document.getElementById('open-workflows').addEventListener('click', () => api.openDocs('workflows'))
 
+let saving = false
 document.getElementById('config').addEventListener('submit', async (event) => {
   event.preventDefault()
+  if (saving) return
+  saving = true
+  const button = event.target.querySelector('[type="submit"]')
+  button.disabled = true
   const form = new FormData(event.target)
-  const result = await api.saveConfig({
-    displayName: form.get('displayName'),
-    email: form.get('email'),
-    signature: form.get('signature'),
-    providerOrder: form.getAll('provider'),
-  })
-  document.getElementById('config-result').textContent = result.output
-  if (result.ok) show(4)
+  try {
+    const result = await api.saveConfig({
+      displayName: form.get('displayName'),
+      email: form.get('email'),
+      signature: form.get('signature'),
+      providerOrder: form.getAll('provider'),
+    })
+    document.getElementById('config-result').textContent = result.output
+    if (result.ok) show(4)
+  } catch {
+    document.getElementById('config-result').textContent = '設定を保存できませんでした。入力と導入手順を確認してください。'
+  } finally {
+    saving = false
+    button.disabled = false
+  }
 })
 
 document.getElementById('dry-run').addEventListener('click', async () => {
   document.getElementById('run-result').textContent = (await api.dryRun()).output
+})
+
+document.getElementById('setup-check').addEventListener('click', async () => {
+  const output = document.getElementById('run-result')
+  output.textContent = 'ローカルの前提を確認しています。通信やログインは行いません。'
+  output.textContent = (await api.setupCheck()).output
 })
 document.getElementById('schedule').addEventListener('click', async () => {
   document.getElementById('run-result').textContent = (await api.schedulePreview()).output

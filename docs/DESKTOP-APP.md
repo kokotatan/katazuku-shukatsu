@@ -1,6 +1,6 @@
 # デスクトップアプリ(開発者でなくても使える katazuku)— 設計
 
-状態: **設計 + 骨組み**(`desktop/`)。まだ配布物はありません。
+状態: **設計 + 骨組み**(`desktop/`)。まだ配布物はありません。設定保存とローカル診断は実処理につながっていますが、認証・同期・定期登録・閲覧画面の一連の操作は完成していません。
 
 ## 目的
 
@@ -15,7 +15,7 @@
 
 ## 変えないこと(非目標)
 
-- **すべてローカル。** katazuku 側のサーバは作らない。利用者の ChatGPT / Google のトークンを中継・保管するホスト型の仕組みは作らない
+- **個人データはローカルに保存。** 本人が接続したGoogle・AIには通信する。このデスクトップ設計では、利用者のChatGPT / Googleのトークンを中継・保管するホスト型の仕組みは作らない
   (ChatGPT プランのホスト型利用は OpenAI の別手続きが必要。Google も公開クライアントには審査が必要)。
 - **無料・オープンソース(Apache-2.0)。** 有料機能・テレメトリ・広告を入れない。
 - **安全境界はコアのまま。** アプリは既存の `scripts/workflow.ts` と `src/` を呼ぶだけで、送信・提出の能力を増やさない。
@@ -49,7 +49,10 @@ desktop/
 - 画面(renderer)は `nodeIntegration: false` / `contextIsolation: true` / `sandbox: true`。外部URLは読み込まず、
   リンクは既定のブラウザで開く。CSP は `default-src 'self'`。
 - IPC は「状態を読む」「決まったコマンドを実行する」だけ。任意のコマンド文字列を画面から受け取らない。
-- 設定は `katazuku.config.json`(スキーマ `schemas/katazuku-config.schema.json` で検証)へ書く。
+- 設定は `scripts/desktop-config.ts` がコアのSchemaで検証してから `katazuku.config.json`(または `KATAZUKU_CONFIG`)へ新規保存する。AI未選択や空の呼び名・署名は保存せず、既存ファイルは置換しない。設定保存だけでは認証・同期・定期実行は始まらない。
+- 「ローカルの前提を診断する」は `scripts/setup-doctor.ts` を呼ぶ。通信・ログイン・スケジュール登録は行わない。診断が通っても実接続の成功を意味しない。
+- `npm run test:desktop` で構文と合成設定の保存拒否・Schema検証・既存ファイル保持・同時保存を確認できる。Electronでの画面操作と実際の本人認証は別途確認が必要。
+- 保存先はhard linkに対応するローカルのファイルシステムを使う。exFAT/FAT32や一部の共有ドライブでは新規保存できない。既存設定は変更しない。
 - AI の接続:
   - ChatGPT: `scripts/chatgpt.ts signin` と同じ処理(127.0.0.1 のループバック・PKCE・ID トークン検証)。
     画面には「Continue with ChatGPT」ボタン、初回だけ「ChatGPT プランを使っています」の案内、「使用量を管理」の案内を出す
