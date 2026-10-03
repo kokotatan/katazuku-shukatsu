@@ -51,7 +51,7 @@ export default function App() {
   const positive = tracks.filter((t) => ['合格', '内定'].includes(t.outcome))
 
   return (
-    <AppShell current="status">
+    <AppShell current="status" demo={data?.demo}>
       <AppHeading
         caption="STATUS"
         title="選考管理"

@@ -15,7 +15,7 @@ export default function App() {
   const needsAction = mails.filter((m) => Boolean(m.needsAction))
 
   return (
-    <AppShell current="inbox">
+    <AppShell current="inbox" demo={data?.demo}>
       <AppHeading
         caption="INBOX"
         title="メールと更新"

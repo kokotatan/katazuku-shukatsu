@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>katazuku — はじめる</title>
+  <style>
+    *{box-sizing:border-box}body{margin:0;background:#f6f7f8;color:#23262b;font:16px/1.7 system-ui,sans-serif}main{max-width:860px;margin:auto;padding:40px 20px}h1{margin:0}h2{font-size:20px}p{margin:10px 0}a{color:#005eb8}header,section{background:white;border:1px solid #d8dce0;border-radius:12px;padding:24px;margin-bottom:20px}.apps{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}.apps a{display:block;border:1px solid #ccd3da;border-radius:8px;padding:14px;text-decoration:none;font-weight:600}.mode{display:inline-block;background:#edf4fb;border-radius:6px;padding:4px 10px}code{background:#f0f2f4;padding:2px 6px}li{margin-bottom:8px}pre{white-space:pre-wrap;overflow-wrap:anywhere;font:inherit}.muted{color:#5e6670}button{font:inherit;border:1px solid #bbc5cf;border-radius:6px;background:white;padding:7px 12px;cursor:pointer}a:focus-visible,button:focus-visible{outline:3px solid #005eb8;outline-offset:3px}
+  </style>
+  <script src="/viewer-home.js" defer></script>
+</head>
+<body><main>
+  <header><p class="muted">katazuku</p><h1>就活の状況を、一か所で確認する。</h1><p id="mode" class="mode">読み込み中</p><p id="mode-description"></p><p class="muted">この画面を開いただけでは、メール取得・AI実行・定期処理は始まりません。</p></header>
+  <section><h2>見る画面を選ぶ</h2><nav class="apps" aria-label="katazuku アプリ">
+    <a href="/insight/">今日やること</a><a href="/board/">ボード</a><a href="/status/">選考管理</a><a href="/inbox/">メール</a><a href="/prep/">面接準備</a><a href="/people/">人</a><a href="/profile/">個人マスタ</a><a href="/impact/">効果</a>
+  </nav></section>
+  <section><h2>朝のまとめ・前夜の準備</h2><p class="muted">作成日を確認してください。過去のまとめは、今日の予定を保証しません。</p><button id="reload" type="button">まとめを再読込</button><div id="briefs" aria-live="polite"><p>読み込み中</p></div></section>
+  <section><h2>自分のデータで使うために</h2><ol>
+    <li>リポジトリの <code>katazuku.config.example.json</code> をコピーし、アカウント・呼び名・使うAIを設定します。</li>
+    <li><a href="https://github.com/kokotatan/katazuku-shukatsu/blob/main/docs/SETUP.md" target="_blank" rel="noreferrer">セットアップ手順</a>に沿ってGoogleとAIを接続します。</li>
+    <li><code>npm run doctor -- --setup</code> で前提を確認します。ログインとMCPの実接続は別途確認が必要です。</li>
+    <li><code>npm run workflow -- daily-sync --dry-run</code> で確認してから日次同期を実行し、正本DBを作ります。</li>
+    <li><code>npm start</code> で自分のデータを開きます。定期処理はセットアップ手順で登録します。</li>
+  </ol><p class="muted">Google Cloudの設定とターミナル操作が必要な開発版です。メールの送信・フォーム提出・適性検査は本人が行います。デスクトップ版は準備中です。</p></section>
+</main></body></html>

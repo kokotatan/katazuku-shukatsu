@@ -1,9 +1,10 @@
 # セットアップ(自分のデータで使う)
 
-所要時間の目安は30〜60分です(Google Cloud の画面操作がいちばん長い)。
+ターミナル操作と、自分のGoogle Cloud OAuthクライアントの作成が必要です。
+所要時間の目安は30〜60分に加え、初回の8画面の導入・ビルドです。Google Cloudの設定で時間が延びることがあります。
 途中で詰まったら、[Issue の「セットアップで困った」](https://github.com/kokotatan/katazuku-shukatsu/issues/new/choose) で気軽に聞いてください。
 
-まだなら、先に [5分デモ](../README.md#5分で試す資格情報ゼロ) で画面を見ておくと、何ができるようになるかが分かります。
+まだなら、先に [認証なしのデモ](../README.md#デモで試す資格情報ゼロ) で画面を見ておくと、何ができるようになるかが分かります。
 
 ## 0. 必要なもの
 
@@ -15,7 +16,7 @@
 ```sh
 git clone https://github.com/kokotatan/katazuku-shukatsu.git
 cd katazuku-shukatsu
-npm install
+npm ci
 npm run doctor     # OS・Node・node:sqlite が使えるかの診断
 ```
 
@@ -118,11 +119,18 @@ npm run schedule:print -- cron
 ## 7. アプリで見る
 
 ```sh
-npm run snapshot                 # 正本DB → 各アプリの public/snapshot.json(gitignore 済み)
-cd board && npm ci && npm run dev
+npm start
 ```
 
-ワークフローは実行のたびにスナップショットを更新します。
+ホームと8画面を同じローカルURLから開けます。初回だけ全画面をビルドします。
+ホームには `logs/briefs/` の朝・前夜それぞれの最新のまとめ、「今日やること」には応募とは別の未完了提出物を表示します。
+
+起動時に既存の正本DBからスナップショットを更新します。ワークフローの実行時も更新されるので、画面の再読込で反映できます。
+正本DBがまだない場合は案内だけを表示し、空のDBを作ったり、架空データへ切り替えたりしません。
+日次同期が成功したことを確認してから再起動してください。
+
+このPCの `127.0.0.1` にだけ公開します。LAN・スマホ・外部サーバーへの公開には使いません。
+停止は Ctrl+C。ポートが使用中なら `npm start -- --port 4174`。起動だけで定期処理やAIは実行されません。
 
 ## 8. バックアップ
 
@@ -140,5 +148,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\register-tasks.ps1 -
 npm run chatgpt -- signout       # ChatGPT のセッションを失効させる
 ```
 
-データは `data/`・`logs/` にだけあります。フォルダごと消せば残りません
-(Google 側の許可は <https://myaccount.google.com/permissions> から取り消せます)。
+閲覧サーバーも Ctrl+C で停止します。データは `data/`・`logs/` と各画面の `public/snapshot.json` にあります。
+利用を終える場合は、これらと個人設定・`.env`、接続時に作成された認証情報を自分で削除します。
+バックアップを別の場所に保存した場合は、その場所も確認してください。
+Google 側の許可は <https://myaccount.google.com/permissions> から取り消せます。

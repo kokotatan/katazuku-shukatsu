@@ -4,6 +4,9 @@
 メールの見張り・予定の登録・提出物の追跡・面接の前夜準備を自動で回し、
 「送る・出す・決める」だけをあなたに残す、オープンソースの就活オートパイロットです。
 
+**現在はターミナル操作とGoogle Cloudの設定が必要な開発版です。**
+認証なしのデモで画面を試せます。自分のデータで使う場合は、接続確認と定期実行の登録まで必要です。
+
 [![CI](https://github.com/kokotatan/katazuku-shukatsu/actions/workflows/ci.yml/badge.svg)](https://github.com/kokotatan/katazuku-shukatsu/actions/workflows/ci.yml)
 [![npm version](https://img.shields.io/npm/v/katazuku-shukatsu)](https://www.npmjs.com/package/katazuku-shukatsu)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue)](./LICENSE)
@@ -12,19 +15,19 @@
 
 紹介動画(準備中): 公開したらここにリンクを置きます。
 
-[English](#english) / [5分で試す](#5分で試す資格情報ゼロ) / [セットアップ](docs/SETUP.md) / [AIプロバイダ](docs/AI-PROVIDERS.md) / [参加方法](CONTRIBUTING.md)
+[English](#english) / [デモで試す](#デモで試す資格情報ゼロ) / [セットアップ](docs/SETUP.md) / [AIプロバイダ](docs/AI-PROVIDERS.md) / [参加方法](CONTRIBUTING.md)
 
 ---
 
 ## あなたはどちら?
 
-| 使いたい人(開発者でなくてOK) | 開発に参加したい人 |
+| 使いたい人(ターミナル操作あり) | 開発に参加したい人 |
 |---|---|
-| 1. [5分デモ](#5分で試す資格情報ゼロ)で画面を見る(アカウント接続なし) | 1. [CONTRIBUTING.md](CONTRIBUTING.md) を読む |
+| 1. [デモ](#デモで試す資格情報ゼロ)で画面を見る(アカウント接続なし) | 1. [CONTRIBUTING.md](CONTRIBUTING.md) を読む |
 | 2. [docs/SETUP.md](docs/SETUP.md) の順に、Google と AI をつなぐ | 2. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) で全体像をつかむ |
 | 3. 毎日のワークフローを登録して、朝のまとめを待つ | 3. [docs/ROADMAP.md](docs/ROADMAP.md) の good first issue 候補から1つ選ぶ |
 
-いまは導入にターミナルを少し使います。ボタンだけで始められる**無料のデスクトップアプリ**(すべてローカル動作・オープンソース)を
+ボタンだけで始められる**無料のデスクトップアプリ**(ローカル動作・オープンソース)を
 準備中です([docs/DESKTOP-APP.md](docs/DESKTOP-APP.md))。
 
 AIの利用料は、**あなた自身の** ChatGPT プラン(Sign in with ChatGPT)・Claude Code・Codex、または API キーで払います。
@@ -77,7 +80,9 @@ flowchart LR
 - **書き手はエージェントだけ。** 状態は遷移規則(`transition()`)を必ず通して更新し、変化は台帳に残ります。
 - **AIは取り替えられる。** 未ログイン・利用枠切れなど「何もしていない失敗」のときだけ、次のAIへ切り替えます。
 
-## 5分で試す(資格情報ゼロ)
+<a id="5分で試す資格情報ゼロ"></a>
+
+## デモで試す(資格情報ゼロ)
 
 Node.js 22.5 以上(推奨 24)が必要です。
 
@@ -87,8 +92,14 @@ cd katazuku-shukatsu
 npm run demo
 ```
 
-架空の会社(A社〜F社)のデモデータで、閲覧アプリがブラウザに開きます。アカウント接続もAIも使いません。
-別のアプリは `npm run demo -- insight` のように名前を付けて開けます。
+架空のデータでホーム画面がブラウザに開きます。8画面へ同じローカルURLから移動できます。
+アカウント接続もAIも使いません。**初回は8画面の依存導入・ビルドがあるため数分〜十数分かかります。**
+2回目からは既存ビルドを使い、ソースが変わった画面だけビルドし直します。パッケージ取得にはインターネットが必要です。
+別のアプリから始めるなら `npm run demo -- insight`。ブラウザを自動で開かない場合は `--no-open`、
+ポートが使用中なら `npm run demo -- --port 4174` を使います。停止は Ctrl+C。
+
+デモは実データや正本DBを読みません。自分のデータを見るときはセットアップ後に `npm start` を実行します。
+朝のまとめ・前夜の準備はホーム、成果物ごとの未完了提出物は「今日やること」から確認できます。
 
 ほかに手元で試せること:
 
@@ -106,7 +117,7 @@ npm run workflow -- asa --dry-run        # 朝のまとめのプロンプトと�
 2. Google につなぐ: 自分の Google Cloud で OAuth クライアントを作り、google-workspace MCP でログイン
 3. AI を選ぶ: `npm run chatgpt -- signin`(ChatGPT プラン)、または Claude Code / Codex にログイン
 4. `--dry-run` で確認してから、毎日のワークフローを登録する
-5. `npm run snapshot` で閲覧アプリに自分のデータを出す
+5. `npm start` で8画面と朝・前夜のまとめを一つのローカルURLから開く
 
 実利用の前提は `npm run doctor -- --setup` で確認できます。設定・Google資格情報・選択したAIのローカル準備を調べ、秘密値は表示しません。
 通信やログインは行わないため、[Google接続ガイド](docs/GOOGLE-CONNECTION.md) の本人による読み取り確認も済ませてください。
@@ -199,7 +210,8 @@ It watches your inbox, drafts replies, keeps interviews and deadlines on your ca
 asked to submit, and prepares a briefing the night before each interview — while leaving every decision and every
 external commitment (sending mail, submitting forms, declining offers) to you.
 
-- **Two audiences.** Users (no coding required): run the [5-minute demo](#5分で試す資格情報ゼロ), then follow
+- **Development version.** Terminal commands and your own Google Cloud OAuth setup are currently required.
+- **Two audiences.** Users: run the [fictional-data demo](#デモで試す資格情報ゼロ), then follow
   [docs/SETUP.md](docs/SETUP.md). A free desktop app is planned ([docs/DESKTOP-APP.md](docs/DESKTOP-APP.md)).
   Contributors: start with [CONTRIBUTING.md](CONTRIBUTING.md) and the good-first-issue list in [docs/ROADMAP.md](docs/ROADMAP.md).
 - **Bring your own AI.** Sign in with ChatGPT (your ChatGPT plan), your own Claude Code or Codex login, or an API key.
@@ -212,10 +224,12 @@ external commitment (sending mail, submitting forms, declining offers) to you.
 ```sh
 git clone https://github.com/kokotatan/katazuku-shukatsu.git
 cd katazuku-shukatsu
-npm run demo      # fictional data, no accounts, no AI
+npm run demo      # eight apps on one local URL; fictional data, no accounts, no AI
 ```
 
 Requirements: Node.js 22.5+ (24 recommended). Workflows run on Windows, macOS and Linux.
+The first launch installs and builds all eight apps and may take several minutes. After setup, use `npm start`
+to view your own data. The viewer binds to 127.0.0.1 and does not run workflows or change to demo data silently.
 
 ## License
 

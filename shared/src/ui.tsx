@@ -27,7 +27,8 @@ type Item = {
 
 /**
  * リンクは兄弟ディレクトリへの相対パス。組み立てて1か所に並べたときに繋がる。
- * 開発サーバー(アプリごとに別ポート)ではアプリ間リンクは飛べない — 本体と同じ制約。
+ * `npm start` / `npm run demo` では8アプリを同じローカルサーバーから配信する。
+ * 個別のVite開発サーバーではアプリ間リンクは使わない。
  */
 const ITEMS: Item[] = [
   { key: 'board', href: '../board/', label: 'ボード', mobileLabel: 'ボード', caption: 'Board', icon: FaHouseIcon },
@@ -73,7 +74,7 @@ export function AppNav({ current }: { current: AppKey }) {
             </a>
           ))}
         </nav>
-        <p className="ktz-side-foot">就活を、ぜんぶ片付ける。</p>
+        <p className="ktz-side-foot"><a href="../">はじめる・朝のまとめ</a></p>
       </aside>
 
       {/* モバイル: 「その他」ボトムシート */}
@@ -90,6 +91,7 @@ export function AppNav({ current }: { current: AppKey }) {
                 </a>
               ))}
             </div>
+            <p className="ktz-side-foot"><a href="../">はじめる・朝のまとめ</a></p>
           </div>
         </div>
       )}
@@ -135,8 +137,8 @@ export function DataState({ loading, error }: { loading: boolean; error: string 
       <Stack gap={0.5}>
         <Text>{error || 'スナップショットが見つかりません。'}</Text>
         <Text size="S" color="TEXT_GREY">
-          リポジトリのルートで <code>npm run snapshot -- --demo</code>(架空データ)または
-          <code> npm run snapshot </code>(自分の正本DB)を実行してから、再読込してください。
+          自分のデータにはセットアップと日次同期が必要です。<a href="../">はじめる</a>で手順を確認してください。
+          架空データを試す場合は、リポジトリのルートで <code>npm run demo</code> を実行します。
         </Text>
       </Stack>
     </InformationPanel>
@@ -192,12 +194,17 @@ export function Tile({ label, value, tone }: { label: string; value: ReactNode; 
 }
 
 /** アプリの外枠(サイドバー + 本文)。全アプリで同じ */
-export function AppShell({ current, children }: { current: AppKey; children: ReactNode }) {
+export function AppShell({ current, children, demo }: { current: AppKey; children: ReactNode; demo?: boolean }) {
   return (
     <div className="ktz-app">
       <AppNav current={current} />
       <main className="ktz-main">
-        <Stack gap={1.5}>{children}</Stack>
+        <Stack gap={1.5}>
+          {demo && <InformationPanel type="warning" heading="架空データのデモです" toggleable={false}>
+            <Text>実際の予定や選考状況ではありません。自分のデータを開くときは <code>npm start</code> を使ってください。</Text>
+          </InformationPanel>}
+          {children}
+        </Stack>
       </main>
     </div>
   )
