@@ -65,7 +65,7 @@ export async function inspectSetup(
           && supplied(stored.client_secret || env.GOOGLE_OAUTH_CLIENT_SECRET)
       } catch { return false }
     })
-    add('Google資格情報', tokensOk, '保存済み資格情報の必要項目を確認しました。有効性・権限は未確認です。', '対象アカウントの保存済みトークンまたはOAuthクライアント情報が不足しています。docs/GOOGLE-CONNECTION.md を参照。')
+    add('Google資格情報', tokensOk, '保存済み資格情報の必要項目を確認しました。有効性・権限は未確認です。読取り専用の資格情報だけではMCPの下書き・書込みは利用できません。', '対象アカウントの保存済みトークンまたはOAuthクライアント情報が不足しています。npm run google:connect または docs/GOOGLE-CONNECTION.md を参照。')
   }
   const commands = options.commands ?? await resolveProviderCommands(env)
   const known = ['claude', 'codex', 'codex-oss', 'anthropic-api', 'openai-api', 'chatgpt-siwc']

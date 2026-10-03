@@ -37,8 +37,8 @@ cp katazuku.config.example.json katazuku.config.json      # Windows(PowerShell)�
 
 ## 2. Google につなぐ(自分の OAuth クライアント)
 
-katazuku は Google のログイン画面を持ちません。**あなた自身の Google Cloud プロジェクト**で OAuth クライアントを作り、
-Gmail・カレンダーの読み書きを、あなたのPCの中だけで許可します。
+**あなた自身の Google Cloud プロジェクト**でOAuthクライアントを作り、`npm run google:connect` から本人がブラウザで読み取りを許可します。
+メール下書き・予定の書込みを使う工程には、Google MCPの別接続も必要です。
 
 1. <https://console.cloud.google.com/> で新しいプロジェクトを作る(名前は何でもよい)。
 2. 「API とサービス」→「ライブラリ」で **Gmail API** と **Google Calendar API** を有効にする。
@@ -46,7 +46,9 @@ Gmail・カレンダーの読み書きを、あなたのPCの中だけで許可�
    「テストユーザー」に自分の就活用アカウントを追加する(テスト中は追加した人しかログインできない=自分専用)。
 4. 「認証情報」→「OAuth クライアント ID を作成」→ 種類は **デスクトップアプリ**。クライアントIDとシークレットを控える。
    これらは `.env`(`GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET`)にだけ書き、コミットしない。
-5. [google-workspace MCP(workspace-mcp)](https://github.com/taylorwilsdon/google_workspace_mcp) を、
+5. `npm run google:connect` で就活用アカウントの読み取りを許可し、本人確認・Gmail・Calendarの診断が成功することを確認する。
+   既存のMCP資格情報がある場合は上書きせず、`npm run google:connect -- --check` で確認する。
+6. 下書き・予定の書込みを使う場合は [google-workspace MCP(workspace-mcp)](https://github.com/taylorwilsdon/google_workspace_mcp) を、
    そのクライアントIDとシークレットで Claude Code / Codex に登録し、就活用アカウントで一度ログインする。
    ログインすると `~/.google_workspace_mcp/credentials/<メールアドレス>.json` にトークンが保存され、
    katazuku の決定的な取得スクリプト(Gmail・カレンダーの読み取り)もそれを再利用します
@@ -54,12 +56,12 @@ Gmail・カレンダーの読み書きを、あなたのPCの中だけで許可�
 
 補足:
 - テスト中の OAuth クライアントのトークンは、Google の仕様で一定期間ごとに再ログインが必要になることがあります。
-  番犬(watchdog)が取得失敗を検知したら、5 の手順でログインし直してください。
+  番犬(watchdog)が取得失敗を検知したら、使用している接続方式の再認証手順を確認してください。既存資格情報はCLIが自動で消去・上書きしません。
 - 多くの人に配る「公開」クライアントにするには Google の審査(OAuth 検証)が必要です。自分用なら不要です。
 
 確認:
 
-MCPの具体的な登録コマンド、本人による認証と読み取り確認は [Google接続ガイド](GOOGLE-CONNECTION.md) を参照してください。
+読み取り専用CLI、MCPの具体的な登録コマンド、本人による認証と読み取り確認は [Google接続ガイド](GOOGLE-CONNECTION.md) を参照してください。
 Google資格情報と選択したAIのローカル準備は、次の診断で確認できます（通信・ログインは行いません）。
 
 ```sh
@@ -101,7 +103,7 @@ npm run workflow -- asa --dry-run
 ```
 
 使うAIの順番・渡す能力・プロンプトが表示されます。ここで、アカウント一覧や署名が自分の値になっているかを確認します。
-`--dry-run` は接続の成功を確認する機能ではありません。定期登録前に `npm run doctor -- --setup` と [Googleの読み取り確認](GOOGLE-CONNECTION.md#3-本人がgoogleで許可し読み取りだけを確認) も済ませてください。
+`--dry-run` は接続の成功を確認する機能ではありません。定期登録前に `npm run doctor -- --setup` と [Googleの読み取り確認](GOOGLE-CONNECTION.md) も済ませてください。
 
 ## 6. 毎日のワークフローを登録する
 

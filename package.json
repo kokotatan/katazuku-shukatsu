@@ -58,7 +58,7 @@
     "build": "npm run clean && tsc -p tsconfig.build.json",
     "prepack": "npm run build",
     "scan": "node tools/scan-secrets.mjs",
-    "test": "npm run test:core && npm run test:application && npm run test:mobility && npm run test:agent-runtime && npm run test:platform && npm run test:migration && npm run test:write-layer && npm run test:api && npm run test:schema && npm run test:recording && npm run test:workflows && npm run test:viewer && npm run test:spark-gateway && npm run test:setup",
+    "test": "npm run test:core && npm run test:application && npm run test:mobility && npm run test:agent-runtime && npm run test:platform && npm run test:migration && npm run test:write-layer && npm run test:api && npm run test:schema && npm run test:recording && npm run test:workflows && npm run test:viewer && npm run test:spark-gateway && npm run test:setup && npm run test:google-connect",
     "test:core": "tsx tests/check-core.ts",
     "test:schema": "tsx tests/check-schema.ts",
     "test:platform": "tsx tests/check-platform.ts",
@@ -97,7 +97,9 @@
     "release:check": "npm run check && npm pack --dry-run && node tools/check-npm-release.mjs",
     "test:spark-gateway": "npm --prefix spark-gateway ci --no-audit --no-fund && npm --prefix spark-gateway run check",
     "test:workflows": "tsx tests/check-workflows.ts",
-    "test:setup": "tsx tests/check-setup-doctor.ts"
+    "test:setup": "tsx tests/check-setup-doctor.ts",
+    "google:connect": "tsx scripts/google-connect.ts",
+    "test:google-connect": "tsx tests/check-google-connect.ts"
   },
   "devDependencies": {
     "@types/node": "^26.3.0",
