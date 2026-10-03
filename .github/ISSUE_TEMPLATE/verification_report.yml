@@ -1,0 +1,51 @@
+name: 動作確認レポート / Verification report
+description: デモやQuickstartを試した結果を共有する。コード変更なしでも歓迎 / No code change needed
+labels: ["documentation"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        成功した確認も歓迎します。失敗・導入相談には「セットアップで困った / Setup help」も使えます。
+        Successful checks are welcome. For setup failures, you can also use Setup help.
+        個人のパス、実在企業名、メール本文、資格情報、ログ全文は貼らないでください。
+        Do not post personal paths, real company names, email content, credentials, or raw logs.
+        Issueだけの報告に全PRチェックは必須ではありません / Full PR checks are not required for a report.
+  - type: input
+    id: related_issue
+    attributes:
+      label: 関連Issue / Related issue
+      description: 同じ課題があれば番号を記入 / Existing issue number, if any
+      placeholder: "#36"
+  - type: input
+    id: revision
+    attributes:
+      label: 確認した版 / Revision checked
+      description: git rev-parse --short HEAD の結果、またはリリース版 / Commit or release version
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: OSとNode.js版 / OS and Node.js version
+      description: OSのバージョン・node -v・npm -v / Include versions; omit personal paths
+      placeholder: "Linux / Node.js 24.x / npm 11.x"
+    validations:
+      required: true
+  - type: textarea
+    id: results
+    attributes:
+      label: 実行したコマンドと結果 / Commands and results
+      description: 成功・失敗・未実施を区別。全文ログは不要 / Separate passed, failed, and not run; no raw logs
+      placeholder: |
+        npm ci: 成功 / passed
+        npm run doctor: 成功 / passed
+        npm test: 未実施 / not run
+        npm run seed: 未実施 / not run
+        npm run demo -- --no-open: 起動して架空データの画面を確認 / fictional data displayed
+    validations:
+      required: true
+  - type: textarea
+    id: feedback
+    attributes:
+      label: 詰まった点・改善案 / Friction or suggestions
+      description: 説明不足だった場所や追加してほしい手順。問題なしでもOK / An unclear step, or no issues
