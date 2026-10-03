@@ -69,7 +69,7 @@ for (const name of VIEWER_APPS) {
   }
   if (!existsSync(join(appRoot, 'dist', 'index.html'))) throw new Error(`${name} のビルドがありません。--no-build を外して起動してください。`)
 }
-const server = createViewerServer({ root, demo, dataAvailable })
+const server = createViewerServer({ root, demo, dataAvailable, briefsAvailable: dataAvailable && !dbArg })
 server.on('error', (error) => {
   console.error(error.code === 'EADDRINUSE' ? `ポート${port}は使用中です。--port 4174 のように変更してください。` : 'ローカルサーバーを起動できませんでした。')
   process.exitCode = 1

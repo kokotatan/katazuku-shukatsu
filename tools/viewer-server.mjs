@@ -28,7 +28,7 @@ export async function readBriefs(root, demo = false) {
   return result
 }
 
-export function createViewerServer({ root, demo = false, dataAvailable = true }) {
+export function createViewerServer({ root, demo = false, dataAvailable = true, briefsAvailable = dataAvailable }) {
   if (typeof root !== 'string' || !root) throw new Error('閲覧用のルートが必要です')
   const sourceName = demo ? 'snapshot.demo.json' : 'snapshot.json'
   const server = createServer(async (req, res) => {
@@ -60,7 +60,7 @@ export function createViewerServer({ root, demo = false, dataAvailable = true })
         return
       }
       if (path === '/api/viewer') { json(200, { mode: demo ? 'demo' : 'local', automaticExecution: false }); return }
-      if (path === '/api/briefs') { json(200, dataAvailable ? await readBriefs(root, demo) : []); return }
+      if (path === '/api/briefs') { json(200, briefsAvailable ? await readBriefs(root, demo) : []); return }
       if (path === '/viewer-home.js') { send(200, await readFile(join(root, 'tools', 'viewer-home.js')), TYPES['.js']); return }
       const match = path.match(/^\/([a-z]+)\/(.*)$/)
       if (!match || !VIEWER_APPS.includes(match[1])) { send(404, 'ページが見つかりません'); return }
