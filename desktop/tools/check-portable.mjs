@@ -90,8 +90,37 @@ try {
   }
   const form = { displayName: '利用者A（架空）', email: 'you@example.test', signature: '利用者A（架空）', providerOrder: ['chatgpt-siwc'] }
   assert.equal((await evaluate(wizard, `window.katazuku.saveConfig(${JSON.stringify({ ...form, providerOrder: [] })})`)).ok, false)
-  const saved = await evaluate(wizard, `window.katazuku.saveConfig(${JSON.stringify(form)})`)
-  assert.equal(saved.ok, true, saved.output)
+  await evaluate(wizard, `document.querySelector('[data-panel="0"] [data-next]').click(); document.querySelector('[data-panel="1"] [data-next]').click(); document.getElementById('open-setup').click()`)
+  let helpPage
+  for (let i = 0; i < 100; i++) {
+    helpPage = (await pages()).find(page => page.url.startsWith('data:text/html'))
+    if (helpPage) break
+    await new Promise(resolve => setTimeout(resolve, 100))
+  }
+  assert(helpPage, '同梱手順がアプリ内で開く')
+  const help = await connect(helpPage.webSocketDebuggerUrl)
+  let helpText = ''
+  for (let i = 0; i < 100; i++) {
+    helpText = await evaluate(help, "document.readyState === 'complete' ? document.body.innerText : ''")
+    if (helpText.length > 100) break
+    await new Promise(resolve => setTimeout(resolve, 100))
+  }
+  assert(helpText.includes('Google') && helpText.includes('セットアップ'))
+  assert.equal(await evaluate(help, 'typeof window.katazuku'), 'undefined')
+  await help.call('Page.close')
+  checks.push('同梱セットアップ手順を外部アプリなしで表示')
+  await evaluate(wizard, `document.querySelector('[data-panel="2"] [data-next]').click();
+    document.querySelector('[name="displayName"]').value=${JSON.stringify(form.displayName)};
+    document.querySelector('[name="email"]').value=${JSON.stringify(form.email)};
+    document.querySelector('[name="signature"]').value=${JSON.stringify(form.signature)};
+    document.querySelector('[value="chatgpt-siwc"]').checked=true;
+    document.getElementById('config').requestSubmit()`)
+  for (let i = 0; i < 200; i++) {
+    if (await evaluate(wizard, '!document.querySelector(\'[data-panel="4"]\').hidden')) break
+    await new Promise(resolve => setTimeout(resolve, 100))
+  }
+  assert(await evaluate(wizard, '!document.querySelector(\'[data-panel="4"]\').hidden'), '設定フォーム送信で次の画面へ進む')
+  checks.push('設定フォーム送信から保存成功・次の画面まで進む')
   assert.equal((await evaluate(wizard, 'window.katazuku.status()')).config.displayName, form.displayName)
   const configPath = join(fixture, 'katazuku.config.json')
   const before = readFileSync(configPath, 'utf8')
