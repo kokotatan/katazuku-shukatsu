@@ -31,7 +31,8 @@
 準備中です([docs/DESKTOP-APP.md](docs/DESKTOP-APP.md))。
 
 AIの利用料は、**あなた自身の** ChatGPT プラン(Sign in with ChatGPT)・Claude Code・Codex、または API キーで払います。
-katazuku 側のサーバや課金はありません。データは最初から最後まで、あなたのPCの中にあります。
+katazuku 側のサーバや課金はありません。正本DBとローカルの閲覧データは、あなたのPCに保存します。
+Googleとの通信や、選択したAIプロバイダへの情報送信は発生します。AIへ渡す情報は各ワークフローの `--dry-run` と [AIプロバイダ](docs/AI-PROVIDERS.md) で確認できます。
 
 ## 何ができるか
 
@@ -63,11 +64,13 @@ katazuku 側のサーバや課金はありません。データは最初から�
 
 ```mermaid
 flowchart LR
-  subgraph PC["あなたのPC(すべてローカル)"]
+  G[("Google<br/>Gmail / Calendar")]
+  A["外部AI provider<br/>ChatGPT プラン / Claude Code / Codex / API"]
+  subgraph PC["あなたのPC(正本・実行・閲覧)"]
     direction TB
     S["スケジューラ<br/>タスクスケジューラ / cron / launchd"] --> W["ワークフロー<br/>scripts/workflow.ts"]
-    W -->|読み取り専用で取得| G[("Gmail / Calendar<br/>自分のOAuth")]
-    W -->|プロンプト| A["AI provider<br/>ChatGPT プラン / Claude Code / Codex / API"]
+    W -->|自分のOAuthで読み取り| G
+    W -->|プロンプト| A
     A -->|厳格JSON| V["検証<br/>Schema・網羅性・暴走ブレーキ"]
     V --> DB[("正本DB<br/>SQLite 1ファイル")]
     DB --> SNAP["snapshot.json"] --> APPS["閲覧アプリ8本<br/>(見る窓)"]
