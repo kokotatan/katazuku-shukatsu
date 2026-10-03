@@ -7,6 +7,7 @@
 
 ### Added
 
+- 実利用前のローカル診断 `npm run doctor -- --setup`、秘密値を含まない `.env.example`、Google/MCPの具体的な接続・読み取り確認手順を追加。設定例を運転可能と扱わず、通信やログインなしで不足を案内する。
 - 自動運転ワークフロー(mail-watch / daily-sync / asa / evening-brief / calendar-sync / watchdog / inbox-tidy)を`npm run workflow`で実行できるようにした。設定は katazuku.config.json、定期実行は Windows タスクスケジューラ・cron・launchd・systemd に対応([docs/WORKFLOWS.md](docs/WORKFLOWS.md))。
 - 提出物台帳(submission_requirement)・空き判定用の予定投影(schedule_block)・外部取得の鮮度(source_sync_state)。スキーマ v4。
 - npm Trusted Publishing用のGitHub Actionsと、タグ・version・公開先を検査するリリースゲート。

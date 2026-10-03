@@ -108,6 +108,9 @@ npm run workflow -- asa --dry-run        # 朝のまとめのプロンプトと�
 4. `--dry-run` で確認してから、毎日のワークフローを登録する
 5. `npm run snapshot` で閲覧アプリに自分のデータを出す
 
+実利用の前提は `npm run doctor -- --setup` で確認できます。設定・Google資格情報・選択したAIのローカル準備を調べ、秘密値は表示しません。
+通信やログインは行わないため、[Google接続ガイド](docs/GOOGLE-CONNECTION.md) の本人による読み取り確認も済ませてください。
+
 ## AIプロバイダ
 
 | 選び方 | 支払い | 向いている工程 |

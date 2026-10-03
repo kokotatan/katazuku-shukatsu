@@ -58,6 +58,13 @@ Gmail・カレンダーの読み書きを、あなたのPCの中だけで許可�
 
 確認:
 
+MCPの具体的な登録コマンド、本人による認証と読み取り確認は [Google接続ガイド](GOOGLE-CONNECTION.md) を参照してください。
+Google資格情報と選択したAIのローカル準備は、次の診断で確認できます（通信・ログインは行いません）。
+
+```sh
+npm run doctor -- --setup
+```
+
 ```sh
 npx tsx scripts/gmail-fetch.ts logs/check-mail.local.json --days 1     # 取得できた件数が出れば成功(読み取りのみ)
 ```
@@ -93,6 +100,7 @@ npm run workflow -- asa --dry-run
 ```
 
 使うAIの順番・渡す能力・プロンプトが表示されます。ここで、アカウント一覧や署名が自分の値になっているかを確認します。
+`--dry-run` は接続の成功を確認する機能ではありません。定期登録前に `npm run doctor -- --setup` と [Googleの読み取り確認](GOOGLE-CONNECTION.md#3-本人がgoogleで許可し読み取りだけを確認) も済ませてください。
 
 ## 6. 毎日のワークフローを登録する
 
