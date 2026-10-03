@@ -8,6 +8,7 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 const folder = resolve(process.argv[2] || '')
 assert(process.argv[2], '配布フォルダーを指定してください')
+assert(process.argv.slice(3).every(value => value === '--screenshot'), '不明なオプションです')
 const fixture = mkdtempSync(join(tmpdir(), 'katazuku-portable-test-'))
 const manifest = JSON.parse(readFileSync(join(folder, 'manifest.json'), 'utf8'))
 for (const file of manifest.files) assert.equal(createHash('sha256').update(readFileSync(join(folder, file.path))).digest('hex'), file.sha256, file.path)
@@ -61,8 +62,11 @@ try {
   const initial = await evaluate(wizard, 'window.katazuku.status()')
   assert.equal(initial.packaged, true); assert.equal(initial.repoReady, true); assert.equal(initial.config, null)
   checks.push('同梱ランタイムでウィザード起動')
-  const welcomeImage = await wizard.call('Page.captureScreenshot')
-  writeFileSync(join(fixture, 'wizard.png'), Buffer.from(welcomeImage.data, 'base64'))
+  // 非表示ウィンドウの画像取得は環境によって完了しないため、目視確認時だけ明示指定する。
+  if (process.argv.includes('--screenshot')) {
+    const welcomeImage = await wizard.call('Page.captureScreenshot')
+    writeFileSync(join(fixture, 'wizard.png'), Buffer.from(welcomeImage.data, 'base64'))
+  }
   await evaluate(wizard, "document.getElementById('open-demo').click()")
   for (let i = 0; i < 100; i++) {
     if (await evaluate(wizard, "!document.getElementById('open-demo').disabled")) break
