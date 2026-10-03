@@ -63,7 +63,12 @@ try {
   checks.push('同梱ランタイムでウィザード起動')
   const welcomeImage = await wizard.call('Page.captureScreenshot')
   writeFileSync(join(fixture, 'wizard.png'), Buffer.from(welcomeImage.data, 'base64'))
-  const demo = await evaluate(wizard, 'window.katazuku.openDemo()'); assert.equal(demo.ok, true)
+  await evaluate(wizard, "document.getElementById('open-demo').click()")
+  for (let i = 0; i < 100; i++) {
+    if (await evaluate(wizard, "!document.getElementById('open-demo').disabled")) break
+    await new Promise(resolve => setTimeout(resolve, 100))
+  }
+  assert((await evaluate(wizard, "document.getElementById('demo-result').textContent")).includes('開きました'))
   const viewerPage = (await pages()).find(page => page.url.startsWith('http://127.0.0.1:'))
   assert(viewerPage)
   const viewer = await connect(viewerPage.webSocketDebuggerUrl)

@@ -2,9 +2,10 @@
 const api = window.katazuku
 for (const id of ['open-demo', 'open-demo-again']) document.getElementById(id).addEventListener('click', async (event) => {
   const button = event.currentTarget
+  const output = document.getElementById(id === 'open-demo' ? 'demo-result' : 'demo-result-again')
   button.disabled = true
-  try { document.getElementById('demo-result').textContent = (await api.openDemo()).output }
-  catch { document.getElementById('demo-result').textContent = '閲覧画面を開けませんでした。アプリを開き直してください。' }
+  try { output.textContent = (await api.openDemo()).output }
+  catch { output.textContent = '閲覧画面を開けませんでした。アプリを開き直してください。' }
   finally { button.disabled = false }
 })
 let step = 0

@@ -8,7 +8,7 @@
   "main": "main.mjs",
   "scripts": {
     "start": "electron .",
-    "check": "node --check main.mjs && node --check preload.cjs && node --check renderer/wizard.js",
+    "check": "node --check main.mjs && node --check preload.cjs && node --check renderer/wizard.js && node --check tools/package-portable.mjs && node --check tools/check-portable.mjs",
     "package:windows": "node tools/package-portable.mjs"
   },
   "devDependencies": {
