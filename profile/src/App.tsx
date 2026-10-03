@@ -25,7 +25,7 @@ export default function App() {
   const suggestions = data?.profileSuggestions ?? []
 
   return (
-    <AppShell current="profile" demo={data?.demo}>
+    <AppShell current="profile" demo={data?.demo} refreshError={data ? error : undefined}>
       <AppHeading
         caption="PROFILE"
         title="個人マスタ"

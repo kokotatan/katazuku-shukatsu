@@ -194,7 +194,7 @@ export function Tile({ label, value, tone }: { label: string; value: ReactNode; 
 }
 
 /** アプリの外枠(サイドバー + 本文)。全アプリで同じ */
-export function AppShell({ current, children, demo }: { current: AppKey; children: ReactNode; demo?: boolean }) {
+export function AppShell({ current, children, demo, refreshError }: { current: AppKey; children: ReactNode; demo?: boolean; refreshError?: string }) {
   return (
     <div className="ktz-app">
       <AppNav current={current} />
@@ -202,6 +202,9 @@ export function AppShell({ current, children, demo }: { current: AppKey; childre
         <Stack gap={1.5}>
           {demo && <InformationPanel type="warning" heading="架空データのデモです" toggleable={false}>
             <Text>実際の予定や選考状況ではありません。自分のデータを開くときは <code>npm start</code> を使ってください。</Text>
+          </InformationPanel>}
+          {refreshError && <InformationPanel type="warning" heading="再読込に失敗しました" toggleable={false}>
+            <Text>表示している内容は、最後に取得できた時点のものです。最新の予定や選考状況はまだ確認できていません。接続と同期を確認し、もう一度「再読込」を押してください。</Text>
           </InformationPanel>}
           {children}
         </Stack>

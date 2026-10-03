@@ -24,7 +24,7 @@ export default function App() {
   const notes = data?.personNotes ?? []
 
   return (
-    <AppShell current="people" demo={data?.demo}>
+    <AppShell current="people" demo={data?.demo} refreshError={data ? error : undefined}>
       <AppHeading
         caption="PEOPLE"
         title="人"
