@@ -88,12 +88,21 @@ function replaceResponse(run: Run, endpoint: string, body: unknown, status = 200
 
 try {
   let run = scenario()
+  let protectedEmpty = 0
+  run.options.protectFile = path => { assert.equal(statSync(path).size, 0); protectedEmpty++; chmodSync(path, 0o600) }
+  const openBrowser = run.options.openBrowser!
+  run.options.openBrowser = async value => {
+    assert.equal(protectedEmpty, 1)
+    assert.deepEqual(readdirSync(run.options.credentialsDir), [])
+    await openBrowser(value)
+  }
   await connectGoogleReadOnly(run.options)
   const stored = JSON.parse(readFileSync(run.path, 'utf8'))
   check('固定Google接続先、loopback、S256 PKCEで接続し互換JSONを保存する', stored.refresh_token === 'synthetic-refresh' && stored.token_uri === GOOGLE_TOKEN_ENDPOINT)
   check('要求権限は本人確認とGmail/Calendar読取りだけ', run.authorization?.searchParams.get('scope') === GOOGLE_READ_SCOPES.join(' ') && !run.authorization?.searchParams.has('include_granted_scopes'))
   check('内容・件数・メール本文・予定の取得を診断に使わない', run.calls.length === 4 && !run.calls.some(url => /messages|events/.test(url)))
   check('一時ファイルを残さず読取り専用を明示する', readdirSync(run.options.credentialsDir).length === 1 && stored.katazuku_connection === 'read-only' && GOOGLE_READ_SUCCESS.includes('別のMCP接続'))
+  check('Google同意前に空ファイルだけで保存権限を確認し、保存時も再確認する', protectedEmpty === 2)
   if (process.platform !== 'win32') check('POSIXの資格情報は0600', (statSync(run.path).mode & 0o777) === 0o600)
   const original = readFileSync(run.path, 'utf8')
   let opened = false
@@ -213,7 +222,10 @@ try {
   run = scenario(); run.options.clientSecret = ''
   await rejected('クライアント未設定ではブラウザを開かない', run)
   run = scenario(); run.options.protectFile = () => { throw new Error('ACL failure') }
+  let permissionFailureOpened = false
+  run.options.openBrowser = async () => { permissionFailureOpened = true }
   await rejected('保存ACLを設定できなければ秘密を残さない', run)
+  check('保存権限の不足はブラウザ・Google通信より前に拒否する', !permissionFailureOpened && run.calls.length === 0)
   run = scenario()
   const previous = run.options.fetch!
   run.options.fetch = async (input, init) => {
@@ -238,6 +250,16 @@ try {
     && commands[1].args.join(' ') === 'synthetic-empty-file /inheritance:r /grant:r *S-1-5-21-100-200-300-400:(F)')
   assert.throws(() => protectGoogleSecretFile('synthetic-empty-file', 'win32', (() => '') as unknown as typeof import('node:child_process').execFileSync), GoogleConnectError)
   check('Windowsの本人SIDが取れなければ保存権限設定を拒否する')
+  commands.length = 0
+  protectGoogleSecretFile('synthetic-empty-file', 'win32', ((command: string, args: readonly string[]) => {
+    commands.push({ command, args }); return command === 'whoami.exe' ? '"synthetic-entra-user","S-1-12-1-111-222-333-444"' : ''
+  }) as typeof import('node:child_process').execFileSync)
+  check('学校や職場のEntraアカウントのSIDでも本人ACLを設定する', commands[1].args.at(-1) === '*S-1-12-1-111-222-333-444:(F)')
+  commands.length = 0
+  protectGoogleSecretFile('synthetic-empty-file', 'win32', ((command: string, args: readonly string[]) => {
+    commands.push({ command, args }); return command === 'whoami.exe' ? '"S-1-5-21-111-222-333-444","S-1-12-1-555-666-777-888"' : ''
+  }) as typeof import('node:child_process').execFileSync)
+  check('表示名のSID風文字列を本人SIDと取り違えない', commands[1].args.at(-1) === '*S-1-12-1-555-666-777-888:(F)')
 
   const badDirectory = join(home, 'bad-endpoint'); mkdirSync(badDirectory)
   const badFile = join(badDirectory, email + '.json')

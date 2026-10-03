@@ -45,7 +45,8 @@ export interface GoogleConnectOptions {
 export function protectGoogleSecretFile(path: string, platform = process.platform, run = execFileSync): void {
   if (platform !== 'win32') { chmodSync(path, 0o600); return }
   const identity = run('whoami.exe', ['/user', '/fo', 'csv', '/nh'], { encoding: 'utf8', windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] })
-  const sid = String(identity).match(/S-1-5-\d+(?:-\d+)+/)?.[0]
+  // CSVの末尾のSID列だけを読む。EntraのS-1-12-1も受け入れ、表示名内の文字列は使わない。
+  const sid = String(identity).trim().match(/,"(S-1-\d+(?:-\d+)+)"$/)?.[1]
   if (!sid) failure('本人だけの保存権限を設定できませんでした。資格情報は保存していません。')
   run('icacls.exe', [path, '/inheritance:r', '/grant:r', `*${sid}:(F)`], { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] })
 }
@@ -81,6 +82,13 @@ function prepareStore(options: GoogleConnectOptions): string {
     failure('既存のGoogle資格情報を保護するため接続を中止しました。読取り確認は --check、MCPの接続は docs/GOOGLE-CONNECTION.md を参照してください。')
   }
   return path
+}
+
+/** 本人のGoogle同意より先に、空ファイルだけで作成/ACL設定を検証する。 */
+function probeStorePermissions(path: string, protect = protectGoogleSecretFile): void {
+  const probe = join(resolve(path, '..'), '.oauth-probe-' + randomBytes(16).toString('hex') + '.tmp')
+  const descriptor = openSync(probe, 'wx', 0o600)
+  try { protect(probe) } finally { closeSync(descriptor); unlinkSync(probe) }
 }
 
 /** シェルを経由せずOSのブラウザを起動。URLはコンソールに出さない。 */
@@ -205,6 +213,8 @@ export async function connectGoogleReadOnly(options: GoogleConnectOptions): Prom
     if (!nonempty(options.clientId) || !options.clientId.endsWith('.apps.googleusercontent.com') || !nonempty(options.clientSecret)) failure('自分のデスクトップOAuthクライアントID・シークレットを.envに入力してください。')
     signal.throwIfAborted()
     const path = prepareStore(options)
+    probeStorePermissions(path, options.protectFile)
+    signal.throwIfAborted()
     const { code, verifier, redirectUri } = await authorizationCode(options.clientId, signal, options.openBrowser ?? openGoogleBrowser)
     const request = options.fetch ?? fetch
     const token = await jsonRequest(request, GOOGLE_TOKEN_ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
