@@ -1,9 +1,10 @@
 # セットアップ(自分のデータで使う)
 
-所要時間の目安は30〜60分です(Google Cloud の画面操作がいちばん長い)。
+ターミナル操作と、自分のGoogle Cloud OAuthクライアントの作成が必要です。
+所要時間の目安は30〜60分に加え、初回の8画面の導入・ビルドです。Google Cloudの設定で時間が延びることがあります。
 途中で詰まったら、[Issue の「セットアップで困った」](https://github.com/kokotatan/katazuku-shukatsu/issues/new/choose) で気軽に聞いてください。
 
-まだなら、先に [5分デモ](../README.md#5分で試す資格情報ゼロ) で画面を見ておくと、何ができるようになるかが分かります。
+まだなら、先に [認証なしのデモ](../README.md#デモで試す資格情報ゼロ) で画面を見ておくと、何ができるようになるかが分かります。
 
 ## 0. 必要なもの
 
@@ -15,7 +16,7 @@
 ```sh
 git clone https://github.com/kokotatan/katazuku-shukatsu.git
 cd katazuku-shukatsu
-npm install
+npm ci
 npm run doctor     # OS・Node・node:sqlite が使えるかの診断
 ```
 
@@ -36,8 +37,8 @@ cp katazuku.config.example.json katazuku.config.json      # Windows(PowerShell)�
 
 ## 2. Google につなぐ(自分の OAuth クライアント)
 
-katazuku は Google のログイン画面を持ちません。**あなた自身の Google Cloud プロジェクト**で OAuth クライアントを作り、
-Gmail・カレンダーの読み書きを、あなたのPCの中だけで許可します。
+**あなた自身の Google Cloud プロジェクト**でOAuthクライアントを作り、`npm run google:connect` から本人がブラウザで読み取りを許可します。
+メール下書き・予定の書込みを使う工程には、Google MCPの別接続も必要です。
 
 1. <https://console.cloud.google.com/> で新しいプロジェクトを作る(名前は何でもよい)。
 2. 「API とサービス」→「ライブラリ」で **Gmail API** と **Google Calendar API** を有効にする。
@@ -45,7 +46,9 @@ Gmail・カレンダーの読み書きを、あなたのPCの中だけで許可�
    「テストユーザー」に自分の就活用アカウントを追加する(テスト中は追加した人しかログインできない=自分専用)。
 4. 「認証情報」→「OAuth クライアント ID を作成」→ 種類は **デスクトップアプリ**。クライアントIDとシークレットを控える。
    これらは `.env`(`GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET`)にだけ書き、コミットしない。
-5. [google-workspace MCP(workspace-mcp)](https://github.com/taylorwilsdon/google_workspace_mcp) を、
+5. `npm run google:connect` で就活用アカウントの読み取りを許可し、本人確認・Gmail・Calendarの診断が成功することを確認する。
+   既存のMCP資格情報がある場合は上書きせず、`npm run google:connect -- --check` で確認する。
+6. 下書き・予定の書込みを使う場合は [google-workspace MCP(workspace-mcp)](https://github.com/taylorwilsdon/google_workspace_mcp) を、
    そのクライアントIDとシークレットで Claude Code / Codex に登録し、就活用アカウントで一度ログインする。
    ログインすると `~/.google_workspace_mcp/credentials/<メールアドレス>.json` にトークンが保存され、
    katazuku の決定的な取得スクリプト(Gmail・カレンダーの読み取り)もそれを再利用します
@@ -53,10 +56,17 @@ Gmail・カレンダーの読み書きを、あなたのPCの中だけで許可�
 
 補足:
 - テスト中の OAuth クライアントのトークンは、Google の仕様で一定期間ごとに再ログインが必要になることがあります。
-  番犬(watchdog)が取得失敗を検知したら、5 の手順でログインし直してください。
+  番犬(watchdog)が取得失敗を検知したら、使用している接続方式の再認証手順を確認してください。既存資格情報はCLIが自動で消去・上書きしません。
 - 多くの人に配る「公開」クライアントにするには Google の審査(OAuth 検証)が必要です。自分用なら不要です。
 
 確認:
+
+読み取り専用CLI、MCPの具体的な登録コマンド、本人による認証と読み取り確認は [Google接続ガイド](GOOGLE-CONNECTION.md) を参照してください。
+Google資格情報と選択したAIのローカル準備は、次の診断で確認できます（通信・ログインは行いません）。
+
+```sh
+npm run doctor -- --setup
+```
 
 ```sh
 npx tsx scripts/gmail-fetch.ts logs/check-mail.local.json --days 1     # 取得できた件数が出れば成功(読み取りのみ)
@@ -93,6 +103,7 @@ npm run workflow -- asa --dry-run
 ```
 
 使うAIの順番・渡す能力・プロンプトが表示されます。ここで、アカウント一覧や署名が自分の値になっているかを確認します。
+`--dry-run` は接続の成功を確認する機能ではありません。定期登録前に `npm run doctor -- --setup` と [Googleの読み取り確認](GOOGLE-CONNECTION.md) も済ませてください。
 
 ## 6. 毎日のワークフローを登録する
 
@@ -110,11 +121,19 @@ npm run schedule:print -- cron
 ## 7. アプリで見る
 
 ```sh
-npm run snapshot                 # 正本DB → 各アプリの public/snapshot.json(gitignore 済み)
-cd board && npm ci && npm run dev
+npm start
 ```
 
-ワークフローは実行のたびにスナップショットを更新します。
+ホームと8画面を同じローカルURLから開けます。初回だけ全画面をビルドします。
+ホームには `logs/briefs/` の朝・前夜それぞれの最新のまとめ、「今日やること」には応募とは別の未完了提出物を表示します。
+`--db` で任意の別DBを指定した場合は、以前のDBのまとめと混ざらないようブリーフを表示しません。
+
+起動時に既存の正本DBからスナップショットを更新します。ワークフローの実行時も更新されるので、画面の再読込で反映できます。
+正本DBがまだない場合は案内だけを表示し、空のDBを作ったり、架空データへ切り替えたりしません。
+日次同期が成功したことを確認してから再起動してください。
+
+このPCの `127.0.0.1` にだけ公開します。LAN・スマホ・外部サーバーへの公開には使いません。
+停止は Ctrl+C。ポートが使用中なら `npm start -- --port 4174`。起動だけで定期処理やAIは実行されません。
 
 ## 8. バックアップ
 
@@ -132,5 +151,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\register-tasks.ps1 -
 npm run chatgpt -- signout       # ChatGPT のセッションを失効させる
 ```
 
-データは `data/`・`logs/` にだけあります。フォルダごと消せば残りません
-(Google 側の許可は <https://myaccount.google.com/permissions> から取り消せます)。
+閲覧サーバーも Ctrl+C で停止します。データは `data/`・`logs/` と各画面の `public/snapshot.json` にあります。
+利用を終える場合は、これらと個人設定・`.env`、接続時に作成された認証情報を自分で削除します。
+バックアップを別の場所に保存した場合は、その場所も確認してください。
+Google 側の許可は <https://myaccount.google.com/permissions> から取り消せます。

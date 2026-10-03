@@ -12,7 +12,7 @@
  * 実データから書き出した snapshot.json は .gitignore 済み。コミットしないこと。
  */
 import { writeFileSync, mkdirSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
   openDb, upsertCompany, insertSelection, addAppointment, addEvent, addPending,
@@ -20,6 +20,8 @@ import {
 } from '../src/db.js'
 import { listPlatformSnapshot, saveBasicProfile, upsertCompanyDossier, upsertMailItem } from '../src/platform.js'
 import { upsertPerson } from '../src/inputs.js'
+import { applySubmissionRequirements } from '../src/submission-requirement.js'
+import { evaluateSubmissionReadiness } from '../src/submission-readiness.js'
 import type { DatabaseSync } from 'node:sqlite'
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -60,6 +62,11 @@ export function buildSnapshot(db: DatabaseSync, demo: boolean): Record<string, u
     personNotes: platform.personNotes,
     interviews: platform.interviews,
     submissions: platform.submissions,
+    submissionRequirements: evaluateSubmissionReadiness(db).map((row) => ({
+      id: row.id, company: row.company, title: row.title, deadline: row.deadline,
+      kind: row.kind, preparationStatus: row.preparationStatus, severity: row.severity,
+      requiredAction: row.requiredAction,
+    })),
     dossiers: platform.dossiers,
     mailItems: platform.mailItems,
     pending: listPending(db).map((p) => ({ name: p.name, context: p.context, createdAt: p.created_at })),
@@ -114,7 +121,7 @@ function seedDemo(db: DatabaseSync): void {
     ['株式会社アルファ', '2026-08-14T09:12:00+09:00', '選考通過', 'メールに「最終面接へお進みいただきます」とあった', 'daily-sync'],
     ['ベータ工業株式会社', '2026-08-15T18:40:00+09:00', '日程打診', '候補日3つの案内メールを受信。返信はまだ', 'daily-sync'],
     ['株式会社アルファ', '2026-08-15T07:00:00+09:00', '予定作成', '結果連絡の面談をカレンダーへ登録した', 'calendar-sync'],
-    ['株式会社イプシロン', '2026-08-16T08:05:00+09:00', '内定', '内定通知と承諾期限(8/28)の案内', 'daily-sync'],
+    ['株式会社イプシロン', '2026-08-16T08:05:00+09:00', '内定', '内定通知と承諾期限の案内', 'daily-sync'],
     ['ゼータ商事株式会社', '2026-08-12T11:30:00+09:00', '不合格', 'お見送りの連絡。トラックを終了に確定した', 'daily-sync'],
   ]
   for (const [company, at, kind, summary, source] of events) {
@@ -192,6 +199,32 @@ function seedDemo(db: DatabaseSync): void {
 
   // 名寄せが怪しかった入力(法人格違い)。アプリの「確認待ち」に出る
   addPending(db, '株式会社ガンマ', '既存「合同会社ガンマ」と紛らわしい。同一なら別名として学習、別会社ならこのままでよい')
+
+  applySubmissionRequirements(db, [
+    { sourceRef: 'demo-pledge', company: '株式会社イプシロン', kind: 'pledge', title: '誓約書を確認して提出する', deadline: '2026-08-18T18:00:00+09:00', status: 'required' },
+    { sourceRef: 'demo-certificate', company: 'ベータ工業株式会社', kind: 'insurance_certificate', title: '大学で保険証明書を手配する', deadline: '2026-08-21T17:00:00+09:00', status: 'required' },
+  ])
+}
+
+/** 架空データの日付を日本時間の今日へ寄せ、毎回「全部期限切れ」のデモにしない。 */
+export function buildDemoSnapshot(now = new Date()): Record<string, unknown> {
+  const db = openDb(':memory:')
+  try {
+    seedDemo(db)
+    const snapshot = buildSnapshot(db, true)
+    const today = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now)
+    const offset = Date.parse(`${today}T00:00:00Z`) - Date.parse('2026-08-16T00:00:00Z')
+    const shifted = JSON.parse(JSON.stringify(snapshot).replace(/2026-08-\d{2}/g, (date) =>
+      new Date(Date.parse(`${date}T00:00:00Z`) + offset).toISOString().slice(0, 10))) as Record<string, unknown>
+    shifted.generatedAt = now.toISOString()
+    // 期限をずらした後のseverityも、表示する日付に合わせる。
+    for (const row of shifted.submissionRequirements as Array<Record<string, unknown>>) {
+      const hours = (Date.parse(String(row.deadline)) - now.getTime()) / 3_600_000
+      row.severity = hours < 0 ? 'overdue' : hours <= 48 ? 'urgent' : hours <= 168 ? 'due_soon' : 'prepare'
+      row.requiredAction = hours < 0 ? '期限を確認して対応する' : '公式手続先と提出物を確認し、本人の承認前まで準備する'
+    }
+    return shifted
+  } finally { db.close() }
 }
 
 function main(): void {
@@ -199,10 +232,15 @@ function main(): void {
   const dbPath = demo
     ? ':memory:'
     : (process.argv.slice(2).find((a) => !a.startsWith('--')) ?? process.env.KATAZUKU_DB ?? 'data/katazuku.db')
-  const db = openDb(dbPath)
-  if (demo) seedDemo(db)
-
-  const snapshot = buildSnapshot(db, demo)
+  const db = demo ? undefined : openDb(dbPath)
+  const snapshot = demo ? buildDemoSnapshot() : buildSnapshot(db!, false)
+  if (demo && process.argv.includes('--viewer')) {
+    const out = join(here, '..', 'logs', 'viewer-demo.local.json')
+    mkdirSync(dirname(out), { recursive: true })
+    writeFileSync(out, `${JSON.stringify(snapshot, null, 2)}\n`, 'utf8')
+    console.log('閲覧用の架空データを準備しました（正本DB・同梱fixtureは変更しません）')
+    return
+  }
   const name = demo ? 'snapshot.demo.json' : 'snapshot.json'
   for (const app of TARGETS) {
     const out = join(here, '..', app, 'public', name)
@@ -210,11 +248,11 @@ function main(): void {
     writeFileSync(out, `${JSON.stringify(snapshot, null, 2)}\n`, 'utf8')
     console.log(`${out} に書き出しました`)
   }
-  db.close()
+  db?.close()
 
   const n = (k: string) => (snapshot[k] as unknown[]).length
   console.log(`  選考 ${n('selections')} / 予定 ${n('appointments')} / ログ ${n('activities')} / 人 ${n('people')} / メール ${n('mailItems')} / 確認待ち ${n('pending')}`)
   if (!demo) console.log('  ※ 実データを含みます。snapshot.json はコミットしないでください(.gitignore 済み)')
 }
 
-main()
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main()

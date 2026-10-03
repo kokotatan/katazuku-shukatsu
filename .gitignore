@@ -72,6 +72,7 @@ web_modules/
 .env
 .env.*
 !.env.example
+/.codex/config.toml
 .dev.vars
 .wrangler/
 cloudflare/wrangler.jsonc
@@ -170,3 +171,4 @@ mirror-out.json
 
 # 自動運転ワークフローの個人設定(雛形は katazuku.config.example.json)
 katazuku.config.json
+!.env.example

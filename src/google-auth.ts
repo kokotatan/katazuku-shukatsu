@@ -1,9 +1,9 @@
 /**
  * 保存済みの Google OAuth トークン(refresh_token)からアクセストークンを得る。
  *
- * katazuku 自身はログイン画面を持たない。利用者が「自分の Google Cloud の OAuth クライアント」で
- * google-workspace MCP(workspace-mcp)を一度認証すると、`<credentialsDir>/<email>.json` に
- * refresh_token が保存される。決定的な取得スクリプト(gmail-fetch / calendar-fetch)はそれを再利用するだけ。
+ * 利用者が自分のGoogle CloudのOAuthクライアントで google:connect（読取り専用）または
+ * google-workspace MCP を一度認証すると、`<credentialsDir>/<email>.json` にrefresh_tokenが保存される。
+ * 決定的な取得スクリプト(gmail-fetch / calendar-fetch)はそれを再利用するだけ。
  * 秘密値はログへ出さない。ファイルはリポジトリの外(既定 ~/.google_workspace_mcp/credentials)に置く。
  */
 import { readFileSync } from 'node:fs'

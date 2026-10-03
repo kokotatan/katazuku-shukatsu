@@ -7,6 +7,10 @@
 
 ### Added
 
+- `npm start` / `npm run demo` から8画面を同じローカルURLで開く閲覧サーバー。デモと実データを分け、ホームで朝・前夜のまとめ、「今日やること」で未完了提出物を確認できる。
+- 起動日の日本時間に合わせた架空デモの日付と、壊れたスナップショットの形式検査。
+- 本人所有のデスクトップOAuthクライアントで接続する `npm run google:connect` を追加。Gmail・Calendarの読取り専用で、state/PKCE・本人一致・権限・APIを確認してから排他的に保存し、既存MCP資格情報は上書きしない。下書き・予定書込みには別MCP接続が必要。
+- 実利用前のローカル診断 `npm run doctor -- --setup`、秘密値を含まない `.env.example`、Google/MCPの具体的な接続・読み取り確認手順を追加。設定例を運転可能と扱わず、通信やログインなしで不足を案内する。
 - 初参加向けの日英ガイド(forkからPRまで)、既存の初心者向けIssueへの直接リンク、コード変更なしでも参加できる動作確認レポートのIssueフォーム。
 - 自動運転ワークフロー(mail-watch / daily-sync / asa / evening-brief / calendar-sync / watchdog / inbox-tidy)を`npm run workflow`で実行できるようにした。設定は katazuku.config.json、定期実行は Windows タスクスケジューラ・cron・launchd・systemd に対応([docs/WORKFLOWS.md](docs/WORKFLOWS.md))。
 - 提出物台帳(submission_requirement)・空き判定用の予定投影(schedule_block)・外部取得の鮮度(source_sync_state)。スキーマ v4。
@@ -17,8 +21,15 @@
 
 ### Security
 
+- 閲覧サーバーを127.0.0.1に限定し、外部Origin/Host・書き込み・任意ファイル配信を拒否。実データがなくてもデモへ黙って切り替えない。
 - npmパスワードや長期トークンをリポジトリ／GitHub Secretsへ置かず、OIDCで公開できる手順を追加。
 - リポジトリ直下の `.npmrc` をgitignoreし、CLI認証情報の誤コミットを防止。
+
+### Fixed
+
+- 個別Vite起動では別アプリへの移動が同じ画面へ戻る問題を、統合ローカル起動で解消。
+- 未設定・未同期の状態でも「自動運転が監視中」と断定していた空状態の案内。
+- SETUPの削除手順が実データのスナップショットと外部の認証情報・バックアップを含めていなかった点。
 
 ## [0.3.0] - 2026-09-03
 

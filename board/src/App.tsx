@@ -260,7 +260,7 @@ export default function App() {
   ]
 
   return (
-    <AppShell current="board">
+    <AppShell current="board" demo={data?.demo}>
       <AppHeading
         caption="BOARD"
         title="ボード"
@@ -272,16 +272,6 @@ export default function App() {
 
       {!data ? <DataState loading={loading} error={error} /> : (
         <>
-          {data.demo && (
-            <InformationPanel type="warning" heading="デモデータを表示しています" toggleable={false}>
-              <Text>
-                架空の企業・予定・ログです。自分のデータを見るには、リポジトリのルートで
-                <code> npm run snapshot </code>
-                を実行してから「再読込」を押してください(書き出した snapshot.json はコミットされません)。
-              </Text>
-            </InformationPanel>
-          )}
-
           <SegmentedControl
             options={options}
             value={tab}
