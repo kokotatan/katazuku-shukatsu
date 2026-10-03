@@ -81,7 +81,7 @@ export default function App() {
   const quiet = overdue.length + soon.length + todayAppts.length + requirements.length === 0
 
   return (
-    <AppShell current="insight" demo={data?.demo}>
+    <AppShell current="insight" demo={data?.demo} refreshError={data ? error : undefined}>
       <AppHeading
         caption="INSIGHT"
         title="今日やること"

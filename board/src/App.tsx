@@ -260,7 +260,7 @@ export default function App() {
   ]
 
   return (
-    <AppShell current="board" demo={data?.demo}>
+    <AppShell current="board" demo={data?.demo} refreshError={data ? error : undefined}>
       <AppHeading
         caption="BOARD"
         title="ボード"
