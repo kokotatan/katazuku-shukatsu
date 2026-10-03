@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld('katazuku', {
   chatgptSignIn: () => ipcRenderer.invoke('katazuku:chatgpt-signin'),
   chatgptStatus: () => ipcRenderer.invoke('katazuku:chatgpt-status'),
   dryRun: () => ipcRenderer.invoke('katazuku:dry-run'),
+  setupCheck: () => ipcRenderer.invoke('katazuku:setup-check'),
   schedulePreview: () => ipcRenderer.invoke('katazuku:schedule-preview'),
   openDocs: (page) => ipcRenderer.invoke('katazuku:open-docs', page),
 })

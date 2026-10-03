@@ -14,7 +14,7 @@
       <p class="lead">就活の「めんどい」を、あなたのPCの中で片づける。</p>
       <ol class="steps" aria-label="進み具合">
         <li data-step="0">ようこそ</li><li data-step="1">AI</li><li data-step="2">Google</li>
-        <li data-step="3">設定</li><li data-step="4">毎日の実行</li><li data-step="5">完了</li>
+        <li data-step="3">設定</li><li data-step="4">毎日の実行</li><li data-step="5">次の手順</li>
       </ol>
     </header>
 
@@ -27,7 +27,7 @@
       <h2>katazuku がしないこと</h2>
       <ul>
         <li>企業へのメール送信、ES・フォームの送信、辞退はしません。送る・出す・決めるのはあなたです。</li>
-        <li>データはこのPCの中にだけ保存します。katazuku のサーバはありません。</li>
+        <li>正本DBはこのPCに保存します。Googleとの通信と、選択した外部AIへの情報送信は発生します。</li>
       </ul>
       <button data-next>はじめる</button>
     </section>
@@ -50,7 +50,7 @@
 
     <section data-panel="2" hidden>
       <h2>Google をつなぐ</h2>
-      <p>いまは、あなた自身の Google Cloud で OAuth クライアントを作る手順が必要です(自分専用なので審査は不要)。</p>
+      <p>いまは、あなた自身の Google Cloud で OAuth クライアントを作り、本人が権限を許可する手順が必要です。組織アカウントは管理者の制限がある場合もあります。</p>
       <button id="open-setup" class="secondary">手順を開く</button>
       <button data-next>次へ</button>
     </section>
@@ -58,9 +58,9 @@
     <section data-panel="3" hidden>
       <h2>あなたの設定</h2>
       <form id="config">
-        <label>呼び名 <input name="displayName" maxlength="40" placeholder="例: 就活 太郎"></label>
+        <label>呼び名 <input name="displayName" maxlength="40" required placeholder="例: 就活 太郎"></label>
         <label>就活用のメールアドレス <input name="email" type="email" required placeholder="you@example.com"></label>
-        <label>返信下書きの署名 <textarea name="signature" rows="4" placeholder="就活 太郎&#10;サンプル大学 工学部 3年"></textarea></label>
+        <label>返信下書きの署名 <textarea name="signature" rows="4" required placeholder="就活 太郎&#10;サンプル大学 工学部 3年"></textarea></label>
         <fieldset>
           <legend>使う AI の順番</legend>
           <label><input type="checkbox" name="provider" value="claude-cli"> Claude Code</label>
@@ -70,10 +70,14 @@
         <button type="submit">保存して次へ</button>
         <p id="config-result" aria-live="polite"></p>
       </form>
+      <p>設定が既にある場合は、上書きせず診断で不足を確認できます。</p>
+      <button data-next class="secondary">既存設定の診断・手順へ進む</button>
     </section>
 
     <section data-panel="4" hidden>
       <h2>毎日の実行</h2>
+      <p>設定保存だけでは、認証・同期・監視は始まっていません。ローカル診断も実接続や定期登録の成功を確認するものではありません。</p>
+      <button id="setup-check" class="secondary">設定・Google・AIの不足を診断する</button>
       <p>登録する前に、外部に触れない「試し実行」と、登録内容を確認できます。</p>
       <button id="dry-run" class="secondary">試し実行(外部に触れない)</button>
       <button id="schedule" class="secondary">登録内容を見る</button>
@@ -82,7 +86,7 @@
     </section>
 
     <section data-panel="5" hidden>
-      <h2>準備ができました</h2>
+      <h2>次に必要な手順を確認する</h2>
       <p>このアプリはまだ骨組みです。定期実行の登録と閲覧アプリの表示は、手順書に沿って行ってください。</p>
       <button id="open-workflows" class="secondary">ワークフローの手順を開く</button>
     </section>
