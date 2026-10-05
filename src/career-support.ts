@@ -5,6 +5,7 @@
 import { createHash, randomUUID } from 'node:crypto'
 import type { DatabaseSync } from 'node:sqlite'
 import { normalizeAppointmentAt } from './db.js'
+import { isAutomaticRecordingEligible } from './recording-eligibility.js'
 import { ensureCareerSupportSchema } from './career-support-schema.js'
 
 export { ensureCareerSupportSchema } from './career-support-schema.js'
@@ -119,14 +120,15 @@ export function upsertCareerMeeting(db: DatabaseSync, input: CareerMeetingInput)
     organizationId = resolveCareerOrganization(db, `${input.title}\n${input.location || ''}`)
   }
   const status = statusOf(input.status, Boolean(organizationId))
-  const recordable = input.recordable ?? /面談|面接|説明会|セミナー|イベント|相談|1on1/i.test(`${input.kind || ''} ${input.title}`)
+  const prior = db.prepare('SELECT id, url FROM career_meeting WHERE calendar_id = ? AND external_id = ?')
+    .get(input.calendarId || '', input.externalId.trim()) as { id: number; url: string } | undefined
+  // URLを省略した更新では保存済みURLを保持する既存のupsert規則と揃える。
+  const recordable = isAutomaticRecordingEligible({ ...input, url: input.url || prior?.url })
   const now = new Date().toISOString()
   const hash = input.sourceHash || createHash('sha256').update(JSON.stringify({
-    title: input.title, startAt, endAt, kind: input.kind || '面談', url: input.url || '',
+    title: input.title, startAt, endAt, kind: input.kind || 'その他', url: input.url || '',
     location: input.location || '', organizationId: organizationId || null, status, recordable,
   })).digest('hex')
-  const prior = db.prepare('SELECT id FROM career_meeting WHERE calendar_id = ? AND external_id = ?')
-    .get(input.calendarId || '', input.externalId.trim()) as { id: number } | undefined
   db.prepare(`
     INSERT INTO career_meeting
       (organization_id, external_id, calendar_id, title, start_at, end_at, kind, url, location,
@@ -141,7 +143,7 @@ export function upsertCareerMeeting(db: DatabaseSync, input: CareerMeetingInput)
       recordable = excluded.recordable, source_hash = excluded.source_hash, updated_at = excluded.updated_at
   `).run(
     organizationId ?? null, input.externalId.trim(), input.calendarId || '', input.title.trim(), startAt, endAt,
-    input.kind || '面談', input.url || '', input.location || '', status, recordable ? 1 : 0, hash, now, now,
+    input.kind || 'その他', input.url || '', input.location || '', status, recordable ? 1 : 0, hash, now, now,
   )
   const row = db.prepare('SELECT id, status FROM career_meeting WHERE calendar_id = ? AND external_id = ?')
     .get(input.calendarId || '', input.externalId.trim()) as { id: number; status: CareerMeetingStatus }
@@ -164,6 +166,6 @@ export function listCareerMeetings(db: DatabaseSync): CareerMeetingRow[] {
     ORDER BY m.start_at, m.id
   `).all() as (Omit<CareerMeetingRow, 'recordable'> & { recordable: number })[]).map((row) => ({
     ...row,
-    recordable: Boolean(row.recordable),
+    recordable: Boolean(row.recordable) && isAutomaticRecordingEligible({ ...row, recordable: true }),
   }))
 }

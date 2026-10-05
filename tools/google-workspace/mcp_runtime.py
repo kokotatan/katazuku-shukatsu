@@ -22,7 +22,7 @@ def install_common_auth():
     credential = directory / (account + '.json')
     if credential.resolve().parent != directory:
         raise RuntimeError('Google接続の保存先が不正です。')
-    reconnect = ('共通Google接続を再認証してください。google:connect に --account ' + account
+    reconnect = ('共通Google接続を再認証してください。google:workspace:connect に --account ' + account
                  + ' と --replace を指定し、--credentials-dir には次の保存先を指定してください: ' + str(directory))
 
     def require_common_file():

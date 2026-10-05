@@ -137,6 +137,17 @@ export interface KatazukuData {
   personNotes: PersonNote[]
   interviews: Interview[]
   submissions: Record<string, unknown>[]
+  /** 成果物ごとの未完了台帳。古いスナップショットとの互換のため省略可。 */
+  submissionRequirements?: {
+    id: number
+    company: string
+    title: string
+    deadline: string
+    kind: string
+    preparationStatus: string
+    severity: string
+    requiredAction: string
+  }[]
   dossiers: Dossier[]
   mailItems: MailItem[]
   pending: PendingReview[]
@@ -144,6 +155,23 @@ export interface KatazukuData {
 
 /** 実データのスナップショットがあればそれを、無ければ同梱のデモを読む */
 const SOURCES = ['./snapshot.json', './snapshot.demo.json'] as const
+
+/** 壊れたスナップショットで画面が落ちる前に、見る窓の最低限の契約を検査する。 */
+export function parseSnapshot(value: unknown): KatazukuData {
+  const invalid = () => new Error('スナップショットの形式が不正です。正本DBから npm run snapshot で作り直してください。')
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw invalid()
+  const data = value as Record<string, unknown>
+  const arrays = ['companies', 'selections', 'appointments', 'events', 'enrichedEvents', 'activities',
+    'profileSuggestions', 'people', 'personNotes', 'interviews', 'submissions', 'dossiers', 'mailItems', 'pending']
+  if (typeof data.demo !== 'boolean' || typeof data.generatedAt !== 'string' || !Number.isFinite(Date.parse(data.generatedAt))) throw invalid()
+  if (!data.profile || typeof data.profile !== 'object' || Array.isArray(data.profile)) throw invalid()
+  for (const key of arrays) {
+    if (!Array.isArray(data[key]) || (data[key] as unknown[]).some((row) => !row || typeof row !== 'object' || Array.isArray(row))) throw invalid()
+  }
+  if (data.submissionRequirements !== undefined && (!Array.isArray(data.submissionRequirements)
+    || data.submissionRequirements.some((row) => !row || typeof row !== 'object' || Array.isArray(row)))) throw invalid()
+  return data as unknown as KatazukuData
+}
 
 export async function fetchKatazukuData(signal?: AbortSignal): Promise<KatazukuData> {
   for (const path of SOURCES) {
@@ -155,9 +183,11 @@ export async function fetchKatazukuData(signal?: AbortSignal): Promise<KatazukuD
     // 開発サーバは存在しないパスにも index.html を200で返す。
     // content-type を見ないと、HTMLをJSONとして読んで無関係な構文エラーになる。
     if (!res.headers.get('content-type')?.includes('json')) continue
-    return await res.json() as KatazukuData
+    try { return parseSnapshot(await res.json()) } catch {
+      throw new Error('スナップショットを読み込めません。形式を確認し、npm run snapshot で作り直してください。')
+    }
   }
-  throw new Error('スナップショットが見つかりません。リポジトリのルートで `npm run snapshot -- --demo` を実行してください。')
+  throw new Error('自分のデータはまだありません。セットアップと日次同期を確認してください。架空データを試す場合は npm run demo を実行します。')
 }
 
 /**

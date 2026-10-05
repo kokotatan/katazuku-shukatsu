@@ -41,11 +41,16 @@ const EXPECTED = [
   'DEFAULT_CAPABILITY_TOOLS', 'DEFAULT_ABORT_PATTERNS',
   // 会議URL
   'isMeetingUrl', 'MEETING_HOSTS', 'SHORTENER_HOSTS',
+  'isAutomaticRecordingEligible',
   // platform
   'ensurePlatformSchema', 'listPlatformSnapshot', 'saveBasicProfile', 'getBasicProfile',
   'upsertCompanyDossier', 'upsertMailItem', 'listActionableMail',
   // 重複検出
   'findDuplicates',
+  // Sparkの依頼キューとMCP
+  'SPARK_KINDS', 'SparkQueue', 'createSparkJob', 'sparkPrompt', 'validateSparkResponse',
+  'validSparkTaskUrl', 'sparkRpc', 'sparkTools', 'sparkIcons', 'SPARK_INSTRUCTIONS', 'SPARK_READ_TOOLS',
+  'quickRead', 'openDbReadOnly',
 ].sort()
 
 /** 内部実装。公開面から漏れていたら落とす */

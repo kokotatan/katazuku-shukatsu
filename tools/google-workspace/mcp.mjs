@@ -13,7 +13,7 @@ export function commonMcpLaunch({ account, credentialsDirectory, environment = p
   const path = credentialPath(account, credentialsDirectory);
   let stored;
   try { stored = JSON.parse(readFileSync(path, 'utf8')); }
-  catch { throw new Error('共通Google接続がありません。先に google:connect を実行してください。'); }
+  catch { throw new Error('共通Google接続がありません。先に google:workspace:connect を実行してください。'); }
   const metadata = inspectCredential(stored);
   if (!metadata.clientConfigured || !metadata.refreshAvailable || stored.client_secret !== ''
       || stored.token_uri !== DEFAULT_BROKER_ORIGIN + '/token'

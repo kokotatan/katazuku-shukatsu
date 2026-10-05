@@ -1,0 +1,16 @@
+{
+  "name": "katazuku-desktop",
+  "private": true,
+  "version": "0.0.0",
+  "description": "katazuku-shukatsu のデスクトップアプリ(骨組み)。初回ウィザードの設定保存とローカル診断に対応。認証・定期登録・閲覧起動・配布は開発中。",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "main.mjs",
+  "scripts": {
+    "start": "electron .",
+    "check": "node --check main.mjs && node --check preload.cjs && node --check renderer/wizard.js"
+  },
+  "devDependencies": {
+    "electron": "^44.5.0"
+  }
+}

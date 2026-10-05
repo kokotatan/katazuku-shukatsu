@@ -117,7 +117,7 @@ export async function main(args = process.argv.slice(2)) {
   }
   const path = credentialPath(account, process.env.KATAZUKU_GOOGLE_CREDENTIALS_DIR);
   let stored;
-  try { stored = JSON.parse(await readFile(path, 'utf8')); } catch { throw new Error('接続資格情報がありません。google:connectで本人が認証してください。'); }
+  try { stored = JSON.parse(await readFile(path, 'utf8')); } catch { throw new Error('接続資格情報がありません。共通接続はgoogle:workspace:connect、個別OAuthはdocs/GOOGLE-CONNECTION.mdで本人が認証してください。'); }
   if (!stored || typeof stored !== 'object' || Array.isArray(stored)) throw new Error('接続資格情報の形式が不正です。');
   const metadata = inspectCredential(stored);
   const live = args.includes('--online') ? await checkOnline(stored, account, { spreadsheetId: process.env.KATAZUKU_GOOGLE_SPREADSHEET_ID, trustedTokenEndpoint }) : undefined;

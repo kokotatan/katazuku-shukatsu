@@ -7,12 +7,33 @@
 
 ### Added
 
+- 共通Google接続の認証中継・PC画面・MCP入口・診断を追加。`google:workspace:connect` と既存の読取り専用 `google:connect` を分け、共通接続も日次取得で利用できる。Googleの権限審査は未完了。
+
+- `npm start` / `npm run demo` から8画面を同じローカルURLで開く閲覧サーバー。デモと実データを分け、ホームで朝・前夜のまとめ、「今日やること」で未完了提出物を確認できる。
+- 起動日の日本時間に合わせた架空デモの日付と、壊れたスナップショットの形式検査。
+- 本人所有のデスクトップOAuthクライアントで接続する `npm run google:connect` を追加。Gmail・Calendarの読取り専用で、state/PKCE・本人一致・権限・APIを確認してから排他的に保存し、既存MCP資格情報は上書きしない。下書き・予定書込みには別MCP接続が必要。
+- 実利用前のローカル診断 `npm run doctor -- --setup`、秘密値を含まない `.env.example`、Google/MCPの具体的な接続・読み取り確認手順を追加。設定例を運転可能と扱わず、通信やログインなしで不足を案内する。
+- 初参加向けの日英ガイド(forkからPRまで)、既存の初心者向けIssueへの直接リンク、コード変更なしでも参加できる動作確認レポートのIssueフォーム。
+- 自動運転ワークフロー(mail-watch / daily-sync / asa / evening-brief / calendar-sync / watchdog / inbox-tidy)を`npm run workflow`で実行できるようにした。設定は katazuku.config.json、定期実行は Windows タスクスケジューラ・cron・launchd・systemd に対応([docs/WORKFLOWS.md](docs/WORKFLOWS.md))。
+- 提出物台帳(submission_requirement)・空き判定用の予定投影(schedule_block)・外部取得の鮮度(source_sync_state)。スキーマ v4。
 - npm Trusted Publishing用のGitHub Actionsと、タグ・version・公開先を検査するリリースゲート。
+- AIプロバイダを追加: 自分のAPIキーで動く anthropic-api / openai-api と、ChatGPT プラン利用(Sign in with ChatGPT、chatgpt-siwc。ローカル完結・フォーム不要のOSS向け手順)。provider 名の別名 claude-cli / codex-cli。[docs/AI-PROVIDERS.md](docs/AI-PROVIDERS.md)
+- 開発者でなくても使えるデスクトップアプリ(Electron)の設計書と骨組み。初回ウィザード → サインイン → Google連携 → 定期実行、の流れを想定。
+- README を「使いたい人」「開発に参加したい人」の2入口に刷新。認証なしで架空データを試せる `npm run demo`、セットアップ手順、good first issue 候補([docs/ROADMAP.md](docs/ROADMAP.md))。
 
 ### Security
 
+- 閲覧サーバーを127.0.0.1に限定し、外部Origin/Host・書き込み・任意ファイル配信を拒否。実データがなくてもデモへ黙って切り替えない。
 - npmパスワードや長期トークンをリポジトリ／GitHub Secretsへ置かず、OIDCで公開できる手順を追加。
 - リポジトリ直下の `.npmrc` をgitignoreし、CLI認証情報の誤コミットを防止。
+
+### Fixed
+
+- 8画面の再読込が失敗してもエラーを隠し、以前のデータを最新のように表示していた問題。最後に取得した内容を保持し、未更新の警告と再試行の手順を表示する。
+- デスクトップの骨組みがAI未選択の設定を成功として保存していた問題。コアのSchemaで保存前に検証し、既存設定を置換せず、保存と実接続・定期登録の完了を区別する。
+- 個別Vite起動では別アプリへの移動が同じ画面へ戻る問題を、統合ローカル起動で解消。
+- 未設定・未同期の状態でも「自動運転が監視中」と断定していた空状態の案内。
+- SETUPの削除手順が実データのスナップショットと外部の認証情報・バックアップを含めていなかった点。
 
 ## [0.3.0] - 2026-09-03
 

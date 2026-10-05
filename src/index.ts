@@ -168,6 +168,8 @@ export type {
 
 // ---- 会議URLの許可リスト ----
 export { isMeetingUrl, MEETING_HOSTS, SHORTENER_HOSTS } from './meeting-url.js'
+export { isAutomaticRecordingEligible } from './recording-eligibility.js'
+export type { AutomaticRecordingCandidate } from './recording-eligibility.js'
 
 // ---- 人物・プロフィール・企業研究・メール ----
 export {
@@ -184,3 +186,13 @@ export type { PlatformSnapshot, CompanyDossier, MailItemInput } from './platform
 // ---- 重複予定の検出 ----
 export { findDuplicates } from './check-duplicate-appointments.js'
 export type { DuplicatePair } from './check-duplicate-appointments.js'
+
+// ---- Sparkへの非同期引き渡し ----
+export { SPARK_KINDS, createSparkJob, sparkPrompt, validateSparkResponse } from './spark-handoff.js'
+export type { SparkKind, SparkJob } from './spark-handoff.js'
+export { SparkQueue, validSparkTaskUrl } from './spark-queue.js'
+export type { SparkState, SparkQueueRow } from './spark-queue.js'
+export { sparkRpc, sparkTools, sparkIcons, SPARK_INSTRUCTIONS, SPARK_READ_TOOLS } from './spark-mcp.js'
+export type { SparkReader } from './spark-mcp.js'
+export { quickRead, openDbReadOnly } from './quick-read.js'
+export type { QuickCommand } from './quick-read.js'

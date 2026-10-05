@@ -34,7 +34,7 @@ export default function App() {
   const activities = data?.activities ?? []
 
   return (
-    <AppShell current="impact">
+    <AppShell current="impact" demo={data?.demo} refreshError={data ? error : undefined}>
       <AppHeading
         caption="IMPACT"
         title="自動運転の効果"

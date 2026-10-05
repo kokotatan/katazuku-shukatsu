@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>katazuku</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main>
+    <header>
+      <h1>katazuku</h1>
+      <p class="lead">就活の「めんどい」を、あなたのPCの中で片づける。</p>
+      <ol class="steps" aria-label="進み具合">
+        <li data-step="0">ようこそ</li><li data-step="1">AI</li><li data-step="2">Google</li>
+        <li data-step="3">設定</li><li data-step="4">毎日の実行</li><li data-step="5">次の手順</li>
+      </ol>
+    </header>
+
+    <section data-panel="0">
+      <h2>katazuku がすること</h2>
+      <ul>
+        <li>メールを見張り、面接の案内や提出依頼だけを拾って、返信の<strong>下書き</strong>とカレンダー登録をします。</li>
+        <li>毎朝「きょうやること」を最大3件にまとめ、面接の前夜には準備メモを作ります。</li>
+      </ul>
+      <h2>katazuku がしないこと</h2>
+      <ul>
+        <li>企業へのメール送信、ES・フォームの送信、辞退はしません。送る・出す・決めるのはあなたです。</li>
+        <li>正本DBはこのPCに保存します。Googleとの通信と、選択した外部AIへの情報送信は発生します。</li>
+      </ul>
+      <button data-next>はじめる</button>
+    </section>
+
+    <section data-panel="1" hidden>
+      <h2>AI をつなぐ</h2>
+      <p>AIの利用料は、あなた自身の契約で払います。</p>
+      <div class="card">
+        <h3>ChatGPT のプランを使う</h3>
+        <p>ブラウザで許可するだけ。いまは毎朝の選考同期などに使われます(ツールを使う工程は今後対応)。</p>
+        <button id="chatgpt">Continue with ChatGPT</button>
+        <pre id="chatgpt-result" aria-live="polite"></pre>
+      </div>
+      <div class="card">
+        <h3>Claude Code / Codex(入っていれば)</h3>
+        <p id="cli-status">確認中...</p>
+      </div>
+      <button data-next>次へ</button>
+    </section>
+
+    <section data-panel="2" hidden>
+      <h2>Google をつなぐ</h2>
+      <p>いまは、あなた自身の Google Cloud で OAuth クライアントを作り、本人が権限を許可する手順が必要です。組織アカウントは管理者の制限がある場合もあります。</p>
+      <button id="open-setup" class="secondary">手順を開く</button>
+      <button data-next>次へ</button>
+    </section>
+
+    <section data-panel="3" hidden>
+      <h2>あなたの設定</h2>
+      <form id="config">
+        <label>呼び名 <input name="displayName" maxlength="40" required placeholder="例: 就活 太郎"></label>
+        <label>就活用のメールアドレス <input name="email" type="email" required placeholder="you@example.com"></label>
+        <label>返信下書きの署名 <textarea name="signature" rows="4" required placeholder="就活 太郎&#10;サンプル大学 工学部 3年"></textarea></label>
+        <fieldset>
+          <legend>使う AI の順番</legend>
+          <label><input type="checkbox" name="provider" value="claude-cli"> Claude Code</label>
+          <label><input type="checkbox" name="provider" value="codex-cli"> Codex</label>
+          <label><input type="checkbox" name="provider" value="chatgpt-siwc"> ChatGPT のプラン</label>
+        </fieldset>
+        <button type="submit">保存して次へ</button>
+        <p id="config-result" aria-live="polite"></p>
+      </form>
+      <p>設定が既にある場合は、上書きせず診断で不足を確認できます。</p>
+      <button data-next class="secondary">既存設定の診断・手順へ進む</button>
+    </section>
+
+    <section data-panel="4" hidden>
+      <h2>毎日の実行</h2>
+      <p>設定保存だけでは、認証・同期・監視は始まっていません。ローカル診断も実接続や定期登録の成功を確認するものではありません。</p>
+      <button id="setup-check" class="secondary">設定・Google・AIの不足を診断する</button>
+      <p>登録する前に、外部に触れない「試し実行」と、登録内容を確認できます。</p>
+      <button id="dry-run" class="secondary">試し実行(外部に触れない)</button>
+      <button id="schedule" class="secondary">登録内容を見る</button>
+      <pre id="run-result" aria-live="polite"></pre>
+      <button data-next>次へ</button>
+    </section>
+
+    <section data-panel="5" hidden>
+      <h2>次に必要な手順を確認する</h2>
+      <p>このアプリはまだ骨組みです。定期実行の登録と閲覧アプリの表示は、手順書に沿って行ってください。</p>
+      <button id="open-workflows" class="secondary">ワークフローの手順を開く</button>
+    </section>
+  </main>
+  <script src="wizard.js"></script>
+</body>
+</html>

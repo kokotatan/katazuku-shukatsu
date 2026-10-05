@@ -23,7 +23,7 @@ export default function App() {
   const interviews = (data?.interviews ?? []).filter((i) => i.company === company)
 
   return (
-    <AppShell current="prep">
+    <AppShell current="prep" demo={data?.demo} refreshError={data ? error : undefined}>
       <AppHeading
         caption="PREP"
         title="面接準備"

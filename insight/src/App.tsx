@@ -77,10 +77,11 @@ export default function App() {
     .filter((s) => !parseDate(s.nextDate) && /結果待ち|要確認|案内待ち|確定待ち|返信待ち/.test(s.status + s.nextAction))
     .map((s) => ({ s, due: null }))
 
-  const quiet = overdue.length + soon.length + todayAppts.length === 0
+  const requirements = data?.submissionRequirements ?? []
+  const quiet = overdue.length + soon.length + todayAppts.length + requirements.length === 0
 
   return (
-    <AppShell current="insight">
+    <AppShell current="insight" demo={data?.demo} refreshError={data ? error : undefined}>
       <AppHeading
         caption="INSIGHT"
         title="今日やること"
@@ -126,9 +127,29 @@ export default function App() {
           <TrackSection title="今週" rows={week} />
           <TrackSection title="待ち(結果・案内)" rows={waiting} />
 
+          {requirements.length > 0 && (
+            <Stack gap={0.5}>
+              <Heading type="subBlockTitle">未完了の提出物</Heading>
+              <Text size="S" color="TEXT_GREY">応募済みでも、別の提出物は完了するまでここに残ります。提出の確定は本人が行います。</Text>
+              {requirements.map((row) => (
+                <Base key={row.id} padding={0.75}>
+                  <Stack gap={0.25}>
+                    <Cluster gap={0.5}>
+                      <StatusLabel type={['overdue', 'urgent', 'blocked'].includes(row.severity) ? 'error' : 'grey'}>
+                        {row.deadline ? formatDate(row.deadline) : '期限未設定'}
+                      </StatusLabel>
+                      <Text weight="bold">{row.company} — {row.title}</Text>
+                    </Cluster>
+                    <Text size="S">{row.preparationStatus === 'ready_for_approval' ? '本人の確認待ち' : row.requiredAction}</Text>
+                  </Stack>
+                </Base>
+              ))}
+            </Stack>
+          )}
+
           {quiet && (
             <InformationPanel heading="直近の締切・予定はありません" toggleable={false}>
-              <Text>自動運転が監視中です。新しい案内が来れば、ここに出ます。</Text>
+              <Text>このスナップショットには直近の項目がありません。同期・認証・定期処理の状態を確認してください。画面だけでは監視中かどうかは判断できません。</Text>
             </InformationPanel>
           )}
 

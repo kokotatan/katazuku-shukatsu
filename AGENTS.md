@@ -11,13 +11,15 @@ AIコーディングエージェント(および使い方を尋ねられたAI)�
 
 ## セットアップと検証
 
-- Node.js 22.5+(推奨 24)。ランタイム依存ゼロ、開発のみ tsx / typescript。
+- Node.js 22.13以降の22系、または24以降(推奨 24)。ランタイム依存ゼロ、開発のみ tsx / typescript。
 - `npm install`
 - `npm run doctor` — 環境が動かせるか診断(OS・Node・node:sqlite)
 - `npm run check` — 公開ゲート(個人情報スキャン + typecheck + テスト)。**変更はこれが通ってから**
 - `npm test` / `npm run seed`(スキーマの1例) / `npm run backup`(VACUUM INTO の単一ファイル退避)
 
 ## 壊してはいけない設計の芯
+
+- 自動録音は会議URLのある予定を対象にし、説明会・セミナー等も含める。インターン参加、宿泊、対面、終日・24時間以上の予定は除外する。インターンの選考面接・面談・説明会は対象にする。公開APIの `isAutomaticRecordingEligible()` を開始前にも使う。詳細は [docs/RECORDING-POLICY.md](docs/RECORDING-POLICY.md)。
 
 - 正本はローカルSQLite 1つ。人・アプリは読み取りのみ(見る窓)。
 - 状態変更は `src/db.ts` の `transition()` を必ず通す(上書きせず遷移規則で更新)。
@@ -26,6 +28,8 @@ AIコーディングエージェント(および使い方を尋ねられたAI)�
   詳細は [SECURITY.md](SECURITY.md)。この一線を弱める変更をしない。
 
 ## この repo での作法
+
+- Sparkへ作業を渡す場合は [docs/GEMINI-SPARK.md](docs/GEMINI-SPARK.md) のキュー・worker・MCPを使う。Gemini CLIと混同せず、成否不明の送信は再実行しない。完成結果も草案であり、正本反映や第三者確定の承認にはしない。
 
 - フィクスチャは**架空の合成ラベル**(`会社A` / `Example`)。実在の企業名・人名・メール・IDを書かない。
 - **絵文字を使わない**(UI・コード・コミットメッセージとも)。
@@ -41,6 +45,7 @@ AIコーディングエージェント(および使い方を尋ねられたAI)�
 | `src/application.ts` | 応募の状態機械(承認ゲート・カレンダー送信待ち・再開点) |
 | `src/agent-runtime.ts` | provider非依存の実行契約(Claude/Codex/ローカル) |
 | `src/mobility.ts` | 移動可能性の判定 |
+| `scripts/workflow.ts` + `scripts/*-prompt.md` | 自動運転ワークフロー(mail-watch / daily-sync / asa / evening-brief / calendar-sync / watchdog)。無人工程は第三者へ送信しない。[docs/WORKFLOWS.md](docs/WORKFLOWS.md) |
 | `schemas/` | 応募イベント / 設定 の JSON Schema(`settings.schema.json` が設定UIを生成) |
 | `examples/` | Schema駆動の設定GUI、架空データの seed |
 | `tools/scan-secrets.mjs` | 個人情報・秘密情報の混入検査(CIゲート) |
@@ -48,7 +53,8 @@ AIコーディングエージェント(および使い方を尋ねられたAI)�
 
 ## よくある質問(AIが即答できるように)
 
-- **どう動かす?** `npm install && npm run doctor && npm test`、次に `npm run seed`。
+- **どう動かす?** まず `npm run demo`(架空データで閲覧アプリを開く)。開発は `npm install && npm run doctor && npm test`。
+- **自分のデータで使うには?** [docs/SETUP.md](docs/SETUP.md) の順に、設定ファイル・Google・AI・定期実行。
 - **自分のデータを入れるには?** 正本DBのパスは環境変数 `KATAZUKU_DB`。書き込みは `src/db-apply*.ts` 経由(エージェントが書き手)。
 - **設定は?** `examples/config-gui.html` をブラウザで開く。設定は `schemas/settings.schema.json` が唯一の真実。
 - **複数デバイスは?** 単一デバイス前提。移送は `npm run backup` の1ファイルで(クラウド同期フォルダ直下に正本を置かない)。

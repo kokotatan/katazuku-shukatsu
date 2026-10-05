@@ -11,7 +11,7 @@ Googleから承認済みのアプリとしては提供していません。一�
 作者のクライアント秘密鍵を受け取ったりする必要はありません。
 
 ```sh
-npm run google:connect -- --account person@example.com
+npm run google:workspace:connect -- --account person@example.com
 ```
 
 表示された `http://127.0.0.1:<port>/` を同じPCで開きます。「Google連携を開始」からGoogleへ移動し、
@@ -19,6 +19,13 @@ npm run google:connect -- --account person@example.com
 接続の既定保存先は `~/.google_workspace_mcp/credentials/<account>.json` です。
 既存の別クライアントを置き換えるときは `--replace` を明示し、元のファイルは同じ保存先の
 `.katazuku-backups/` へ退避します。保存先を分けて試す場合は `--credentials-dir <directory>` を指定します。
+日次取得で使う `google.credentialsDir` にも同じ保存先を指定してください。
+
+個別OAuthの読取り専用接続は従来どおり `npm run google:connect` です。
+共通接続とコマンドを分け、既存の設定や資格情報を自動で置き換えません。
+共通接続の保存済み資格情報はGmail・Calendarの決定的な取得スクリプトでも利用できます。
+更新先はGoogleまたは既定の共通サービスに固定し、PCへクライアント秘密鍵を配布しません。
+独自運用の中継は本ガイドの診断で確認できますが、共通MCP入口とコアの同期は既定サービスのみ対応します。
 
 | 処理 | 場所 |
 |---|---|
@@ -121,7 +128,7 @@ npx wrangler deploy --config google-auth/wrangler.jsonc
 Google審査の承認を表しません。OAuthのコードやトークンを記録しないため、実行ログは無効にしています。
 独自運用では、利用者数に応じた濫用対策、Google側の上限、障害対応と審査の運用も必要です。
 
-実演を録画する場合は `google:connect` に `--record-demo` を付けます。本人がChromeのウィンドウを選び、
+実演を録画する場合は `google:workspace:connect` に `--record-demo` を付けます。本人がChromeのウィンドウを選び、
 アドレスバーを含む実画面を録画できます。動画はPCへ保存し、自動アップロードしません。
 この機能はOAuth部分の録画手段です。Googleの審査には各権限を使う実機能と、プロジェクト内の全クライアントの実演も必要です。
 
