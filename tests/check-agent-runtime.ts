@@ -296,6 +296,18 @@ try {
     assert(preview.args.includes('lmstudio'), 'local providerがありません')
   })
 
+  await check('CodexはGitのない個人データ領域でもsandboxを維持して起動できる', async () => {
+    const dataRoot = join(workDir, 'installed-user-data')
+    await mkdir(dataRoot, { recursive: true })
+    const adapter = createCodexAdapter({ command: 'codex' })
+    const req = request({ cwd: dataRoot, capabilities: [], risk: 'read-only', sideEffectMode: 'none' })
+    const preview = commandPreview(adapter, req, join(dataRoot, 'final.local.txt'))
+    assert(preview.args.includes('--skip-git-repo-check'), '非Git領域がCodexの信頼検査で止まります')
+    assert(preview.args[preview.args.indexOf('-C') + 1] === dataRoot, '個人データ領域をcwdにしていません')
+    assert(preview.args[preview.args.indexOf('--sandbox') + 1] === 'read-only', 'readonly sandboxが失われています')
+    assert(!preview.args.some((arg) => /danger|yolo/.test(arg)), 'sandboxを迂回するflagがあります')
+  })
+
   await check('Claudeはstream-jsonで副作用と最終出力を分離する', async () => {
     const adapter = createClaudeAdapter({ command: 'claude' })
     const req = request({ capabilities: ['workspace.read', 'web.search'] })

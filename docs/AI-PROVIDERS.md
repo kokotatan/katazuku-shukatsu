@@ -56,6 +56,10 @@ Claude をAPIで使う場合は `anthropic-api`(あなたのAPIキー)を選ん�
 1. Codex CLI を入れ、**あなた自身が** `codex login` でログインします(ChatGPT アカウントでのログインを含む)。
 2. `agent.providerOrder` に `codex-cli` を入れます。
 
+katazuku はGitのないインストール先や個人データ領域でもCodex CLIを起動します。
+Gitリポジトリの検査は省略しますが、読取り専用の工程には`read-only`、書込みを伴う工程には`workspace-write`のsandboxを指定します。
+このsandbox指定だけでCLIの全ツールが無効になるわけではありません。ツール不要のAPIプロバイダと同じ制約を保証するものではありません。
+
 ### Sign in with ChatGPT(`chatgpt-siwc`)— 開発者でなくても一番かんたん
 
 OpenAI が公開している、**オープンソースでローカル動作するアプリ向け**の手順
