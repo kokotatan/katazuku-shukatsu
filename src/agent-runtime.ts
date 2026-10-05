@@ -894,7 +894,9 @@ export function createCodexAdapter(options: AdapterOptions, id: 'codex' | 'codex
       return { ok: false, failure: classifyFailure(result) }
     },
     buildInvocation(request, paths) {
-      const args = ['exec', '-C', request.cwd, '--color', 'never', '--json', '--output-last-message', paths.finalOutputPath]
+      // npm/ポータブル配布や個人データ領域はGit checkoutではない。cwdは呼出側が
+      // 明示する作業領域であり、Gitの有無で正規の実行を止めない。sandboxは別途維持する。
+      const args = ['exec', '-C', request.cwd, '--skip-git-repo-check', '--color', 'never', '--json', '--output-last-message', paths.finalOutputPath]
       args.push('--sandbox', request.risk === 'read-only' ? 'read-only' : 'workspace-write')
       if (request.capabilities.includes('web.search')) args.push(...webSearchArgs)
       if (request.capabilities.includes('voice.transcribe') && options.voiceboxMcpUrl) {
