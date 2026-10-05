@@ -66,3 +66,21 @@ jobs:
           node-version: '22'
       - run: npm ci
       - run: npm test
+
+  desktop-windows:
+    # 公開ソースから標準ビルドし、Node/npmなしの利用者環境を実行ファイルで検証する。
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - name: Build the portable trial
+        shell: pwsh
+        run: node desktop/tools/package-portable.mjs "$env:RUNNER_TEMP/katazuku-windows-x64"
+      - name: Verify the packaged application
+        shell: pwsh
+        run: node desktop/tools/check-portable.mjs "$env:RUNNER_TEMP/katazuku-windows-x64"
+      - name: Run the complete public gate
+        run: npm run check
