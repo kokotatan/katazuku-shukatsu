@@ -27,7 +27,10 @@ export function saveDesktopConfig(root: string, input: unknown, env: NodeJS.Proc
   const config = {
     $schema: './schemas/katazuku-config.schema.json',
     profile: { displayName, timezone: 'Asia/Tokyo', signature },
-    google: { accounts: [{ id: 'main', email, primary: true, calendars: 'all-visible' }] },
+    google: {
+      accounts: [{ id: 'main', email, primary: true, calendars: 'all-visible' }],
+      ...(env.KATAZUKU_GOOGLE_CREDENTIALS_DIR ? { credentialsDir: resolve(env.KATAZUKU_GOOGLE_CREDENTIALS_DIR) } : {}),
+    },
     agent: { providerOrder: [...new Set(providers)] },
     notify: { selfEmail: false, desktop: true },
   }

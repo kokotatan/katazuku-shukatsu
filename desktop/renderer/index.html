@@ -19,6 +19,7 @@
     </header>
 
     <section data-panel="0">
+      <p>試用版です。今は架空データの閲覧・設定保存・ローカル診断を利用できます。実メールの同期と定期実行は準備中です。</p>
       <h2>katazuku がすること</h2>
       <ul>
         <li>メールを見張り、面接の案内や提出依頼だけを拾って、返信の<strong>下書き</strong>とカレンダー登録をします。</li>
@@ -30,6 +31,8 @@
         <li>正本DBはこのPCに保存します。Googleとの通信と、選択した外部AIへの情報送信は発生します。</li>
       </ul>
       <button data-next>はじめる</button>
+      <button id="open-demo" class="secondary">まず架空データで体験する</button>
+      <p id="demo-result" aria-live="polite">接続・設定なしで8つの閲覧画面を試せます。実際のメールや予定は読みません。</p>
     </section>
 
     <section data-panel="1" hidden>
@@ -37,7 +40,7 @@
       <p>AIの利用料は、あなた自身の契約で払います。</p>
       <div class="card">
         <h3>ChatGPT のプランを使う</h3>
-        <p>ブラウザで許可するだけ。いまは毎朝の選考同期などに使われます(ツールを使う工程は今後対応)。</p>
+        <p>ブラウザで本人が接続を許可します。接続だけではメールの同期や毎日の自動実行は始まりません。</p>
         <button id="chatgpt">Continue with ChatGPT</button>
         <pre id="chatgpt-result" aria-live="polite"></pre>
       </div>
@@ -87,7 +90,9 @@
 
     <section data-panel="5" hidden>
       <h2>次に必要な手順を確認する</h2>
-      <p>このアプリはまだ骨組みです。定期実行の登録と閲覧アプリの表示は、手順書に沿って行ってください。</p>
+      <p>架空データの閲覧と設定保存ができます。Googleの本人認証、実データ同期、定期実行の登録は別の手順が必要です。</p>
+      <button id="open-demo-again" class="secondary">架空データの閲覧画面を開く</button>
+      <p id="demo-result-again" aria-live="polite"></p>
       <button id="open-workflows" class="secondary">ワークフローの手順を開く</button>
     </section>
   </main>
