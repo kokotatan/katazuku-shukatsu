@@ -3,7 +3,7 @@ import { existsSync, readFileSync, statSync } from 'node:fs'
 import { delimiter, isAbsolute, join } from 'node:path'
 import { detectCodexExtraCapabilities, resolveProviderCommands } from '../src/agent-runtime.js'
 import { repositoryRoot } from '../src/database-path.js'
-import { credentialPath } from '../src/google-auth.js'
+import { COMMON_GOOGLE_REFRESH_ENDPOINT, credentialPath, hasGoogleRefreshConfiguration } from '../src/google-auth.js'
 import { configPath, loadConfig } from '../src/katazuku-config.js'
 import { activeLabel, credentialsDir, isSiwcEnabled, loadCredential } from '../src/providers/chatgpt-siwc.js'
 import { isGoogleAccountEmail, isPersonalProfile, isSuppliedSetting as supplied } from '../src/setup-values.js'
@@ -55,8 +55,9 @@ export async function inspectSetup(
     const tokensOk = config.google.accounts.every((account) => {
       try {
         const stored = JSON.parse(readFileSync(credentialPath(config.google.credentialsDir, account.email), 'utf8')) as Record<string, unknown>
-        return supplied(stored.refresh_token) && supplied(stored.client_id || env.GOOGLE_OAUTH_CLIENT_ID)
-          && supplied(stored.client_secret || env.GOOGLE_OAUTH_CLIENT_SECRET)
+        return hasGoogleRefreshConfiguration(stored, env) && supplied(stored.refresh_token)
+          && supplied(stored.client_id || env.GOOGLE_OAUTH_CLIENT_ID)
+          && (stored.token_uri === COMMON_GOOGLE_REFRESH_ENDPOINT || supplied(stored.client_secret || env.GOOGLE_OAUTH_CLIENT_SECRET))
       } catch { return false }
     })
     add('Google資格情報', tokensOk, '保存済み資格情報の必要項目を確認しました。有効性・権限は未確認です。読取り専用の資格情報だけではMCPの下書き・書込みは利用できません。', '対象アカウントの保存済みトークンまたはOAuthクライアント情報が不足しています。npm run google:connect または docs/GOOGLE-CONNECTION.md を参照。')
