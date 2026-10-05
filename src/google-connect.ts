@@ -239,10 +239,7 @@ export async function connectGoogleReadOnly(options: GoogleConnectOptions): Prom
 /** 既存の資格情報は変更せず、公開のrefresh処理を再利用する。 */
 export async function checkStoredGoogleReadConnection(email: string, directory: string, request: typeof fetch = fetch, env: NodeJS.ProcessEnv = process.env, signal = AbortSignal.timeout(90_000)): Promise<void> {
   try {
-    // 保存ファイルのtoken_uriは信頼しない。Google以外へrefresh_tokenを送らない。
-    const { readFileSync } = await import('node:fs')
-    const stored = JSON.parse(readFileSync(credentialPath(directory, email), 'utf8')) as Record<string, unknown>
-    if (stored.token_uri && stored.token_uri !== GOOGLE_TOKEN_ENDPOINT) failure('保存済み資格情報の接続先がGoogleではありません。確認を中止しました。')
+    // 公開refresh処理がGoogleまたは既知の共通接続だけへ送信先を固定する。
     signal.throwIfAborted()
     const token = await getGoogleAccessToken(email, directory, { fetch: (url, init) => request(url, { ...init, redirect: 'error', signal: AbortSignal.any([signal, ...(init?.signal ? [init.signal] : [])]) }), env })
     await verifyGoogleReadConnection(email, token, request, signal)

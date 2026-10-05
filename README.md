@@ -125,6 +125,10 @@ npm run workflow -- asa --dry-run        # 朝のまとめのプロンプトと�
 実利用の前提は `npm run doctor -- --setup` で確認できます。設定・Google資格情報・選択したAIのローカル準備を調べ、秘密値は表示しません。
 通信やログインは行わないため、[Google接続ガイド](docs/GOOGLE-CONNECTION.md) の本人による読み取り確認も済ませてください。
 
+開発者向けの[共通Google接続](docs/GOOGLE-WORKSPACE.md)も用意しています。
+`npm run google:workspace:connect -- --account 自分のメールアドレス` で起動します。
+権限審査は未完了で、一般利用向けの完成版ではありません。個別OAuthの `google:connect` と分けて試せます。
+
 ## AIプロバイダ
 
 | 選び方 | 支払い | 向いている工程 |

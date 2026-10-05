@@ -37,6 +37,12 @@ cp katazuku.config.example.json katazuku.config.json      # Windows(PowerShell)�
 
 ## 2. Google につなぐ(自分の OAuth クライアント)
 
+共通接続を試す開発者向けに、Google Cloudプロジェクトを自分で作らない経路もあります。
+`npm run google:workspace:connect -- --account 自分のメールアドレス` を使い、
+[共通Google接続ガイド](GOOGLE-WORKSPACE.md)に従って本人が許可してください。
+共通接続はGoogleの権限審査が未完了で、一般利用向けの完成版ではありません。
+既存接続を自動で置き換えません。個別OAuthを使う場合は以下の手順を続けてください。
+
 **あなた自身の Google Cloud プロジェクト**でOAuthクライアントを作り、`npm run google:connect` から本人がブラウザで読み取りを許可します。
 メール下書き・予定の書込みを使う工程には、Google MCPの別接続も必要です。
 
