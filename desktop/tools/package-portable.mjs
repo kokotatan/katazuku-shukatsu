@@ -50,13 +50,14 @@ function collectNotices(directory) {
   }
 }
 if (!reuseInstalled) {
-  run(npm, ['ci', '--no-audit', '--no-fund'])
-  run(npm, ['ci', '--no-audit', '--no-fund'], join(root, 'desktop'))
+  run(npm, ['ci', '--include=dev', '--no-audit', '--no-fund'])
+  run(npm, ['ci', '--include=dev', '--no-audit', '--no-fund'], join(root, 'desktop'))
 }
 // Electron 44はnpmパッケージと実バイナリの取得が別。公式installerでchecksumも検証する。
 run(process.execPath, [join(root, 'desktop', 'node_modules', 'electron', 'install.js')])
 for (const name of VIEWER_APPS) {
-  if (!reuseInstalled) run(npm, ['ci', '--no-audit', '--no-fund'], join(root, name))
+  // Viteは同一プロセスのNODE_ENVをproductionにする。後続画面にもビルド用依存を必ず入れる。
+  if (!reuseInstalled) run(npm, ['ci', '--include=dev', '--no-audit', '--no-fund'], join(root, name))
   run(process.execPath, [join(root, name, 'node_modules', 'typescript', 'bin', 'tsc'), '-b'], join(root, name))
   const { build } = await import(pathToFileURL(join(root, name, 'node_modules', 'vite', 'dist', 'node', 'index.js')).href)
   // publicには実データsnapshot.jsonがあり得るため、Viteにも読ませない。
