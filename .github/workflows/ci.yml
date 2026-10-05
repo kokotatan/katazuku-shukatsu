@@ -32,6 +32,7 @@ jobs:
       - run: npm pack --dry-run
       - run: node tools/check-npm-release.mjs
       - run: npm test
+      - run: npm run google-auth:check
 
   apps:
     # アプリ群が腐らないように、型検査とビルドまで通す。

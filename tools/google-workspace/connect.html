@@ -1,0 +1,8 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Google連携 | katazuku</title><link rel="stylesheet" href="/connect.css"><script src="/connect-ui.mjs" type="module"></script></head>
+<body><main><header><p class="brand">katazuku</p><h1>Googleとつなぐ</h1><p>メール・予定・資料を、このPCで整理できるようにします。</p></header>
+<section><h2>1. 接続先を確認</h2><dl><dt>Googleアカウント</dt><dd id="account"></dd><dt>認証サービス</dt><dd id="broker"></dd></dl><p id="existing"></p><p>GoogleのパスワードはGoogleの画面で入力します。メールや資料をAIに処理させる場合は、選んだAIサービスにも内容が送られます。</p><p><a href="https://katazuku-shukatsu.kotalabo.com/google/privacy/" target="_blank" rel="noopener noreferrer">Googleデータの取扱方針</a></p></section>
+<section><h2>2. Googleで許可する</h2><p>メールの読み取り・整理・下書き・送信、予定の読み取り・更新、資料の読み取り・保存、シートの読み取り・更新に使います。送信などの確定操作は、内容を本人が確認してから実行します。</p><button id="connect">Google連携を開始</button><p><a id="google-link" hidden target="_blank" rel="noopener noreferrer">Googleの認証画面を開く</a></p><details><summary>要求する権限を見る</summary><ul id="scopes"></ul></details></section>
+<section><h2>3. 接続を確認</h2><p id="status" role="status" aria-live="polite">準備しています。</p><button id="check" disabled>接続を確認する</button><div id="diagnostic"></div><p class="note">接続の成功とGoogleの権限審査の承認は別です。接続を保存しただけでは、自動同期は始まりません。</p></section>
+<footer>接続資格情報はこのPCに保存します。共通認証サービスはトークンの交換・更新を中継します。Googleのメール本文・予定・資料のAPI処理は、このPCからGoogleへ直接行います。</footer>
+<script id="bootstrap" type="application/json">BOOTSTRAP_JSON</script></main></body></html>

@@ -7,6 +7,8 @@
 
 ### Added
 
+- 共通Google接続の認証中継・PC画面・MCP入口・診断を追加。`google:workspace:connect` と既存の読取り専用 `google:connect` を分け、共通接続も日次取得で利用できる。Googleの権限審査は未完了。
+
 - `npm start` / `npm run demo` から8画面を同じローカルURLで開く閲覧サーバー。デモと実データを分け、ホームで朝・前夜のまとめ、「今日やること」で未完了提出物を確認できる。
 - 起動日の日本時間に合わせた架空デモの日付と、壊れたスナップショットの形式検査。
 - 本人所有のデスクトップOAuthクライアントで接続する `npm run google:connect` を追加。Gmail・Calendarの読取り専用で、state/PKCE・本人一致・権限・APIを確認してから排他的に保存し、既存MCP資格情報は上書きしない。下書き・予定書込みには別MCP接続が必要。

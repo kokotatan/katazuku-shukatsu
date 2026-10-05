@@ -50,6 +50,11 @@ try {
   delete env.GOOGLE_OAUTH_CLIENT_SECRET
   writeFileSync(tokenFile, JSON.stringify({ refresh_token: 'fixture-refresh', client_id: 'fixture-client', client_secret: 'fixture-secret' }))
   check('MCP保存形式のOAuthクライアント情報も確認する', !missing(await inspect(), 'Google資格情報'))
+  writeFileSync(tokenFile, JSON.stringify({ refresh_token: 'fixture-refresh', client_id: 'fixture-client', client_secret: '', token_uri: 'https://katazuku-google.kotalabo.com/token' }))
+  check('共通Google接続はPCの秘密鍵なしで診断できる', !missing(await inspect(), 'Google資格情報'))
+  writeFileSync(tokenFile, JSON.stringify({ refresh_token: 'fixture-refresh', client_id: 'fixture-client', client_secret: 'fixture-secret', token_uri: 'https://outside.example.test/token' }))
+  check('任意の更新先はローカル診断でも利用可能と扱わない', missing(await inspect(), 'Google資格情報'))
+  writeFileSync(tokenFile, JSON.stringify({ refresh_token: 'fixture-refresh', client_id: 'fixture-client', client_secret: 'fixture-secret' }))
   check('未導入の選択CLIを検知する', missing(await inspect(), 'AIのローカル準備'))
   writeFileSync(commands.codex, 'not executed')
   result = await inspect()

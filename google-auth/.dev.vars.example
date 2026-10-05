@@ -1,0 +1,3 @@
+# 実値は .dev.vars または wrangler secret put で設定する。
+GOOGLE_CLIENT_SECRET=replace-with-your-google-client-secret
+STATE_SIGNING_SECRET=replace-with-a-random-signing-key-of-at-least-43-characters
