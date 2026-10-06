@@ -58,7 +58,7 @@
     "build": "npm run clean && tsc -p tsconfig.build.json",
     "prepack": "npm run build",
     "scan": "node tools/scan-secrets.mjs",
-    "test": "npm run test:core && npm run test:application && npm run test:mobility && npm run test:agent-runtime && npm run test:platform && npm run test:migration && npm run test:write-layer && npm run test:api && npm run test:schema && npm run test:recording && npm run test:workflows && npm run test:viewer && npm run test:spark-gateway && npm run test:setup && npm run test:google-connect && npm run test:desktop && npm run test:google-workspace",
+    "test": "npm run test:core && npm run test:application && npm run test:mobility && npm run test:agent-runtime && npm run test:platform && npm run test:migration && npm run test:write-layer && npm run test:api && npm run test:schema && npm run test:recording && npm run test:workflows && npm run test:viewer && npm run test:spark-gateway && npm run test:setup && npm run test:google-connect && npm run test:desktop && npm run test:google-workspace && npm run test:interview-bundle",
     "test:core": "tsx tests/check-core.ts",
     "test:schema": "tsx tests/check-schema.ts",
     "test:platform": "tsx tests/check-platform.ts",
@@ -105,7 +105,8 @@
     "google:doctor": "node tools/google-workspace/doctor.mjs",
     "google-auth:types": "wrangler types --config google-auth/wrangler.example.jsonc --env-interface OAuthEnv --strict-vars false google-auth/worker-configuration.d.ts",
     "google-auth:check": "npm run google-auth:types && tsc -p google-auth/tsconfig.json && wrangler deploy --config google-auth/wrangler.example.jsonc --dry-run",
-    "test:google-workspace": "node tools/google-workspace/check.mjs && tsx google-auth/check.ts && tsx google-auth/check-connection.ts"
+    "test:google-workspace": "node tools/google-workspace/check.mjs && tsx google-auth/check.ts && tsx google-auth/check-connection.ts",
+    "test:interview-bundle": "tsx tests/check-interview-bundle.ts"
   },
   "devDependencies": {
     "@types/node": "^26.3.0",

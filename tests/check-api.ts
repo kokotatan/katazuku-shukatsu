@@ -15,6 +15,7 @@ function check(label: string, cond: boolean, detail = '') {
 
 /** 公開する値(型は実行時に見えないのでここでは扱わない) */
 const EXPECTED = [
+  'assertBundleMatchesInterview', 'isSafeBundlePath', 'sha256OfFile', 'validateBundleManifest', 'verifyExtractedBundle',
   // db
   'openDb', 'SCHEMA_VERSION', 'transition', 'STATUS_FOR', 'outcomeOf',
   'resolveCompany', 'sameCompany', 'samePosition', 'addAlias', 'addPending', 'listPending', 'setOfficialName',

@@ -246,3 +246,11 @@ to view your own data. The viewer binds to 127.0.0.1 and does not run workflows 
 
 このプロジェクトは日本の新卒一括採用(プレエントリー・ES・Web適性・面接日程調整)という固有の流れを対象にしています。
 実データ(氏名・企業・面接記録)はリポジトリに含めません。
+
+## ブラウザだけで試す・導入支援
+
+[企業研究・面談準備メモ](https://hp.katazuku-shukatsu.kotalabo.com/tools/)はインストール不要です。同じツールを`examples/research-notes.html`として同梱しており、ブラウザで直接開けます。入力は端末内で処理し、保存は本人によるダウンロードのみです。
+
+OSSはApache-2.0で無料・改変可能です。外部サービスの費用は別です。設定が難しい方には[個別導入支援](https://hp.katazuku-shukatsu.kotalabo.com/support/)（セットアップ7,000円〜、フォロー付き15,000円〜、税込目安）をご案内しています。期間と作業範囲は見積もりで確認します。
+
+[開発者も募集しています](https://hp.katazuku-shukatsu.kotalabo.com/developers/)。導入体験、連携、アクセシビリティ、検証、説明文の改善に力を貸してください。
