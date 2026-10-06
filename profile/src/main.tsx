@@ -1,9 +1,11 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { IntlProvider, ThemeProvider, createTheme } from 'smarthr-ui'
-import 'smarthr-normalize-css'
-import 'smarthr-ui/smarthr-ui.css'
-import '../../shared/src/digital.css'
+import './styles.css'
+
+
+
+
 import App from './App'
 
 const root = document.getElementById('root')

@@ -177,7 +177,7 @@ export function AppHeading({
 
 function ReloadButton({ onReload, loading }: { onReload: () => void; loading: boolean }) {
   return (
-    <button type="button" className="ktz-reload" onClick={onReload} disabled={loading}>
+    <button type="button" className="ktz-reload dads-button" data-type="outline" data-size="md" onClick={onReload} disabled={loading}>
       {loading ? '読込中…' : '再読込'}
     </button>
   )
@@ -196,9 +196,9 @@ export function Tile({ label, value, tone }: { label: string; value: ReactNode; 
 /** アプリの外枠(サイドバー + 本文)。全アプリで同じ */
 export function AppShell({ current, children, demo, refreshError }: { current: AppKey; children: ReactNode; demo?: boolean; refreshError?: string }) {
   return (
-    <div className="ktz-app">
+    <div className="ktz-app"><a className="ktz-skip" href="#main-content">本文へ移動</a>
       <AppNav current={current} />
-      <main className="ktz-main">
+      <main className="ktz-main" id="main-content" tabIndex={-1}>
         <Stack gap={1.5}>
           {demo && <InformationPanel type="warning" heading="架空データのデモです" toggleable={false}>
             <Text>実際の予定や選考状況ではありません。自分のデータを開くときは <code>npm start</code> を使ってください。</Text>

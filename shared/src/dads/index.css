@@ -1,0 +1,11 @@
+@layer dads-reset, katazuku-layout;
+@import "./global.css" layer(dads-reset);
+@import "./button.css";
+@import "./input-text.css";
+@import "./textarea.css";
+@import "./select.css";
+@import "./form-control-label.css";
+@import "./tab.css";
+@import "./table.css";
+@import "./link.css";
+@import "./checkbox.css";

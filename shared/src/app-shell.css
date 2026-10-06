@@ -1,3 +1,5 @@
+@layer theme, base, dads-reset, katazuku-layout, components, utilities;
+@layer katazuku-layout {
 /*
  * アプリ群の外枠。色は SmartHR Design System のパレットに合わせる。
  * (main #0077c7 / text #23221e / grey #706d65 / border #d6d3d0 / background #f8f7f6)
@@ -308,4 +310,6 @@ body {
   height: 0.5rem;
   border-radius: 9999px;
   background-color: #0077c7;
+}
+
 }
