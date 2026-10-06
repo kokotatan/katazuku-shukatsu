@@ -1,0 +1,19 @@
+{
+  "repository": "https://github.com/digital-go-jp/design-system-example-components-html",
+  "commit": "af8b6656c8d864a22ef444d088e5568f3416f6aa",
+  "guidelines": "https://design.digital.go.jp/dads/",
+  "version": "2.18.0",
+  "files": [
+    "global.css",
+    "components/button/button.css",
+    "components/input-text/input-text.css",
+    "components/textarea/textarea.css",
+    "components/select/select.css",
+    "components/form-control-label/form-control-label.css",
+    "components/tab/tab.css",
+    "components/table/table.css",
+    "components/link/link.css",
+    "components/checkbox/checkbox.css"
+  ],
+  "license": "MIT"
+}

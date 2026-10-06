@@ -1,0 +1,37 @@
+.dads-link:any-link {
+  color: var(--color-primitive-blue-1000);
+  text-decoration: underline;
+  text-decoration-thickness: calc(1 / 16 * 1rem);
+  text-underline-offset: calc(3 / 16 * 1rem);
+}
+
+.dads-link:visited {
+  color: var(--color-primitive-magenta-900);
+}
+
+@media (hover: hover) {
+  .dads-link:hover {
+    color: var(--color-primitive-blue-900);
+    text-decoration-thickness: calc(3 / 16 * 1rem);
+  }
+}
+
+.dads-link:active {
+  color: var(--color-primitive-orange-800);
+  text-decoration-thickness: calc(1 / 16 * 1rem);
+}
+
+.dads-link:focus-visible {
+  outline: calc(4 / 16 * 1rem) solid var(--color-neutral-black);
+  outline-offset: calc(2 / 16 * 1rem);
+  border-radius: calc(4 / 16 * 1rem);
+  background-color: var(--color-primitive-yellow-300);
+  box-shadow: 0 0 0 calc(2 / 16 * 1rem) var(--color-primitive-yellow-300);
+}
+
+.dads-link__icon {
+  display: inline-block;
+  width: calc(16 / 16 * 1rem);
+  height: calc(16 / 16 * 1rem);
+  vertical-align: -0.15em;
+}

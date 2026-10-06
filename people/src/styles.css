@@ -1,0 +1,6 @@
+@layer theme, base, dads-reset, katazuku-layout, components, utilities;
+
+@import 'smarthr-ui/smarthr-ui.css' layer(base);
+@import '../../shared/src/digital.css';
+@import '../../shared/src/dads/index.css';
+@import '../../shared/src/dads-integration.css';
