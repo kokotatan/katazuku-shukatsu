@@ -196,3 +196,5 @@ export { sparkRpc, sparkTools, sparkIcons, SPARK_INSTRUCTIONS, SPARK_READ_TOOLS 
 export type { SparkReader } from './spark-mcp.js'
 export { quickRead, openDbReadOnly } from './quick-read.js'
 export type { QuickCommand } from './quick-read.js'
+
+export { assertBundleMatchesInterview, isSafeBundlePath, sha256OfFile, validateBundleManifest, verifyExtractedBundle, type InterviewBundleManifest, type BundleFile, type BundleVerifyResult } from './interview-bundle.js'

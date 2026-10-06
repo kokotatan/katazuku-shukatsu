@@ -1,0 +1,47 @@
+/* デジタル庁デザインシステムの読みやすさ・コントラスト・操作指針。 */
+:root{--dads-blue:#0017c1;--dads-blue-hover:#000082;--dads-text:#1a1a1a;--dads-muted:#595959;--dads-line:#767676;--dads-soft:#e8f1fe;--dads-focus:#ffd43d}
+body{font-family:"Noto Sans JP","BIZ UDPGothic",system-ui,sans-serif;font-size:1rem;color:var(--dads-text);line-height:1.7}
+:is(a,button,input,select,textarea,summary,[tabindex]):focus-visible{outline:4px solid #000!important;outline-offset:2px;box-shadow:0 0 0 2px #fff,0 0 0 6px #ffd43d!important}
+:is(input,select,textarea){font-size:1rem;min-height:44px}
+:is(button,[role=button],summary){min-height:44px}
+.app-page :is(.text-xs,.text-\[10px\],.text-\[11px\]){font-size:.875rem;line-height:1.6}
+.app-page a:not([class*="bg-"]){text-underline-offset:.2em}
+.app-page :is(input,textarea,select){border-color:#767676}
+.access-form{border-color:#767676;border-radius:8px;max-width:420px;box-shadow:none}
+.access-form h2{font-size:1.5rem;line-height:1.5}.access-form>p{font-size:1rem;color:#595959}
+.access-form button{font-size:1rem;min-height:48px;background:#0017c1;border-radius:8px}.access-form button:not(:disabled):hover{background:#000082}
+.access-form input{border-color:#767676;min-height:48px;border-radius:8px}
+.ws-app{--ws-line:#b3b3b3;--ws-text:#1a1a1a;--ws-muted:#595959;font:1rem/1.7 "Noto Sans JP","BIZ UDPGothic",system-ui,sans-serif;color:#1a1a1a}
+.ws-app button,.ws-dialog button{font-family:inherit;min-height:44px}.ws-app input,.ws-app select,.ws-app textarea{font-size:1rem!important;min-height:44px;border-color:#767676!important}
+.ws-app .ws-sidebar{background:#f2f2f2;border-color:#949494}.ws-app .ws-brand{font-size:1.25rem;color:#1a1a1a}
+.ws-app .ws-sidebar nav a,.ws-app .ws-side-secondary a,.ws-app .ws-side-bottom>a,.ws-app .ws-side-bottom>button{font-size:1rem;min-height:48px;color:#1a1a1a;border-radius:8px;line-height:1.5;padding-block:12px}
+.ws-app .ws-sidebar nav a.active{background:#e8f1fe;color:#0017c1;box-shadow:inset 4px 0 #0017c1;font-weight:700}
+.ws-app .ws-toolbar{min-height:80px;height:auto;padding-block:16px;border-color:#949494}
+.ws-app .ws-search{min-height:48px;border:1px solid #767676;border-radius:8px;background:#fff}.ws-app .ws-search input{min-height:44px}
+.ws-app .ws-page-head{padding-block:32px}.ws-app h1{font-size:2rem;line-height:1.5;font-weight:700;letter-spacing:0}
+.ws-app .ws-page-head p,.ws-app .ws-select-label,.ws-app .ws-breadcrumb,.ws-app .ws-page-head h1>span{font-size:.875rem;color:#595959}
+.ws-app .ws-company-table th{font-size:.875rem;color:#333;background:#f2f2f2;font-weight:700;border-bottom:1px solid #767676}
+.ws-app .ws-company-table td{padding-block:20px;font-size:1rem;border-color:#b3b3b3}
+.ws-app .ws-company-open strong{font-size:1rem;color:#0017c1;text-decoration:underline;text-underline-offset:.2em;font-weight:700}
+.ws-app .ws-company-open small,.ws-app .ws-date,.ws-app .ws-contact-names button,.ws-app .ws-company-table .ws-badge{font-size:.875rem;color:#333}
+.ws-app .ws-badge{background:#e8f1fe;border:1px solid #0017c1;border-radius:4px;color:#00118f;padding:4px 8px}
+.ws-app .ws-company-detail{background:#fff;border-color:#949494}.ws-app .ws-detail-head h2{font-size:1.75rem;line-height:1.5;color:#1a1a1a}.ws-app .ws-detail-head p{font-size:1rem;color:#595959}
+.ws-app .ws-tabs button{font-size:1rem;color:#595959;min-height:48px}.ws-app .ws-tabs button.active{color:#0017c1;font-weight:700;border-bottom:4px solid #0017c1}
+.ws-app h3,.ws-dialog h3{font-size:1.125rem;line-height:1.6;color:#1a1a1a;font-weight:700}
+.ws-app .ws-section p,.ws-app .ws-record summary strong,.ws-app .ws-person-row strong,.ws-dialog .ws-profile-body p{font-size:1rem;color:#1a1a1a}
+.ws-app .ws-record summary{min-height:48px}.ws-app .ws-person-row small,.ws-app .ws-person-company,.ws-app .ws-person-role,.ws-app .ws-person-contact,.ws-app .ws-list-footer{font-size:.875rem;color:#595959;line-height:1.7}
+.ws-app .ws-person-name{font-size:1rem;color:#1a1a1a;font-weight:700}.ws-app .ws-face-grid{gap:24px;grid-template-columns:repeat(auto-fill,minmax(160px,1fr))}
+.ws-app .ws-setting-row strong,.ws-app .ws-setting-row p,.ws-app .ws-settings h3,.ws-app .ws-automation-form label,.ws-app .ws-field{font-size:1rem;color:#1a1a1a}
+.ws-app .ws-muted,.ws-app .ws-setting-row p.ws-muted,.ws-app .ws-sync,.ws-app .ws-text-button{font-size:.875rem;color:#595959}
+.ws-app .ws-notice{font-size:1rem!important;border-color:#767676;background:#e8f1fe;border-radius:8px;color:#1a1a1a}
+.ws-app .ws-notice a,.ws-app .ws-section a{color:#0017c1;text-decoration:underline;text-underline-offset:.2em}
+.ws-app .ws-prewrap{font-size:1rem}.ws-app .ws-empty{font-size:1rem;color:#595959}
+.ws-app .ws-gantt-label strong{font-size:1rem;color:#1a1a1a}.ws-app .ws-gantt-label span,.ws-app .ws-gantt-label small,.ws-app .ws-gantt-dates>div,.ws-app .ws-schedule-caption{font-size:.875rem;color:#595959}
+.ws-app .ws-gantt-event{font-size:.875rem!important;color:#00118f!important;background:#e8f1fe;border-color:#0017c1;min-height:32px}.ws-app .ws-gantt-event.deadline{background:#fff4cf;color:#664600!important;border-color:#806000}
+.ws-app .ws-no-dates{color:#595959;font-size:.875rem}.ws-dialog{color:#1a1a1a}.ws-dialog .ws-person-profile h2{font-size:1.75rem}.ws-dialog .ws-person-profile p{font-size:1rem;color:#595959}
+@media(max-width:850px){.ws-app .ws-toolbar{min-height:72px}.ws-app .ws-page-head{padding:24px}.ws-app .ws-gantt-label{width:230px}.ws-app .ws-search{width:100%}}
+@media(max-width:600px){.ws-app{padding-bottom:88px}.ws-app .ws-sidebar{height:80px;background:#fff}.ws-app .ws-sidebar nav a,.ws-app .ws-side-bottom>a{font-size:.75rem;min-height:72px;padding:8px 2px;gap:4px;line-height:1.5;word-break:keep-all}.ws-app .ws-sidebar nav a.active{box-shadow:inset 0 4px #0017c1}.ws-app .ws-sidebar nav a svg,.ws-app .ws-side-bottom>a svg{width:24px;height:24px}.ws-app .ws-toolbar{padding:12px 16px}.ws-app .ws-toolbar:before{display:none}.ws-app .ws-page-head{padding:24px 16px}.ws-app h1{font-size:1.75rem}.ws-app .ws-company-table td{padding:16px 12px}.ws-app .ws-company-open strong{font-size:1rem}.ws-app .ws-company-open small,.ws-app .ws-company-table .ws-badge{font-size:.875rem}.ws-app .ws-company-open{gap:8px}.ws-app .ws-company-icon{display:none}.ws-app .ws-face-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:24px 12px;padding:0 16px}.ws-app .ws-person-name{font-size:1rem}.ws-app .ws-person-company,.ws-app .ws-person-role{font-size:.875rem}.ws-app .ws-list-footer{padding:20px 16px;font-size:.875rem}.ws-app .ws-tabs{gap:16px;flex-wrap:wrap}.ws-app .ws-tabs button{font-size:1rem}.ws-app .ws-gantt-label{width:180px;padding:12px}.ws-app .ws-gantt-label strong{font-size:.875rem}.ws-app .ws-gantt-label span{font-size:.875rem}.ws-app .ws-gantt-event{font-size:.875rem!important}.ws-app .ws-schedule-controls{flex-wrap:wrap;gap:8px}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+
+.access-form a{display:block;min-height:44px;padding-block:8px;color:#0017c1;text-decoration:underline;text-underline-offset:.2em;font-size:.875rem}
+.ktz-app{background:#fff;color:#1a1a1a;font:1rem/1.7 "Noto Sans JP",system-ui,sans-serif}.ktz-app .ktz-side{background:#f2f2f2;border-color:#949494}.ktz-app .ktz-side-link{font-size:1rem;min-height:48px;border-radius:8px;color:#1a1a1a}.ktz-app .ktz-side-link.is-current{background:#e8f1fe;color:#0017c1;box-shadow:inset 4px 0 #0017c1}.ktz-app .ktz-caption,.ktz-app .ktz-side-foot{font-size:.875rem;color:#595959}.ktz-app .ktz-tab{font-size:.75rem;min-height:64px}.ktz-app .ktz-tab.is-current{color:#0017c1}.ktz-app .ktz-local-actions a{font-size:1rem;color:#0017c1;text-decoration:underline}.ktz-app .ktz-tile{border-color:#949494;border-radius:8px}.ktz-app .ktz-reload{min-height:48px;font-size:1rem}
