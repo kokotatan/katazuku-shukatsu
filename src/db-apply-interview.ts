@@ -20,7 +20,7 @@ export interface InterviewPerson {
   category?: string
   notes?: string[]
   confidence?: number
-  /** 面談スクショから切り出した顔写真の絶対パス(interview-digest-prompt.md 手順7。本人には付けない) */
+  /** 面談スクショから切り出した顔写真の絶対パス(npm run interview:faces が付ける。本人には付けない) */
   photoPath?: string
 }
 
@@ -78,6 +78,47 @@ export function savePersonPhoto(db: DatabaseSync, personId: number, imagePath: s
   return storageKey
 }
 
+const normalizePersonName = (text: string) => text.replace(/(さん|様|氏|先生|くん|君)$/u, '').replace(/[\s　]+/gu, '')
+
+/**
+ * 反映済みの議事録(同じ runId)に結び付いた人物へ、people[].photoPath の顔写真を登録する。
+ * 人物は「この議事録の人物メモ(source_ref = runId)」か「この予定の同席者」に限って名前で探し、
+ * 1人に決まらなければ登録しない(別人の写真を付けないため)。戻り値は登録した枚数。
+ */
+export function attachPhotosToAppliedInterview(db: DatabaseSync, input: InterviewInput, photoRoot = PHOTO_ROOT): number {
+  const withPhoto = (input.people || []).filter((person) => person.photoPath?.trim())
+  if (!withPhoto.length) return 0
+  const linked = db.prepare(`
+    SELECT DISTINCT p.id, p.name FROM person p
+    WHERE p.id IN (SELECT person_id FROM person_note WHERE source_ref = ?)
+       OR (? IS NOT NULL AND p.id IN (SELECT person_id FROM appointment_person WHERE appointment_id = ?))
+  `).all(input.runId, input.appointmentId ?? null, input.appointmentId ?? null) as { id: number; name: string }[]
+  let photos = 0
+  for (const person of withPhoto) {
+    const key = normalizePersonName(person.name.trim())
+    const exact = linked.filter((row) => normalizePersonName(row.name) === key)
+    const partial = linked.filter((row) => {
+      const other = normalizePersonName(row.name)
+      const shorter = other.length <= key.length ? other : key
+      const longer = other.length <= key.length ? key : other
+      return shorter.length >= 2 && longer.includes(shorter)
+    })
+    const found = exact.length === 1 ? exact[0] : exact.length === 0 && partial.length === 1 ? partial[0] : undefined
+    if (!found) {
+      console.warn(`顔写真を登録しません(反映済みの議事録で人物が1人に決まらない): ${person.name}`)
+      continue
+    }
+    try {
+      const imagePath = resolve(person.photoPath!)
+      if (!existsSync(imagePath)) throw new Error('画像ファイルが見つかりません')
+      if (savePersonPhoto(db, found.id, imagePath, photoRoot)) photos += 1
+    } catch (error) {
+      console.warn(`顔写真の登録に失敗: ${person.name}: ${error instanceof Error ? error.message : error}`)
+    }
+  }
+  return photos
+}
+
 /** 議事録JSONの必須項目を検査する。CLIとバンドル反映の両方が同じ規則を通す。 */
 export function validateInterviewInput(input: unknown): asserts input is InterviewInput {
   if (!input || typeof input !== 'object') throw new Error('入力はオブジェクトです')
@@ -106,7 +147,12 @@ export function applyInterview(
     let photos = 0
     const duplicate = db.prepare('SELECT id FROM interview_note WHERE source_ref = ?')
       .get(input.runId) as { id: number } | undefined
-    if (duplicate) return { created: false, interviewId: duplicate.id, photos }
+    if (duplicate) {
+      // 反映済みの議事録でも、後から付けた顔写真(npm run interview:faces -- attach)だけは登録する。
+      // 写真は人物ごとに1枚で上書きしないので、何度実行しても増えない。
+      photos = attachPhotosToAppliedInterview(db, input, photoRoot)
+      return { created: false, interviewId: duplicate.id, photos }
+    }
 
     let selectionId: number | undefined
     let companyId: number | undefined

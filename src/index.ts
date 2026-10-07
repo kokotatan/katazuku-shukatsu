@@ -62,7 +62,7 @@ export { resolveSelectionId, upsertPerson, transaction } from './inputs.js'
 export { applyDiff, MAX_APPLY_CHANGES } from './db-apply.js'
 export type { DiffItem, ApplyResult } from './db-apply.js'
 export { applyCalendar } from './db-apply-calendar.js'
-export { applyInterview, savePersonPhoto, validateInterviewInput } from './db-apply-interview.js'
+export { applyInterview, attachPhotosToAppliedInterview, savePersonPhoto, validateInterviewInput } from './db-apply-interview.js'
 export { applyCareerCalendar } from './db-apply-career-calendar.js'
 export type { CareerCalendarCandidate, CareerCalendarInput, CareerCalendarResult } from './db-apply-career-calendar.js'
 
@@ -220,3 +220,11 @@ export { transcribeAudio } from './transcribe-audio.js'
 export type { TranscribeAudioOptions, TranscribeAudioResult } from './transcribe-audio.js'
 export { INTERVIEW_MINUTES_SCHEMA_PATH, buildMinutesPrompt, minutesRunId, parseMinutesOutput, toInterviewInput } from './interview-minutes.js'
 export type { MinutesContext, MinutesInterview, MinutesOutput } from './interview-minutes.js'
+export { cropImage, decodePng, encodePng } from './png.js'
+export type { PixelBox, RgbaImage } from './png.js'
+export {
+  buildFacesManifest, expandBox, isSelfLabel, normalizeName, parseBoxArgument, parseFaceDetections,
+  parseFacesManifest, planFaceCrops, resolveFaceAssignments,
+} from './face-crop.js'
+export type { ExcludedFace, FaceAssignment, FaceCropOptions, FaceDetection, FacesManifest, PlannedFace, ShotDetections } from './face-crop.js'
+export { attachFacesToInterview, cropFacesFromShots, detectionsFromBoxes, listShots, runFaceDetector, selfDisplayNames, shotsDirFor } from './interview-faces.js'

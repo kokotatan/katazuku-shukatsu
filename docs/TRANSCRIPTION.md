@@ -166,10 +166,52 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\new-interview-bundle
     -OutputZipPath example-bundle.zip
 ```
 
+## 4. 顔写真を付ける(任意)
+
+`scripts/record-vac.ps1` は録音中に `<録音>-shots/shot-NNN.png`(プライマリ画面のスクリーンショット)を撮る。
+ここから面談相手の顔を切り出し、議事録JSONの `people[].photoPath` に付ける。議事録化のエージェントは画像を見ない
+(ツールなし)ので、切り出しはスクリプトが決定的に行い、**どの顔が誰かは本人が書く**。顔の見た目から人物を当てる工程は無い。
+
+```sh
+# 1. 顔を切り出す(<録音>-shots/face-NNN.png と faces.json ができる)
+npm run interview:faces -- detect logs/interviews/example.wav
+# 2. faces.json の "person" に、議事録JSONの people[].name を書く(または --map で渡す)
+npm run interview:faces -- attach logs/interviews/example-db.json --map face-001=面接官A
+# 3. 正本DBへ登録する(反映済みの議事録でも、顔写真だけが追加される)
+npm run interview:faces -- attach logs/interviews/example-db.json --apply
+```
+
+| `detect` のオプション | 意味 |
+|---|---|
+| (なし) | 任意導入の検出器 `scripts/detect-faces.py`(OpenCV)で顔の矩形を探す |
+| `--box <スクショ>:x,y,w,h[:表示名]` | 検出器を使わず、顔の範囲を自分で指定する(複数可) |
+| `--detections <json>` | 別の検出器の結果(`{ "shots": [{ "file", "width", "height", "faces": [{ "x", "y", "w", "h", "score", "label" }] }] }`)を使う |
+| `--self-name <表示名>` | 本人の表示名(複数可)。設定の `profile.displayName` と環境変数 `KATAZUKU_MEETING_DISPLAY_NAMES`(カンマ区切り)にも足せる |
+| `--labels` | 検出器が pytesseract で顔の下の表示名を読む(読めた顔だけ本人の判定に使う) |
+| `--min-size <px>` / `--margin <割合>` | 使う顔の最小の大きさ(既定 48) / 顔の周りに足す余白(既定 0.3) |
+| `--force` | `faces.json` があっても作り直す(同じ顔に書いた "person" は引き継ぐ) |
+
+切り出しの規則(`src/face-crop.ts`):
+
+- 小さすぎる顔(サムネイルや資料の写真)は使わない
+- タイルの表示名が本人の表示名と一致した顔は、**同じ位置に写る顔ごと**外す(表示名が読めなかったスクショの本人も拾わないため)。
+  表示名が読めない・設定していないときは本人の顔も候補に残るので、`attach` で本人の名前を書いても写真は付かない
+- 同じ位置に何度も写る顔はスクショをまたいで1人とみなし、いちばん大きく写った1枚だけを切り出す。番号は画面の上から順
+
+`attach` は、書かれた対応のうち曖昧でないものだけを使う。次の場合は写真を付けずに `[要確認]` として理由を表示する。
+
+- 誰の顔か未記入 / 議事録の `people` にいない名前 / 同じ名前の人物が議事録に複数いる
+- 1人に複数の顔が当たっている / 本人の名前が書かれている / 別の写真が既に指定されている
+
+検出器は任意で、使うなら `pip install opencv-python`。既定は OpenCV 同梱の Haar cascade(追加の取得・通信なし)。
+`KATAZUKU_FACE_MODEL` に YuNet の onnx を指定するとそちらを使う(モデルは各自で入手する)。
+画像はローカルで処理し、外部へは送らない。顔写真・スクショ・`faces.json` は `logs/` 配下(gitignore 済み)にだけ置き、
+正本DBへは `data/private/photos` への複製と `person_photo.storage_key` だけが入る(DB・スナップショット・git に画像は入らない)。
+既に写真がある人物は上書きしない。正本DBが別の機械なら、`-shots` フォルダごと面談バンドルに入れて運ぶ(`photoPath` は同名の同梱ファイルへ付け替えられる)。
+
 ## 含まれないもの
 
-- **面談スクリーンショットからの顔写真の切り出し**: 議事録化のエージェントにはツールを渡さないため、画像を見て切り出す工程は入れていない。
-  `people[].photoPath` もモデルには出させない。顔写真を登録するなら、本人が切り出して議事録JSONに足してから反映する
+- **顔と人物の自動の対応づけ**: 顔の見た目や話者から誰かを推測しない。対応は本人が `faces.json` か `--map` で書く
 - **人物の氏名表記のWeb検索**: 面談内容を外部へ送らないため行わない。表記が不確かな人物は `notes` に「要確認」と残る
 - **自動実行**: 録音が終わったら自動で議事録化する常駐の仕組みは入っていない。タスクスケジューラなどから
   `npm run interview:digest` を叩く
