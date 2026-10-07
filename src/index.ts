@@ -198,3 +198,7 @@ export { quickRead, openDbReadOnly } from './quick-read.js'
 export type { QuickCommand } from './quick-read.js'
 
 export { assertBundleMatchesInterview, isSafeBundlePath, sha256OfFile, validateBundleManifest, verifyExtractedBundle, type InterviewBundleManifest, type BundleFile, type BundleVerifyResult } from './interview-bundle.js'
+
+// ---- 会議実行(録音から議事録反映まで)の状態機械 ----
+export { MEETING_RUN_ORDER, decideMeetingRunTransition, ensureMeetingRun, isMeetingRunState, transitionMeetingRun } from './meeting-run.js'
+export type { MeetingRunKind, MeetingRunRow, MeetingRunState } from './meeting-run.js'
