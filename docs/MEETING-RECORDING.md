@@ -40,7 +40,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\record-vac.ps1 `
   1ch同士を渡しても期待どおり L/R に割り当たらないことがあるため
 
 出力は `logs/interviews/` の下に、録音 `<スラッグ>-<日時>.wav`(16kHz mono)と
-スクリーンショット `<スラッグ>-<日時>-shots/` が**同じ語幹**で並ぶ。この対応は規約なので崩さないこと。
+スクリーンショット `<スラッグ>-<日時>-shots/`、録音の記録 `<スラッグ>-<日時>.recording.json`
+(予定ID・開始/終了予定・自動停止の時刻・録音プロセスのPID)が**同じ語幹**で並ぶ。この対応は規約なので崩さないこと。
+録音の記録は、録り終わった録音を自動で議事録にする `npm run interview:autopilot` が読む([TRANSCRIPTION.md](./TRANSCRIPTION.md))。
 `logs/` は `.gitignore` 済み。録音・文字起こし・顔写真は個人情報であり、コミットしてはいけない。
 
 ## なぜこの構成なのか
@@ -116,5 +118,6 @@ BOM が無いと Windows PowerShell 5.1 が UTF-8 を ANSI と誤読する。
 
 - **スケジューラ連携**: 予定を見て自動で録り始める常駐の仕組みは本リポジトリには入っていない。
   `record-vac.ps1` は単発の実行単位なので、タスクスケジューラや cron から予定ごとに叩く
-- **文字起こし・議事録化**: 録音とは別のコマンド(`npm run transcribe` / `npm run interview:digest`)。
+- **文字起こし・議事録化**: 録音とは別のコマンド(`npm run transcribe` / `npm run interview:digest`。
+  録り終わったら自動で回すなら `npm run interview:autopilot` を定期実行に登録する)。
   手順は [TRANSCRIPTION.md](./TRANSCRIPTION.md)、できた議事録を別の機械の正本DBへ運ぶ手順は [INTERVIEW-BUNDLE.md](./INTERVIEW-BUNDLE.md)

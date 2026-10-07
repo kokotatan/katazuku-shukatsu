@@ -207,6 +207,21 @@ $p = Start-Process -FilePath $ffmpeg -ArgumentList $a -WindowStyle Hidden -PassT
 Set-Content -LiteralPath $lock -Value $p.Id -Encoding ascii
 Log ("録音開始 PID={0} 予定ID={1} 終了{2}+{3}分 = {4}秒 -> {5}" -f $p.Id, $AppointmentId, $endAt.ToString('HH:mm'), $BufferMinutes, $durSec, $outWav)
 
+# 録音の隣に <stem>.recording.json を書く。interview-autopilot が「録り終わったか」と
+# 「どの予定の録音か」をここから読む(予定IDや開始時刻をモデルに推測させない)。
+# 書けなくても録音は続ける(autopilot はファイルが伸びなくなったことで録り終わりを判断する)。
+try {
+  $sidecar = [ordered]@{
+    schemaVersion = 1
+    endIso        = $endAt.ToString('yyyy-MM-ddTHH:mm:sszzz')
+    stopAfterIso  = (Get-Date).AddSeconds($durSec + 60).ToString('yyyy-MM-ddTHH:mm:sszzz')
+    pid           = $p.Id
+  }
+  if ($AppointmentId -gt 0) { $sidecar.appointmentId = $AppointmentId }
+  if ($StartIso) { $sidecar.startIso = (ConvertTo-LocalTime $StartIso).ToString('yyyy-MM-ddTHH:mm:sszzz') }
+  [IO.File]::WriteAllText((Join-Path $intDir ($stem + '.recording.json')), ($sidecar | ConvertTo-Json), (New-Object Text.UTF8Encoding($false)))
+} catch { Log ("録音の記録(.recording.json)を書けなかった(録音は続行): {0}" -f $_.Exception.Message) }
+
 # ショットは録音と同じ stem にする(<stem>-shots を探して顔写真を切り出す規約)
 $delays = @()
 for ($s = 180; $s -lt $durSec; $s += 300) { $delays += $s }
