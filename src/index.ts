@@ -228,3 +228,8 @@ export {
 } from './face-crop.js'
 export type { ExcludedFace, FaceAssignment, FaceCropOptions, FaceDetection, FacesManifest, PlannedFace, ShotDetections } from './face-crop.js'
 export { attachFacesToInterview, cropFacesFromShots, detectionsFromBoxes, listShots, runFaceDetector, selfDisplayNames, shotsDirFor } from './interview-faces.js'
+export {
+  AUTOPILOT_DEFAULTS, decideRecording, digestArguments, emptyAutopilotState, isRecordingFile, parseAutopilotState,
+  parseRecordingSidecar, recordingFinished, recordOutcome,
+} from './interview-autopilot.js'
+export type { AutopilotEntry, AutopilotMode, AutopilotOptions, AutopilotState, RecordingCandidate, RecordingSidecar } from './interview-autopilot.js'

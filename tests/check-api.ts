@@ -59,6 +59,14 @@ const EXPECTED = [
   'CHUNK_SECONDS', 'VOICEBOX_STARTUP_WAIT_MS', 'VoiceboxMcpClient', 'mergeSpeakerSegments', 'renderChunkTranscript',
   'renderSegmentTranscript', 'selectTranscriptionBackend', 'transcribeAudio',
   'INTERVIEW_MINUTES_SCHEMA_PATH', 'buildMinutesPrompt', 'minutesRunId', 'parseMinutesOutput', 'toInterviewInput',
+  // 面談スクショからの顔写真
+  'attachPhotosToAppliedInterview', 'cropImage', 'decodePng', 'encodePng',
+  'buildFacesManifest', 'expandBox', 'isSelfLabel', 'normalizeName', 'parseBoxArgument', 'parseFaceDetections',
+  'parseFacesManifest', 'planFaceCrops', 'resolveFaceAssignments',
+  'attachFacesToInterview', 'cropFacesFromShots', 'detectionsFromBoxes', 'listShots', 'runFaceDetector', 'selfDisplayNames', 'shotsDirFor',
+  // 録音後の自動議事録化
+  'AUTOPILOT_DEFAULTS', 'decideRecording', 'digestArguments', 'emptyAutopilotState', 'isRecordingFile', 'parseAutopilotState',
+  'parseRecordingSidecar', 'recordingFinished', 'recordOutcome',
 ].sort()
 
 /** 内部実装。公開面から漏れていたら落とす */

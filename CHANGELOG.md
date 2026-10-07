@@ -9,6 +9,7 @@
 
 - 面談の録音を文字起こしする `npm run transcribe` と、文字起こしから議事録を作る `npm run interview:digest`。文字起こしはスクリプトが決定的に行い、ローカルの voicebox(MCP。30秒ごとに分割、止まっていれば起動して最大240秒待つ)か、任意導入の faster-whisper を使う。faster-whisper ではステレオ録音を左右別に文字起こしして `[相手]` / `[本人]` を付けられる。議事録化はツールなしの読み取り専用エージェントが厳格JSONを返し、Schema で検査してから議事録Markdownと DB反映用JSONを書き出す。`--apply` で同じ機械の正本DBへ冪等に反映する。[docs/TRANSCRIPTION.md](docs/TRANSCRIPTION.md)
 - 面談スクショから相手の顔写真を切り出す `npm run interview:faces`。顔の矩形は任意導入の OpenCV 検出器か本人の指定から得て、本人の表示名のタイル・小さすぎる顔を外し、同じ位置の顔を1枚にまとめて切り出す(依存ゼロの PNG 読み書き)。どの顔が誰かは本人が `faces.json` か `--map` で書き、曖昧な対応は付けずに要確認として表示する。反映済みの議事録にも、後から付けた顔写真だけを登録できる。[docs/TRANSCRIPTION.md](docs/TRANSCRIPTION.md)
+- 録音が終わった面談を自動で議事録にする `npm run interview:autopilot`(定期実行の1回分)。停止の目印・録音の記録(`record-vac.ps1` が書く `<録音>.recording.json`)・ファイルが伸びていないことで録り終わりを判断し、`interview:digest` を `--apply` か面談バンドル作成まで進める。ロックで二重起動を防ぎ、処理済みの録音は大きさと更新時刻で記録して二度と処理しない。Windows タスクスケジューラへの登録は `scripts/register-interview-autopilot.ps1`。[docs/TRANSCRIPTION.md](docs/TRANSCRIPTION.md)
 - `scripts/record-vac.ps1 -Stereo`: 相手と自分を混ぜずに L=相手 / R=自分 の2chで録る。
 - 録音機と正本DBの機械が別のときの面談バンドル。録音機で議事録JSON・文字起こし・スクショ・音声を sha256 付き manifest と一緒に zip にまとめ(`scripts/new-interview-bundle.ps1`)、正本DBの機械で検査してから1トランザクションで反映する(`npm run interview:apply`)。文字起こしと顔写真のパスは正本側へ付け替える。[docs/INTERVIEW-BUNDLE.md](docs/INTERVIEW-BUNDLE.md)
 - 会議実行(`meeting_run` / `career_meeting_run`)の状態機械と `npm run meeting-run`。既に先の段にいるときの手前の段の指定は何もせず、2段以上の飛び越しだけを拒否する。

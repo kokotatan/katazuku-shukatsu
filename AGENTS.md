@@ -50,6 +50,7 @@ AIコーディングエージェント(および使い方を尋ねられたAI)�
 | `examples/` | Schema駆動の設定GUI、架空データの seed |
 | `src/transcription.ts` / `src/transcribe-audio.ts` / `src/interview-minutes.ts` | 面談録音の文字起こし(voicebox / faster-whisper)と、読み取り専用エージェントによる議事録化。[docs/TRANSCRIPTION.md](docs/TRANSCRIPTION.md) |
 | `src/face-crop.ts` / `src/interview-faces.ts` / `src/png.ts` | 面談スクショからの顔写真の切り出しと、本人が書いた対応による `people[].photoPath` の付与(顔と人物を推測しない) |
+| `src/interview-autopilot.ts` + `scripts/interview-autopilot.ts` | 録り終わった録音を見つけて議事録化する定期実行(ロック・処理済みの記録・活動ログ) |
 | `tools/scan-secrets.mjs` | 個人情報・秘密情報の混入検査(CIゲート) |
 | `tests/check-*.ts` | 依存ゼロの自前assertテスト |
 

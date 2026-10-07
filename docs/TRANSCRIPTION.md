@@ -209,10 +209,69 @@ npm run interview:faces -- attach logs/interviews/example-db.json --apply
 正本DBへは `data/private/photos` への複製と `person_photo.storage_key` だけが入る(DB・スナップショット・git に画像は入らない)。
 既に写真がある人物は上書きしない。正本DBが別の機械なら、`-shots` フォルダごと面談バンドルに入れて運ぶ(`photoPath` は同名の同梱ファイルへ付け替えられる)。
 
+## 5. 録音が終わったら自動で議事録にする(任意)
+
+`npm run interview:autopilot` は定期実行の1回分で、`logs/interviews` から録り終わった録音を見つけて議事録にする。
+
+```sh
+npm run interview:autopilot -- --apply --dry-run   # 何を処理するかだけ表示する(何も書かない)
+npm run interview:autopilot -- --apply             # 正本DBがこの機械にある
+npm run interview:autopilot -- --bundle            # 正本DBが別の機械にある(面談バンドルを作る。PowerShell が要る)
+npm run interview:autopilot                        # 議事録とDB反映用JSONを作るだけ
+```
+
+1回の実行で、録り終わった録音を古い順に最大 `--max` 件(既定1)処理する。
+
+1. `npm run interview:digest -- <録音>`。`scripts/record-vac.ps1` が録音の隣に書く `<録音>.recording.json` から、
+   予定ID(`--appointment`)と開始時刻(`--occurred-at`)を渡す
+2. `<録音>-shots` があれば `npm run interview:faces -- detect` で顔写真の候補を切り出す(検出器が無ければ飛ばす)。
+   誰の顔かは本人が書くまで付けない。書いたら `npm run interview:faces -- attach <録音>-db.json --apply`
+3. `--bundle` なら `scripts/new-interview-bundle.ps1` で `logs/interview-bundles/<録音>-bundle.zip` を作る
+
+録り終わりは次のどれかで判断し、どの場合もファイルが1分以上伸びていないことを確かめてから処理する。
+
+- `<録音>.stop` がある(手で止めたとき、空のファイルを置けばすぐ対象になる)
+- `<録音>.recording.json` の録音プロセスが居ない、または自動停止の時刻(`stopAfterIso`)を過ぎた
+- どちらも無い録音は、15分以上伸びていない
+
+| 仕組み | 置き場所 |
+|---|---|
+| 二重起動の防止(固まった前回は6時間で回収) | `logs/interview-autopilot.lock` |
+| 処理済みの記録(録音の大きさと更新時刻。同じ録音は二度と処理しない) | `logs/interview-autopilot-state.json` |
+| 経過のログ | `logs/interview-autopilot.log` |
+| 結果 / 失敗 | `logs/activity-log.jsonl` / `logs/alert-interview-autopilot.txt` |
+
+200KB 未満の録音(ほぼ無音)は議事録化しない。失敗した録音は30分おいて試し直し、3回続けて失敗したら止まる
+(直してから `logs/interview-autopilot-state.json` のその録音の行を消すと、また対象になる)。
+
+### 定期実行に登録する
+
+Windows はタスクスケジューラへ登録する(管理者権限は要らない。ログオン中だけ動く)。
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts
+egister-interview-autopilot.ps1 -DryRun   # 登録内容だけ表示
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts
+egister-interview-autopilot.ps1           # 10分ごと・--apply
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts
+egister-interview-autopilot.ps1 -Mode bundle
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts
+egister-interview-autopilot.ps1 -Unregister
+```
+
+macOS / Linux は cron か launchd から同じコマンドを叩く。録音の仕組み(`record-vac.ps1`)は Windows 専用なので、
+他のOSでは録音ファイルを `logs/interviews` に置き、録り終わったら `<録音>.stop` を置くか15分待つ。
+
+```cron
+*/10 * * * * cd /path/to/katazuku-shukatsu && npm run interview:autopilot -- --apply >> logs/interview-autopilot.cron.log 2>&1
+```
+
+launchd なら `npm run schedule:print -- launchd` が出す plist([WORKFLOWS.md](./WORKFLOWS.md))と同じ形で、
+`ProgramArguments` を `npm run interview:autopilot -- --apply`、`StartInterval` を 600 にしたものを `~/Library/LaunchAgents` に置く。
+katazuku はスケジューラへ勝手に書き込まない(登録は各自が行う)。
+
 ## 含まれないもの
 
 - **顔と人物の自動の対応づけ**: 顔の見た目や話者から誰かを推測しない。対応は本人が `faces.json` か `--map` で書く
 - **人物の氏名表記のWeb検索**: 面談内容を外部へ送らないため行わない。表記が不確かな人物は `notes` に「要確認」と残る
-- **自動実行**: 録音が終わったら自動で議事録化する常駐の仕組みは入っていない。タスクスケジューラなどから
-  `npm run interview:digest` を叩く
 - **処理後の録音の自動削除**: 根拠音声の保管・削除の方針は環境ごとに違うので各自に委ねる
