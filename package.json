@@ -58,7 +58,7 @@
     "build": "npm run clean && tsc -p tsconfig.build.json",
     "prepack": "npm run build",
     "scan": "node tools/scan-secrets.mjs",
-    "test": "npm run test:core && npm run test:application && npm run test:mobility && npm run test:agent-runtime && npm run test:platform && npm run test:migration && npm run test:write-layer && npm run test:api && npm run test:schema && npm run test:recording && npm run test:workflows && npm run test:viewer && npm run test:spark-gateway && npm run test:setup && npm run test:google-connect && npm run test:desktop && npm run test:google-workspace && npm run test:interview-bundle && npm run test:meeting-run",
+    "test": "npm run test:core && npm run test:application && npm run test:mobility && npm run test:agent-runtime && npm run test:platform && npm run test:migration && npm run test:write-layer && npm run test:api && npm run test:schema && npm run test:recording && npm run test:workflows && npm run test:viewer && npm run test:spark-gateway && npm run test:setup && npm run test:google-connect && npm run test:desktop && npm run test:google-workspace && npm run test:interview-bundle && npm run test:meeting-run && npm run test:transcription",
     "test:core": "tsx tests/check-core.ts",
     "test:schema": "tsx tests/check-schema.ts",
     "test:platform": "tsx tests/check-platform.ts",
@@ -109,7 +109,9 @@
     "test:interview-bundle": "tsx tests/check-interview-bundle.ts && tsx tests/check-interview-bundle-apply.ts",
     "test:meeting-run": "tsx tests/check-meeting-run.ts",
     "meeting-run": "tsx scripts/db-meeting-run.ts",
-    "interview:apply": "tsx scripts/interview-bundle-apply.ts"
+    "interview:apply": "tsx scripts/interview-bundle-apply.ts",
+    "test:transcription": "tsx tests/check-transcription.ts",
+    "transcribe": "tsx scripts/transcribe.ts"
   },
   "devDependencies": {
     "@types/node": "^26.3.0",
