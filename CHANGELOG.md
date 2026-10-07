@@ -7,6 +7,8 @@
 
 ### Added
 
+- 録音機と正本DBの機械が別のときの面談バンドル。録音機で議事録JSON・文字起こし・スクショ・音声を sha256 付き manifest と一緒に zip にまとめ(`scripts/new-interview-bundle.ps1`)、正本DBの機械で検査してから1トランザクションで反映する(`npm run interview:apply`)。文字起こしと顔写真のパスは正本側へ付け替える。[docs/INTERVIEW-BUNDLE.md](docs/INTERVIEW-BUNDLE.md)
+- 会議実行(`meeting_run` / `career_meeting_run`)の状態機械と `npm run meeting-run`。既に先の段にいるときの手前の段の指定は何もせず、2段以上の飛び越しだけを拒否する。
 - Windows x64のポータブル試用版ビルダー。Electron・専用tsx・8画面・合成データを同梱し、Node/npmなしで初回設定と架空データ閲覧を起動する。個人設定・資格情報はアプリ保存領域へ分離し、配布物は公開ファイル許可リストから組み立てる。
 - 共通Google接続の認証中継・PC画面・MCP入口・診断を追加。`google:workspace:connect` と既存の読取り専用 `google:connect` を分け、共通接続も日次取得で利用できる。Googleの権限審査は未完了。
 
@@ -30,6 +32,7 @@
 
 ### Fixed
 
+- `db-apply-interview` の既定のDB・顔写真の置き場所がリポジトリの1つ上を指していた問題。
 - npm配布や個人データ領域などGitのない作業場所でCodex CLIが推論前に停止する問題。Gitリポジトリ検査を省略し、工程ごとのsandbox設定は維持する。
 - 8画面の再読込が失敗してもエラーを隠し、以前のデータを最新のように表示していた問題。最後に取得した内容を保持し、未更新の警告と再試行の手順を表示する。
 - デスクトップの骨組みがAI未選択の設定を成功として保存していた問題。コアのSchemaで保存前に検証し、既存設定を置換せず、保存と実接続・定期登録の完了を区別する。

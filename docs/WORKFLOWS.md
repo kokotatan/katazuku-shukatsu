@@ -118,3 +118,4 @@ cron は PATH が最小になるので、`claude` / `codex` が見つからな�
 
 面談の録音から議事録を作る `interview-digest`(文字起こし・話者推定・人物抽出)は、まだ入っていません。
 録音そのものは [MEETING-RECORDING.md](./MEETING-RECORDING.md) の手順で使えます。
+録音機と正本DBの機械が別なら、議事録JSONを [INTERVIEW-BUNDLE.md](./INTERVIEW-BUNDLE.md) の面談バンドルで運んで反映できます。
