@@ -114,8 +114,11 @@ cron は PATH が最小になるので、`claude` / `codex` が見つからな�
 | `npx tsx scripts/brief-data.ts [YYYY-MM-DD]` | 前夜ブリーフの材料 |
 | `npx tsx scripts/db-calendar-outbox.ts` / `db-link-calendar.ts` | DB → カレンダーの送信待ちと、作成済みIDの書き戻し |
 
-## 未移植のもの
+## 面談の議事録化
 
-面談の録音から議事録を作る `interview-digest`(文字起こし・話者推定・人物抽出)は、まだ入っていません。
-録音そのものは [MEETING-RECORDING.md](./MEETING-RECORDING.md) の手順で使えます。
-録音機と正本DBの機械が別なら、議事録JSONを [INTERVIEW-BUNDLE.md](./INTERVIEW-BUNDLE.md) の面談バンドルで運んで反映できます。
+面談の録音から議事録を作る `interview-digest`(文字起こし・話者推定・人物抽出)は、定期実行のワークフローではなく
+単発のコマンドです(`npm run transcribe` / `npm run interview:digest`)。手順は [TRANSCRIPTION.md](./TRANSCRIPTION.md)。
+録音そのものは [MEETING-RECORDING.md](./MEETING-RECORDING.md)、録音機と正本DBの機械が別なら
+議事録JSONを [INTERVIEW-BUNDLE.md](./INTERVIEW-BUNDLE.md) の面談バンドルで運んで反映できます。
+
+まだ入っていないもの: 面談スクリーンショットからの顔写真の切り出しと、録音終了を見て自動で議事録化する常駐の仕組み。

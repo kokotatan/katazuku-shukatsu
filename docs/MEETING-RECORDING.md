@@ -34,6 +34,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\record-vac.ps1 `
   引けたときだけ待機し、引けなければ即座に録音を開始する
 - 録音は「予定の終了時刻 + `-BufferMinutes`(既定15分)」で自動停止する
 - 内蔵マイクの名前が既定と違う環境では `-MicPattern` を上書きする
+- `-Stereo` を付けると、相手と自分を混ぜずに L=相手 / R=自分 の2chで残す(1分あたり約3.8MB)。
+  文字起こしで `--speakers` を付けると話者が音響的に確定する([TRANSCRIPTION.md](./TRANSCRIPTION.md))。
+  左右を `amerge` ではなく `join` で並べているのは、`amerge` が入力のチャンネル配置を見て並べ直し、
+  1ch同士を渡しても期待どおり L/R に割り当たらないことがあるため
 
 出力は `logs/interviews/` の下に、録音 `<スラッグ>-<日時>.wav`(16kHz mono)と
 スクリーンショット `<スラッグ>-<日時>-shots/` が**同じ語幹**で並ぶ。この対応は規約なので崩さないこと。
@@ -112,5 +116,5 @@ BOM が無いと Windows PowerShell 5.1 が UTF-8 を ANSI と誤読する。
 
 - **スケジューラ連携**: 予定を見て自動で録り始める常駐の仕組みは本リポジトリには入っていない。
   `record-vac.ps1` は単発の実行単位なので、タスクスケジューラや cron から予定ごとに叩く
-- **文字起こし・議事録化**: 録音ファイルの受け取り手は各自の環境に委ねている。
-  できた議事録を別の機械の正本DBへ運ぶ手順は [INTERVIEW-BUNDLE.md](./INTERVIEW-BUNDLE.md)
+- **文字起こし・議事録化**: 録音とは別のコマンド(`npm run transcribe` / `npm run interview:digest`)。
+  手順は [TRANSCRIPTION.md](./TRANSCRIPTION.md)、できた議事録を別の機械の正本DBへ運ぶ手順は [INTERVIEW-BUNDLE.md](./INTERVIEW-BUNDLE.md)

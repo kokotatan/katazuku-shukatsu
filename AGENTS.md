@@ -48,6 +48,7 @@ AIコーディングエージェント(および使い方を尋ねられたAI)�
 | `scripts/workflow.ts` + `scripts/*-prompt.md` | 自動運転ワークフロー(mail-watch / daily-sync / asa / evening-brief / calendar-sync / watchdog)。無人工程は第三者へ送信しない。[docs/WORKFLOWS.md](docs/WORKFLOWS.md) |
 | `schemas/` | 応募イベント / 設定 の JSON Schema(`settings.schema.json` が設定UIを生成) |
 | `examples/` | Schema駆動の設定GUI、架空データの seed |
+| `src/transcription.ts` / `src/transcribe-audio.ts` / `src/interview-minutes.ts` | 面談録音の文字起こし(voicebox / faster-whisper)と、読み取り専用エージェントによる議事録化。[docs/TRANSCRIPTION.md](docs/TRANSCRIPTION.md) |
 | `tools/scan-secrets.mjs` | 個人情報・秘密情報の混入検査(CIゲート) |
 | `tests/check-*.ts` | 依存ゼロの自前assertテスト |
 

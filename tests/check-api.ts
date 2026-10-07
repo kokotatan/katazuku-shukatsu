@@ -55,6 +55,10 @@ const EXPECTED = [
   'SPARK_KINDS', 'SparkQueue', 'createSparkJob', 'sparkPrompt', 'validateSparkResponse',
   'validSparkTaskUrl', 'sparkRpc', 'sparkTools', 'sparkIcons', 'SPARK_INSTRUCTIONS', 'SPARK_READ_TOOLS',
   'quickRead', 'openDbReadOnly',
+  // 録音の文字起こしと議事録化
+  'CHUNK_SECONDS', 'VOICEBOX_STARTUP_WAIT_MS', 'VoiceboxMcpClient', 'mergeSpeakerSegments', 'renderChunkTranscript',
+  'renderSegmentTranscript', 'selectTranscriptionBackend', 'transcribeAudio',
+  'INTERVIEW_MINUTES_SCHEMA_PATH', 'buildMinutesPrompt', 'minutesRunId', 'parseMinutesOutput', 'toInterviewInput',
 ].sort()
 
 /** 内部実装。公開面から漏れていたら落とす */

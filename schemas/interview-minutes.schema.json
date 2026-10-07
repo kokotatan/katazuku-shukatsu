@@ -1,0 +1,69 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "面談の議事録化の出力(モデルは文字起こしを読むだけ・DB反映は後段)",
+  "description": "runId・予定ID・文字起こしのパスなど、実行側が決める値はモデルに出させない。後段の src/interview-minutes.ts が付け足して InterviewInput にする。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "minutesMarkdown", "interview"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "minutesMarkdown": { "type": "string", "minLength": 1 },
+    "interview": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "occurredAt", "title", "summary", "questions", "people", "profileSuggestions", "followUps"],
+      "properties": {
+        "kind": { "enum": ["selection", "career_support"] },
+        "company": { "type": "string" },
+        "organization": { "type": "string" },
+        "position": { "type": "string" },
+        "occurredAt": { "type": "string", "minLength": 1 },
+        "title": { "type": "string", "minLength": 1 },
+        "summary": { "type": "string", "minLength": 1 },
+        "questions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["question"],
+            "properties": {
+              "question": { "type": "string", "minLength": 1 },
+              "answer": { "type": "string" },
+              "feedback": { "type": "string" }
+            }
+          }
+        },
+        "people": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "notes", "confidence"],
+            "properties": {
+              "name": { "type": "string", "minLength": 1 },
+              "company": { "type": "string" },
+              "role": { "type": "string" },
+              "category": { "type": "string" },
+              "notes": { "type": "array", "items": { "type": "string" } },
+              "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+            }
+          }
+        },
+        "profileSuggestions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["field", "value", "confidence"],
+            "properties": {
+              "field": { "enum": ["strengths", "weaknesses", "careerAxis", "desiredRole", "desiredIndustry"] },
+              "value": { "type": "string", "minLength": 1 },
+              "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+            }
+          }
+        },
+        "followUps": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}
