@@ -62,7 +62,7 @@ export { resolveSelectionId, upsertPerson, transaction } from './inputs.js'
 export { applyDiff, MAX_APPLY_CHANGES } from './db-apply.js'
 export type { DiffItem, ApplyResult } from './db-apply.js'
 export { applyCalendar } from './db-apply-calendar.js'
-export { applyInterview, savePersonPhoto } from './db-apply-interview.js'
+export { applyInterview, savePersonPhoto, validateInterviewInput } from './db-apply-interview.js'
 export { applyCareerCalendar } from './db-apply-career-calendar.js'
 export type { CareerCalendarCandidate, CareerCalendarInput, CareerCalendarResult } from './db-apply-career-calendar.js'
 
@@ -202,3 +202,7 @@ export { assertBundleMatchesInterview, isSafeBundlePath, sha256OfFile, validateB
 // ---- 会議実行(録音から議事録反映まで)の状態機械 ----
 export { MEETING_RUN_ORDER, decideMeetingRunTransition, ensureMeetingRun, isMeetingRunState, transitionMeetingRun } from './meeting-run.js'
 export type { MeetingRunKind, MeetingRunRow, MeetingRunState } from './meeting-run.js'
+
+// ---- 面談バンドルの正本側反映 ----
+export { applyInterviewBundle, applyInterviewBundleFile, extractBundleZip, readBundleManifest, rebaseBundlePhotoPaths } from './interview-bundle-apply.js'
+export type { InterviewBundleApplyOptions, InterviewBundleApplyOutcome } from './interview-bundle-apply.js'

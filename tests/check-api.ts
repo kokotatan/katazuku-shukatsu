@@ -15,6 +15,7 @@ function check(label: string, cond: boolean, detail = '') {
 
 /** 公開する値(型は実行時に見えないのでここでは扱わない) */
 const EXPECTED = [
+  'applyInterviewBundle', 'applyInterviewBundleFile', 'extractBundleZip', 'readBundleManifest', 'rebaseBundlePhotoPaths',
   'assertBundleMatchesInterview', 'isSafeBundlePath', 'sha256OfFile', 'validateBundleManifest', 'verifyExtractedBundle',
   // 会議実行の状態機械
   'MEETING_RUN_ORDER', 'decideMeetingRunTransition', 'ensureMeetingRun', 'isMeetingRunState', 'transitionMeetingRun',
@@ -27,7 +28,7 @@ const EXPECTED = [
   // inputs
   'resolveSelectionId', 'upsertPerson', 'transaction',
   // 書き込み層
-  'applyDiff', 'MAX_APPLY_CHANGES', 'applyCalendar', 'applyInterview', 'savePersonPhoto', 'applyCareerCalendar',
+  'applyDiff', 'MAX_APPLY_CHANGES', 'applyCalendar', 'applyInterview', 'savePersonPhoto', 'validateInterviewInput', 'applyCareerCalendar',
   // 応募企業と分離した支援組織・支援面談
   'ensureCareerSupportSchema', 'normalizeOrganizationAlias', 'upsertCareerOrganization',
   'resolveCareerOrganization', 'upsertCareerMeeting', 'listCareerMeetings',

@@ -11,6 +11,7 @@ import type { DatabaseSync } from 'node:sqlite'
 import { addEvent, openDb, sameCompany } from './db.js'
 import { resolveSelectionId, transaction, upsertPerson } from './inputs.js'
 import { ensureCareerSupportSchema, upsertCareerOrganization } from './career-support.js'
+import { repositoryRoot, resolveDatabasePath } from './database-path.js'
 
 export interface InterviewPerson {
   name: string
@@ -47,10 +48,13 @@ export interface InterviewInput {
   followUps?: string[]
 }
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
+// src/ と dist/ のどちらから読まれてもリポジトリ(パッケージ)直下を指す。
+// 以前は '..' を2回たどっており、リポジトリの1つ上へ data/ を作っていた。
+const ROOT = repositoryRoot()
 const dbArgIndex = process.argv.indexOf('--db')
-const DB_PATH = dbArgIndex >= 0 ? resolve(process.argv[dbArgIndex + 1]) : ((process.env.KATAZUKU_DB || process.env.KATAZUKU_DB_PATH) || join(ROOT, 'data', 'katazuku.db'))
-const PHOTO_ROOT = join(ROOT, 'data', 'private', 'photos')
+const DB_PATH = resolveDatabasePath(dbArgIndex >= 0 ? process.argv[dbArgIndex + 1] : undefined)
+/** 顔写真の既定の置き場所。<リポジトリ>/data/private/photos */
+export const PHOTO_ROOT = join(ROOT, 'data', 'private', 'photos')
 
 /**
  * 顔写真を data/private/photos へ複製し、DBには person_photo.storage_key と sha256 だけを記録する
@@ -74,7 +78,8 @@ export function savePersonPhoto(db: DatabaseSync, personId: number, imagePath: s
   return storageKey
 }
 
-function validate(input: unknown): asserts input is InterviewInput {
+/** 議事録JSONの必須項目を検査する。CLIとバンドル反映の両方が同じ規則を通す。 */
+export function validateInterviewInput(input: unknown): asserts input is InterviewInput {
   if (!input || typeof input !== 'object') throw new Error('入力はオブジェクトです')
   const value = input as InterviewInput
   for (const field of ['runId', 'occurredAt', 'title', 'summary'] as const) {
@@ -228,6 +233,6 @@ if (process.argv[1] && currentFile === resolve(process.argv[1])) {
   const file = process.argv[2]
   if (!file) throw new Error('使い方: npx tsx scripts/db-apply-interview.ts <interview.json>')
   const input: unknown = JSON.parse(readFileSync(resolve(file), 'utf8'))
-  validate(input)
+  validateInterviewInput(input)
   console.log(JSON.stringify(applyInterview(input), null, 2))
 }
