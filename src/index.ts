@@ -206,3 +206,17 @@ export type { MeetingRunKind, MeetingRunRow, MeetingRunState } from './meeting-r
 // ---- 面談バンドルの正本側反映 ----
 export { applyInterviewBundle, applyInterviewBundleFile, extractBundleZip, readBundleManifest, rebaseBundlePhotoPaths } from './interview-bundle-apply.js'
 export type { InterviewBundleApplyOptions, InterviewBundleApplyOutcome } from './interview-bundle-apply.js'
+
+// ---- 録音の文字起こし(voicebox / faster-whisper)と議事録化 ----
+export {
+  CHUNK_SECONDS, VOICEBOX_STARTUP_WAIT_MS, VoiceboxMcpClient, mergeSpeakerSegments, renderChunkTranscript,
+  renderSegmentTranscript, selectTranscriptionBackend,
+} from './transcription.js'
+export type {
+  BackendAvailability, BackendChoice, SpeakerTrack, TranscriptSegment, TranscriptionBackend, TranscriptionBackendRequest,
+  VoiceboxClientOptions,
+} from './transcription.js'
+export { transcribeAudio } from './transcribe-audio.js'
+export type { TranscribeAudioOptions, TranscribeAudioResult } from './transcribe-audio.js'
+export { INTERVIEW_MINUTES_SCHEMA_PATH, buildMinutesPrompt, minutesRunId, parseMinutesOutput, toInterviewInput } from './interview-minutes.js'
+export type { MinutesContext, MinutesInterview, MinutesOutput } from './interview-minutes.js'

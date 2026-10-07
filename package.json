@@ -110,8 +110,9 @@
     "test:meeting-run": "tsx tests/check-meeting-run.ts",
     "meeting-run": "tsx scripts/db-meeting-run.ts",
     "interview:apply": "tsx scripts/interview-bundle-apply.ts",
-    "test:transcription": "tsx tests/check-transcription.ts",
-    "transcribe": "tsx scripts/transcribe.ts"
+    "test:transcription": "tsx tests/check-transcription.ts && tsx tests/check-interview-minutes.ts",
+    "transcribe": "tsx scripts/transcribe.ts",
+    "interview:digest": "tsx scripts/interview-digest.ts"
   },
   "devDependencies": {
     "@types/node": "^26.3.0",
