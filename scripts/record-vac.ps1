@@ -11,6 +11,10 @@
 # ループバックを使うので、出力先がヘッドセットでもBluetoothでも相手の声が録れる。
 # 実測の目安: 無音 -91dB / 相手が話している間 -25〜-30dB、16kHz mono で 1分あたり約1.9MB。
 #
+# -Stereo を付けると、混ぜずに L=相手 / R=自分 の2chで残す(1分あたり約3.8MB)。
+# 混ぜた録音では「誰が話したか」を後から内容で推測するしかないが、分けて録れば
+# 文字起こし(npm run transcribe -- <録音> --speakers)で話者が物理的に確定する。
+#
 # 前提:
 #   - ffmpeg が PATH にあること(winget の Gyan.FFmpeg なら自動で拾う)
 #   - virtual-audio-capturer が入っていること(screen-capture-recorder 同梱の dshow フィルタ)
@@ -36,7 +40,9 @@ param(
   # dshow のデバイス名にかける正規表現。日本語版Windowsの内蔵マイクは「マイク配列」、
   # 英語版は "Microphone Array" なので既定で両方を見る。別のマイクを使うなら上書きする。
   [string]$MicPattern = 'マイク配列|Microphone Array',
-  [string]$LoopbackPattern = 'virtual-audio-capturer'
+  [string]$LoopbackPattern = 'virtual-audio-capturer',
+  # 相手と自分を混ぜず、L=相手 / R=自分 のステレオで録る(話者分離つきの文字起こし用)
+  [switch]$Stereo
 )
 $ErrorActionPreference = 'Stop'
 # ffmpeg の -list_devices はデバイス名をUTF-8で出す。PowerShell 5.1 は既定で端末コードページ
@@ -176,13 +182,25 @@ if (-not $loopAlt) { Log ("!! ループバック({0})が無い。相手の声は
 if (-not $micAlt)  { Log ("!! マイク({0})が無い" -f $MicPattern) }
 
 $a = @('-hide_banner', '-loglevel', 'warning', '-y')
+$channels = 1
 if ($loopAlt -and $micAlt) {
-  $a += @('-f','dshow','-i',("audio=" + $loopAlt), '-f','dshow','-i',("audio=" + $micAlt),
-          '-filter_complex','amix=inputs=2:duration=longest:dropout_transition=0')
+  $a += @('-f','dshow','-i',("audio=" + $loopAlt), '-f','dshow','-i',("audio=" + $micAlt))
+  if ($Stereo) {
+    # 両入力ともステレオで来るので、先に1chへ落としてから L/R に並べる。
+    # amerge は入力のチャンネル配置を見て並べ直すため、1ch同士を渡しても期待どおり L/R に
+    # 割り当たらないことがある(無音のはずの L に相手側の音が乗った)。join は配置を明示して固定できる。
+    $a += @('-filter_complex','[0:a]pan=mono|c0=c0[l];[1:a]pan=mono|c0=c0[r];[l][r]join=inputs=2:channel_layout=stereo[out]',
+            '-map','[out]')
+    $channels = 2
+  } else {
+    $a += @('-filter_complex','amix=inputs=2:duration=longest:dropout_transition=0')
+  }
 } elseif ($micAlt) {
+  # ループバックが取れないときは自分の声だけでも残す。片側しか無いのでステレオにする意味は無い
+  if ($Stereo) { Log '!! ループバックが無いため -Stereo を使わずモノラルで録る' }
   $a += @('-f','dshow','-i',("audio=" + $micAlt))
 } else { Log '録れるデバイスが無い'; exit 1 }
-$a += @('-ac','1','-ar','16000','-t',"$durSec", $outWav)
+$a += @('-ac',"$channels",'-ar','16000','-t',"$durSec", $outWav)
 
 $p = Start-Process -FilePath $ffmpeg -ArgumentList $a -WindowStyle Hidden -PassThru
 # ロックの持ち主を ffmpeg 本体に移す(この待機用スクリプトはすぐ終了するため)

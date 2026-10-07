@@ -135,4 +135,4 @@ npm run meeting-run -- career transition 7 digesting
 ## 含まれないもの
 
 - 録音機から正本DBの機械への自動転送(SSHの経路づくり・常駐の受け口)。環境ごとに違うので各自に委ねる
-- 文字起こし・議事録化そのもの([WORKFLOWS.md](./WORKFLOWS.md) の「未移植のもの」)
+- 文字起こし・議事録化そのもの。議事録JSON(`<名前>-db.json`)は [TRANSCRIPTION.md](./TRANSCRIPTION.md) の `npm run interview:digest` で作れる

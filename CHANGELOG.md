@@ -7,6 +7,8 @@
 
 ### Added
 
+- 面談の録音を文字起こしする `npm run transcribe` と、文字起こしから議事録を作る `npm run interview:digest`。文字起こしはスクリプトが決定的に行い、ローカルの voicebox(MCP。30秒ごとに分割、止まっていれば起動して最大240秒待つ)か、任意導入の faster-whisper を使う。faster-whisper ではステレオ録音を左右別に文字起こしして `[相手]` / `[本人]` を付けられる。議事録化はツールなしの読み取り専用エージェントが厳格JSONを返し、Schema で検査してから議事録Markdownと DB反映用JSONを書き出す。`--apply` で同じ機械の正本DBへ冪等に反映する。[docs/TRANSCRIPTION.md](docs/TRANSCRIPTION.md)
+- `scripts/record-vac.ps1 -Stereo`: 相手と自分を混ぜずに L=相手 / R=自分 の2chで録る。
 - 録音機と正本DBの機械が別のときの面談バンドル。録音機で議事録JSON・文字起こし・スクショ・音声を sha256 付き manifest と一緒に zip にまとめ(`scripts/new-interview-bundle.ps1`)、正本DBの機械で検査してから1トランザクションで反映する(`npm run interview:apply`)。文字起こしと顔写真のパスは正本側へ付け替える。[docs/INTERVIEW-BUNDLE.md](docs/INTERVIEW-BUNDLE.md)
 - 会議実行(`meeting_run` / `career_meeting_run`)の状態機械と `npm run meeting-run`。既に先の段にいるときの手前の段の指定は何もせず、2段以上の飛び越しだけを拒否する。
 - Windows x64のポータブル試用版ビルダー。Electron・専用tsx・8画面・合成データを同梱し、Node/npmなしで初回設定と架空データ閲覧を起動する。個人設定・資格情報はアプリ保存領域へ分離し、配布物は公開ファイル許可リストから組み立てる。
