@@ -99,7 +99,8 @@ export function describeMinutesContext(context: MinutesContext): string {
 
 /** 議事録化のプロンプトを組み立てる。文字起こしは指示ではなくデータとして区切って渡す。 */
 export function buildMinutesPrompt(template: string, transcript: string, context: MinutesContext, vars: { USER_NAME?: string; TIMEZONE?: string } = {}): string {
-  return renderTemplate(template, {
+  // Windows の checkout では改行が CRLF になる。文字起こしと揃えて LF にする
+  return renderTemplate(template.replace(/\r\n/g, '\n'), {
     USER_NAME: vars.USER_NAME || '本人',
     TIMEZONE: vars.TIMEZONE || 'Asia/Tokyo',
     CONTEXT: describeMinutesContext(context),

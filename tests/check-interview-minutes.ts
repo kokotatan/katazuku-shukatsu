@@ -60,6 +60,9 @@ const context: MinutesContext = {
   check('個人のパスを含まない', !/C:\\Users\\/.test(template))
 }
 
+check('CRLF のテンプレートでも区切りは LF にそろう',
+  buildMinutesPrompt(template.replace(/\r?\n/g, '\r\n'), transcript, context).includes('<<<TRANSCRIPT\n' + transcript + '\nTRANSCRIPT>>>'))
+
 // --- モデル出力の検査 ----------------------------------------------------------------
 const valid: MinutesOutput = {
   schemaVersion: 1,
