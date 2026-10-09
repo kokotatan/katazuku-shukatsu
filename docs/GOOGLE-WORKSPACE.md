@@ -40,9 +40,13 @@ npm run google:workspace:connect -- --account person@example.com
 AIサービスへ処理を依頼する場合のデータ送信は別に発生します。
 [Googleデータの取扱方針](https://katazuku-shukatsu.kotalabo.com/google/privacy/)を確認してください。
 
-要求する権限は `tools/google-workspace/scopes.mjs` の9項目です。
-Gmailの整理、予定の読み取り・更新、既存Drive資料の検索・読み取り、アプリのファイル保存、既存シートの更新に使います。
+要求する権限は `tools/google-workspace/scopes.mjs` の7項目です。
+Gmailの整理、予定の読み取り・更新、katazukuが作成または利用者が開いたDriveファイルの検索・保存、シートの更新に使います。
 Googleの同意を途中で取り消した場合や、別のアカウントを選んだ場合は、保存済み接続を上書きしません。
+
+旧9権限の接続は、そのまま継続せず、本人が共通接続を再認証してください。
+
+Drive全体の検索・読み取りは行えません。カレンダーの一覧取得とfree/busy照会も公開せず、既知のカレンダーIDに対する予定APIを使います。Drive保存先の `root` はそのまま作成先として渡し、権限のないフォルダ情報取得を避けます。
 
 ## MCPとの接続
 
@@ -58,11 +62,11 @@ node tools/google-workspace/mcp.mjs --account person@example.com
 ```
 
 保存先を分けた場合は同じ `--credentials-dir <directory>` を指定します。
-専用入口はworkspace-mcp 1.23.0を隔離して起動し、9権限を使うGmail・Calendar・Drive・Sheetsのツールを公開します。
+専用入口はworkspace-mcp 1.23.0を隔離して起動し、7権限を使うGmail・Calendar・Drive・Sheetsのツールを公開します。
 古いOAuth設定や秘密鍵を引き継がず、別アカウントへのアクセス、Gmail設定変更、カレンダー自体の作成などは拒否します。
 接続の失効時は本ガイドの共通接続画面へ戻るよう案内し、MCP独自のOAuthフローは開始しません。
 この入口は読み取り専用ではありません。メール送信・予定変更等には、本人確認とExecutorによる確定処理を組み込んでください。
-架空資格情報で更新・失効・権限境界と実MCPプロセスの48ツールを検証済みです。
+架空資格情報で更新・失効・権限境界と実MCPプロセスのツール一覧を検証しています。
 2026-09-17に共通接続の実Google同意と、実MCP経由のGmail検索・Calendar一覧・Drive検索・Sheets読み取りを確認しました。
 全機能の実演とGoogle権限審査は未完了です。接続成功は審査完了を意味しません。
 MCP接続だけでは、定期同期やkatazukuのDBへの書き込みは始まりません。
@@ -145,3 +149,14 @@ Googleデータは必要な用途だけに使い、AIに読ませる場合は送
 - [制限付き権限の審査と実演動画](https://developers.google.com/identity/protocols/oauth2/production-readiness/restricted-scope-verification)
 - [デスクトップアプリのOAuth](https://developers.google.com/identity/protocols/oauth2/native-app)
 - [Google API Services User Data Policy](https://developers.google.com/terms/api-services-user-data-policy)
+
+### 接続完了をアプリへ反映する開発者向け API
+
+`startConnection({ account, onConnected: async () => { /* 利用アカウントを保存 */ } })` の
+`onConnected` は、Googleの本人照合と資格情報の保存が成功した後に一度だけ実行します。
+認証開始時点で利用アカウントを切り替えないでください。取消・別アカウント・期限切れ・
+不正なコールバックでは呼び出されず、既存の利用アカウントを保てます。
+
+コールバック内の保存が失敗した場合は、Google接続の保存とアプリ登録の失敗を分けて表示します。
+保存先を直して新しい接続セッションを開始してください。コールバックは自動再試行しません。
+この通知だけではメール送信・予定登録・定期同期は始まりません。

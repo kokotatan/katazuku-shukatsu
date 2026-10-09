@@ -20,7 +20,7 @@ export function commonMcpLaunch({ account, credentialsDirectory, environment = p
       || !Array.isArray(stored.scopes) || stored.scopes.length !== GOOGLE_SCOPES.length
       || new Set(stored.scopes).size !== GOOGLE_SCOPES.length
       || GOOGLE_SCOPES.some(scope => !stored.scopes.includes(scope))) {
-    throw new Error('9権限の共通Google接続が必要です。既存の接続は変更していません。');
+    throw new Error('7権限の共通Google接続が必要です。既存の接続は変更していません。');
   }
   const env = Object.fromEntries(Object.entries(environment)
     .filter(([key]) => !/^(GOOGLE_|WORKSPACE_|MCP_|FASTMCP_|USER_GOOGLE_EMAIL$)/i.test(key)));

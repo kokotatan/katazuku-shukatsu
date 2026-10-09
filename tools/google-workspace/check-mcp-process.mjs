@@ -49,8 +49,10 @@ try {
   child.stdin.write(JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }) + '\n');
   const { tools } = await request('tools/list', {});
   const names = tools.map(tool => tool.name);
-  for (const name of ['search_gmail_messages', 'list_calendars', 'search_drive_files', 'read_sheet_values']) assert.ok(names.includes(name), name);
-  for (const name of ['create_calendar', 'get_gmail_filters', 'create_gmail_filter']) assert.ok(!names.includes(name), name);
+  for (const name of ['search_gmail_messages', 'draft_gmail_message', 'modify_gmail_message_labels', 'get_events', 'manage_event',
+    'search_drive_files', 'read_sheet_values', 'modify_sheet_values']) assert.ok(names.includes(name), name);
+  // calendar.readonly・Drive全体読取・Gmail設定を要求しないため、それらが必要なツールは出さない。
+  for (const name of ['create_calendar', 'list_calendars', 'query_freebusy', 'list_gmail_filters', 'manage_gmail_filter']) assert.ok(!names.includes(name), name);
   const denied = await request('tools/call', { name: 'search_gmail_messages', arguments: {
     user_google_email: 'someone@example.com', query: 'test', page_size: 1,
   } });

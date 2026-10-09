@@ -17,6 +17,7 @@ let instant = Date.now();
 let identity = account;
 let expectedChallenge = '';
 let exchanges = 0;
+let connected = 0;
 const googleFetch: typeof fetch = async (request, init) => {
   const url = String(request);
   assert.equal(init?.redirect, url === GOOGLE_TOKEN_URL ? 'manual' : 'error');
@@ -39,9 +40,9 @@ const fetcher: typeof fetch = async (request, init) => {
   return googleFetch(request, init);
 };
 const sessions: Awaited<ReturnType<typeof startConnection>>[] = [];
-async function open(directory: string, replace = false) {
+async function open(directory: string, replace = false, onConnected = async () => { connected++; }) {
   const session = await startConnection({ account, broker: env.PUBLIC_ORIGIN, credentialsDirectory: directory, replace,
-    fetcher, now: () => instant, spreadsheetId: 'example-spreadsheet' });
+    fetcher, now: () => instant, spreadsheetId: 'example-spreadsheet', onConnected });
   sessions.push(session);
   return session;
 }
@@ -84,11 +85,13 @@ try {
   identity = 'someone@example.com';
   await fetch(callback);
   assert.equal(session.getState().status, 'failed');
+  assert.equal(connected, 0);
   await assert.rejects(() => readFile(join(directory, account + '.json')));
   identity = account;
   callback = await authorize(session);
   await fetch(callback);
   assert.equal(session.getState().status, 'connected');
+  assert.equal(connected, 1);
   const savedText = await readFile(join(directory, account + '.json'), 'utf8');
   const saved = JSON.parse(savedText);
   assert.equal(saved.token_uri, env.PUBLIC_ORIGIN + '/token');
@@ -98,10 +101,26 @@ try {
   const countBeforeReplay = exchanges;
   assert.equal((await fetch(callback)).status, 400);
   assert.equal(exchanges, countBeforeReplay);
+  assert.equal(connected, 1);
   assert.equal((await post(session, 'check')).status, 200);
   const status = await (await fetch(session.url + '/api/status')).text();
   assert.doesNotMatch(status, /example-(access|refresh|client-secret)/);
   assert.equal(JSON.parse(status).diagnostic.services.filter((service: { state: string }) => service.state === 'connected').length, 4);
+
+  const cancelled = await open(join(root, 'cancelled'));
+  const cancellation = new URL(await authorize(cancelled));
+  cancellation.searchParams.set('error', 'access_denied');
+  await fetch(cancellation);
+  assert.equal(cancelled.getState().status, 'cancelled');
+  assert.equal(connected, 1);
+  await assert.rejects(() => readFile(join(root, 'cancelled', account + '.json')));
+
+  const failedRegistration = await open(join(root, 'registration-failure'), false, async () => { throw new Error('example-private-path'); });
+  await fetch(await authorize(failedRegistration));
+  assert.equal(failedRegistration.getState().status, 'failed');
+  assert.match(failedRegistration.getState().message, /接続はこのPCに保存しましたが/);
+  assert.doesNotMatch(failedRegistration.getState().message, /example-private-path/);
+  assert.equal(JSON.parse(await readFile(join(root, 'registration-failure', account + '.json'), 'utf8')).refresh_token, 'example-refresh');
 
   const existingDir = join(root, 'existing');
   await mkdir(existingDir);
