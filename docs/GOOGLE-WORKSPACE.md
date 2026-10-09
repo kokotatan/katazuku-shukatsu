@@ -145,3 +145,14 @@ Googleデータは必要な用途だけに使い、AIに読ませる場合は送
 - [制限付き権限の審査と実演動画](https://developers.google.com/identity/protocols/oauth2/production-readiness/restricted-scope-verification)
 - [デスクトップアプリのOAuth](https://developers.google.com/identity/protocols/oauth2/native-app)
 - [Google API Services User Data Policy](https://developers.google.com/terms/api-services-user-data-policy)
+
+### 接続完了をアプリへ反映する開発者向け API
+
+`startConnection({ account, onConnected: async () => { /* 利用アカウントを保存 */ } })` の
+`onConnected` は、Googleの本人照合と資格情報の保存が成功した後に一度だけ実行します。
+認証開始時点で利用アカウントを切り替えないでください。取消・別アカウント・期限切れ・
+不正なコールバックでは呼び出されず、既存の利用アカウントを保てます。
+
+コールバック内の保存が失敗した場合は、Google接続の保存とアプリ登録の失敗を分けて表示します。
+保存先を直して新しい接続セッションを開始してください。コールバックは自動再試行しません。
+この通知だけではメール送信・予定登録・定期同期は始まりません。

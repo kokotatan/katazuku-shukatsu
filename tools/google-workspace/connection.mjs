@@ -61,7 +61,7 @@ async function readExisting(path) {
 }
 
 export async function startConnection({ account, broker = DEFAULT_BROKER_ORIGIN, credentialsDirectory,
-  replace = false, port = 0, fetcher = fetch, now = Date.now, spreadsheetId, recordDemo = false } = {}) {
+  replace = false, port = 0, fetcher = fetch, now = Date.now, spreadsheetId, recordDemo = false, onConnected } = {}) {
   const destination = credentialPath(account, credentialsDirectory);
   const origin = brokerOrigin(broker);
   const csrf = token();
@@ -138,6 +138,8 @@ export async function startConnection({ account, broker = DEFAULT_BROKER_ORIGIN,
             const temporary = destination + '.' + token() + '.tmp';
             try { await writeFile(temporary, JSON.stringify(stored, null, 2) + '\n', { flag: 'wx', mode: 0o600 }); await rename(temporary, destination); }
             finally { await unlink(temporary).catch(() => {}); }
+            try { await onConnected?.(); }
+            catch { throw new ConnectionError('Google接続はこのPCに保存しましたが、アプリの利用アカウントを更新できませんでした。保存フォルダを確認し、設定画面からもう一度接続してください。'); }
             state = { status: 'connected', message: 'Google接続をこのPCに保存しました。続けて接続を確認できます。',
               account, capabilities: inspectCredential(stored).capabilities, missingScopes: GOOGLE_SCOPES.filter(scope => !scopes.includes(scope)) };
           } catch (error) { state = { status: 'failed', message: safeMessage(error) }; }
