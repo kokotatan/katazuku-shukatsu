@@ -80,8 +80,9 @@ export async function checkOnline(stored, account, { fetcher = fetch, spreadshee
     }
     const checks = [
       ['gmail', 'gmail.readonly', 'https://gmail.googleapis.com/gmail/v1/users/me/profile'],
-      ['calendar', 'calendar.readonly', 'https://www.googleapis.com/calendar/v3/users/me/calendarList?maxResults=1&fields=items(id)'],
-      ['drive', 'drive.readonly', 'https://www.googleapis.com/drive/v3/files?pageSize=1&fields=files(id)'],
+      // 共通接続はcalendar.events・drive.fileだけを持つ。それぞれで許される読み取りで確かめる。
+      ['calendar', 'calendar.events', 'https://www.googleapis.com/calendar/v3/calendars/primary/events?maxResults=1&fields=items(id)'],
+      ['drive', 'drive.file', 'https://www.googleapis.com/drive/v3/files?pageSize=1&fields=files(id)'],
       ['sheets', 'spreadsheets.readonly', spreadsheetId ? `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}?fields=spreadsheetId` : null],
     ];
     const services = await Promise.all(checks.map(async ([service, capability, url]) => {

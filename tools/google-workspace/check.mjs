@@ -74,10 +74,12 @@ try {
   assert.ok(launch.args.includes(`workspace-mcp==${WORKSPACE_MCP_VERSION}`));
   for (const invalid of [stored, { ...common, scopes: [...common.scopes, 'https://www.googleapis.com/auth/drive'] },
     { ...common, scopes: common.scopes.slice(1) }, { ...common, scopes: [...common.scopes.slice(1), common.scopes[1]] },
-    { ...common, token_uri: 'https://outside.example.test/token' }, { ...common, refresh_token: '' }]) {
+    { ...common, token_uri: 'https://outside.example.test/token' }, { ...common, refresh_token: '' },
+    // 2026-10-07以前の9権限接続(drive.readonly・calendar.readonly付き)は再接続を求める。
+    { ...common, scopes: [...common.scopes, ...['drive.readonly', 'calendar.readonly'].map(s => `https://www.googleapis.com/auth/${s}`)] }]) {
     write(invalid);
     assert.throws(() => commonMcpLaunch({ account, credentialsDirectory: mcpFixture }));
   }
   assert.throws(() => commonMcpLaunch({ account: 'someone@example.com', credentialsDirectory: mcpFixture }));
 } finally { rmSync(mcpFixture, { recursive: true }); }
-console.log('共通MCP起動: 旧秘密の除外・9権限・保存先・旧接続の拒否を検証しました。');
+console.log('共通MCP起動: 旧秘密の除外・7権限・保存先・旧接続(9権限を含む)の拒否を検証しました。');

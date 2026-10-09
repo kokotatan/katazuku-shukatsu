@@ -10,7 +10,7 @@ with tempfile.TemporaryDirectory(prefix='katazuku-mcp-test-') as temporary:
     account = 'person@example.com'
     prefix = 'https://www.googleapis.com/auth/'
     scopes = ['openid'] + [prefix + name for name in ['userinfo.email', 'userinfo.profile', 'gmail.modify',
-              'calendar.readonly', 'calendar.events', 'drive.readonly', 'drive.file', 'spreadsheets']]
+              'calendar.events', 'drive.file', 'spreadsheets']]
     endpoint = 'https://katazuku-google.kotalabo.com/token'
     os.environ.update(USER_GOOGLE_EMAIL=account, GOOGLE_OAUTH_CLIENT_ID='123-example.apps.googleusercontent.com',
                       GOOGLE_OAUTH_CLIENT_SECRET='', WORKSPACE_MCP_CREDENTIALS_DIR=temporary,
@@ -45,6 +45,15 @@ with tempfile.TemporaryDirectory(prefix='katazuku-mcp-test-') as temporary:
     assert set(calls[0][2]['scope'][0].split()) == set(scopes)
     assert set(scope_module.get_current_scopes()) == set(scopes)
     assert permissions.get_scopes_for_permission('gmail', 'katazuku')
+    from gdrive import drive_helpers
+
+    class NoDriveLookup:
+        def files(self):
+            raise AssertionError('rootの解決でfiles.getを呼びました')
+
+    assert asyncio.run(drive_helpers.resolve_folder_id(NoDriveLookup(), 'root')) == 'root'
+    from gdrive import drive_tools
+    assert drive_tools.resolve_folder_id is drive_helpers.resolve_folder_id
 
     def rejected(callback):
         try:
@@ -64,4 +73,4 @@ with tempfile.TemporaryDirectory(prefix='katazuku-mcp-test-') as temporary:
     Response.data = b'{"error":"invalid_grant"}'
     rejected(lambda: get(account, []))
     assert len(calls) == 2
-    print('共通MCP実行: 更新トークン・9権限・別アカウント拒否・再認証の固定を検証しました。')
+    print('共通MCP実行: 更新トークン・7権限・別アカウント拒否・再認証の固定を検証しました。')
