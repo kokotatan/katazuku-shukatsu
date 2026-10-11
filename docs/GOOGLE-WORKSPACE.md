@@ -21,17 +21,23 @@ npm run google:workspace:connect -- --account person@example.com
 `.katazuku-backups/` へ退避します。保存先を分けて試す場合は `--credentials-dir <directory>` を指定します。
 日次取得で使う `google.credentialsDir` にも同じ保存先を指定してください。
 
-### 認証が終わったら初回同期を始める
+### 認証後の初回同期
 
 `katazuku.config.json` の `google.accounts` に対象アカウントを登録し、`google.credentialsDir` を接続先と一致させ、
-使用するAIを自分のPCで準備した場合は、次のように `--sync` を付けられます。
+使用するAIを自分のPCで事前に準備してください。設定済みの標準接続では、認証成功後に予定・メールの初回同期を自動で始めます。
+設定ファイルが無いときは接続だけを保存し、同期を始めないことを画面で示します。設定があるのに
+アカウントや資格情報保存先が違う場合は、Googleの認証画面を開く前に停止します。
+
+接続だけを試す場合は `--no-sync`、設定不足を認証前にエラーとして確かめたい場合は `--sync` を付けます。
 
 ```sh
-npm run google:workspace:connect -- --account person@example.com --sync
+npm run google:workspace:connect -- --account person@example.com
+# 初回同期を始めずに接続だけ試す
+npm run google:workspace:connect -- --account person@example.com --no-sync
 ```
 
-認証前にアカウントと資格情報保存先を照合し、一致しなければGoogle画面を開かず停止します。
 認証が成功して資格情報を保存した後、別のローカルプロセスでカレンダー同期、続いてメールの日次同期を一度だけ開始します。
+共通接続で必要な7権限の一部を許可しなかった場合も同期を始めません。審査用録画と独自の認証中継では自動開始しません。
 メールの抽出には設定済みのAIを使います。外部へのメール送信、応募、予約確定はしません。
 進捗は `logs/google-first-sync.local.json`、詳細は `logs/google-first-sync.local.log` で確認できます。
 失敗した場合は後続の同期を始めず、接続資格情報を消しません。通常の定期実行は

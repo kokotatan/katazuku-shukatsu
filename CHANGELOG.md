@@ -7,7 +7,7 @@
 
 ### Added
 
-- 共通Google接続の `--sync`。設定済みアカウントと資格情報保存先を照合し、認証成功後に予定・メールの初回同期をローカルで開始する。進捗と失敗は `logs/google-first-sync.local.json` に残す。
+- 共通Google接続の初回同期。設定済みの標準接続では認証成功後に予定・メールの初回同期をローカルで開始する。`--no-sync` で接続だけ試せる。進捗と失敗は `logs/google-first-sync.local.json` に残す。
 - 正本DBから企業名や自由記述を含まない選考集計CSVをローカル出力できるようにした。架空データとDatabricksで試す手順を追加した。
 - 面談の録音を文字起こしする `npm run transcribe` と、文字起こしから議事録を作る `npm run interview:digest`。文字起こしはスクリプトが決定的に行い、ローカルの voicebox(MCP。30秒ごとに分割、止まっていれば起動して最大240秒待つ)か、任意導入の faster-whisper を使う。faster-whisper ではステレオ録音を左右別に文字起こしして `[相手]` / `[本人]` を付けられる。議事録化はツールなしの読み取り専用エージェントが厳格JSONを返し、Schema で検査してから議事録Markdownと DB反映用JSONを書き出す。`--apply` で同じ機械の正本DBへ冪等に反映する。[docs/TRANSCRIPTION.md](docs/TRANSCRIPTION.md)
 - 面談スクショから相手の顔写真を切り出す `npm run interview:faces`。顔の矩形は任意導入の OpenCV 検出器か本人の指定から得て、本人の表示名のタイル・小さすぎる顔を外し、同じ位置の顔を1枚にまとめて切り出す(依存ゼロの PNG 読み書き)。どの顔が誰かは本人が `faces.json` か `--map` で書き、曖昧な対応は付けずに要確認として表示する。反映済みの議事録にも、後から付けた顔写真だけを登録できる。[docs/TRANSCRIPTION.md](docs/TRANSCRIPTION.md)

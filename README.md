@@ -131,7 +131,7 @@ npm run workflow -- asa --dry-run        # 朝のまとめのプロンプトと�
 
 開発者向けの[共通Google接続](docs/GOOGLE-WORKSPACE.md)も用意しています。
 `npm run google:workspace:connect -- --account 自分のメールアドレス` で起動します。
-設定済みのアカウントで認証成功後に予定・メールの初回同期を始める場合は `--sync` を付けます（進捗はローカルの `logs/google-first-sync.local.json`）。
+設定済みの標準接続では、認証成功後に予定・メールの初回同期が始まります（進捗はローカルの `logs/google-first-sync.local.json`）。接続だけ試す場合は `--no-sync` を付けます。
 権限審査は未完了で、一般利用向けの完成版ではありません。個別OAuthの `google:connect` と分けて試せます。
 
 ## AIプロバイダ

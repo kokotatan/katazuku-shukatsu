@@ -107,6 +107,22 @@ try {
   assert.doesNotMatch(status, /example-(access|refresh|client-secret)/);
   assert.equal(JSON.parse(status).diagnostic.services.filter((service: { state: string }) => service.state === 'connected').length, 4);
 
+  let syncCallbacks = 0;
+  const syncSession = await startConnection({ account, broker: env.PUBLIC_ORIGIN, credentialsDirectory: join(root, 'sync'),
+    fetcher, now: () => instant, initialSync: true, onConnected: async ({ scopes }: { scopes: string[] }) => {
+      syncCallbacks++;
+      assert.deepEqual(scopes, [...GOOGLE_SCOPES].sort());
+      return '初回同期を開始しました。';
+    } });
+  sessions.push(syncSession);
+  const syncPage = await (await fetch(syncSession.url + '/')).text();
+  assert.match(syncPage, /"initialSync":true/);
+  const syncCallback = await authorize(syncSession);
+  await fetch(syncCallback);
+  assert.equal(syncSession.getState().message, '初回同期を開始しました。');
+  assert.equal((await fetch(syncCallback)).status, 400);
+  assert.equal(syncCallbacks, 1);
+
   const cancelled = await open(join(root, 'cancelled'));
   const cancellation = new URL(await authorize(cancelled));
   cancellation.searchParams.set('error', 'access_denied');

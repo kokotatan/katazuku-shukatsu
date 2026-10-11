@@ -40,6 +40,8 @@ cp katazuku.config.example.json katazuku.config.json      # Windows(PowerShell)�
 共通接続を試す開発者向けに、Google Cloudプロジェクトを自分で作らない経路もあります。
 `npm run google:workspace:connect -- --account 自分のメールアドレス` を使い、
 [共通Google接続ガイド](GOOGLE-WORKSPACE.md)に従って本人が許可してください。
+設定済みの標準接続では認証後に初回同期を始めるため、先に手順4のAI接続を済ませてください。
+接続だけ先に済ませる場合は `--no-sync` を付けます。
 共通接続はGoogleの権限審査が未完了で、一般利用向けの完成版ではありません。
 既存接続を自動で置き換えません。個別OAuthを使う場合は以下の手順を続けてください。
 
