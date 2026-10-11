@@ -61,7 +61,7 @@ async function readExisting(path) {
 }
 
 export async function startConnection({ account, broker = DEFAULT_BROKER_ORIGIN, credentialsDirectory,
-  replace = false, port = 0, fetcher = fetch, now = Date.now, spreadsheetId, recordDemo = false, initialSync = false, onConnected } = {}) {
+  replace = false, port = 0, fetcher = fetch, now = Date.now, spreadsheetId, recordDemo = false, initialSync = false, onConnected, readInitialSyncStatus } = {}) {
   const destination = credentialPath(account, credentialsDirectory);
   const origin = brokerOrigin(broker);
   const csrf = token();
@@ -99,7 +99,12 @@ export async function startConnection({ account, broker = DEFAULT_BROKER_ORIGIN,
             pending = undefined;
             state = { status: 'expired', message: 'Google認証の有効期限が切れました。接続をやり直してください。' };
           }
-          return send(response, 200, state);
+          let sync;
+          if (state.status === 'connected' && readInitialSyncStatus) {
+            try { sync = readInitialSyncStatus(); }
+            catch { sync = { status: 'unknown' }; }
+          }
+          return send(response, 200, sync ? { ...state, initialSyncStatus: sync } : state);
         }
         if (url.pathname !== '/google/callback') return send(response, 404, { error: 'ページがありません。' });
         if (!pending || !equal(url.searchParams.get('state'), pending.state) || pending.expires < now() || busy) {

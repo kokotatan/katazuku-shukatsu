@@ -80,34 +80,55 @@ function workflow(name, workspace, logPath) {
 }
 
 /** 自分のPCで順に実行。失敗時は後続を始めず、状態と詳細ログをローカルへ残す。 */
-export async function runFirstSync({ workspace = root, runWorkflow = workflow, now = () => new Date() } = {}) {
+export async function runFirstSync({ workspace = root, runWorkflow = workflow, now = () => new Date(), runId = process.env.KATAZUKU_FIRST_SYNC_RUN_ID || randomUUID() } = {}) {
   const logs = join(workspace, 'logs');
   mkdirSync(logs, { recursive: true, mode: 0o700 });
   const statusPath = join(logs, 'google-first-sync.local.json');
   const logPath = join(logs, 'google-first-sync.local.log');
   const startedAt = now().toISOString();
   for (const name of ['calendar-sync', 'daily-sync']) {
-    updateStatus(statusPath, { status: 'running', phase: name, startedAt });
+    updateStatus(statusPath, { runId, status: 'running', phase: name, startedAt });
     try { await runWorkflow(name, workspace, logPath); }
     catch (error) {
-      updateStatus(statusPath, { status: 'failed', phase: name, startedAt, finishedAt: now().toISOString(),
+      updateStatus(statusPath, { runId, status: 'failed', phase: name, startedAt, finishedAt: now().toISOString(),
         message: `${name} を完了できませんでした。ローカルの詳細ログを確認してください。` });
       throw error;
     }
   }
-  updateStatus(statusPath, { status: 'complete', startedAt, finishedAt: now().toISOString(), message: '予定とメールの初回同期が完了しました。' });
+  updateStatus(statusPath, { runId, status: 'complete', startedAt, finishedAt: now().toISOString(), message: '予定とメールの初回同期が完了しました。' });
   return statusPath;
+}
+
+/** 画面には固定の状態と工程だけを返し、ログ・アカウント・例外文は渡さない。 */
+export function readFirstSyncStatus({ workspace = root, runId } = {}) {
+  if (!runId) return undefined;
+  try {
+    const value = JSON.parse(readFileSync(join(workspace, 'logs', 'google-first-sync.local.json'), 'utf8'));
+    if (value.runId !== runId) return { status: 'unknown' };
+    if (!['queued', 'running', 'complete', 'failed'].includes(value.status)) return { status: 'unknown' };
+    const phase = ['calendar-sync', 'daily-sync'].includes(value.phase) ? value.phase : undefined;
+    return { status: value.status, ...(phase ? { phase } : {}) };
+  } catch { return { status: 'unknown' }; }
 }
 
 /** OAuthコールバックを待たせずに、初回同期をローカルの別プロセスへ渡す。 */
 export function launchFirstSync({ workspace = root, configPath } = {}) {
   return new Promise((resolveLaunch, reject) => {
+    const logs = join(workspace, 'logs');
+    mkdirSync(logs, { recursive: true, mode: 0o700 });
+    const statusPath = join(logs, 'google-first-sync.local.json');
+    const runId = randomUUID();
+    updateStatus(statusPath, { runId, status: 'queued', startedAt: new Date().toISOString() });
     const child = spawn(process.execPath, [fileURLToPath(import.meta.url)], {
-      cwd: workspace, env: { ...process.env, ...(configPath ? { KATAZUKU_CONFIG: configPath } : {}) },
+      cwd: workspace, env: { ...process.env, ...(configPath ? { KATAZUKU_CONFIG: configPath } : {}), KATAZUKU_FIRST_SYNC_RUN_ID: runId },
       windowsHide: true, detached: true, stdio: 'ignore',
     });
-    child.once('error', reject);
-    child.once('spawn', () => { child.unref(); resolveLaunch(); });
+    child.once('error', error => {
+      try { updateStatus(statusPath, { runId, status: 'failed', startedAt: new Date().toISOString() }); }
+      catch { /* 起動エラーを優先して呼び出し元へ返す。 */ }
+      reject(error);
+    });
+    child.once('spawn', () => { child.unref(); resolveLaunch(runId); });
   });
 }
 
