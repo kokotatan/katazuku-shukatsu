@@ -108,8 +108,9 @@ try {
   assert.equal(JSON.parse(status).diagnostic.services.filter((service: { state: string }) => service.state === 'connected').length, 4);
 
   let syncCallbacks = 0;
+  let syncState: { status: string; phase?: string } = { status: 'queued' };
   const syncSession = await startConnection({ account, broker: env.PUBLIC_ORIGIN, credentialsDirectory: join(root, 'sync'),
-    fetcher, now: () => instant, initialSync: true, onConnected: async ({ scopes }: { scopes: string[] }) => {
+    fetcher, now: () => instant, initialSync: true, readInitialSyncStatus: () => syncState, onConnected: async ({ scopes }: { scopes: string[] }) => {
       syncCallbacks++;
       assert.deepEqual(scopes, [...GOOGLE_SCOPES].sort());
       return '初回同期を開始しました。';
@@ -120,6 +121,19 @@ try {
   const syncCallback = await authorize(syncSession);
   await fetch(syncCallback);
   assert.equal(syncSession.getState().message, '初回同期を開始しました。');
+  assert.deepEqual((await (await fetch(syncSession.url + '/api/status')).json()).initialSyncStatus, { status: 'queued' });
+  syncState = { status: 'running', phase: 'calendar-sync' };
+  assert.deepEqual((await (await fetch(syncSession.url + '/api/status')).json()).initialSyncStatus, syncState);
+  syncState = { status: 'complete' };
+  assert.deepEqual((await (await fetch(syncSession.url + '/api/status')).json()).initialSyncStatus, syncState);
+  const readerFailure = await startConnection({ account, broker: env.PUBLIC_ORIGIN, credentialsDirectory: join(root, 'reader-failure'),
+    fetcher, now: () => instant, readInitialSyncStatus: () => { throw new Error('private sync detail'); } });
+  sessions.push(readerFailure);
+  await fetch(await authorize(readerFailure));
+  const readerStatus = await (await fetch(readerFailure.url + '/api/status')).text();
+  assert.equal(JSON.parse(readerStatus).status, 'connected');
+  assert.deepEqual(JSON.parse(readerStatus).initialSyncStatus, { status: 'unknown' });
+  assert.doesNotMatch(readerStatus, /private sync detail/);
   assert.equal((await fetch(syncCallback)).status, 400);
   assert.equal(syncCallbacks, 1);
 

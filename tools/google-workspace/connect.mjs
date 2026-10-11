@@ -1,5 +1,5 @@
 import { startConnection } from './connection.mjs';
-import { checkFirstSyncConfig, hasFirstSyncScopes, launchFirstSync, prepareFirstSync } from './first-sync.mjs';
+import { checkFirstSyncConfig, hasFirstSyncScopes, launchFirstSync, prepareFirstSync, readFirstSyncStatus } from './first-sync.mjs';
 import { DEFAULT_BROKER_ORIGIN } from './scopes.mjs';
 
 const args = process.argv.slice(2);
@@ -28,15 +28,17 @@ try {
   const syncPlan = prepareFirstSync(options.account, options.credentialsDirectory, { mode: syncMode, standardConnection });
   if (syncPlan.enabled) {
     const { configPath } = syncPlan;
+    let activeSyncRunId;
     options.initialSync = true;
+    options.readInitialSyncStatus = () => readFirstSyncStatus({ runId: activeSyncRunId });
     options.onConnected = async ({ scopes }) => {
       if (!hasFirstSyncScopes(scopes)) {
         return 'Google接続を保存しました。必要なGoogle権限が揃っていないため、初回同期は開始していません。権限を確認して再接続してください。';
       }
       try {
         checkFirstSyncConfig(options.account, options.credentialsDirectory);
-        await launchFirstSync({ configPath });
-        return 'Google接続を保存しました。予定とメールの初回同期を開始しました。進捗は logs/google-first-sync.local.json で確認できます。';
+        activeSyncRunId = await launchFirstSync({ configPath });
+        return 'Google接続を保存しました。予定とメールの初回同期を開始しました。進捗はこの画面で確認できます。';
       } catch {
         return 'Google接続を保存しました。初回同期は起動できませんでした。ターミナルとPCの設定を確認してください。';
       }
