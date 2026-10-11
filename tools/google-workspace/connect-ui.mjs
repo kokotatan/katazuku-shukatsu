@@ -2,6 +2,9 @@ const config = JSON.parse(document.getElementById('bootstrap').textContent);
 const byId = id => document.getElementById(id);
 byId('account').textContent = config.account;
 byId('broker').textContent = config.broker;
+byId('sync-note').textContent = config.initialSync
+  ? '対象アカウントと資格情報の保存先を確認しました。必要な権限を許可すると、接続後にこのPCで予定とメールの初回同期を開始します。進捗はローカルの logs/google-first-sync.local.json で確認できます。'
+  : 'この接続では初回同期を開始しません。設定とAIの準備後に、標準接続で再接続してください。';
 byId('existing').textContent = config.hasExistingConnection ? (config.replace ? '既存の接続をバックアップして、新しい接続に置き換えます。' : '既存の接続があります。別の認証サービスへの置き換えは、この起動方法では行いません。') : 'このアカウントの接続を新しく保存します。';
 for (const scope of config.scopes) { const item = document.createElement('li'); item.textContent = scope; byId('scopes').append(item); }
 async function post(path) {

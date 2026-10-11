@@ -1,19 +1,43 @@
-/** Google接続後、本人が --sync を選んだときだけ初回の取込みを開始する。 */
+/** Google接続後、設定済みの標準接続で初回の取込みを開始する。 */
 import { existsSync, mkdirSync, readFileSync, writeFileSync, openSync, closeSync, renameSync, rmSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { GOOGLE_SCOPES } from './scopes.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const defaultCredentials = join(homedir(), '.google_workspace_mcp', 'credentials');
 const expandHome = path => path === '~' ? homedir() : path.startsWith('~/') || path.startsWith('~\\') ? join(homedir(), path.slice(2)) : path;
 
+export function firstSyncConfigPath({ workspace = root, env = process.env } = {}) {
+  return resolve(env.KATAZUKU_CONFIG?.trim() || join(workspace, 'katazuku.config.json'));
+}
+
+export function hasFirstSyncScopes(scopes) {
+  // 共通MCP入口も7権限の完全一致を要求する。部分許可では先に進めない。
+  return Array.isArray(scopes) && GOOGLE_SCOPES.every(scope => scopes.includes(scope));
+}
+
+/** 標準接続では設定済みなら自動開始。明示指定は設定不足を認証前に拒否する。 */
+export function prepareFirstSync(account, credentialsDirectory, {
+  mode = 'auto', standardConnection = true, workspace = root, env = process.env,
+} = {}) {
+  if (mode === 'off') return { enabled: false, reason: 'disabled' };
+  if (!standardConnection) {
+    if (mode === 'required') throw new Error('初回同期は既定のGoogle認証サービスで接続するときだけ使えます。');
+    return { enabled: false, reason: 'nonstandard_connection' };
+  }
+  const configPath = firstSyncConfigPath({ workspace, env });
+  if (mode === 'auto' && !existsSync(configPath)) return { enabled: false, reason: 'missing_config' };
+  return { enabled: true, ...checkFirstSyncConfig(account, credentialsDirectory, { workspace, env }) };
+}
+
 /** 認証前に設定と保存先を照合する。違うアカウントの記録を取り込まない。 */
 export function checkFirstSyncConfig(account, credentialsDirectory, { workspace = root, env = process.env } = {}) {
   if (typeof account !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(account)) throw new Error('初回同期のGoogleアカウントを指定してください。');
-  const configPath = resolve(env.KATAZUKU_CONFIG?.trim() || join(workspace, 'katazuku.config.json'));
+  const configPath = firstSyncConfigPath({ workspace, env });
   if (!existsSync(configPath)) throw new Error('初回同期には katazuku.config.json が必要です。docs/SETUP.md に従って設定してください。');
   let config;
   try { config = JSON.parse(readFileSync(configPath, 'utf8').replace(/^\uFEFF/, '')); }

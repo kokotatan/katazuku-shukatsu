@@ -61,7 +61,7 @@ async function readExisting(path) {
 }
 
 export async function startConnection({ account, broker = DEFAULT_BROKER_ORIGIN, credentialsDirectory,
-  replace = false, port = 0, fetcher = fetch, now = Date.now, spreadsheetId, recordDemo = false, onConnected } = {}) {
+  replace = false, port = 0, fetcher = fetch, now = Date.now, spreadsheetId, recordDemo = false, initialSync = false, onConnected } = {}) {
   const destination = credentialPath(account, credentialsDirectory);
   const origin = brokerOrigin(broker);
   const csrf = token();
@@ -79,7 +79,7 @@ export async function startConnection({ account, broker = DEFAULT_BROKER_ORIGIN,
   const script = await readFile(new URL('./connect-ui.mjs', import.meta.url), 'utf8');
   const recorder = recordDemo ? await readFile(new URL('./record-demo.mjs', import.meta.url), 'utf8') : '';
   const style = await readFile(new URL('./connect.css', import.meta.url), 'utf8');
-  const bootstrap = () => ({ account, broker: origin, csrf, replace, hasExistingConnection: initialCredential !== null, scopes: GOOGLE_SCOPES });
+  const bootstrap = () => ({ account, broker: origin, csrf, replace, initialSync, hasExistingConnection: initialCredential !== null, scopes: GOOGLE_SCOPES });
   const send = (response, status, body, type = 'application/json; charset=utf-8') => {
     response.writeHead(status, { ...headers, 'Content-Type': type });
     response.end(type.startsWith('application/json') ? JSON.stringify(body) : body);
@@ -139,7 +139,7 @@ export async function startConnection({ account, broker = DEFAULT_BROKER_ORIGIN,
             try { await writeFile(temporary, JSON.stringify(stored, null, 2) + '\n', { flag: 'wx', mode: 0o600 }); await rename(temporary, destination); }
             finally { await unlink(temporary).catch(() => {}); }
             let connectedMessage;
-            try { connectedMessage = await onConnected?.(); }
+            try { connectedMessage = await onConnected?.({ account, scopes }); }
             catch { throw new ConnectionError('Google接続はこのPCに保存しましたが、アプリの利用アカウントを更新できませんでした。保存フォルダを確認し、設定画面からもう一度接続してください。'); }
             state = { status: 'connected', message: typeof connectedMessage === 'string' ? connectedMessage : 'Google接続をこのPCに保存しました。続けて接続を確認できます。',
               account, capabilities: inspectCredential(stored).capabilities, missingScopes: GOOGLE_SCOPES.filter(scope => !scopes.includes(scope)) };
