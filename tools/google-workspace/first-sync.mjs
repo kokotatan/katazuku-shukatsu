@@ -1,6 +1,7 @@
 /** Google接続後、本人が --sync を選んだときだけ初回の取込みを開始する。 */
-import { existsSync, mkdirSync, readFileSync, writeFileSync, openSync, closeSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, openSync, closeSync, renameSync, rmSync } from 'node:fs';
 import { spawn } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -32,7 +33,11 @@ export function checkFirstSyncConfig(account, credentialsDirectory, { workspace 
 }
 
 function updateStatus(path, status) {
-  writeFileSync(path, JSON.stringify(status, null, 2) + '\n', { mode: 0o600 });
+  const temporary = `${path}.${randomUUID()}.tmp`;
+  try {
+    writeFileSync(temporary, JSON.stringify(status, null, 2) + '\n', { flag: 'wx', mode: 0o600 });
+    renameSync(temporary, path);
+  } finally { rmSync(temporary, { force: true }); }
 }
 
 function workflow(name, workspace, logPath) {
@@ -71,10 +76,11 @@ export async function runFirstSync({ workspace = root, runWorkflow = workflow, n
 }
 
 /** OAuthコールバックを待たせずに、初回同期をローカルの別プロセスへ渡す。 */
-export function launchFirstSync({ workspace = root } = {}) {
+export function launchFirstSync({ workspace = root, configPath } = {}) {
   return new Promise((resolveLaunch, reject) => {
     const child = spawn(process.execPath, [fileURLToPath(import.meta.url)], {
-      cwd: workspace, env: process.env, windowsHide: true, detached: true, stdio: 'ignore',
+      cwd: workspace, env: { ...process.env, ...(configPath ? { KATAZUKU_CONFIG: configPath } : {}) },
+      windowsHide: true, detached: true, stdio: 'ignore',
     });
     child.once('error', reject);
     child.once('spawn', () => { child.unref(); resolveLaunch(); });

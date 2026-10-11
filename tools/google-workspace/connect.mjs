@@ -22,10 +22,11 @@ try {
   if (sync) {
     if (options.recordDemo) throw new Error('審査用録画と初回同期は同時に実行できません。');
     if (options.broker && options.broker !== DEFAULT_BROKER_ORIGIN) throw new Error('初回同期は既定のGoogle認証サービスで接続するときだけ使えます。');
-    checkFirstSyncConfig(options.account, options.credentialsDirectory);
+    const { configPath } = checkFirstSyncConfig(options.account, options.credentialsDirectory);
     options.onConnected = async () => {
       try {
-        await launchFirstSync();
+        checkFirstSyncConfig(options.account, options.credentialsDirectory);
+        await launchFirstSync({ configPath });
         return 'Google接続を保存しました。予定とメールの初回同期を開始しました。進捗は logs/google-first-sync.local.json で確認できます。';
       } catch {
         return 'Google接続を保存しました。初回同期は起動できませんでした。ターミナルとPCの設定を確認してください。';
