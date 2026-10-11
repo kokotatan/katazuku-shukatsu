@@ -21,6 +21,22 @@ npm run google:workspace:connect -- --account person@example.com
 `.katazuku-backups/` へ退避します。保存先を分けて試す場合は `--credentials-dir <directory>` を指定します。
 日次取得で使う `google.credentialsDir` にも同じ保存先を指定してください。
 
+### 認証が終わったら初回同期を始める
+
+`katazuku.config.json` の `google.accounts` に対象アカウントを登録し、`google.credentialsDir` を接続先と一致させ、
+使用するAIを自分のPCで準備した場合は、次のように `--sync` を付けられます。
+
+```sh
+npm run google:workspace:connect -- --account person@example.com --sync
+```
+
+認証前にアカウントと資格情報保存先を照合し、一致しなければGoogle画面を開かず停止します。
+認証が成功して資格情報を保存した後、別のローカルプロセスでカレンダー同期、続いてメールの日次同期を一度だけ開始します。
+メールの抽出には設定済みのAIを使います。外部へのメール送信、応募、予約確定はしません。
+進捗は `logs/google-first-sync.local.json`、詳細は `logs/google-first-sync.local.log` で確認できます。
+失敗した場合は後続の同期を始めず、接続資格情報を消しません。通常の定期実行は
+[ワークフローの登録](WORKFLOWS.md#定期実行の登録)で別途設定します。
+
 個別OAuthの読取り専用接続は従来どおり `npm run google:connect` です。
 共通接続とコマンドを分け、既存の設定や資格情報を自動で置き換えません。
 共通接続の保存済み資格情報はGmail・Calendarの決定的な取得スクリプトでも利用できます。
