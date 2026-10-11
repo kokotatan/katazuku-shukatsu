@@ -7,6 +7,8 @@
 **現在はターミナル操作とGoogle Cloudの設定が必要な開発版です。**
 認証なしのデモで画面を試せます。自分のデータで使う場合は、接続確認と定期実行の登録まで必要です。
 
+[カタヅク就活の公式HP](https://hp.katazuku-shukatsu.kotalabo.com/)では、ブラウザだけで試せる機能、無料OSSの導入方法、個別導入支援、開発への参加方法を案内しています。
+
 [![CI](https://github.com/kokotatan/katazuku-shukatsu/actions/workflows/ci.yml/badge.svg)](https://github.com/kokotatan/katazuku-shukatsu/actions/workflows/ci.yml)
 [![npm version](https://img.shields.io/npm/v/katazuku-shukatsu)](https://www.npmjs.com/package/katazuku-shukatsu)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue)](./LICENSE)
@@ -16,6 +18,8 @@
 紹介動画(準備中): 公開したらここにリンクを置きます。
 
 [English](#english) / [デモで試す](#デモで試す資格情報ゼロ) / [セットアップ](docs/SETUP.md) / [AIプロバイダ](docs/AI-PROVIDERS.md) / [参加方法](CONTRIBUTING.md)
+
+架空データから集計CSVを作り、Databricksで分析を試す手順は [Databricksガイド](docs/DATABRICKS.md) にまとめています。正本DBや個人情報は自動送信しません。
 
 ---
 
