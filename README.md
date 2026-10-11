@@ -197,7 +197,7 @@ npm run check    # 個人情報スキャン + 型検査 + ビルド + 全テス�
 | `src/` | 正本DBとセマンティックレイヤー(遷移規則・名寄せ・冪等な反映)、応募の状態機械、AI実行契約、各種の決定論的な部品 |
 | `scripts/` | ワークフロー(`workflow.ts`)とプロンプト(`*-prompt.md`)、取得・台帳・スナップショットのCLI、定期実行の登録 |
 | `schemas/` | 入出力の JSON Schema(AIの抽出結果・設定ファイル・設定GUI) |
-| `shared/` と `board/` ほか7本 | 閲覧アプリ群(SmartHR Design System 準拠・読み取り専用) |
+| `shared/` と `board/` ほか7本 | 閲覧アプリ群(デジタル庁デザインシステムの公式CSSを使用・読み取り専用) |
 | `tests/` | 依存ゼロの自前assertテスト(架空データだけ) |
 | `cloudflare/` / `spark-gateway/` | 任意: 自分の Cloudflare へのセルフホスト、Gemini Spark 連携 |
 | `docs/` | セットアップ・ワークフロー・AIプロバイダ・設計・ロードマップ |

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Base, Cluster, DefinitionList, DefinitionListItem, Heading, Select, Stack, Text, TextLink } from 'smarthr-ui'
+import { Base, Cluster, DefinitionList, DefinitionListItem, Heading, Select, Stack, Text, TextLink } from '../../shared/src/viewer-components'
 import { formatDate, textValue } from '@katazuku/data'
 import { AppHeading, AppShell, DataState } from '@katazuku/ui'
 import { useKatazukuData } from './lib/useKatazukuData'

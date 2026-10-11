@@ -1,14 +1,12 @@
 @layer theme, base, dads-reset, katazuku-layout, components, utilities;
 @layer katazuku-layout {
 /*
- * アプリ群の外枠。色は SmartHR Design System のパレットに合わせる。
- * (main #0077c7 / text #23221e / grey #706d65 / border #d6d3d0 / background #f8f7f6)
- * レイアウトだけを持ち、部品の見た目は smarthr-ui に任せる。
+ * アプリ群の外枠。公式DADS CSSは無改変で読み込み、ここでは製品固有の配置と補助色だけを定義する。
  */
 
 body {
   margin: 0;
-  background-color: #f8f7f6;
+  background-color: #fff;
 }
 
 .ktz-app {
@@ -36,7 +34,7 @@ body {
   width: 14rem;
   flex-shrink: 0;
   flex-direction: column;
-  border-right: 1px solid #d6d3d0;
+  border-right: 1px solid #949494;
   background-color: #fff;
 }
 
@@ -60,7 +58,7 @@ body {
   height: 2rem;
   flex-shrink: 0;
   border-radius: 0.5rem;
-  background-color: #0077c7;
+  background-color: #0017c1;
   color: #fff;
   font-size: 0.9375rem;
   font-weight: 700;
@@ -71,7 +69,7 @@ body {
   font-size: 1.125rem;
   font-weight: 700;
   letter-spacing: -0.01em;
-  color: #23221e;
+  color: #1a1a1a;
 }
 
 .ktz-side-nav {
@@ -88,33 +86,33 @@ body {
   gap: 0.625rem;
   border-radius: 0.5rem;
   padding: 0.5rem 0.75rem;
-  font-size: 0.875rem;
-  color: #23221e;
+  font-size: 1rem;
+  color: #1a1a1a;
   text-decoration: none;
 }
 
-.ktz-side-link:hover { background-color: #f2f1f0; }
+.ktz-side-link:hover { background-color: #f2f2f2; }
 
 .ktz-side-link.is-current {
-  background-color: #e5f1f9;
-  color: #0071c1;
+  background-color: #e8f1fe;
+  color: #0017c1;
   font-weight: 700;
 }
 
 .ktz-caption {
   margin-left: auto;
-  font-size: 0.625rem;
+  font-size: 0.875rem;
   font-weight: 600;
   letter-spacing: 0.15em;
   text-transform: uppercase;
-  color: #706d65;
+  color: #595959;
 }
 
 .ktz-side-foot {
   padding: 1rem 1.25rem;
-  font-size: 0.6875rem;
+  font-size: 0.875rem;
   line-height: 1.6;
-  color: #706d65;
+  color: #595959;
 }
 
 /* ---- モバイル: 下タブバー ---- */
@@ -125,7 +123,7 @@ body {
   bottom: 0;
   z-index: 30;
   display: flex;
-  border-top: 1px solid #d6d3d0;
+  border-top: 1px solid #949494;
   background-color: #fff;
   padding-bottom: env(safe-area-inset-bottom);
 }
@@ -143,13 +141,13 @@ body {
   border: 0;
   background: none;
   padding: 0.5rem 0 0.375rem;
-  font-size: 0.625rem;
-  color: #706d65;
+  font-size: 0.875rem;
+  color: #595959;
   text-decoration: none;
   cursor: pointer;
 }
 
-.ktz-tab.is-current { color: #0071c1; font-weight: 700; }
+.ktz-tab.is-current { color: #0017c1; font-weight: 700; box-shadow: inset 0 4px #0017c1; }
 
 /* ---- モバイル: 「その他」ボトムシート ---- */
 
@@ -165,14 +163,14 @@ body {
   width: 100%;
   height: 100%;
   border: 0;
-  background-color: rgba(35, 34, 30, 0.4);
+  background-color: rgba(26, 26, 26, 0.48);
 }
 
 .ktz-sheet-body {
   position: absolute;
   inset-inline: 0;
   bottom: 0;
-  border-top: 1px solid #d6d3d0;
+  border-top: 1px solid #949494;
   border-radius: 0.5rem 0.5rem 0 0;
   background-color: #fff;
   padding: 0.75rem 1rem calc(1.25rem + env(safe-area-inset-bottom));
@@ -181,9 +179,9 @@ body {
 .ktz-sheet-title {
   margin: 0 0 0.75rem;
   padding-inline: 0.25rem;
-  font-size: 0.75rem;
+  font-size: 0.875rem;
   font-weight: 700;
-  color: #706d65;
+  color: #595959;
 }
 
 .ktz-sheet-grid {
@@ -198,8 +196,8 @@ body {
   align-items: center;
   gap: 0.375rem;
   padding: 0.25rem 0;
-  font-size: 0.6875rem;
-  color: #23221e;
+  font-size: 0.875rem;
+  color: #1a1a1a;
   text-decoration: none;
 }
 
@@ -210,12 +208,12 @@ body {
   width: 3rem;
   height: 3rem;
   border-radius: 0.5rem;
-  background-color: #f2f1f0;
-  color: #706d65;
+  background-color: #f2f2f2;
+  color: #595959;
   font-size: 1.25rem;
 }
 
-.ktz-sheet-icon.is-current { background-color: #e5f1f9; color: #0071c1; }
+.ktz-sheet-icon.is-current { background-color: #e8f1fe; color: #0017c1; }
 
 /* ---- 部品 ---- */
 

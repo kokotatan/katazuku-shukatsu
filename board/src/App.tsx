@@ -2,7 +2,7 @@ import { useState } from 'react'
 import {
   AnchorButton, Base, Button, Cluster, Heading, InformationPanel, LineClamp,
   Section, SegmentedControl, Stack, StatusLabel, Text,
-} from 'smarthr-ui'
+} from '../../shared/src/viewer-components'
 import {
   daysLeft, isClosed, parseDate,
   type Appointment, type KatazukuData, type Selection,
@@ -278,10 +278,12 @@ export default function App() {
             onClickOption={(v) => setTab(v as Tab)}
             aria-label="表示する一覧"
           />
-          {tab === 'today' && <TodayTab data={data} />}
-          {tab === 'tracks' && <TracksTab data={data} />}
-          {tab === 'companies' && <CompaniesTab data={data} />}
-          {tab === 'log' && <LogTab data={data} />}
+          <div id="ktz-board-panel" role="tabpanel" aria-labelledby={`ktz-board-tab-${tab}`} tabIndex={0}>
+            {tab === 'today' && <TodayTab data={data} />}
+            {tab === 'tracks' && <TracksTab data={data} />}
+            {tab === 'companies' && <CompaniesTab data={data} />}
+            {tab === 'log' && <LogTab data={data} />}
+          </div>
 
           <Text size="S" color="TEXT_GREY">
             このボードは正本DBへ書き込みません。状態を変えるのはエージェントと本人だけです。

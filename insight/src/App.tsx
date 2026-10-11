@@ -1,4 +1,4 @@
-import { AnchorButton, Base, Cluster, Heading, InformationPanel, Stack, StatusLabel, Text } from 'smarthr-ui'
+import { AnchorButton, Base, Cluster, Heading, InformationPanel, Stack, StatusLabel, Text } from '../../shared/src/viewer-components'
 import { daysLeft, formatDate, isClosed, parseDate, type Appointment, type Selection } from '@katazuku/data'
 import { AppHeading, AppShell, DataState } from '@katazuku/ui'
 import { useKatazukuData } from './lib/useKatazukuData'
