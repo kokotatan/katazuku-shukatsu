@@ -15,7 +15,7 @@ export default defineConfig({
     },
     // shared/ は自分の node_modules を持たない。実体をアプリ側の1コピーへ固定する
     // (Reactが二重に読み込まれるとフックが壊れる)
-    dedupe: ['react', 'react-dom', 'styled-components', 'smarthr-ui'],
+    dedupe: ['react', 'react-dom'],
   },
   build: { outDir: 'dist', emptyOutDir: true },
 })

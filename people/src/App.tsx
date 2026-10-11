@@ -1,4 +1,4 @@
-import { Base, Cluster, DefinitionList, DefinitionListItem, Stack, StatusLabel, Text } from 'smarthr-ui'
+import { Base, Cluster, DefinitionList, DefinitionListItem, Stack, StatusLabel, Text } from '../../shared/src/viewer-components'
 import { formatDate, photoUrl, type Person } from '@katazuku/data'
 import { AppHeading, AppShell, DataState } from '@katazuku/ui'
 import { useKatazukuData } from './lib/useKatazukuData'

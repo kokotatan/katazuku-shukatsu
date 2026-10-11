@@ -1,14 +1,13 @@
 # board（アプリ群のひとつ）
 
 正本DBの状態を見るための、**読み取り専用**のボードです。本体(private)の `board/` を
-公開用に移植したもので、[SmartHR Design System](https://smarthr.design/) /
-[smarthr-ui](https://github.com/kufu/smarthr-ui) に準拠しています。
+公開用に移植し、[デジタル庁デザインシステム](https://design.digital.go.jp/dads/)の公式CSSを無改変で使います。
 
 アプリは全部で8本あります(`board` `insight` `status` `inbox` `people` `prep` `profile` `impact`)。
 どれも同じ構成・同じ共有層([shared/](../shared/))で、ここに書いた設計は全部に当てはまります。
 
-> このプロジェクトは SmartHR 社とは無関係です。OSS として公開されているデザインシステムと
-> コンポーネントライブラリを利用しているだけで、SmartHR のロゴ・ブランドは使用していません。
+公式ボタン・セレクト・タブのHTML/CSSへの接続は `shared/src/viewer-components.tsx`、
+製品固有のカード・配置は同ディレクトリのCSSに分けています。
 
 ## 設計
 
@@ -26,7 +25,7 @@
 | タブ | 中身 |
 |---|---|
 | きょう | 14日以内の予定 / 未提出の締切(残り日数つき) / 結果・案内の待ち。名寄せの確認待ちがあればここに出る |
-| 選考 | 全トラック。状態は `outcomeOf()` の機械判定を `StatusLabel` で表示 |
+| 選考 | 全トラック。状態は `outcomeOf()` の機械判定を状況ラベルで表示 |
 | 企業 | 企業ごとに畳んだ一覧。開くと正式名称・トラック・企業研究の要約・マイページ |
 | ログ | イベント台帳(`event`)。「なぜ今この状態か」を後から追うための行 |
 
@@ -57,7 +56,7 @@ npm run dev
 ## 依存について
 
 コア(`src/`)は**ランタイム依存ゼロ**のままです。各アプリは自分の `package.json` を持ち、
-npm パッケージ `katazuku-shukatsu` には含まれません。コアを使うのに React も SmartHR UI も要りません。
+npm パッケージ `katazuku-shukatsu` には含まれません。コアを使うのに React は要りません。
 
 共有データ層 `@katazuku/data` は `../shared/src/index.ts` を Vite のエイリアスで直接読みます
 (ビルドしません。本体と同じ構成)。

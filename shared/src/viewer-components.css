@@ -1,0 +1,27 @@
+@layer katazuku-layout {
+.ktz-stack{display:flex;flex-direction:column;min-width:0}
+.ktz-cluster{display:flex;flex-wrap:wrap;min-width:0}
+.ktz-center{display:flex;justify-content:center;align-items:center;min-height:8rem}
+.ktz-base,.ktz-section{background:#fff;border:1px solid #949494;border-radius:8px;min-width:0}
+.ktz-section{padding:1rem}
+.ktz-text{display:block;font-size:1rem;line-height:1.7;overflow-wrap:anywhere}
+.ktz-text[data-size="S"]{font-size:.875rem}.ktz-text[data-size="L"]{font-size:1.125rem}.ktz-text[data-size="XL"]{font-size:1.5rem}
+.ktz-text[data-weight="bold"]{font-weight:700}.ktz-text[data-color="TEXT_GREY"]{color:#595959}
+.ktz-text[data-color="TEXT_LINK"]{color:#0017c1}.ktz-text[data-color="DANGER"]{color:#b20000}
+.ktz-heading{margin:0;font-weight:700;line-height:1.5}.ktz-heading[data-size="lg"]{font-size:2rem}.ktz-heading[data-size="md"]{font-size:1.25rem}
+.ktz-status{display:inline-flex;align-items:center;border:1px solid;border-radius:4px;padding:2px 8px;font-size:.875rem;line-height:1.5;font-weight:700;white-space:nowrap}
+.ktz-status[data-type="green"]{color:#006638;background:#e6f5ed;border-color:#006638}
+.ktz-status[data-type="blue"]{color:#00118f;background:#e8f1fe;border-color:#0017c1}
+.ktz-status[data-type="grey"]{color:#333;background:#f2f2f2;border-color:#767676}
+.ktz-status[data-type="warning"]{color:#664600;background:#fff4cf;border-color:#806000}
+.ktz-status[data-type="error"]{color:#b20000;background:#fff0f0;border-color:#b20000}
+.ktz-definition-list{display:grid;gap:.5rem;margin:0}.ktz-definition-item{display:grid;grid-template-columns:minmax(7rem,25%) 1fr;gap:1rem;border-bottom:1px solid #d9d9d9;padding:.5rem 0}
+.ktz-definition-item dt{font-weight:700}.ktz-definition-item dd{margin:0;overflow-wrap:anywhere}
+.ktz-information{border:1px solid #767676;border-left:4px solid #0017c1;border-radius:8px;background:#e8f1fe;padding:1rem}
+.ktz-information[data-type="warning"]{border-left-color:#806000;background:#fff4cf}
+.ktz-information[data-type="error"]{border-left-color:#b20000;background:#fff0f0}
+.ktz-information h2{margin:0 0 .5rem;font-size:1.125rem;line-height:1.5}
+.ktz-loader{margin:0;font-size:1rem}.ktz-line-clamp{display:-webkit-box;-webkit-box-orient:vertical;overflow:hidden}
+.ktz-text-link{color:#0017c1;text-decoration:underline;text-underline-offset:.2em}
+@media(max-width:600px){.ktz-definition-item{grid-template-columns:1fr;gap:0}}
+}

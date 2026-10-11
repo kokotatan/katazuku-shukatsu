@@ -37,9 +37,6 @@
       ],
       "react-dom/client": [
         "./node_modules/@types/react-dom/client"
-      ],
-      "smarthr-ui": [
-        "./node_modules/smarthr-ui"
       ]
     }
   },

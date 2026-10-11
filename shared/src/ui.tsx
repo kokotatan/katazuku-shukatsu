@@ -1,9 +1,5 @@
-import { useState, type ComponentType, type ReactNode } from 'react'
-import {
-  Center, Cluster, FaCalendarCheckIcon, FaChartLineIcon, FaCommentsIcon, FaEllipsisIcon,
-  FaHouseIcon, FaIdCardIcon, FaInboxIcon, FaTableColumnsIcon, FaUsersIcon,
-  Heading, InformationPanel, Loader, Stack, Text,
-} from 'smarthr-ui'
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
+import { Center, Cluster, Heading, InformationPanel, Loader, Stack, Text } from './viewer-components'
 import './app-shell.css'
 
 /**
@@ -22,7 +18,7 @@ type Item = {
   label: string
   mobileLabel: string
   caption: string
-  icon: ComponentType<{ className?: string }>
+  icon: AppKey
 }
 
 /**
@@ -31,21 +27,53 @@ type Item = {
  * 個別のVite開発サーバーではアプリ間リンクは使わない。
  */
 const ITEMS: Item[] = [
-  { key: 'board', href: '../board/', label: 'ボード', mobileLabel: 'ボード', caption: 'Board', icon: FaHouseIcon },
-  { key: 'inbox', href: '../inbox/', label: 'メール', mobileLabel: 'メール', caption: 'Inbox', icon: FaInboxIcon },
-  { key: 'status', href: '../status/', label: '選考管理', mobileLabel: '選考', caption: 'Status', icon: FaTableColumnsIcon },
-  { key: 'insight', href: '../insight/', label: '今日やること', mobileLabel: '今日', caption: 'Insight', icon: FaCalendarCheckIcon },
-  { key: 'profile', href: '../profile/', label: '個人マスタ', mobileLabel: 'マスタ', caption: 'Profile', icon: FaIdCardIcon },
-  { key: 'people', href: '../people/', label: '人', mobileLabel: '人', caption: 'People', icon: FaUsersIcon },
-  { key: 'prep', href: '../prep/', label: '面接準備', mobileLabel: '面接', caption: 'Prep', icon: FaCommentsIcon },
-  { key: 'impact', href: '../impact/', label: '効果', mobileLabel: '効果', caption: 'Impact', icon: FaChartLineIcon },
+  { key: 'board', href: '../board/', label: 'ボード', mobileLabel: 'ボード', caption: 'Board', icon: 'board' },
+  { key: 'inbox', href: '../inbox/', label: 'メール', mobileLabel: 'メール', caption: 'Inbox', icon: 'inbox' },
+  { key: 'status', href: '../status/', label: '選考管理', mobileLabel: '選考', caption: 'Status', icon: 'status' },
+  { key: 'insight', href: '../insight/', label: '今日やること', mobileLabel: '今日', caption: 'Insight', icon: 'insight' },
+  { key: 'profile', href: '../profile/', label: '個人マスタ', mobileLabel: 'マスタ', caption: 'Profile', icon: 'profile' },
+  { key: 'people', href: '../people/', label: '人', mobileLabel: '人', caption: 'People', icon: 'people' },
+  { key: 'prep', href: '../prep/', label: '面接準備', mobileLabel: '面接', caption: 'Prep', icon: 'prep' },
+  { key: 'impact', href: '../impact/', label: '効果', mobileLabel: '効果', caption: 'Impact', icon: 'impact' },
 ]
+
+function AppIcon({ name }: { name: AppKey | 'more' }) {
+  const paths: Record<AppKey | 'more', ReactNode> = {
+    board: <><path d="m3 10 9-7 9 7"/><path d="M5 9v12h14V9M9 21v-7h6v7"/></>,
+    inbox: <><path d="M4 4h16v12h-5l-2 3h-2l-2-3H4z"/><path d="M4 16v4h16v-4"/></>,
+    status: <><rect x="3" y="4" width="18" height="16" rx="1"/><path d="M3 10h18M9 4v16M15 4v16"/></>,
+    insight: <><rect x="3" y="5" width="18" height="16" rx="1"/><path d="M3 10h18M8 3v4M16 3v4m-8 8 2 2 5-5"/></>,
+    profile: <><rect x="3" y="4" width="18" height="16" rx="1"/><circle cx="9" cy="10" r="2"/><path d="M5 17c0-3 8-3 8 0m2-7h4m-4 4h4"/></>,
+    people: <><circle cx="9" cy="8" r="3"/><path d="M3 20c0-6 12-6 12 0m3-11a3 3 0 0 1 0 6m0 2c2 0 3 1 3 3"/></>,
+    prep: <><path d="M4 4h16v12H9l-5 4z"/><path d="M8 9h8m-8 3h5"/></>,
+    impact: <><path d="M4 20h16M6 17v-4m6 4V8m6 9V4"/></>,
+    more: <><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></>,
+  }
+  return <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg>
+}
 
 // モバイル下タブは主要4つ+「その他」に絞る(タブは5つまで。8項目の横並びは触りにくい)
 const MOBILE_PRIMARY: AppKey[] = ['board', 'inbox', 'status', 'insight']
 
 export function AppNav({ current }: { current: AppKey }) {
   const [moreOpen, setMoreOpen] = useState(false)
+  const moreButton = useRef<HTMLButtonElement>(null)
+  const sheetBody = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (moreOpen) sheetBody.current?.querySelector<HTMLAnchorElement>('a[href]')?.focus()
+  }, [moreOpen])
+  const closeMore = () => {
+    setMoreOpen(false)
+    moreButton.current?.focus()
+  }
+  const onSheetKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Escape') { event.preventDefault(); closeMore(); return }
+    if (event.key !== 'Tab') return
+    const links = Array.from(event.currentTarget.querySelectorAll<HTMLAnchorElement>('a[href]'))
+    if (!links.length) return
+    if (event.shiftKey && document.activeElement === links[0]) { event.preventDefault(); links.at(-1)?.focus() }
+    else if (!event.shiftKey && document.activeElement === links.at(-1)) { event.preventDefault(); links[0].focus() }
+  }
   const primary = MOBILE_PRIMARY
     .map((key) => ITEMS.find((item) => item.key === key))
     .filter((item): item is Item => Boolean(item))
@@ -61,14 +89,14 @@ export function AppNav({ current }: { current: AppKey }) {
           <span className="ktz-brand-name">katazuku</span>
         </a>
         <nav className="ktz-side-nav" aria-label="katazuku アプリ">
-          {ITEMS.map(({ key, href, label, caption, icon: Icon }) => (
+          {ITEMS.map(({ key, href, label, caption, icon }) => (
             <a
               key={key}
               href={href}
               aria-current={key === current ? 'page' : undefined}
               className={`ktz-side-link${key === current ? ' is-current' : ''}`}
             >
-              <Icon />
+              <AppIcon name={icon} />
               <span>{label}</span>
               <span className="ktz-caption">{caption}</span>
             </a>
@@ -80,13 +108,13 @@ export function AppNav({ current }: { current: AppKey }) {
       {/* モバイル: 「その他」ボトムシート */}
       {moreOpen && (
         <div className="ktz-sheet" role="dialog" aria-modal="true" aria-label="その他のアプリ">
-          <button type="button" aria-label="閉じる" className="ktz-sheet-scrim" onClick={() => setMoreOpen(false)} />
-          <div className="ktz-sheet-body">
+          <button type="button" aria-label="閉じる" className="ktz-sheet-scrim" onClick={closeMore} tabIndex={-1} />
+          <div className="ktz-sheet-body" ref={sheetBody} onKeyDown={onSheetKeyDown}>
             <p className="ktz-sheet-title">その他のアプリ</p>
             <div className="ktz-sheet-grid">
-              {overflow.map(({ key, href, label, icon: Icon }) => (
+              {overflow.map(({ key, href, label, icon }) => (
                 <a key={key} href={href} aria-current={key === current ? 'page' : undefined} className="ktz-sheet-item">
-                  <span className={`ktz-sheet-icon${key === current ? ' is-current' : ''}`}><Icon /></span>
+                  <span className={`ktz-sheet-icon${key === current ? ' is-current' : ''}`}><AppIcon name={icon} /></span>
                   <span>{label}</span>
                 </a>
               ))}
@@ -98,24 +126,25 @@ export function AppNav({ current }: { current: AppKey }) {
 
       {/* モバイル: 下タブバー(主要4+その他) */}
       <nav className="ktz-tabbar" aria-label="katazuku アプリ">
-        {primary.map(({ key, href, mobileLabel, icon: Icon }) => (
+        {primary.map(({ key, href, mobileLabel, icon }) => (
           <a
             key={key}
             href={href}
             aria-current={key === current ? 'page' : undefined}
             className={`ktz-tab${key === current ? ' is-current' : ''}`}
           >
-            <Icon />
+            <AppIcon name={icon} />
             <span>{mobileLabel}</span>
           </a>
         ))}
         <button
           type="button"
+          ref={moreButton}
           aria-expanded={moreOpen}
           onClick={() => setMoreOpen((open) => !open)}
           className={`ktz-tab${moreActive || moreOpen ? ' is-current' : ''}`}
         >
-          <FaEllipsisIcon />
+          <AppIcon name="more" />
           <span>その他</span>
         </button>
       </nav>
