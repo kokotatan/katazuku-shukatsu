@@ -20,6 +20,9 @@ DBへの反映は後段の決定論的なスクリプトが検証してから行
      職種・コース・開催区分 → position(トラックを見分ける鍵)。name は本文の表記のままでよい。
    - 面接・面談・説明会・提出締切・参加確定インターンは appointments に構造化する。会議URLと開始・終了時刻は必ず拾う。
      短縮リンク(bit.ly など)しか無い場合もそれを url に入れる。ref にはメールIDを入れる。
+   - 参加確定インターンの交通費は、本人立替への支給が全文=`full`、一部=`partial`、定額=`fixed`、支給なし=`none`、
+     企業による切符・宿泊手配=`arranged`、不明=`unknown`として `reimbursementStatus` に入れる。領収書提出が明記される場合だけ
+     `receiptRequired=true`にする。本文にない支給や提出義務を推測しない。
 2. Inbox 表示用の短い要約(`mailItems`)。本文全文は入れない。id と sourceRef はメールID。対応が要るなら needsAction=true。
 3. 提出完了・結果がメールで確定できるものだけ `submissions`(result は 合格/不合格/内定/辞退 など)。
 4. 求められた提出物・事前手続き(`requirements`)を**成果物1件ずつ**。

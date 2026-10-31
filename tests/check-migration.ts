@@ -35,6 +35,11 @@ check('v3: 議事録と人物が支援組織を参照できる', (() => {
     && interview.some((row) => row.name === 'career_meeting_id')
     && person.some((row) => row.name === 'organization_id')
 })())
+check('v6: 交通費精算と領収書タスク由来の列が版管理下にある', (() => {
+  const columns = fresh.prepare('PRAGMA table_info(appointment)').all() as { name: string }[]
+  return ['reimbursement_status', 'receipt_required', 'parent_appointment_id', 'task_type']
+    .every((name) => columns.some((column) => column.name === name))
+})())
 
 // --- ファイルDB: 破壊的な版の前にスナップショットが残る ---
 const dir = mkdtempSync(join(tmpdir(), 'katazuku-migration-'))

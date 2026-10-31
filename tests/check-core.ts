@@ -46,6 +46,9 @@ check('#6: ISOの予定は登録できる', addAppointment(db, { selectionId: ap
 let apThrew = false
 try { addAppointment(db, { selectionId: apSel, at: '来週火曜', kind: '面接', title: 'ダメな日時' }) } catch { apThrew = true }
 check('#6: 解釈できない日時は例外にする(outboxからの沈黙脱落を防ぐ)', apThrew)
+let endAtThrew = false
+try { addAppointment(db, { selectionId: apSel, at: '2026-07-25T15:00', endAt: '終了未定', kind: '面接', title: '終了時刻不正' }) } catch { endAtThrew = true }
+check('#6: 解釈できない終了日時も例外にする', endAtThrew)
 check('同値は書かない', transition('出願済', 'entried') === null)
 
 // --- 名寄せ(エンティティ解決)。名前は規則を試すための合成ラベル ---

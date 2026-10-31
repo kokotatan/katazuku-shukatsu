@@ -8,6 +8,7 @@
  * - source_sync_state: 外部取得(カレンダー等)をどのアカウントのどの期間まで正常に取れたか。
  *   鮮度と期間被覆を満たさない限り、空き判定は unknown を返す(情報不足を空きと誤認しない)。
  * - appointment.flexible: 固定予定と重なったら動かしてよい本人タスク(空き判定では占有しない)。
+ * - appointmentの交通費列: インターン案内から領収書提出タスクを決定的に作るための根拠。
  */
 import type { DatabaseSync } from 'node:sqlite'
 
@@ -20,6 +21,10 @@ function addColumn(db: DatabaseSync, table: string, name: string, definition: st
 
 export function ensureWorkflowSchema(db: DatabaseSync): void {
   addColumn(db, 'appointment', 'flexible', 'INTEGER NOT NULL DEFAULT 0')
+  addColumn(db, 'appointment', 'reimbursement_status', "TEXT NOT NULL DEFAULT 'unknown' CHECK (reimbursement_status IN ('unknown','none','full','partial','fixed','arranged'))")
+  addColumn(db, 'appointment', 'receipt_required', 'INTEGER NOT NULL DEFAULT 0 CHECK (receipt_required IN (0,1))')
+  addColumn(db, 'appointment', 'parent_appointment_id', 'INTEGER REFERENCES appointment(id)')
+  addColumn(db, 'appointment', 'task_type', "TEXT NOT NULL DEFAULT ''")
   db.exec(`
     CREATE TABLE IF NOT EXISTS submission_requirement (
       id INTEGER PRIMARY KEY,

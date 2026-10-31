@@ -53,6 +53,7 @@ export type {
   AppointmentMatch,
   AppointmentRow,
   EventRow,
+  ReimbursementStatus,
 } from './db.js'
 export {
   databaseVersion,
