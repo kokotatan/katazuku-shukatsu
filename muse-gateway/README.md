@@ -38,6 +38,16 @@ OAuth認可と一時中継だけです。正本SQLite、Google資格情報、too
 6. `npm run muse:bridge`を常駐端末で起動します。
 7. Museにcustom remote MCPの登録画面が提供されている場合だけ、`https://<host>/mcp`を登録し、owner keyで同意します。
 
+実在する設定を作った後、deployより先に次を実行します。HTTPS origin、placeholder、KV/DO、秘密の平文混入、
+ログ無効化を検査し、秘密値を読まずに審査用endpointとsource hashをJSON出力します。
+
+```sh
+npm run muse:production-preflight -- --config=muse-gateway/wrangler.jsonc > muse-production-evidence.json
+```
+
+この証跡はlive deploymentやMeta承認を意味しません。外部から`/health`、OAuth discovery、token失効、MCP、
+bridge切断時のfail-closedを確認してから、production確認済みとして扱います。
+
 MetaはConnector Platformで提出項目、tool権限分類、3段階審査、承認後のSettings > Connectorsでの発見方法を公開しています。
 このgatewayは未提出・未承認です。実装済み、提出済み、承認済み、利用者接続済みを区別し、
 [`docs/MUSE-CONNECTOR-SUBMISSION.md`](../docs/MUSE-CONNECTOR-SUBMISSION.md)の不足項目を解消してから提出してください。
