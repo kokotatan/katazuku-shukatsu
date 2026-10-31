@@ -241,7 +241,7 @@ async function dailySync(ctx: Context): Promise<boolean> {
     `  選考: 更新 ${summary.selections.updated.length} / 追加 ${summary.selections.added.length} / 保留 ${summary.selections.skipped.length} / 名寄せ要確認 ${summary.selections.pending.length}`,
     `  未完了提出物: 追加 ${summary.requirements.created} / 更新 ${summary.requirements.updated} / 完了反映 ${summary.requirements.completed}`,
     `  メール: 追加 ${summary.mail.created} / 更新 ${summary.mail.updated}`,
-    `  提出結果: 追加 ${summary.submissions.created} / 既反映 ${summary.submissions.duplicate}`,
+    `  提出結果: 追加 ${summary.submissions.created} / 既反映 ${summary.submissions.duplicate} / 非選考のため除外 ${summary.submissions.skipped}`,
     ...summary.priorityMails.map((mailItem) => `  最優先メール: ${mailItem.subject}(${mailItem.reason})`),
     ...[...summary.submissions.errors, ...summary.requirements.errors, ...summary.selections.errors].map((error) => `  失敗: ${error}`),
   ].join('\n'))
