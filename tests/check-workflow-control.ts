@@ -41,7 +41,7 @@ const store = openWorkflowStore(':memory:')
 try {
   startWorkflowRun(store, contract, { sourceRef: 'message-example' }, target, 'email:example')
   assert.throws(() => beginWorkflowStep(store, contract, 'email:example', 'send', 'executor', {
-    targetDatabase: target, capabilities: ['gmail.read', 'gmail.send.confirmed'], action,
+    targetDatabase: target, capabilities: ['mail.read', 'mail.send.confirmed'], action,
   }), /現在のstepはvalidate/)
 
   beginWorkflowStep(store, contract, 'email:example', 'validate', 'executor', { targetDatabase: target, input: action })
@@ -56,12 +56,12 @@ try {
   decideWorkflowApproval(store, contract, 'email:example', 'approve', action, 'approved', target)
   assert.throws(() => beginWorkflowStep(store, contract, 'email:example', 'send', 'executor', {
     targetDatabase: target,
-    capabilities: ['gmail.read', 'gmail.send.confirmed'],
+    capabilities: ['mail.read', 'mail.send.confirmed'],
     action: { ...action, target: { ...action.target, to: ['other@example.com'] } },
   }), /承認後に宛先/)
 
   beginWorkflowStep(store, contract, 'email:example', 'send', 'executor', {
-    targetDatabase: target, capabilities: ['gmail.read', 'gmail.send.confirmed'], action,
+    targetDatabase: target, capabilities: ['mail.read', 'mail.send.confirmed'], action,
   })
   completeWorkflowStep(store, contract, 'email:example', 'send', 'executor', { targetDatabase: target, action })
   beginWorkflowStep(store, contract, 'email:example', 'audit', 'executor', { targetDatabase: target })
