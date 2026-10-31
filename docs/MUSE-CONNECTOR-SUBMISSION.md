@@ -91,6 +91,14 @@ Metaの分類では、状態を変えないtoolはRead、正本またはworkflow
 合成DB、schema-native MCPを一続きで起動し、`read`、`sensitive`、`write`、`actions`を実tool callで検証します。
 これはproduction Connectorの審査・接続を代替しませんが、gateway内の偽応答だけでE2E済みと扱うことを防ぎます。
 
+提出用の全tool仕様は、実装とremote policyから次のコマンドでJSON生成します。出力には全28 toolの入力schema、
+OAuth scope、Meta権限分類、ローカル副作用、外部確定操作の有無、共通エラー、payload上限、同時実行上限、timeoutを含めます。
+手書きの一覧を提出せず、production候補revisionでこの出力を保存してください。
+
+```sh
+npm run --silent muse:submission-spec > muse-connector-tool-spec.json
+```
+
 ## 提出前の未完了項目
 
 - [ ] Connector専用の公開プライバシー通知を`https://www.katazuku-shukatsu.kotalabo.com/muse/privacy/`へデプロイし、外部から本文・更新日・問い合わせ先を確認する（サイト実装と`MUSE-CONNECTOR-PRIVACY-DRAFT.md`は準備済み、まだ未公開）。
@@ -99,7 +107,7 @@ Metaの分類では、状態を変えないtoolはRead、正本またはworkflow
 - [ ] production gateway origin、OAuth client情報、redirect URIを実環境で固定する。
 - [ ] 個人データを含まない審査専用アカウント、合成DB、bridge、接続手順を用意する。
 - [ ] access revokeと削除要求に対する、OAuth認可情報・ローカルDB・workflow証跡の削除手順を実機確認する。
-- [ ] 全toolの入力、出力、副作用、エラー、rate limitを提出用仕様へ書き出す。
+- [x] 全toolの入力、副作用、共通エラー、gateway上限を実装から提出用JSONへ書き出す（出力JSON Schemaは未宣言であることも明記）。
 - [ ] `npm run check`と上記E2Eをproduction候補revisionで通し、revisionと結果を保存する。
 - [ ] Muse Connector Termsとデータ処理条件を本人が確認し、提出対象・公開範囲を最終承認する。
 
