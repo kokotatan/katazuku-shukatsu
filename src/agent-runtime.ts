@@ -804,14 +804,16 @@ const GOOGLE_WORKSPACE_CAPABILITIES = [
   'sheets.write',
 ]
 
-async function findProjectCodexConfig(start: string): Promise<string | undefined> {
+async function findProjectCodexConfig(start: string, boundary?: string): Promise<string | undefined> {
   let current = resolve(start)
+  const resolvedBoundary = boundary ? resolve(boundary) : undefined
   while (true) {
     const candidate = join(current, '.codex', 'config.toml')
     try {
       await access(candidate)
       return candidate
     } catch {
+      if (resolvedBoundary && current === resolvedBoundary) return undefined
       const parent = dirname(current)
       if (parent === current) return undefined
       current = parent
@@ -823,8 +825,8 @@ async function findProjectCodexConfig(start: string): Promise<string | undefined
  * provider capabilityは実接続設定から保守的に推定する。秘密値やtool名は読まず、
  * MCP server sectionの存在だけを見る。実際の起動・認証失敗はadapterが分類する。
  */
-export async function detectCodexExtraCapabilities(cwd: string): Promise<string[]> {
-  const configPath = await findProjectCodexConfig(cwd)
+export async function detectCodexExtraCapabilities(cwd: string, boundary?: string): Promise<string[]> {
+  const configPath = await findProjectCodexConfig(cwd, boundary)
   if (!configPath) return []
   try {
     const config = await readFile(configPath, 'utf8')

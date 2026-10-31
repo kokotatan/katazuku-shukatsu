@@ -43,6 +43,18 @@ const EXPECTED = [
   'parseProviderOrder', 'classifyFailure', 'mayFallback', 'parseQuotaResetAt', 'validateJsonSchema',
   'executeProcess', 'PROVIDER_IDS', 'DEFAULT_CODEX_WEB_SEARCH_ARGS',
   'DEFAULT_CAPABILITY_TOOLS', 'DEFAULT_ABORT_PATTERNS',
+  // 原子的判断
+  'DECISION_BACKENDS', 'DEFAULT_DECISION_POLICY', 'renderLlmDecisionPrompt', 'parseLlmDecisionResult',
+  'routeAtomicDecision', 'routeDecisionResult', 'resolveDecisionControlConfig',
+  'LlmAtomicDecisionEvaluator', 'TypeSafeJevDecisionEvaluator',
+  // 宣言的workflowと承認hash
+  'WORKFLOW_OWNERS', 'WORKFLOW_EFFECTS', 'canonicalJson', 'workflowHash', 'validateWorkflowContract',
+  'loadWorkflowContract', 'ensureWorkflowControlSchema', 'openWorkflowStore', 'startWorkflowRun',
+  'beginWorkflowStep', 'completeWorkflowStep', 'failWorkflowStep', 'requestWorkflowApproval',
+  'decideWorkflowApproval', 'getWorkflowRun',
+  // capability-scoped katazuku MCP
+  'KATAZUKU_MCP_SCOPES', 'KATAZUKU_MCP_INSTRUCTIONS', 'KatazukuMcpServer',
+  'defaultWorkflowStorePath', 'katazukuRpc',
   // 会議URL
   'isMeetingUrl', 'MEETING_HOSTS', 'SHORTENER_HOSTS',
   'isAutomaticRecordingEligible',
