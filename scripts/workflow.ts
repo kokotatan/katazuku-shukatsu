@@ -71,6 +71,7 @@ interface Context {
   dryRun: boolean
   agent: string
   force: boolean
+  deliveryTest?: string
   now: Date
   log: (line: string) => void
 }
@@ -362,7 +363,41 @@ async function watchdog(ctx: Context): Promise<boolean> {
 
 // ---------------------------------------------------------------- asa
 
+async function asaDeliveryTest(ctx: Context, id: string): Promise<boolean> {
+  const account = primaryAccount(ctx.config)
+  if (!account || !ctx.config.notify.selfEmail) {
+    throw new Error('配信試験にはprimaryの本人Googleアカウントとnotify.selfEmail=trueの設定が必要です。')
+  }
+  if (!ctx.dryRun) {
+    const db = new DatabaseSync(resolveDatabasePath(), { readOnly: true })
+    try { db.prepare('SELECT COUNT(*) FROM selection').get() } finally { db.close() }
+  }
+  const subject = `【OSS初回導入・朝まとめ配信確認】${id}`
+  const body = `OSS初回導入・朝まとめ配信確認\n試験ID: ${id}\n\nこれは朝のまとめの配信試験です。実際の選考や予定の判断は行っていません。\n正本DBの初期化・Google接続・本人宛メール配信を確認しています。`
+  const prompt = [
+    'これは初回導入後の本人宛配信試験です。カレンダー変更、下書き作成、ラベル変更、第三者送信は行いません。',
+    `対象アカウントと送信元・宛先は ${account.email} だけです。添付・Cc・Bccは使いません。`,
+    `件名は ${JSON.stringify(subject)}、プレーンテキストの本文は次の文字列と完全に同じにします:\n${JSON.stringify(body)}`,
+    'まず接続済みGoogle Workspace MCPでSentを検索し、この試験ID・件名・宛先の送信済みがあれば再送しません。',
+    '未送信を確認できた場合だけ、send_gmail_messageでuser_google_emailとtoを明示して一回送信します。',
+    '送信の成否が不明なら再送せず、同じ試験IDをSentと受信箱で照合します。',
+    '送信済みID・宛先・件名を確認できた場合だけ、最後の一行に === asa DONE === と出力します。',
+  ].join('\n\n')
+  const capabilities = ['workspace.read', 'shell', 'gmail.read', 'gmail.send.self']
+  if (ctx.dryRun) { dryRunReport(ctx, 'asa', prompt, capabilities); return true }
+  const result = await runAgentStep({
+    config: ctx.config, workflow: 'asa', runId: `asa-delivery-test:${id}`, prompt, capabilities,
+    risk: 'external-commit', sideEffectMode: 'reconcile', timeoutMs: 15 * MINUTE, agent: ctx.agent,
+  })
+  if (result.status !== 'succeeded') throw new Error('配信試験に失敗: ' + describeFailure(result))
+  if (!hasSentinel(result.output ?? '', 'asa')) throw new Error('配信を確認できません。同じ試験IDのSentを照合し、再送せず確認してください。')
+  const path = saveBrief('asa-delivery-test', id, result.output ?? '')
+  ctx.log(`朝まとめの配信試験を確認: ${path}。受信箱で件名と試験IDを確認してください。`)
+  return true
+}
+
 async function asa(ctx: Context): Promise<boolean> {
+  if (ctx.deliveryTest) return asaDeliveryTest(ctx, ctx.deliveryTest)
   if (!ctx.dryRun) refreshSubmissionReadiness(ctx)
   const reported = checkWatchdog(ctx.config, ctx.now)
   if (!ctx.dryRun) writeFileSync(join(LOGS, 'watchdog-summary.local.txt'), reported.problems.join('\n') + (reported.problems.length ? '\n' : ''), 'utf8')
@@ -516,6 +551,12 @@ async function main(): Promise<void> {
     process.exit(1)
   }
   const flags = parseCliFlags(process.argv.slice(3))
+  const deliveryTest = flags.values['delivery-test']
+  if ('delivery-test' in flags.values && (name !== 'asa' || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/.test(deliveryTest))) {
+    console.error('--delivery-testはasaでのみ使えます。試験IDを半角英数字・ハイフン・アンダースコアの1〜64文字で指定してください。')
+    process.exitCode = 1
+    return
+  }
   const [major, minor] = process.versions.node.split('.').map(Number)
   if (!(major >= 24 || (major === 22 && minor >= 13))) {
     console.error('Node.js 22.13以降の22系、または24以降(推奨24)を使ってください。')
@@ -529,7 +570,8 @@ async function main(): Promise<void> {
   }
   const now = new Date()
   if (!flags.dryRun) mkdirSync(LOGS, { recursive: true })
-  const logFile = join(LOGS, `${name}-${stamp(now).slice(0, 8)}.log`)
+  const executionName = deliveryTest ? 'asa-delivery-test' : name
+  const logFile = join(LOGS, `${executionName}-${stamp(now).slice(0, 8)}.log`)
   const log = (line: string) => {
     if (!line) return
     const text = `[${new Date().toISOString()}] ${line}\n`
@@ -543,23 +585,23 @@ async function main(): Promise<void> {
   }
   try {
     log(`===== ${name} 開始${flags.dryRun ? '(dry-run)' : ''} =====`)
-    await HANDLERS[name]({ config, dryRun: flags.dryRun, agent: flags.agent, force: flags.force, now, log })
+    await HANDLERS[name]({ config, dryRun: flags.dryRun, agent: flags.agent, force: flags.force, deliveryTest, now, log })
     if (!flags.dryRun) {
-      clearAlert(name, ROOT)
+      clearAlert(executionName, ROOT)
       if (name !== 'daily-sync' && name !== 'calendar-sync') {
-        appendActivity({ by: name, action: `${name} 完了`, why: '定常の自動運転', result: '成功' }, ROOT, now)
+        appendActivity({ by: executionName, action: `${executionName} 完了`, why: deliveryTest ? '初回導入の配信確認' : '定常の自動運転', result: '成功' }, ROOT, now)
       }
     }
     log(sentinelFor(name))
   } catch (error) {
     const message = (error as Error).message
     log(`失敗: ${message}`)
-    if (!flags.dryRun) recordAlert(name, message, logFile.split(/[\\/]/).pop(), ROOT, now)
+    if (!flags.dryRun) recordAlert(executionName, message, logFile.split(/[\\/]/).pop(), ROOT, now)
     process.exitCode = 1
   } finally {
     release()
     if (!flags.dryRun) {
-      pruneFiles(LOGS, new RegExp(`^${name}-\\d{8}\\.log$`), 30, now)
+      pruneFiles(LOGS, new RegExp(`^${executionName}-\\d{8}\\.log$`), 30, now)
       pruneFiles(join(LOGS, 'agent-runs'), /^(?!provider-health)/, 30, now)
       pruneFiles(join(LOGS, 'briefs'), /\.local\.md$/, 60, now)
     }

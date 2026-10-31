@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { access, mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises'
+import { access, mkdir, readFile, readdir, realpath, stat, writeFile } from 'node:fs/promises'
 import { delimiter, dirname, join, resolve } from 'node:path'
 import { createAnthropicApiAdapter } from './providers/anthropic-api.js'
 import { createChatGptPlanAdapter } from './providers/chatgpt-siwc.js'
@@ -929,7 +929,9 @@ export function createCodexAdapter(options: AdapterOptions, id: 'codex' | 'codex
       return {
         command: options.command,
         args,
-        stdin: request.prompt,
+        stdin: request.capabilities.some((capability) => /^(gmail|calendar|drive|sheets|google)\./.test(capability))
+          ? 'Google Workspace操作は、接続済みMCPのツールを直接使ってください。利用できるツールの名前・説明から発見し、ALL_TOOLSがあれば必要な項目だけ検索します。shellからbridgeやMCPを再起動・インストールせず、sandboxを変更しません。接続済みツールが見つからなければ「MCPが使えないため中止」と明示し、送信や処理を済ませたと報告しません。\n\n' + request.prompt
+          : request.prompt,
         cwd: request.cwd,
         env: workspacePolicyEnv(request),
       }
@@ -1173,7 +1175,14 @@ export async function runAgent(request: AgentRunRequest, options: RunAgentOption
     const ledger = await readFile(join(runDir, 'run.local.json'), 'utf8')
       .then((text) => JSON.parse(text) as AgentRunResult)
       .catch(() => null)
-    if (ledger && ledger.status) return ledger
+    if (ledger && ledger.status) {
+      if (ledger.status === 'succeeded' && ledger.outputRef) {
+        const outputPath = await realpath(resolve(ledger.outputRef))
+        if (dirname(outputPath) !== await realpath(runDir)) throw new Error('保存済みの出力が実行領域外を指しています。再実行せず停止しました。')
+        return { ...ledger, output: await readFile(outputPath, 'utf8') }
+      }
+      return ledger
+    }
     throw new Error(`runId ${request.runId} は既に実行中です。二重起動を防止しました(冪等キーの衝突)。`)
   }
   const attempts: AgentAttempt[] = []

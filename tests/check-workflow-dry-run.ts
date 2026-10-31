@@ -36,9 +36,9 @@ function snapshot(ignoreSqliteAuxiliary = false): Record<string, unknown> {
   }
   return result
 }
-function run(workflow: string, dryRun = true, dbPath = database) {
+function run(workflow: string, dryRun = true, dbPath = database, args: string[] = []) {
   const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !/^KATAZUKU_/i.test(key)))
-  return spawnSync(process.execPath, [join(dependencies, 'tsx', 'dist', 'cli.mjs'), 'scripts/workflow.ts', workflow, ...(dryRun ? ['--dry-run'] : [])], {
+  return spawnSync(process.execPath, [join(dependencies, 'tsx', 'dist', 'cli.mjs'), 'scripts/workflow.ts', workflow, ...(dryRun ? ['--dry-run'] : []), ...args], {
     cwd: fixture, windowsHide: true, encoding: 'utf8', timeout: 20_000,
     env: { ...env, KATAZUKU_CONFIG: config, KATAZUKU_DB: dbPath, KATAZUKU_CHATGPT_DIR: join(fixture, 'chatgpt') },
   })
@@ -85,6 +85,20 @@ try {
   db.exec('PRAGMA journal_mode = DELETE')
   db.close()
   for (const workflow of WORKFLOW_NAMES) unchanged(workflow)
+  writeFileSync(config, JSON.stringify({ notify: { desktop: false, selfEmail: true }, google: {
+    accounts: [{ id: 'synthetic-owner', email: ['owner', 'example.test'].join('@'), primary: true, calendars: 'primary' }],
+  } }))
+  const beforeDelivery = snapshot()
+  const delivery = run('asa', true, database, ['--delivery-test', 'setup-smoke'])
+  check('初回配信試験は独立した件名と試験IDを表示する', delivery.status === 0
+    && delivery.stdout.includes('OSS初回導入・朝まとめ配信確認') && delivery.stdout.includes('setup-smoke'))
+  const deliveryCapabilities = delivery.stdout.split('\n').find((line) => line.startsWith('[dry-run] capabilities:')) ?? ''
+  check('初回配信試験は本人宛送信と読取だけを許可する', deliveryCapabilities.includes('gmail.send.self')
+    && !/gmail.draft|gmail.labels|calendar.write/.test(deliveryCapabilities))
+  check('初回配信試験のdry-runはDB・ログを変更しない', JSON.stringify(snapshot()) === JSON.stringify(beforeDelivery))
+  check('初回配信の試験IDでパスを外へ出せない', run('asa', true, database, ['--delivery-test', '../outside']).status === 1)
+  check('初回配信のflagは他workflowへ流用できない', run('mail-watch', true, database, ['--delivery-test', 'setup-smoke']).status === 1)
+  writeFileSync(config, JSON.stringify({ notify: { desktop: false, selfEmail: false } }))
 
   const legacy = new DatabaseSync(database)
   legacy.exec('PRAGMA user_version = 1')

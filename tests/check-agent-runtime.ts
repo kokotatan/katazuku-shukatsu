@@ -308,6 +308,7 @@ try {
       && envConfig.includes('GOOGLE_OAUTH_CLIENT_SECRET')), 'STDIO MCPへenv名を転送していません')
     assert(invocation.args.includes('mcp_servers.google-workspace.required=true'), 'Google接続を待たずに実行を開始します')
     assert(!invocation.args.some((arg) => arg.includes(syntheticEmail)), '本人アドレスをコマンド引数へ出しています')
+    assert(invocation.stdin?.includes('接続済みMCP') && invocation.stdin.includes('shellからbridgeやMCPを再起動'), '制限shellからMCPの再起動へ逸れます')
   })
 
   await check('ローカルOSS adapterはCodexのlocal provider境界を使う', () => {
@@ -450,6 +451,7 @@ try {
     const callsAfterFirst = calls.length
     const second = await runAgent(req(), opts)
     assert(second.runId === first.runId && second.status === first.status, '再試行が既存結果を返していません')
+    assert(second.output === first.output, '再試行で保存済みの完了出力が失われます')
     assert(calls.length === callsAfterFirst, '再試行で provider を二重起動しています')
   })
 
