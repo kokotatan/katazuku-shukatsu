@@ -120,6 +120,11 @@ CLIの子プロセスへ一時的に渡します。bridgeはそれ以外の宛�
 本人アドレスはメールアドレスとして明示します。bridgeは未知のtoolや不明な宛先形式を拒否します。
 新しいworkspace-mcp toolを使う際は、同梱ポリシーで操作の種類を確認して個別に対応する必要があります。
 
+`notify.selfEmail=true` は、設定した本人アドレスへ通知を送ることの継続許可です。
+Codexの非対話実行では、そのworkflowが本人宛送信の能力を持つ場合だけ`send_gmail_message`を承認待ちなしで使います。
+このときも同梱guardを必ず通し、別の送信元、外部to/cc/bcc、未知の操作を拒否します。
+全体の承認設定・sandboxや、他のGoogle書込みの承認条件は変更しません。通知しない場合は`false`へ戻します。
+
 #### Windowsで `spawn EPERM` が出る場合
 
 Codexの制限されたshell内で、Node.jsからさらにGoogle MCP用の子プロセスを起動すると、

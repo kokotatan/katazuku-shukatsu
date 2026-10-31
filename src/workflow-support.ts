@@ -166,6 +166,7 @@ export interface AgentStepOptions {
   sideEffectMode: SideEffectMode
   timeoutMs: number
   outputSchemaPath?: string
+  completionMarker?: string
   /** 'auto' 以外を指定したら、その provider だけで実行する(診断用。利用枠の健康状態を迂回する) */
   agent?: string
   root?: string
@@ -192,6 +193,7 @@ export async function runAgentStep(options: AgentStepOptions): Promise<AgentRunR
     risk: options.risk,
     sideEffectMode: options.sideEffectMode,
     outputSchemaPath: options.outputSchemaPath,
+    completionMarker: options.completionMarker,
     providerOrder: order,
     timeoutMs: options.timeoutMs,
     workspacePolicy: {
