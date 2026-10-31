@@ -97,7 +97,9 @@ CLIのユーザー設定だけへ登録しても、katazukuのツール工程で
 [mcp_servers.google-workspace]
 command = "node"
 args = ["scripts/google-workspace-bridge.mjs"]
-env_vars = ["GOOGLE_OAUTH_CLIENT_ID", "GOOGLE_OAUTH_CLIENT_SECRET"]
+env_vars = ["GOOGLE_OAUTH_CLIENT_ID", "GOOGLE_OAUTH_CLIENT_SECRET", "USER_GOOGLE_EMAIL", "KATAZUKU_WORKSPACE_CAPABILITIES", "KATAZUKU_WORKSPACE_SELF_EMAILS", "KATAZUKU_WORKSPACE_ALLOWED_SENDERS", "KATAZUKU_GOOGLE_MCP_COMMAND", "KATAZUKU_GOOGLE_MCP_ARGS_JSON", "KATAZUKU_GOOGLE_CREDENTIALS_DIR", "KATAZUKU_GOOGLE_MCP_ENV_ALLOWLIST"]
+required = true
+startup_timeout_sec = 120
 ```
 
 ```sh
@@ -110,10 +112,13 @@ Codex内で `/mcp` を開き、サーバー接続を確認します。初回は�
 通常の `npm run workflow -- ...` は実行ごとのcapabilityと、`katazuku.config.json`で本人が設定したGoogleアドレスを
 CLIの子プロセスへ一時的に渡します。bridgeはそれ以外の宛先・送信元を拒否します。手動のCLIセッションでは
 安全側でGoogle toolをすべて拒否するため、まず読み取りだけを試す場合も、そのセッションに限って
-`KATAZUKU_WORKSPACE_CAPABILITIES=["gmail.read","calendar.read"]` を環境変数として渡してください。
+`KATAZUKU_WORKSPACE_CAPABILITIES=["gmail.read","calendar.read","google.auth"]` を環境変数として渡してください。
+`google.auth` は本人が初回認証を行う対話セッション専用で、定常workflowには渡しません。
 本人宛送信を試す場合は `gmail.send.self` と、本人アドレスのJSON配列を
 `KATAZUKU_WORKSPACE_SELF_EMAILS`、`KATAZUKU_WORKSPACE_ALLOWED_SENDERS` に指定します。
 第三者送信の承認値を手で作ったり、`.env`へ恒久保存したりしないでください。
+本人アドレスはメールアドレスとして明示します。bridgeは未知のtoolや不明な宛先形式を拒否します。
+新しいworkspace-mcp toolを使う際は、同梱ポリシーで操作の種類を確認して個別に対応する必要があります。
 
 #### Windowsで `spawn EPERM` が出る場合
 

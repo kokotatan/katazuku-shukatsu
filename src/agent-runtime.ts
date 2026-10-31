@@ -905,6 +905,12 @@ export function createCodexAdapter(options: AdapterOptions, id: 'codex' | 'codex
       // 明示する作業領域であり、Gitの有無で正規の実行を止めない。sandboxは別途維持する。
       const args = ['exec', '-C', request.cwd, '--skip-git-repo-check', '--color', 'never', '--json', '--output-last-message', paths.finalOutputPath]
       args.push('--sandbox', request.risk === 'read-only' ? 'read-only' : 'workspace-write')
+      if (request.capabilities.some((capability) => /^(gmail|calendar|drive|sheets|google)\./.test(capability))) {
+        // CLIへのenv指定だけではSTDIO MCPへ届かない。値を引数へ出さず、必要な名前だけ転送する。
+        args.push('-c', `mcp_servers.google-workspace.env_vars=${JSON.stringify(googleMcpEnvNames())}`)
+        args.push('-c', 'mcp_servers.google-workspace.required=true')
+        args.push('-c', 'mcp_servers.google-workspace.startup_timeout_sec=120')
+      }
       if (request.capabilities.includes('web.search')) args.push(...webSearchArgs)
       if (request.capabilities.includes('voice.transcribe') && options.voiceboxMcpUrl) {
         args.push('-c', `mcp_servers.voicebox.url=${JSON.stringify(options.voiceboxMcpUrl)}`)
@@ -983,18 +989,29 @@ export function createClaudeAdapter(options: AdapterOptions): AgentAdapter {
   }
 }
 
+function googleMcpEnvNames(): string[] {
+  const raw = process.env.KATAZUKU_GOOGLE_MCP_ENV_ALLOWLIST ?? ''
+  const extra: unknown = raw.trim().startsWith('[') ? JSON.parse(raw) : raw.split(',').map((name) => name.trim()).filter(Boolean)
+  if (!Array.isArray(extra) || extra.some((name) => typeof name !== 'string' || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(name))) {
+    throw new Error('KATAZUKU_GOOGLE_MCP_ENV_ALLOWLISTは環境変数名の配列で指定してください')
+  }
+  return [...new Set([
+    'GOOGLE_OAUTH_CLIENT_ID', 'GOOGLE_OAUTH_CLIENT_SECRET', 'USER_GOOGLE_EMAIL',
+    'KATAZUKU_WORKSPACE_CAPABILITIES', 'KATAZUKU_WORKSPACE_SELF_EMAILS', 'KATAZUKU_WORKSPACE_ALLOWED_SENDERS',
+    'KATAZUKU_GOOGLE_MCP_COMMAND', 'KATAZUKU_GOOGLE_MCP_ARGS_JSON', 'KATAZUKU_GOOGLE_MCP_ENV_ALLOWLIST',
+    'KATAZUKU_GOOGLE_CREDENTIALS_DIR',
+    ...extra,
+  ])]
+}
+
 function workspacePolicyEnv(request: AgentRunRequest): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = {
     KATAZUKU_WORKSPACE_CAPABILITIES: JSON.stringify(request.capabilities),
     KATAZUKU_WORKSPACE_SELF_EMAILS: JSON.stringify(request.workspacePolicy?.selfEmails ?? []),
     KATAZUKU_WORKSPACE_ALLOWED_SENDERS: JSON.stringify(request.workspacePolicy?.allowedSenderEmails ?? []),
   }
-  for (const key of [
-    'KATAZUKU_GOOGLE_MCP_COMMAND',
-    'KATAZUKU_GOOGLE_MCP_ARGS_JSON',
-    'KATAZUKU_GOOGLE_MCP_ENV_ALLOWLIST',
-    'KATAZUKU_GOOGLE_CREDENTIALS_DIR',
-  ]) {
+  for (const key of googleMcpEnvNames()) {
+    if (key.startsWith('KATAZUKU_WORKSPACE_')) continue // 実行要求の境界をホストenvで上書きさせない。
     if (process.env[key] !== undefined) env[key] = process.env[key]
   }
   return env

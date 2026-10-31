@@ -90,8 +90,15 @@ function beginShutdown(exitCode = 0) {
 let stdinBuffer = ''
 function forwardLine(line) {
   if (!line.trim()) return
+  let message
   try {
-    const message = JSON.parse(line)
+    message = JSON.parse(line)
+  } catch {
+    process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: null,
+      error: { code: -32700, message: 'Invalid JSON-RPC input' } }) + '\n')
+    return
+  }
+  try {
     const verdict = evaluateWorkspaceToolCall(message, {
       selfEmails,
       allowedSenderEmails,
@@ -104,7 +111,9 @@ function forwardLine(line) {
     }
     if (verdict.consumeApproval) approvedCall = undefined
   } catch {
-    // JSON-RPC以外の行はプロトコル互換性のため、そのままupstreamへ渡す。
+    // 検証処理が例外になってもupstreamへ流さない。
+    process.stdout.write(JSON.stringify(blockedToolResult(message?.id ?? null, 'Google Workspaceの操作検証に失敗したため拒否しました。')) + '\n')
+    return
   }
   child.stdin.write(line + '\n')
 }

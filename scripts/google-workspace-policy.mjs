@@ -8,9 +8,18 @@ const SENDER_KEYS = new Set([
 ])
 
 function emailsIn(value) {
+  if (value == null || value === '') return []
   if (Array.isArray(value)) return value.flatMap(emailsIn)
-  if (typeof value !== 'string') return []
-  return value.toLowerCase().match(/[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?/g) || []
+  if (typeof value !== 'string' || /[\r\n\0]/.test(value)) throw new Error('検証できないメールアドレス形式です')
+  return value.split(',').map((part) => {
+    const text = part.trim()
+    const angle = text.match(/^[^<>]*<\s*([^<>]+)\s*>$/)
+    const email = (angle ? angle[1] : text).trim().toLowerCase()
+    if (!/^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/.test(email)) {
+      throw new Error('検証できないメールアドレス形式です')
+    }
+    return email
+  })
 }
 
 function emailsForKeys(args, keys) {
@@ -54,18 +63,22 @@ function approvedCallMatches(message, approvedCall) {
   })
 }
 
-function requiredCapability(toolName) {
-  const name = toolName.toLowerCase()
-  if (name.includes('draft_gmail_message')) return 'gmail.draft'
-  if (name.includes('gmail') && /(label|modify)/.test(name)) return 'gmail.labels'
-  if (name.includes('gmail')) return 'gmail.read'
-  if (/(manage_event|create_calendar)/.test(name)) return 'calendar.write'
-  if (/(get_events|list_calendars|query_freebusy)/.test(name)) return 'calendar.read'
-  if (/(modify_sheet|append_table)/.test(name)) return 'sheets.write'
-  if (/(sheet|spreadsheet)/.test(name)) return 'sheets.read'
-  if (name.includes('drive')) return 'drive.read'
-  return undefined
-}
+// 部分一致で未知の送信・共有・削除をreadとして通さない。追加toolは仕様を確認して個別登録する。
+const TOOL_CAPABILITIES = new Map(Object.entries({
+  'google.auth': ['start_google_auth'],
+  'gmail.read': ['search_gmail_messages', 'get_gmail_message_content', 'get_gmail_messages_content_batch',
+    'get_gmail_attachment_content', 'get_gmail_thread_content', 'get_gmail_threads_content_batch',
+    'list_gmail_labels', 'list_gmail_filters'],
+  'gmail.draft': ['draft_gmail_message'],
+  'gmail.labels': ['manage_gmail_label', 'modify_gmail_message_labels', 'batch_modify_gmail_message_labels'],
+  'calendar.read': ['list_calendars', 'get_events', 'query_freebusy'],
+  'calendar.write': ['manage_event', 'create_calendar'],
+  'drive.read': ['search_drive_files', 'get_drive_file_content', 'get_drive_file_download_url',
+    'list_drive_items', 'get_drive_file_permissions', 'check_drive_file_public_access'],
+  'sheets.read': ['list_spreadsheets', 'get_spreadsheet_info', 'read_sheet_values',
+    'list_sheet_tables', 'list_spreadsheet_comments'],
+  'sheets.write': ['modify_sheet_values', 'append_table_rows'],
+}).flatMap(([capability, names]) => names.map((name) => [name, capability])))
 
 /**
  * send_gmail_message は送信元と全宛先(to/cc/bcc)を必須にする。
@@ -73,13 +86,16 @@ function requiredCapability(toolName) {
  * gmail.send.confirmed capability と同時に満たした場合だけ、一度だけ許可する。
  */
 export function evaluateWorkspaceToolCall(message, policy = {}) {
-  if (!message || typeof message !== 'object' || message.method !== 'tools/call') return { allow: true }
+  if (!message || typeof message !== 'object' || Array.isArray(message)) {
+    return { allow: false, reason: 'JSON-RPCは一件ずつ検証する必要があります。batchや非object入力は拒否します。' }
+  }
+  if (message.method !== 'tools/call') return { allow: true }
 
   const name = String(message.params?.name || '').toLowerCase()
   const granted = new Set((policy.capabilities || []).map((value) => String(value).trim()).filter(Boolean))
-  const isSend = name.includes('send_gmail_message')
+  const isSend = name === 'send_gmail_message'
   if (!isSend) {
-    const required = requiredCapability(name)
+    const required = TOOL_CAPABILITIES.get(name)
     if (!required || !granted.has(required)) {
       return { allow: false, reason: `このworkflowに許可されていないGoogle Workspace操作です: ${name || '(tool名なし)'}` }
     }
@@ -87,12 +103,18 @@ export function evaluateWorkspaceToolCall(message, policy = {}) {
   }
 
   const args = message.params?.arguments
-  const recipients = recipientsOf(args)
+  let recipients
+  let senders
+  try {
+    recipients = recipientsOf(args)
+    senders = sendersOf(args)
+  } catch {
+    return { allow: false, reason: '宛先または送信元の形式を検証できないため拒否しました。' }
+  }
   if (!recipients.length) {
     return { allow: false, reason: 'to/cc/bccをコードで検証できないため送信を拒否しました。宛先を明示してください。' }
   }
 
-  const senders = sendersOf(args)
   if (senders.length !== 1) {
     return { allow: false, reason: '送信元を一意に検証できないため送信を拒否しました。user_google_emailを明示してください。' }
   }

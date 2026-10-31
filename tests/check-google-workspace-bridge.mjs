@@ -62,17 +62,33 @@ const approvedArgs = {
   attachments: [{ path: 'synthetic.pdf', sha256: '0'.repeat(64) }],
 }
 
-const selfResponses = await runBridge({ capabilities: ['gmail.send.self', 'gmail.read'] }, (child) => {
+const selfResponses = await runBridge({ capabilities: ['gmail.send.self', 'gmail.read', 'drive.read', 'sheets.read'] }, (child) => {
   sendCall(child, 1, 'send_gmail_message', selfArgs)
   sendCall(child, 2, 'send_gmail_message', { ...selfArgs, cc: [EXTERNAL] })
   sendCall(child, 3, 'send_gmail_message', { ...selfArgs, user_google_email: ATTACKER })
   sendCall(child, 4, 'send_gmail_message', { ...selfArgs, user_google_email: undefined })
   sendCall(child, 5, 'search_gmail_messages', { user_google_email: OWNER, query: 'synthetic' })
   sendCall(child, 6, 'delete_everything', {})
+  for (const [offset, tool] of ['delete_gmail_message', 'manage_gmail_filter', 'send_draft_gmail_message',
+    'create_drive_file', 'manage_drive_access', 'set_drive_file_permissions', 'create_spreadsheet',
+    'create_sheet', 'manage_spreadsheet_comment', 'unknown_search_gmail_messages'].entries()) {
+    sendCall(child, 30 + offset, tool, selfArgs)
+  }
+  sendCall(child, 40, 'send_gmail_message', { ...selfArgs, bcc: { address: EXTERNAL } })
+  sendCall(child, 41, 'send_gmail_message', { ...selfArgs, to: `${OWNER}\r\nBcc: ${EXTERNAL}` })
+  sendCall(child, 42, 'send_gmail_message', { ...selfArgs, to: [OWNER, 'unknown-local-alias'] })
+  sendCall(child, 43, 'send_gmail_message', { ...selfArgs, from: 'unverifiable-alias' })
+  sendCall(child, 44, 'get_drive_file_content', { user_google_email: OWNER, file_id: 'synthetic-file' })
+  child.stdin.write(JSON.stringify([{ jsonrpc: '2.0', id: 45, method: 'tools/call',
+    params: { name: 'send_gmail_message', arguments: { ...selfArgs, to: [EXTERNAL] } } }]) + '\n')
 })
 assert.match(selfResponses.find((item) => item.id === 1).result.content[0].text, /^upstream:/)
-for (const id of [2, 3, 4, 6]) assert.equal(selfResponses.find((item) => item.id === id).result.isError, true)
+for (const id of [2, 3, 4, 6, ...Array.from({ length: 14 }, (_, i) => 30 + i)]) {
+  assert.equal(selfResponses.find((item) => item.id === id).result.isError, true, `blocked call ${id} reached upstream`)
+}
 assert.match(selfResponses.find((item) => item.id === 5).result.content[0].text, /^upstream:/)
+assert.match(selfResponses.find((item) => item.id === 44).result.content[0].text, /^upstream:/)
+assert.equal(selfResponses.find((item) => item.id == null)?.result.isError, true, 'JSON-RPC batch reached upstream')
 
 const approvedResponses = await runBridge({
   capabilities: ['gmail.send.confirmed'],
@@ -80,6 +96,9 @@ const approvedResponses = await runBridge({
 }, (child) => {
   sendCall(child, 10, 'send_gmail_message', { ...approvedArgs, body: 'Modified body' })
   sendCall(child, 11, 'send_gmail_message', { ...approvedArgs, bcc: [HIDDEN] })
+  const deep = '['.repeat(15000) + '0' + ']'.repeat(15000)
+  child.stdin.write('{"jsonrpc":"2.0","id":14,"method":"tools/call","params":{"name":"send_gmail_message","arguments":'
+    + JSON.stringify(approvedArgs).slice(0, -1) + ',"deep":' + deep + '}}}\n')
   sendCall(child, 12, 'send_gmail_message', approvedArgs)
   sendCall(child, 13, 'send_gmail_message', approvedArgs)
 })
@@ -87,6 +106,7 @@ assert.equal(approvedResponses.find((item) => item.id === 10).result.isError, tr
 assert.equal(approvedResponses.find((item) => item.id === 11).result.isError, true)
 assert.match(approvedResponses.find((item) => item.id === 12).result.content[0].text, /^upstream:/)
 assert.equal(approvedResponses.find((item) => item.id === 13).result.isError, true)
+assert.equal(approvedResponses.find((item) => item.id === 14).result.isError, true, 'policy validation exception reached upstream')
 
 const noCapability = await runBridge({ capabilities: [] }, (child) => {
   sendCall(child, 20, 'send_gmail_message', selfArgs)

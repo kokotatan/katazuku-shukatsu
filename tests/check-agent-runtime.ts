@@ -302,6 +302,12 @@ try {
     assert(invocation.env?.KATAZUKU_WORKSPACE_CAPABILITIES === '["gmail.read","gmail.send.self"]', 'capabilityがbridgeへ渡りません')
     assert(invocation.env?.KATAZUKU_WORKSPACE_SELF_EMAILS === JSON.stringify([syntheticEmail]), '本人宛境界がbridgeへ渡りません')
     assert(invocation.env?.KATAZUKU_WORKSPACE_ALLOWED_SENDERS === JSON.stringify([syntheticEmail]), '送信元境界がbridgeへ渡りません')
+    const envConfig = invocation.args.find((arg) => arg.startsWith('mcp_servers.google-workspace.env_vars='))
+    assert(Boolean(envConfig?.includes('KATAZUKU_WORKSPACE_CAPABILITIES')
+      && envConfig.includes('KATAZUKU_WORKSPACE_ALLOWED_SENDERS')
+      && envConfig.includes('GOOGLE_OAUTH_CLIENT_SECRET')), 'STDIO MCPへenv名を転送していません')
+    assert(invocation.args.includes('mcp_servers.google-workspace.required=true'), 'Google接続を待たずに実行を開始します')
+    assert(!invocation.args.some((arg) => arg.includes(syntheticEmail)), '本人アドレスをコマンド引数へ出しています')
   })
 
   await check('ローカルOSS adapterはCodexのlocal provider境界を使う', () => {
