@@ -92,7 +92,8 @@ sequenceDiagram
 工程ごとの再開台帳、承認hash付きworkflow契約、録音後の文字起こし・構造化議事録・正本反映、
 provider-neutralな外部操作契約、Muse向けOAuth MCP gatewayは実装済みです。
 
+Windowsのローカル認証はDPAPI CurrentUser、隔離Chrome、origin/テナントパス二重検査、MFA/CAPTCHA停止まで実装済みです。
 残る課題は、Muse Connectorのproduction提出・審査・利用者アカウント接続、実サイトごとの規約確認済みbrowser adapter、
-Google共通接続の権限審査、OS native資格情報ストア、macOS/Linuxでの定期実行とkeychainの実機検証です。
+Google共通接続の権限審査、macOS Keychain/Linux Secret Service、macOS/Linuxでの定期実行の実機検証です。
 外部アカウントやproduction証拠が無い状態を実装済み・接続済み・審査済みとは扱いません。
 優先順と参加できる作業は[ROADMAP.md](../ROADMAP.md)を参照してください。

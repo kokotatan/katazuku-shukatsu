@@ -52,11 +52,12 @@ Googleとの通信や、選択したAIプロバイダへの情報送信は発生
 | ハーネス改善ループ | run台帳を匿名化した最小観測へ変え、失敗を合成回帰caseにしてbaseline比較する。合格候補も人がrevisionを確認するまで反映しない | 不要 | — |
 | 閲覧アプリ8本 | きょう / 選考 / 企業 / メール / 人 / 面接準備 / プロフィール / 効果 | 不要 | — |
 | 面談の録音(任意・Windows) | オンライン面談を相手の声つきで録る | 不要 | — |
+| 安全なローカルログイン(任意・Windows) | DPAPIで保護した資格情報を隔離Chromeへだけ入力。origin・テナントパスを再検査し、MFA/CAPTCHA/規約同意では停止 | 不要 | 本人が登録した採用サービス |
 | Gemini Spark 連携(任意) | スマホから予定・選考状況を聞く | 不要 | 自分の Cloudflare |
 | katazuku MCP(任意) | Muse・Codex・Claude Codeから正本を読み、明示scopeで冪等入力と承認提案を行う。利用者のMuseアカウントが対象メールボックスに対応する場合は、毎回承認・action hash・Sent再照合付きのemail connector経路を使える。未対応のiCloudはprivate adapterへ分離する。フォーム提出と採用ポータル送信も、汎用workflow契約で本人承認・外部冪等キー・監査を必須にする。remote用OAuth gatewayもセルフホスト可能 | 不要 | 対応MCPクライアント・任意で自分のCloudflare |
 
 詳しい動きは [docs/WORKFLOWS.md](docs/WORKFLOWS.md)、AIの選び方は [docs/AI-PROVIDERS.md](docs/AI-PROVIDERS.md)。
-MCPは[MCPガイド](docs/MCP.md)、Museは[Muse接続ガイド](docs/MUSE.md)、運用を失敗から改善する仕組みは[ハーネス改善ループ](docs/HARNESS-IMPROVEMENT.md)を参照してください。private版との差と意図的な秘密境界は[追随台帳](docs/PRIVATE-PARITY.md)に固定しています。
+MCPは[MCPガイド](docs/MCP.md)、Museは[Muse接続ガイド](docs/MUSE.md)、安全なWindowsログインは[ローカル認証ブローカー](scripts/local-login/README-daily-login.md)、運用を失敗から改善する仕組みは[ハーネス改善ループ](docs/HARNESS-IMPROVEMENT.md)を参照してください。private版との差と意図的な秘密境界は[追随台帳](docs/PRIVATE-PARITY.md)に固定しています。
 
 ## やらないこと(コードで止めている安全境界)
 
@@ -132,6 +133,8 @@ npm run workflow -- asa --dry-run        # 朝のまとめのプロンプトと�
 3. AI を選ぶ: `npm run chatgpt -- signin`(ChatGPT プラン)、または Claude Code / Codex にログイン
 4. `--dry-run` で確認してから、毎日のワークフローを登録する
 5. `npm start` で8画面と朝・前夜のまとめを一つのローカルURLから開く
+
+採用サービスへの継続ログインが必要なWindows利用者は、セットアップ後に[ローカル認証ブローカー](scripts/local-login/README-daily-login.md)を任意で設定できます。資格情報は正本DBやMCPへ入らず、サービス・設定世代別のDPAPI暗号文として端末内だけに保存されます。
 
 Muse、Codex、Claude Codeなどから正本を使う場合は、既定で読取専用のMCPを起動できます。
 

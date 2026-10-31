@@ -69,6 +69,7 @@ DB初期化後に `docs/GOOGLE_WORKSPACE_SETUP.md` の利用者別OAuth設定へ
 | `src/transcription.ts` / `src/transcribe-audio.ts` / `src/interview-minutes.ts` | 面談録音の文字起こし(voicebox / faster-whisper)と、読み取り専用エージェントによる議事録化。[docs/TRANSCRIPTION.md](docs/TRANSCRIPTION.md) |
 | `src/face-crop.ts` / `src/interview-faces.ts` / `src/png.ts` | 面談スクショからの顔写真の切り出しと、本人が書いた対応による `people[].photoPath` の付与(顔と人物を推測しない) |
 | `src/interview-autopilot.ts` + `scripts/interview-autopilot.ts` | 録り終わった録音を見つけて議事録化する定期実行(ロック・処理済みの記録・活動ログ) |
+| `scripts/local-login/` | Windows DPAPI、隔離Chrome、origin/テナントパス再検査を使うローカル認証ブローカー。個人URL・暗号文・プロファイルはGit/DB/MCPへ出さない。 |
 | `tools/scan-secrets.mjs` | 個人情報・秘密情報の混入検査(CIゲート) |
 | `tests/check-*.ts` | 依存ゼロの自前assertテスト |
 
