@@ -22,6 +22,7 @@ import { listPlatformSnapshot, saveBasicProfile, upsertCompanyDossier, upsertMai
 import { upsertPerson } from '../src/inputs.js'
 import { applySubmissionRequirements } from '../src/submission-requirement.js'
 import { evaluateSubmissionReadiness } from '../src/submission-readiness.js'
+import { readConsistentSnapshot } from '../src/database-maintenance.js'
 import type { DatabaseSync } from 'node:sqlite'
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -30,15 +31,16 @@ const here = dirname(fileURLToPath(import.meta.url))
 const TARGETS = ['board', 'status', 'inbox', 'insight', 'profile', 'people', 'prep', 'impact']
 
 export function buildSnapshot(db: DatabaseSync, demo: boolean): Record<string, unknown> {
-  const selections = listSelections(db)
-  const companyOf = new Map(selections.map((s) => [s.id, s.company]))
-  const platform = listPlatformSnapshot(db)
+  return readConsistentSnapshot(db, () => {
+    const selections = listSelections(db)
+    const companyOf = new Map(selections.map((s) => [s.id, s.company]))
+    const platform = listPlatformSnapshot(db)
 
-  return {
-    generatedAt: new Date().toISOString(),
-    demo,
-    // ログインID・パスワードは意図的に出さない(見る窓に認証情報は要らない)
-    companies: listCompanies(db).map((c) => ({
+    return {
+      generatedAt: new Date().toISOString(),
+      demo,
+      // ログインID・パスワードは意図的に出さない(見る窓に認証情報は要らない)
+      companies: listCompanies(db).map((c) => ({
       name: c.name, shortName: c.shortName ?? '', industry: c.industry,
       mypageUrl: c.mypageUrl, memo: c.memo,
     })),
@@ -69,8 +71,9 @@ export function buildSnapshot(db: DatabaseSync, demo: boolean): Record<string, u
     })),
     dossiers: platform.dossiers,
     mailItems: platform.mailItems,
-    pending: listPending(db).map((p) => ({ name: p.name, context: p.context, createdAt: p.created_at })),
-  }
+      pending: listPending(db).map((p) => ({ name: p.name, context: p.context, createdAt: p.created_at })),
+    }
+  })
 }
 
 /** 架空データだけでアプリ群を一通り埋める。実在の企業・人物は登場しない */

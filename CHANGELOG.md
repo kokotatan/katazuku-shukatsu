@@ -7,6 +7,7 @@
 
 ### Added
 
+- 正本DBの保全API。未知の将来版を変更前に拒否し、移行を排他トランザクション化した。移行前バックアップはSQLite自身でWALを畳み、整合性・外部キー・ディスク同期を検査して一意名へ上書きせず保存する。閲覧スナップショットも複数テーブルを同じ時点から読む。
 - Museなどのremote MCP client向けに、Cloudflare上へ正本や資格情報を置かないOAuth 2.1/PKCE gatewayと、端末から外向きに接続する認証済みbridgeを追加。`katazuku:read` / `write` / `sensitive` / `actions`をOAuth tokenと端末allowlistの両方で検査する。
 - 面接・面談準備のスキーマ v5。企業研究の出典、予定・相手・過去記録の根拠hash、30日鮮度、48時間以内の最終確認を全件再評価し、正本へ冪等保存する。MCPからもscope別に状態確認・根拠取得・保存ができる。
 - capability-scoped katazuku MCP。正本DBの読取り、取得済み事実の冪等反映、個人スナップショット、第三者操作の承認提案を`read` / `write` / `sensitive` / `actions`へ分離した。

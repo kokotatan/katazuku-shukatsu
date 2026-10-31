@@ -5,7 +5,7 @@
  * スナップショットが残ること、未来の版のDBを古いコードで開かないことを確かめる。
  *   npm run test:migration
  */
-import { existsSync, mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, readdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
@@ -43,16 +43,19 @@ new DatabaseSync(path).close()
 const first = openDb(path)
 upsertCompany(first, { name: '株式会社サンプルA' })
 first.close()
-check('破壊的な版の適用前スナップショットが残る', existsSync(`${path}.v1.bak`))
+const backupsAfterMigration = readdirSync(dir).filter((name) => name.startsWith('katazuku.db.before-v1-') && name.endsWith('.db'))
+check('破壊的な版の適用前バックアップが一意名で残る', backupsAfterMigration.length === 1, backupsAfterMigration.join(', '))
 
 // --- 再オープンで再適用しない ---
 const reopened = openDb(path)
 check('再オープンしても版は変わらない', userVersion(reopened) === SCHEMA_VERSION)
 check('再オープンでデータが消えない', listCompanies(reopened).some((c) => c.name === '株式会社サンプルA'))
-rmSync(`${path}.v1.bak`, { force: true })
 reopened.close()
 const third = openDb(path)
-check('適用済みの版はスナップショットを取り直さない(=再実行していない)', !existsSync(`${path}.v1.bak`))
+const backupsAfterReopen = readdirSync(dir).filter((name) => name.startsWith('katazuku.db.before-v1-') && name.endsWith('.db'))
+check('適用済みの版はバックアップを取り直さない(=再実行していない)', backupsAfterReopen.length === backupsAfterMigration.length)
+const indexes = third.prepare("SELECT name FROM sqlite_schema WHERE type = 'index'").all() as { name: string }[]
+check('履歴・予定の主要索引を維持する', ['idx_event_at_id', 'idx_appointment_at_id'].every((name) => indexes.some((row) => row.name === name)))
 third.close()
 
 // --- 未来の版のDBは開かない ---

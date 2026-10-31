@@ -7,11 +7,19 @@
  * - だから「上書きしない」ではなく「遷移規則で堂々と更新する」(transition() に集約)
  */
 import { DatabaseSync } from 'node:sqlite'
-import { existsSync, mkdirSync, rmSync } from 'node:fs'
+import { randomUUID } from 'node:crypto'
+import { existsSync, mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { ensurePlatformSchema } from './platform.js'
 import { ensureCareerSupportSchema } from './career-support-schema.js'
 import { ensureWorkflowSchema } from './workflow-schema.js'
+import {
+  assertDatabaseIntegrity,
+  assertSupportedDatabase,
+  createDatabaseBackup,
+  databaseVersion,
+  ensureCoreIndexes,
+} from './database-maintenance.js'
 
 export interface Selection {
   id?: number
@@ -47,7 +55,10 @@ export function openDb(path: string): DatabaseSync {
   const existed = path !== ':memory:' && existsSync(path)
   mkdirSync(dirname(path), { recursive: true })
   const db = new DatabaseSync(path)
-  db.exec(`
+  try {
+    // 将来版を古いコードで開いた場合は、journal_mode変更やCREATE TABLEより先に止める。
+    assertSupportedDatabase(db, SCHEMA_VERSION)
+    db.exec(`
     PRAGMA journal_mode = WAL;
     PRAGMA busy_timeout = 5000;
     PRAGMA foreign_keys = ON;
@@ -121,11 +132,10 @@ export function openDb(path: string): DatabaseSync {
       status TEXT NOT NULL DEFAULT '予定',  -- 予定 / 完了 / 中止
       created_at TEXT NOT NULL
     );
-  `)
-  // マイグレーションに失敗したら開きっぱなしにしない。
-  // 呼び手は例外で気づくが、ハンドルが残るとファイルを掴んだままになる。
-  try {
+    `)
     migrate(db, path, existed)
+    ensureCoreIndexes(db)
+    assertDatabaseIntegrity(db)
   } catch (error) {
     db.close()
     throw error
@@ -213,33 +223,43 @@ const MIGRATIONS: Migration[] = [
   },
 ]
 
-/** 適用前のスナップショット。`VACUUM INTO` で WAL を畳んだ1ファイルを隣に置く */
-function snapshotBeforeMigration(db: DatabaseSync, path: string, version: number): string {
-  const target = `${path}.v${version}.bak`
-  rmSync(target, { force: true })
-  db.exec(`VACUUM INTO '${target.replace(/'/g, "''")}'`)
-  return target
-}
-
 function migrate(db: DatabaseSync, path: string, existed: boolean): void {
-  const current = (db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version
-  for (const migration of MIGRATIONS) {
-    if (migration.version <= current) continue
-    // インメモリDBはバックアップの取りようが無い(消えて困るデータも無い)ので飛ばす
-    // 新規作成中の空DBには守るべき旧データがない。既存ファイルだけ退避する。
-    if (migration.destructive && existed) {
-      const target = snapshotBeforeMigration(db, path, migration.version)
-      console.warn(`スキーマ v${migration.version} を適用します。適用前のスナップショット: ${target}`)
+  assertSupportedDatabase(db, SCHEMA_VERSION)
+  if (databaseVersion(db) === SCHEMA_VERSION) return
+
+  db.exec('BEGIN IMMEDIATE')
+  try {
+    // ロック取得後に再判定する。他プロセスが先に移行を完了していても二重適用しない。
+    assertSupportedDatabase(db, SCHEMA_VERSION)
+    const current = databaseVersion(db)
+    const pending = MIGRATIONS.filter((migration) => migration.version > current)
+    const destructive = pending.find((migration) => migration.destructive)
+
+    // 新規作成中の空DBには守るべき旧データがない。既存ファイルだけ一意名へ退避する。
+    if (destructive && existed && path !== ':memory:') {
+      const target = `${path}.before-v${destructive.version}-${Date.now()}-${randomUUID()}.db`
+      const reader = new DatabaseSync(path, { readOnly: true })
+      try {
+        createDatabaseBackup(reader, target)
+      } finally {
+        reader.close()
+      }
+      console.warn(`スキーマ v${destructive.version} を適用します。検証済みの適用前バックアップ: ${target}`)
     }
-    migration.up(db)
-    db.exec(`PRAGMA user_version = ${migration.version}`)
-  }
-  const after = (db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version
-  if (after > SCHEMA_VERSION) {
-    throw new Error(
-      `このDBはスキーマ v${after} です。コードが知っているのは v${SCHEMA_VERSION} まで。` +
-      '新しい版で書かれたDBを古いコードで開くとデータを壊すので、コードを更新してください。',
-    )
+
+    for (const migration of pending) {
+      migration.up(db)
+      db.exec(`PRAGMA user_version = ${migration.version}`)
+    }
+    assertDatabaseIntegrity(db)
+    db.exec('COMMIT')
+  } catch (error) {
+    try {
+      db.exec('ROLLBACK')
+    } catch {
+      // 元のエラーを返す。
+    }
+    throw error
   }
 }
 

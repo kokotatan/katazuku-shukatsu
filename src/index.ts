@@ -54,6 +54,16 @@ export type {
   AppointmentRow,
   EventRow,
 } from './db.js'
+export {
+  databaseVersion,
+  assertSupportedDatabase,
+  assertDatabaseIntegrity,
+  verifyDatabaseBackup,
+  createDatabaseBackup,
+  migrateDatabase,
+  readConsistentSnapshot,
+  ensureCoreIndexes,
+} from './database-maintenance.js'
 
 // ---- 入力の共通処理 ----
 export { resolveSelectionId, upsertPerson, transaction } from './inputs.js'

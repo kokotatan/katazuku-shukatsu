@@ -21,6 +21,8 @@ const EXPECTED = [
   'MEETING_RUN_ORDER', 'decideMeetingRunTransition', 'ensureMeetingRun', 'isMeetingRunState', 'transitionMeetingRun',
   // db
   'openDb', 'SCHEMA_VERSION', 'transition', 'STATUS_FOR', 'outcomeOf',
+  'databaseVersion', 'assertSupportedDatabase', 'assertDatabaseIntegrity', 'verifyDatabaseBackup',
+  'createDatabaseBackup', 'migrateDatabase', 'readConsistentSnapshot', 'ensureCoreIndexes',
   'resolveCompany', 'sameCompany', 'samePosition', 'addAlias', 'addPending', 'listPending', 'setOfficialName',
   'upsertCompany', 'insertSelection', 'listSelections', 'listCompanies', 'getCompanyCredential', 'addEvent', 'listEvents',
   'addAppointment', 'listAppointments', 'sameAppointment', 'findAppointmentMatch',
