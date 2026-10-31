@@ -25,6 +25,7 @@ const EXPECTED = [
   'createDatabaseBackup', 'migrateDatabase', 'readConsistentSnapshot', 'ensureCoreIndexes',
   'resolveCompany', 'sameCompany', 'samePosition', 'addAlias', 'addPending', 'listPending', 'setOfficialName',
   'COMPANY_EXCLUSION_MARKER', 'isCompanyExcluded', 'excludeCompany', 'applyPeopleResearch',
+  'applyCompanyResearch',
   'emailIdentityFromProfile', 'professionalEmailIssues', 'hasScheduleCommitmentLanguage',
   'buildWorkspaceSendCall', 'preflightThirdPartyEmail',
   'executeApprovedThirdPartyEmail',

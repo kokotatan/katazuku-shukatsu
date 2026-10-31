@@ -22,6 +22,8 @@ export const KATAZUKU_REMOTE_TOOL_SCOPES = {
   katazuku_record_submission: 'katazuku:write',
   katazuku_record_calendar: 'katazuku:write',
   katazuku_record_people_research: 'katazuku:write',
+  katazuku_record_company_research: 'katazuku:write',
+  katazuku_record_interview: 'katazuku:write',
   katazuku_exclude_company: 'katazuku:write',
   katazuku_record_meeting_preparation: 'katazuku:write',
   katazuku_prepare_action: 'katazuku:actions',

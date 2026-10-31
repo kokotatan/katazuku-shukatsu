@@ -71,6 +71,8 @@ export { COMPANY_EXCLUSION_MARKER, isCompanyExcluded, excludeCompany } from './c
 export type { CompanyExclusionInput } from './company-preference.js'
 export { applyPeopleResearch } from './people-research.js'
 export type { PeopleResearchInput } from './people-research.js'
+export { applyCompanyResearch } from './company-research.js'
+export type { CompanyResearchInput, CompanyResearchSource, CompanyResearchResult } from './company-research.js'
 export {
   emailIdentityFromProfile,
   professionalEmailIssues,

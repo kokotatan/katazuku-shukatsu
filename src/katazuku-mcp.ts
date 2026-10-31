@@ -7,7 +7,9 @@ import { openDb } from './db.js'
 import { applyCalendar } from './db-apply-calendar.js'
 import { applyMail } from './db-apply-mail.js'
 import { applySubmission } from './db-apply-submission.js'
+import { applyInterview, type InterviewInput } from './db-apply-interview.js'
 import { listActionableMail, listPlatformSnapshot } from './platform.js'
+import { applyCompanyResearch } from './company-research.js'
 import { meetingPreparationContext, meetingPreparationSnapshot, saveMeetingPreparation } from './meeting-preparation.js'
 import { excludeCompany } from './company-preference.js'
 import { applyPeopleResearch } from './people-research.js'
@@ -73,6 +75,33 @@ const allTools: Tool[] = [
         confidence: { type: 'number', minimum: 0, maximum: 1 },
       }, ['name', 'notes']) },
     }) },
+  { name: 'katazuku_record_company_research', scope: 'write', description: '既存企業への調査結果を一次情報URL・調査日時・sourceRef付きで正本へ反映する。企業の新規作成や古い調査による巻き戻しは行わない。', annotations: writeAnnotations,
+    inputSchema: objectSchema({
+      company: { ...text, maxLength: 200 }, summary: { ...text, maxLength: 16000 },
+      facts: { type: 'object', maxProperties: 200 }, researchedAt: text, sourceRef: { ...text, maxLength: 500 },
+      sources: { type: 'array', minItems: 1, maxItems: 100, items: objectSchema({
+        title: { ...text, maxLength: 500 }, url: { ...text, maxLength: 3000 },
+      }) },
+    }, ['company', 'summary', 'sources', 'researchedAt', 'sourceRef']) },
+  { name: 'katazuku_record_interview', scope: 'write', description: '面接・面談の構造化議事録をrunIdで冪等反映し、人物メモ・プロフィール候補・予定完了状態を同一トランザクションで更新する。ローカルpathや顔写真は受け付けない。', annotations: writeAnnotations,
+    inputSchema: objectSchema({
+      runId: { ...text, maxLength: 300 }, appointmentId: { type: 'integer', minimum: 1 }, careerMeetingId: { type: 'integer', minimum: 1 },
+      contextKind: { type: 'string', enum: ['selection', 'career_support'] }, company: { type: 'string', maxLength: 200 },
+      organization: { type: 'string', maxLength: 200 }, position: { type: 'string', maxLength: 500 }, occurredAt: text,
+      title: { ...text, maxLength: 500 }, summary: { ...text, maxLength: 16000 },
+      questions: { type: 'array', maxItems: 100, items: objectSchema({
+        question: { ...text, maxLength: 4000 }, answer: { type: 'string', maxLength: 12000 }, feedback: { type: 'string', maxLength: 8000 },
+      }, ['question']) },
+      people: { type: 'array', maxItems: 100, items: objectSchema({
+        name: { ...text, maxLength: 200 }, company: { type: 'string', maxLength: 200 }, role: { type: 'string', maxLength: 300 },
+        category: { type: 'string', maxLength: 100 }, notes: { type: 'array', maxItems: 100, items: { type: 'string', maxLength: 4000 } },
+        confidence: { type: 'number', minimum: 0, maximum: 1 },
+      }, ['name']) },
+      profileSuggestions: { type: 'array', maxItems: 100, items: objectSchema({
+        field: { ...text, maxLength: 200 }, value: {}, confidence: { type: 'number', minimum: 0, maximum: 1 },
+      }, ['field', 'value']) },
+      followUps: { type: 'array', maxItems: 100, items: { type: 'string', maxLength: 4000 } },
+    }, ['runId', 'occurredAt', 'title', 'summary']) },
   { name: 'katazuku_exclude_company', scope: 'write', description: '本人が既に対象外と決めた企業を正本へ記録し、既存トラックとローカル予定を停止する。外部カレンダーや第三者には変更・通知しない。', annotations: writeAnnotations,
     inputSchema: objectSchema({ name: { ...text, maxLength: 200 }, reason: { ...text, maxLength: 1000 }, ref: { ...text, maxLength: 500 } }) },
   { name: 'katazuku_record_meeting_preparation', scope: 'write', description: '根拠hashと一次情報を検証し、面接・面談ごとの準備成果物を正本DBへ冪等保存する。企業研究なし・古い根拠・必須項目不足は拒否する。', annotations: writeAnnotations,
@@ -161,6 +190,12 @@ export class KatazukuMcpServer {
     if (name === 'katazuku_record_submission') return this.write((db) => applySubmission(db, args as unknown as Parameters<typeof applySubmission>[1]))
     if (name === 'katazuku_record_calendar') return this.write((db) => applyCalendar(args as unknown as Parameters<typeof applyCalendar>[0], db))
     if (name === 'katazuku_record_people_research') return this.write((db) => applyPeopleResearch(db, args as unknown as Parameters<typeof applyPeopleResearch>[1]))
+    if (name === 'katazuku_record_company_research') return this.write((db) => applyCompanyResearch(db, args as unknown as Parameters<typeof applyCompanyResearch>[1]))
+    if (name === 'katazuku_record_interview') {
+      // MCP入力には transcriptPath/photoPath がschema上存在しない。ローカルファイルへの
+      // 任意アクセスを遠隔クライアントへ広げず、構造化した議事録だけを既存writerへ渡す。
+      return this.write((db) => applyInterview(args as unknown as InterviewInput, db))
+    }
     if (name === 'katazuku_exclude_company') return this.write((db) => excludeCompany(db, args as unknown as Parameters<typeof excludeCompany>[1], this.options.now?.()))
     if (name === 'katazuku_record_meeting_preparation') return this.write((db) => saveMeetingPreparation(db, args, this.options.now?.()))
     if (name === 'katazuku_prepare_action') {

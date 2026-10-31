@@ -11,7 +11,7 @@ katazukuの正本SQLiteを、Muse・Codex・Claude CodeなどのMCPクライア�
 |---|---|---|
 | `read` | 予定、選考、空き、提出物、要対応メール要約 | 書込み、メール本文、外部操作 |
 | `sensitive` | プロフィール、人脈、面談記録、企業研究を含む個人スナップショット | 画像本体、資格情報 |
-| `write` | 取得済みメール要約、Calendarイベント、提出結果、人物調査、本人の対象外指示の正本への冪等反映 | メール送信、Calendar作成、応募提出、受験 |
+| `write` | 取得済みメール要約、Calendarイベント、提出結果、企業・人物調査、面談議事録、本人の対象外指示の正本への冪等反映 | メール送信、Calendar作成、応募提出、受験、ローカルファイル参照 |
 | `actions` | 第三者確定操作を承認台帳へ提案し、内容hashを固定 | 承認、送信、予約、購入、取消 |
 
 `read,write,sensitive,actions`がkatazuku内の全scopeです。ただし「フルアクセス」は資格情報・任意SQL・任意シェルを
@@ -57,6 +57,8 @@ DBやGoogleのrefresh tokenをgatewayへ複製せず、端末停止時は503で�
 - `katazuku_snapshot` / `katazuku_meeting_preparation_context` (`sensitive`)
 - `katazuku_record_mail` / `katazuku_record_calendar` / `katazuku_record_submission` / `katazuku_record_meeting_preparation` (`write`)
 - `katazuku_record_people_research`: 出典・日時・confidence付きの人物調査を冪等反映 (`write`)
+- `katazuku_record_company_research`: 既存企業へ一次情報URL・調査日時・sourceRef付きで企業研究を反映。古い調査は新しい結果を巻き戻さない (`write`)
+- `katazuku_record_interview`: 面談議事録・人物メモ・プロフィール候補・予定完了をrunIdで原子的に反映。文字起こしpathと顔写真は受け付けない (`write`)
 - `katazuku_exclude_company`: 本人の対象外指示を記録し、ローカルの選考・予定を停止。外部予定は変更しない (`write`)
 - `katazuku_prepare_action` / `katazuku_action_status` (`actions`)
 

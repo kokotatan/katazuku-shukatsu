@@ -15,6 +15,7 @@ applyCalendar({ events: [{
   externalId: 'calendar-example-1', title: '一次面接', startAt: '2099-01-01T10:00:00+09:00',
   endAt: '2099-01-01T11:00:00+09:00', company: 'Example株式会社', position: '新卒採用', kind: '面接',
 }] }, db)
+const appointmentId = Number((db.prepare('SELECT id FROM appointment WHERE external_id = ?').get('calendar-example-1') as { id: number }).id)
 db.close()
 
 const rpc = async (server: KatazukuMcpServer, method: string, params?: unknown) => katazukuRpc(server, { jsonrpc: '2.0', id: 1, method, params }) as Promise<any>
@@ -48,6 +49,35 @@ try {
     people: [{ name: '採用担当A', company: 'Example株式会社', role: '採用担当', category: '採用担当', notes: ['公式チームページに掲載'], confidence: 0.9 }],
   } })
   assert.equal(research.result.isError, false)
+  const companyResearch = await rpc(full, 'tools/call', { name: 'katazuku_record_company_research', arguments: {
+    company: 'Example株式会社', summary: '公式情報に基づく企業研究', facts: { business: 'example' },
+    sources: [{ title: '公式会社情報', url: 'https://example.com/company' }],
+    researchedAt: '2098-12-31T13:00:00Z', sourceRef: 'research:example-company',
+  } })
+  assert.equal(companyResearch.result.isError, false)
+  const interview = await rpc(full, 'tools/call', { name: 'katazuku_record_interview', arguments: {
+    runId: 'meeting:example:1', appointmentId, company: 'Example株式会社', position: '新卒採用',
+    occurredAt: '2099-01-01T11:00:00+09:00', title: '一次面接', summary: '面接の構造化要約',
+    questions: [{ question: '志望理由', answer: '事業への関心' }],
+    people: [{ name: '面接官B', company: 'Example株式会社', role: '面接官', notes: ['次回は業務理解を深掘り'], confidence: 0.9 }],
+    profileSuggestions: [{ field: 'careerAxis', value: '顧客価値', confidence: 0.8 }], followUps: ['企業研究を更新'],
+  } })
+  assert.equal(interview.result.isError, false)
+  assert.equal(JSON.parse(interview.result.content[0].text).created, true)
+  const interviewRepeated = await rpc(full, 'tools/call', { name: 'katazuku_record_interview', arguments: {
+    runId: 'meeting:example:1', appointmentId, company: 'Example株式会社', occurredAt: '2099-01-01T11:00:00+09:00',
+    title: '一次面接', summary: '面接の構造化要約',
+  } })
+  assert.equal(JSON.parse(interviewRepeated.result.content[0].text).created, false)
+  const pathRejected = await rpc(full, 'tools/call', { name: 'katazuku_record_interview', arguments: {
+    runId: 'meeting:path:1', appointmentId, company: 'Example株式会社', occurredAt: '2099-01-01T11:00:00+09:00',
+    title: '一次面接', summary: 'pathは許可しない', transcriptPath: 'C:\\secret.txt',
+  } })
+  assert.equal(pathRejected.result.isError, true)
+  const afterWrites = await rpc(full, 'tools/call', { name: 'katazuku_snapshot', arguments: {} })
+  const afterWritesData = JSON.parse(afterWrites.result.content[0].text)
+  assert(afterWritesData.dossiers.some((item: { company: string }) => item.company === 'Example株式会社'))
+  assert(afterWritesData.interviews.some((item: { sourceRef: string }) => item.sourceRef === 'meeting:example:1'))
   const excluded = await rpc(full, 'tools/call', { name: 'katazuku_exclude_company', arguments: {
     name: 'Example株式会社', reason: '本人が今後の管理対象外と決定', ref: 'conversation:example-exclusion',
   } })

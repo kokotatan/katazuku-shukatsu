@@ -7,6 +7,7 @@ import { applyCalendar } from '../src/db-apply-calendar.js'
 import { applyMail } from '../src/db-apply-mail.js'
 import { applyDiff } from '../src/db-apply.js'
 import { applyPeopleResearch } from '../src/people-research.js'
+import { applyCompanyResearch } from '../src/company-research.js'
 import { applySubmissionRequirements } from '../src/submission-requirement.js'
 
 const db = openDb(':memory:')
@@ -88,6 +89,33 @@ try {
   assert(!companies.includes('架空大学'), '学生の所属大学を応募企業マスタへ追加しない')
   assert.equal((db.prepare('SELECT count(*) AS n FROM person_note').get() as { n: number }).n, 2)
 
+  const researchCompanyId = upsertCompany(db, { name: '企業研究株式会社' })
+  const dossier = applyCompanyResearch(db, {
+    company: '企業研究株式会社', summary: '一次情報に基づく事業要約', facts: { founded: 2020 },
+    sources: [{ title: '公式会社情報', url: 'https://example.com/company' }],
+    researchedAt: '2099-01-04T00:00:00Z', sourceRef: 'research:company:1',
+  })
+  assert.deepEqual(dossier, { companyId: researchCompanyId, changed: true, reason: 'recorded' })
+  assert.deepEqual(applyCompanyResearch(db, {
+    company: '企業研究株式会社', summary: '古い調査',
+    sources: [{ title: '公式会社情報', url: 'https://example.com/company-old' }],
+    researchedAt: '2099-01-03T00:00:00Z', sourceRef: 'research:company:old',
+  }), { companyId: researchCompanyId, changed: false, reason: 'older_than_current' })
+  const storedDossier = db.prepare('SELECT summary, source_ref FROM company_dossier WHERE company_id = ?')
+    .get(researchCompanyId) as { summary: string; source_ref: string }
+  assert.equal(storedDossier.summary, '一次情報に基づく事業要約')
+  assert.equal(storedDossier.source_ref, 'research:company:1')
+  assert.throws(() => applyCompanyResearch(db, {
+    company: '未登録株式会社', summary: '新規企業を作らない',
+    sources: [{ title: '公式', url: 'https://example.com' }],
+    researchedAt: '2099-01-04T00:00:00Z', sourceRef: 'research:unknown',
+  }), /既存の企業が見つかりません/)
+  assert.throws(() => applyCompanyResearch(db, {
+    company: '企業研究株式会社', summary: '危険な出典',
+    sources: [{ title: 'ローカル', url: 'file:///etc/passwd' }],
+    researchedAt: '2099-01-05T00:00:00Z', sourceRef: 'research:file',
+  }), /http\(s\)/)
+
   const peopleBefore = (db.prepare('SELECT count(*) AS n FROM person').get() as { n: number }).n
   assert.throws(() => applyPeopleResearch(db, {
     sourceRef: 'official:bad', researchedAt: '2099-01-04T00:00:00Z',
@@ -95,7 +123,7 @@ try {
   }), /人物と根拠/)
   assert.equal((db.prepare('SELECT count(*) AS n FROM person').get() as { n: number }).n, peopleBefore)
 
-  console.log('企業対象外・人物調査: 復活防止、ローカル停止、企業汚染防止、根拠付き冪等反映を確認')
+  console.log('企業対象外・人物/企業調査: 復活防止、企業汚染防止、根拠付き反映、調査巻き戻し防止を確認')
 } finally {
   db.close()
 }

@@ -22,7 +22,10 @@ plugin/MCP serverはAPI・DB・toolという能力を追加する別物だと区
 
 ### 2. katazuku MCPを接続する
 
-このリポジトリの`npm run mcp`が、正本DBへつながる標準MCP serverです。Muse側で任意のMCP serverを
+このリポジトリの`npm run mcp`が、正本DBへつながる標準MCP serverです。`read,write,sensitive,actions`では、
+予定・選考・提出物・個人スナップショットの参照に加え、取得済みメール/Calendar/提出結果、企業・人物調査、
+面談議事録、面談準備を型付きwriterで正本へ戻せます。任意SQL、任意shell、資格情報、ローカルファイルpath、
+無承認の第三者送信は「フルアクセス」に含めません。Muse側で任意のMCP serverを
 登録できる環境では、[MCPガイド](MCP.md)のStreamable HTTP endpointを登録します。
 
 remote接続に必要なOAuth 2.1 gatewayと端末へのprivate relayは`muse-gateway/`に実装しています。DB、Google資格情報、
