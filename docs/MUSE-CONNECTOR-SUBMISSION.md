@@ -87,6 +87,10 @@ Muse built-in email connectorのsend toolは、宛先・件名・本文を表示
 9. OAuth tokenのscope外tool、再利用した認可code、不正Origin、URL内token、過大payloadを拒否する。
 10. bridge停止時は503でfail closedし、成功を捏造しない。
 
+ローカルの`npm run test:muse-gateway`は、OAuth全4 scope、Cloudflare Durable Object relay、実bridge、
+合成DB、schema-native MCPを一続きで起動し、`read`、`sensitive`、`write`、`actions`を実tool callで検証します。
+これはproduction Connectorの審査・接続を代替しませんが、gateway内の偽応答だけでE2E済みと扱うことを防ぎます。
+
 ## 提出前の未完了項目
 
 - [ ] Connector専用の公開プライバシー通知を`https://www.katazuku-shukatsu.kotalabo.com/muse/privacy/`へデプロイし、外部から本文・更新日・問い合わせ先を確認する（サイト実装と`MUSE-CONNECTOR-PRIVACY-DRAFT.md`は準備済み、まだ未公開）。

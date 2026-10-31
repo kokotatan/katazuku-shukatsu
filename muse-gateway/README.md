@@ -51,4 +51,6 @@ npm run test:muse-gateway
 ```
 
 gatewayテストはOAuth discovery、PKCE、CSRF、scope分離、端末不在時のfail-closed、中継、認可codeの
-再利用拒否をローカルworkerdで確認します。
+再利用拒否をローカルworkerdで確認します。さらに全4 scopeのOAuth tokenを発行し、実`muse-bridge.ts`、
+合成SQLite、schema-native MCPを接続して、`read`、`sensitive`、`write`、`actions`のtool callが端末まで
+往復するE2E試験を行います。HTTPはこのloopback試験で明示フラグを付けた場合だけ許可され、本番bridgeはHTTPSを必須にします。

@@ -18,7 +18,7 @@
 | 第三者フォーム | 候補日時とhostを固定し、本人承認後だけ外部冪等キー付きで提出 | `workflows/third-party-form.json`、`test:workflow-control` |
 | 採用ポータル連絡 | 企業別hostを設定値として分離し、本人承認後だけ送信、外部IDと証拠参照を監査 | `workflows/third-party-portal-message.json`、`test:workflow-control` |
 | MCP | `read/write/sensitive/actions`、型付きtool、任意SQL・shell・秘密値・ローカルpathの非公開 | `test:mcp` |
-| Muse remote接続 | OAuth 2.1 gateway、端末relay、scopeとtool allowlist、秘密値・payload非永続化 | `test:muse-gateway`、`test:mcp` |
+| Muse remote接続 | OAuth 2.1 gateway、端末relay、scopeとtool allowlist、秘密値・payload非永続化。全4 scopeを実bridgeと合成DBへ往復 | `test:muse-gateway`、`test:mcp` |
 | Muse iCloudメール | Muse Secure VM内のemail connectorで認証し、毎回承認、action hash、送信ID、Sent再照合を要求 | `test:mcp`、`test:third-party-email` |
 | ローカルiCloudメール | credential brokerを別processで呼ぶIMAP/SMTP adapter。TLS固定、秘密値非出力、unknown再送禁止 | `test:icloud-mail` |
 | ハーネス改善 | 最小観測、合成回帰case、baseline/candidate eval、安全gate、人手承認、revision競合防止、直前版rollback | `test:harness-improvement` |

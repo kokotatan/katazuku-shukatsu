@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "precheck": "wrangler types --config wrangler.example.jsonc",
-    "check": "tsc --noEmit && node check.mjs",
+    "check": "tsc --noEmit && node check.mjs && node check-e2e.mjs",
     "deploy": "wrangler deploy"
   },
   "dependencies": {

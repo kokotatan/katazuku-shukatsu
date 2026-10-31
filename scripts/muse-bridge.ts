@@ -16,7 +16,12 @@ const config = JSON.parse(readFileSync(configPath, 'utf8').replace(/^\uFEFF/, ''
   workflowStorePath?: string
 }
 const origin = new URL(config.origin)
-if (origin.protocol !== 'https:' || origin.username || origin.password || origin.search || origin.hash || origin.pathname !== '/') throw new Error('HTTPS originが必要です')
+const testLoopback = process.env.KATAZUKU_MUSE_BRIDGE_TEST_LOOPBACK === '1'
+  && origin.protocol === 'http:'
+  && ['127.0.0.1', 'localhost', '[::1]'].includes(origin.hostname)
+if ((!testLoopback && origin.protocol !== 'https:') || origin.username || origin.password || origin.search || origin.hash || origin.pathname !== '/') {
+  throw new Error('HTTPS originが必要です')
+}
 if (!/^[A-Za-z0-9_-]{43,128}$/.test(config.token)) throw new Error('bridge tokenが不正です')
 const allowedScopes = new Set(config.scopes?.length ? config.scopes : ['katazuku:read'])
 for (const scope of allowedScopes) if (!KATAZUKU_REMOTE_SCOPES.includes(scope as typeof KATAZUKU_REMOTE_SCOPES[number])) throw new Error(`bridge scopeが不正です: ${scope}`)
@@ -29,7 +34,8 @@ const seen = new Set<string>()
 
 function connect(): void {
   if (stopped) return
-  socket = new WebSocket(config.origin.replace(/^https:/, 'wss:') + '/bridge', ['katazuku-muse', `auth.${config.token}`])
+  const socketOrigin = config.origin.replace(/^https:/, 'wss:').replace(/^http:/, 'ws:')
+  socket = new WebSocket(socketOrigin + '/bridge', ['katazuku-muse', `auth.${config.token}`])
   const current = socket
   let lastPong = Date.now()
   const heartbeat = setInterval(() => {
