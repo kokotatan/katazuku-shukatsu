@@ -64,13 +64,15 @@ function prepareStore(options: GoogleConnectOptions): string {
   if (!/^[A-Za-z0-9._-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(options.email)
     || /@(?:[^@]+\.)?example\.(?:com|net|org)$/i.test(options.email)) failure('自分のGoogleアカウントを個人設定に入力してください。')
   const home = realpathSync(options.home ?? homedir())
-  const directory = resolve(options.credentialsDir)
+  const requestedDirectory = resolve(options.credentialsDir)
   const root = realpathSync(options.root)
-  if (!inside(home, directory) || directory === root || inside(root, directory)) failure('資格情報の保存先はリポジトリ外の本人のホーム配下にしてください。')
   // mkdirより先に既存の祖先を解決し、ホーム外へのリンクを通って作成しない。
-  let ancestor = directory
+  let ancestor = requestedDirectory
   while (!existing(ancestor)) ancestor = resolve(ancestor, '..')
   const actualAncestor = realpathSync(ancestor)
+  // macOSの /var → /private/var など、同じ実体の別名も正規化して比較する。
+  const directory = resolve(actualAncestor, relative(ancestor, requestedDirectory))
+  if (!inside(home, directory) || directory === root || inside(root, directory)) failure('資格情報の保存先はリポジトリ外の本人のホーム配下にしてください。')
   if (actualAncestor !== home && !inside(home, actualAncestor)) failure('資格情報の保存先のリンクがホーム外を指しています。')
   if (actualAncestor === root || inside(root, actualAncestor)) failure('資格情報はリポジトリ内に保存できません。')
   mkdirSync(directory, { recursive: true, mode: 0o700 })

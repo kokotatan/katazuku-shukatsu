@@ -87,7 +87,8 @@ export async function inspectSetup(
     '有効な工程に必要なAIの種類を確認しました。Google MCPの実接続は未確認です。',
     'メール見張り・朝のまとめ等にはClaude CodeまたはCodexが必要です。接続するか、未対応の工程を設定で無効にしてください。')
   if (needsTools && available.includes('codex') && !available.includes('claude')) {
-    const capabilities = await detectCodexExtraCapabilities(root)
+    // 診断対象外の親ディレクトリにあるユーザー設定を、当該プロジェクトの設定と誤認しない。
+    const capabilities = await detectCodexExtraCapabilities(root, root)
     add('Codex Google MCP設定', capabilities.includes('gmail.read') && capabilities.includes('calendar.read'),
       'プロジェクトのGoogle MCP設定を検出しました。起動・認証・権限は未確認です。',
       'プロジェクトにgoogle-workspaceのMCP設定がありません。CLIのユーザー設定だけでは能力を認識できません。docs/GOOGLE-CONNECTION.md を参照。')

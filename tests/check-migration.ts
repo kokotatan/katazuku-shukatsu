@@ -5,11 +5,12 @@
  * スナップショットが残ること、未来の版のDBを古いコードで開かないことを確かめる。
  *   npm run test:migration
  */
-import { existsSync, mkdtempSync, rmSync } from 'node:fs'
+import { copyFileSync, mkdtempSync, readdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { openDb, SCHEMA_VERSION, upsertCompany, listCompanies } from '../src/db.js'
+import { getDatabaseContext } from '../src/schedule.js'
 
 let failed = 0
 function check(label: string, cond: boolean, detail = '') {
@@ -35,24 +36,47 @@ check('v3: 議事録と人物が支援組織を参照できる', (() => {
     && interview.some((row) => row.name === 'career_meeting_id')
     && person.some((row) => row.name === 'organization_id')
 })())
+check('v6: 交通費精算と領収書タスク由来の列が版管理下にある', (() => {
+  const columns = fresh.prepare('PRAGMA table_info(appointment)').all() as { name: string }[]
+  return ['reimbursement_status', 'receipt_required', 'parent_appointment_id', 'task_type']
+    .every((name) => columns.some((column) => column.name === name))
+})())
+check('v6: 正本の論理IDをDB内部に持つ', /^[a-f0-9]{32}$/.test(getDatabaseContext(fresh).databaseId))
+check('v7: companyから平文資格情報列を削除した', (() => {
+  const columns = fresh.prepare('PRAGMA table_info(company)').all() as { name: string }[]
+  return !columns.some((column) => ['login_id', 'password'].includes(column.name))
+})())
 
 // --- ファイルDB: 破壊的な版の前にスナップショットが残る ---
 const dir = mkdtempSync(join(tmpdir(), 'katazuku-migration-'))
 const path = join(dir, 'katazuku.db')
+new DatabaseSync(path).close()
 const first = openDb(path)
 upsertCompany(first, { name: '株式会社サンプルA' })
+const canonicalId = getDatabaseContext(first).databaseId
 first.close()
-check('破壊的な版の適用前スナップショットが残る', existsSync(`${path}.v1.bak`))
+const backupsAfterMigration = readdirSync(dir).filter((name) => name.startsWith('katazuku.db.before-v1-') && name.endsWith('.db'))
+check('破壊的な版の適用前バックアップが一意名で残る', backupsAfterMigration.length === 1, backupsAfterMigration.join(', '))
 
 // --- 再オープンで再適用しない ---
 const reopened = openDb(path)
 check('再オープンしても版は変わらない', userVersion(reopened) === SCHEMA_VERSION)
 check('再オープンでデータが消えない', listCompanies(reopened).some((c) => c.name === '株式会社サンプルA'))
-rmSync(`${path}.v1.bak`, { force: true })
 reopened.close()
 const third = openDb(path)
-check('適用済みの版はスナップショットを取り直さない(=再実行していない)', !existsSync(`${path}.v1.bak`))
+const backupsAfterReopen = readdirSync(dir).filter((name) => name.startsWith('katazuku.db.before-v1-') && name.endsWith('.db'))
+check('適用済みの版はバックアップを取り直さない(=再実行していない)', backupsAfterReopen.length === backupsAfterMigration.length)
+const indexes = third.prepare("SELECT name FROM sqlite_schema WHERE type = 'index'").all() as { name: string }[]
+check('履歴・予定・派生タスクの主要索引を維持する', ['idx_event_at_id', 'idx_appointment_at_id', 'idx_appointment_derived_task'].every((name) => indexes.some((row) => row.name === name)))
 third.close()
+
+// --- バックアップや移設でも同じデータ系列だと識別できる ---
+const copiedPath = join(dir, 'copied.db')
+copyFileSync(path, copiedPath)
+const copied = openDb(copiedPath)
+check('DBを別パスへ複製しても論理IDを保持する', getDatabaseContext(copied, 'replica').databaseId === canonicalId)
+check('論理IDが同じでも実行時roleはreplicaにできる', getDatabaseContext(copied, 'replica').role === 'replica')
+copied.close()
 
 // --- 未来の版のDBは開かない ---
 const futurePath = join(dir, 'future.db')

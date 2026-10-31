@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "presets": [
+    { "id": "goodfind", "label": "Goodfind" },
+    { "id": "gaishishukatsu", "label": "外資就活ドットコム" },
+    { "id": "labbase", "label": "LabBase就職" },
+    { "id": "bizreach-campus", "label": "ビズリーチ・キャンパス" },
+    { "id": "rikunabi", "label": "リクナビ" },
+    { "id": "onecareer", "label": "ワンキャリア" },
+    { "id": "offerbox", "label": "OfferBox" },
+    { "id": "kimisuka", "label": "キミスカ" },
+    { "id": "doda-campus", "label": "dodaキャンパス" },
+    { "id": "reshukatsu-campus", "label": "Ｒｅ就活キャンパス" }
+  ]
+}

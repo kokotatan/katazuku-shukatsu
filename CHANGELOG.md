@@ -7,6 +7,26 @@
 
 ### Added
 
+- 現在のOS既定または明示正本を使う検証済み`backup`、`backup:verify`、`restore`を追加。WALを単一ファイルへ畳み、整合性・参照・対応schemaを検査し、既存ファイルや稼働中の正本を上書きせず新規パスへ復元する。
+- schema v7で`company.login_id/password`と実値取得APIを廃止。旧DBに平文が残る場合はバックアップや変更の前に値を表示せず停止し、Windows専用移行コマンドが新規DPAPI recordを検証できた行だけを原子的に空にしてから列を削除する。既存record、broker失敗、同時変更では旧DBを保持する。
+- Driverへ渡す前のブラウザ操作計画契約を追加。任意JavaScript、生値、秘密欄、別origin/pathを拒否し、dry-runは無操作、実行は正本identity・本人承認hash・外部冪等キー・事前reconcileが一致した場合だけ許可する。commitは最後の1回に限定し、MFA/CAPTCHA等は本人checkpoint、成否不明は自動再試行せず再照合待ちにする。
+- 第三者メールExecutorをGmail専用actionからprovider固定の`email.send`へ拡張。既存`gmail.send`との互換性を維持しつつ、iCloud Mailを同じ本人承認hash・正本照合・SENT照合・不明時再送禁止の境界へ接続できるようにした。資格情報や直接送信toolはMCPへ公開しない。
+- 第三者メールの文面検査を採用担当専用から`recruiting`、`business`、`education`、`personal`へ分離。採用時の正本企業・選考・所属・署名検査を弱めず、事業連絡や教員連絡へ不適切に強制しない。
+- LLM/Jev共通の原子的判断契約を厳格化。request・質問・回答の未知フィールドを拒否し、scoreを安全な整数と全段階の確率だけに制限して、判断JSONへ実行命令を混入できないようにした。
+- 日次抽出Schemaに既にあったインターン交通費の精算状態と領収書提出要否をDB writerへ接続。本人立替の支給対象または提出明記がある場合、最終開催日の翌日09:00 JSTへ外部Calendar反映前だけ追随する可動タスクを冪等生成する。企業による切符手配では生成しない。
+- workflowが正本をファイルパスだけで識別しないよう、バックアップ・移設後も保持される論理IDをDB内部へ追加。派生する領収書タスクも親予定とtask種別の一意制約で二重作成を防ぐ。
+- 個人スナップショットへ、提出済み結果とは別の未完了提出要件と、証拠pathを除いた面談準備状態を追加。Muse等が専用toolを個別に呼ばなくても残作業を見落とさない。
+- katazuku MCPの`write` scopeへ、一次情報URL付き企業研究と、ローカルpathを受け付けない構造化面談議事録writerを追加。企業研究は既存企業だけに紐づき、古い調査で新しいdossierを巻き戻さない。
+- 正本DBの保全API。未知の将来版を変更前に拒否し、移行を排他トランザクション化した。移行前バックアップはSQLite自身でWALを畳み、整合性・外部キー・ディスク同期を検査して一意名へ上書きせず保存する。閲覧スナップショットも複数テーブルを同じ時点から読む。
+- 本人が就活管理対象外にした企業を、メール・Calendar・応募・提出物の後続入力から復活させない制御と、公開情報の人物調査を出典・日時・confidence付きで人物台帳へ冪等反映するAPI/MCP toolを追加した。
+- 第三者宛メールの送信前検査を汎用API化した。正本プロフィール、元メール、企業・選考、予定同期鮮度、添付、採用担当向け文面、不要な第三者情報、承認対象action hashを検査し、送信処理とは分離する。
+- 承認済みメール専用の注入式Executor APIを追加した。外部adapterは送信前後にSENTを照合し、送信済みなら再送せず、成否不明ならworkflowを`unknown`で固定して自動再送しない。一般MCPからは直接実行できない。
+- voicebox文字起こし前に、16-bit PCMモノラルWAVの確実なデジタル無音だけをローカル判定して外部呼出しを省く。未知形式や破損は音声を捨てず通常処理へ倒す。
+- Calendar outboxへ予定の`flexible`を真偽値で含め、宿泊マーカー等を滞在期間全体のbusy予定へ戻さないための情報を保持する。
+- Museなどのremote MCP client向けに、Cloudflare上へ正本や資格情報を置かないOAuth 2.1/PKCE gatewayと、端末から外向きに接続する認証済みbridgeを追加。`katazuku:read` / `write` / `sensitive` / `actions`をOAuth tokenと端末allowlistの両方で検査する。
+- 面接・面談準備のスキーマ v5。企業研究の出典、予定・相手・過去記録の根拠hash、30日鮮度、48時間以内の最終確認を全件再評価し、正本へ冪等保存する。MCPからもscope別に状態確認・根拠取得・保存ができる。
+- capability-scoped katazuku MCP。正本DBの読取り、取得済み事実の冪等反映、個人スナップショット、第三者操作の承認提案を`read` / `write` / `sensitive` / `actions`へ分離した。
+- 宣言的workflow controlと原子的判断API。正本DB identity、工程順、capability、第三者操作のaction hash、本人承認の一回消費を検査する。
 - 共通Google接続の初回同期。設定済みの標準接続では認証成功後に予定・メールの初回同期をローカルで開始する。`--no-sync` で接続だけ試せる。進捗と失敗は `logs/google-first-sync.local.json` に残す。
 - 正本DBから企業名や自由記述を含まない選考集計CSVをローカル出力できるようにした。架空データとDatabricksで試す手順を追加した。
 - 面談の録音を文字起こしする `npm run transcribe` と、文字起こしから議事録を作る `npm run interview:digest`。文字起こしはスクリプトが決定的に行い、ローカルの voicebox(MCP。30秒ごとに分割、止まっていれば起動して最大240秒待つ)か、任意導入の faster-whisper を使う。faster-whisper ではステレオ録音を左右別に文字起こしして `[相手]` / `[本人]` を付けられる。議事録化はツールなしの読み取り専用エージェントが厳格JSONを返し、Schema で検査してから議事録Markdownと DB反映用JSONを書き出す。`--apply` で同じ機械の正本DBへ冪等に反映する。[docs/TRANSCRIPTION.md](docs/TRANSCRIPTION.md)

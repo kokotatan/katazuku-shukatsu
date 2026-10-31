@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "本人へそのまま提示する第三者確定操作",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["actionType", "target", "content", "effectiveAt", "notification"],
+  "properties": {
+    "actionType": { "type": "string", "minLength": 1 },
+    "target": { "type": "object", "minProperties": 1 },
+    "content": { "type": "object", "minProperties": 1 },
+    "effectiveAt": { "type": "string", "minLength": 1 },
+    "notification": { "type": "string", "minLength": 1 }
+  }
+}

@@ -155,7 +155,8 @@ export function upsertCareerMeeting(db: DatabaseSync, input: CareerMeetingInput)
 }
 
 export function listCareerMeetings(db: DatabaseSync): CareerMeetingRow[] {
-  ensureCareerSupportSchema(db)
+  const exists = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'career_meeting'").get()
+  if (!exists) return []
   return (db.prepare(`
     SELECT m.id, m.organization_id AS organizationId,
       COALESCE(NULLIF(o.short_name, ''), o.name, '要確認') AS organization,

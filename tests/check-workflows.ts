@@ -35,13 +35,58 @@ function throws(fn: () => unknown): boolean {
   try { fn(); return false } catch { return true }
 }
 
-// ---- スキーマ v4 ----
+// ---- スキーマ v4〜v6 ----
 {
   const db = openDb(':memory:')
   const tables = (db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as { name: string }[]).map((row) => row.name)
   check('v4: 提出物台帳・予定投影・取得状態の表がある', ['submission_requirement', 'schedule_block', 'source_sync_state'].every((name) => tables.includes(name)))
   check('v4: appointment.flexible 列がある', (db.prepare('PRAGMA table_info(appointment)').all() as { name: string }[]).some((col) => col.name === 'flexible'))
-  check('SCHEMA_VERSION は 4', SCHEMA_VERSION === 4)
+  const appointmentColumns = (db.prepare('PRAGMA table_info(appointment)').all() as { name: string }[]).map((col) => col.name)
+  check('v6: 交通費精算と自動タスク由来の列がある', ['reimbursement_status', 'receipt_required', 'parent_appointment_id', 'task_type'].every((name) => appointmentColumns.includes(name)))
+  check('SCHEMA_VERSION は 7', SCHEMA_VERSION === 7)
+}
+
+// ---- インターン交通費: 抽出結果を捨てず、領収書提出を可動タスク化 ----
+{
+  const db = openDb(':memory:')
+  const input = [{
+    name: '交通費テスト社', stage: 'intern' as const, position: '夏インターン',
+    appointments: [{
+      at: '2030-08-01T00:00:00+09:00', endAt: '2030-08-03T00:00:00+09:00',
+      kind: 'インターン', title: '2日間インターン', reimbursementStatus: 'full' as const,
+    }],
+  }]
+  applyDiff(db, input)
+  const rows = db.prepare(`
+    SELECT title, at, flexible, reimbursement_status AS reimbursementStatus,
+           receipt_required AS receiptRequired, parent_appointment_id AS parentAppointmentId, task_type AS taskType
+    FROM appointment ORDER BY id
+  `).all() as {
+    title: string; at: string; flexible: number; reimbursementStatus: string
+    receiptRequired: number; parentAppointmentId: number | null; taskType: string
+  }[]
+  check('交通費: 支給対象インターンと領収書タスクを2件保持する', rows.length === 2 && rows[0].reimbursementStatus === 'full')
+  check('交通費: 終日endAtをexclusiveとして最終開催日の翌日09:00 JSTへ置く', rows[1].at === '2030-08-03T00:00:00.000Z')
+  check('交通費: 自動タスクは元予定へ紐づき、時間変更可になる', rows[1].parentAppointmentId != null
+    && rows[1].taskType === 'transportation_receipt_submission' && rows[1].flexible === 1)
+  applyDiff(db, input)
+  check('交通費: 同じ案内の再反映で領収書タスクを重複させない', (db.prepare('SELECT count(*) AS n FROM appointment').get() as { n: number }).n === 2)
+
+  applyDiff(db, [{
+    name: '手配テスト社', stage: 'intern', appointments: [{
+      at: '2030-09-01T10:00:00+09:00', kind: 'インターン', title: '切符手配済みインターン', reimbursementStatus: 'arranged',
+    }],
+  }])
+  check('交通費: 企業が切符を手配する場合は領収書送付タスクを作らない',
+    (db.prepare("SELECT count(*) AS n FROM appointment WHERE task_type = 'transportation_receipt_submission'").get() as { n: number }).n === 1)
+
+  applyDiff(db, [{
+    name: '提出明記テスト社', stage: 'intern', appointments: [{
+      at: '2030-10-01T10:00:00+09:00', kind: 'インターン', title: '領収書提出明記インターン', receiptRequired: true,
+    }],
+  }])
+  check('交通費: 支給形態が未確定でも領収書提出の明記があればタスク化する',
+    (db.prepare("SELECT count(*) AS n FROM appointment WHERE task_type = 'transportation_receipt_submission'").get() as { n: number }).n === 2)
 }
 
 // ---- 提出物台帳 ----
@@ -81,15 +126,17 @@ function throws(fn: () => unknown): boolean {
   const input: MailInput = {
     accounts: [{ status: 'success' }],
     messages: [
-      { id: 'x1', receivedAt: '2030-01-01T00:00:00Z', subject: '一次面接のご案内', body: '...' },
-      { id: 'x2', receivedAt: '2030-01-01T01:00:00Z', subject: 'ニュースレター', body: '...' },
+      { id: 'x1', receivedAt: '2030-01-01T00:00:00Z', subject: '一次面接のご案内', body: '一次面接の日程は1月5日10時です。' },
+      { id: 'x2', receivedAt: '2030-01-01T01:00:00Z', subject: 'ニュースレター', body: '限定スカウトが届きました。' },
     ],
   }
   const batches = buildExtractionBatches(input, '抽出してください', '{}')
   check('抽出: 本文をプロンプトへ埋め込み、入力ダイジェストを指示する', batches.length === 1 && batches[0].prompt.includes(inputDigest(input)) && batches[0].prompt.includes('MAIL_DATA'))
   const output = {
     schemaVersion: 1,
-    selections: [{ name: 'C社', stage: 'interview', position: '本選考', appointments: [{ at: '2030-01-05T10:00:00+09:00', kind: '面接', title: '一次面接' }] }],
+    selections: [{ name: 'C社', stage: 'interview', position: '本選考', ref: 'x1',
+      evidence: { messageId: 'x1', kind: 'interview_scheduled', quote: '一次面接の日程は1月5日10時です。' },
+      appointments: [{ at: '2030-01-05T10:00:00+09:00', kind: '面接', title: '一次面接' }] }],
     mailItems: [{ id: 'x1', receivedAt: '2030-01-01T00:00:00Z', subject: '一次面接のご案内', company: 'C社', needsAction: true }],
     submissions: [],
     requirements: [],
@@ -99,6 +146,15 @@ function throws(fn: () => unknown): boolean {
   check('抽出: 未知の項目があれば全体を拒否', throws(() => validateDailySyncResult({ ...output, extra: 1 })))
   check('抽出: 読んでいないメールがあれば網羅性で拒否', throws(() => validateCoverage(input, { ...output.coverage, status: 'completed', reviewedMessageIds: ['x1'] })))
   const merged = mergeExtractionResults(input, [{ input: batches[0].input, output }])
+  for (const [label, selection] of [
+    ['未承諾スカウト', { ...output.selections[0], stage: 'scouted', ref: 'x2', evidence: { messageId: 'x2', kind: 'direct_scout_accepted', quote: '限定スカウトが届きました。' } }],
+    ['別メールの根拠', { ...output.selections[0], evidence: { ...output.selections[0].evidence, messageId: 'x2' } }],
+    ['実在しない引用', { ...output.selections[0], evidence: { ...output.selections[0].evidence, quote: '二次面接の日程が確定しました。' } }],
+    ['段階に合わない根拠', { ...output.selections[0], stage: 'offer' }],
+  ] as const) {
+    const held = mergeExtractionResults(input, [{ input: batches[0].input, output: { ...output, selections: [selection] } }])
+    check(`抽出: ${label}は選考へ反映せずメールと要確認に残す`, held.selections.length === 0 && held.mailItems.length === 1 && held.priorityMails!.length === 1)
+  }
   const db = openDb(':memory:')
   const summary = applyDailySyncResult(db, merged)
   check('反映: 選考と予定とメールが正本へ入る', summary.selections.added.length === 1 && summary.mail.created === 1

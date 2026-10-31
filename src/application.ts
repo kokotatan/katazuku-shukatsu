@@ -15,6 +15,7 @@ import {
   upsertCompany,
 } from './db.js'
 import { transaction } from './inputs.js'
+import { isCompanyExcluded } from './company-preference.js'
 
 export type ApplicationState =
   | 'started'
@@ -152,6 +153,8 @@ export interface CalendarOutboxRow {
   url: string
   location: string
   person: string
+  /** trueなら宿泊マーカー等で、Calendarへ書いても時間帯全体をbusyにしない。 */
+  flexible: boolean
 }
 
 export interface CalendarLinkInput {
@@ -293,6 +296,7 @@ function resolveApplicationTarget(
   position: string,
   season: string,
 ): { selectionId: number; companyId: number } {
+  if (isCompanyExcluded(db, company)) throw new Error(`本人が就活管理対象外にした企業です: ${company}`)
   const resolution = resolveCompany(db, company)
   if (resolution.kind === 'suspicious') {
     throw new Error(`企業名の確認が必要です: ${company} (候補: ${resolution.suggestName})`)
@@ -763,7 +767,8 @@ export function applyApplicationEvent(
 }
 
 export function listApplicationRuns(db: DatabaseSync): ApplicationRunRow[] {
-  ensureApplicationSchema(db)
+  const exists = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'application_run'").get()
+  if (!exists) return []
   return db.prepare(
     'SELECT ar.id, ar.selection_id AS selectionId, c.name AS company, s.position, ' +
     'ar.state, ar.previous_state AS previousState, ar.entry_url AS entryUrl, ' +
@@ -776,7 +781,8 @@ export function listApplicationRuns(db: DatabaseSync): ApplicationRunRow[] {
 }
 
 export function listWebAssessments(db: DatabaseSync): Record<string, unknown>[] {
-  ensureApplicationSchema(db)
+  const exists = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'web_assessment'").get()
+  if (!exists) return []
   return db.prepare(
     'SELECT wa.id, wa.run_id AS runId, wa.selection_id AS selectionId, ' +
     'c.name AS company, s.position, wa.test_type AS testType, ' +
@@ -793,16 +799,17 @@ export function listWebAssessments(db: DatabaseSync): Record<string, unknown>[] 
 export function listCalendarOutbox(db: DatabaseSync, now = new Date()): CalendarOutboxRow[] {
   const earliest = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString()
   const latest = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000).toISOString()
-  return db.prepare(
+  const rows = db.prepare(
     'SELECT a.id AS appointmentId, a.selection_id AS selectionId, ' +
     'c.name AS company, s.position, a.at, a.end_at AS endAt, ' +
-    'a.kind, a.title, a.url, a.location, a.person ' +
+    'a.kind, a.title, a.url, a.location, a.person, a.flexible ' +
     'FROM appointment a JOIN selection s ON s.id = a.selection_id ' +
     'JOIN company c ON c.id = s.company_id ' +
     "WHERE a.status = '予定' AND a.external_id = '' " +
     'AND julianday(a.at) >= julianday(?) AND julianday(a.at) <= julianday(?) ' +
     'ORDER BY a.at, a.id',
-  ).all(earliest, latest) as unknown as CalendarOutboxRow[]
+  ).all(earliest, latest) as unknown as (Omit<CalendarOutboxRow, 'flexible'> & { flexible: number })[]
+  return rows.map((row) => ({ ...row, flexible: row.flexible === 1 }))
 }
 
 export function linkCalendarAppointment(

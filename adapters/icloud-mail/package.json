@@ -1,0 +1,15 @@
+{
+  "name": "@katazuku/icloud-mail-adapter",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "check": "node --check lib.mjs && node --check worker.mjs && node --check inbox.mjs && node check.mjs"
+  },
+  "engines": { "node": ">=24 <25" },
+  "dependencies": {
+    "imapflow": "^2.9.1",
+    "mailparser": "^3.14.1",
+    "nodemailer": "^10.3.1"
+  }
+}

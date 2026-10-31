@@ -49,16 +49,21 @@ Googleとの通信や、選択したAIプロバイダへの情報送信は発生
 | カレンダー同期(30分) | カレンダー → 正本DB。空き判定は「空き / 重複 / 不明」で、情報不足を空きと扱わない | 不要(判断が要る予定だけAI) | カレンダー |
 | 提出物台帳 | 誓約書・証明書・ES などを成果物1件ずつ追跡し、完了するまで毎日再評価 | 不要 | — |
 | 番犬(4時間) | 自動処理が止まっていないか・AIの利用枠が全滅していないかを見張る | 不要 | — |
+| ハーネス改善ループ | run台帳を匿名化した最小観測へ変え、失敗を合成回帰caseにしてbaseline比較する。合格候補も人がrevisionを確認するまで反映しない | 不要 | — |
 | 閲覧アプリ8本 | きょう / 選考 / 企業 / メール / 人 / 面接準備 / プロフィール / 効果 | 不要 | — |
 | 面談の録音(任意・Windows) | オンライン面談を相手の声つきで録る | 不要 | — |
+| 安全なローカルログイン(任意・Windows) | DPAPIで保護した資格情報を隔離Chromeへだけ入力。origin・テナントパスを再検査し、MFA/CAPTCHA/規約同意では停止 | 不要 | 本人が登録した採用サービス |
+| ブラウザ操作計画(開発者向け) | 生値・任意JavaScriptなしの型付き計画。dry-runは無操作、実行は正本・本人承認hash・外部冪等キー・再照合が一致した専用Executorだけ | 不要 | 規約確認済みのサイトadapter |
 | Gemini Spark 連携(任意) | スマホから予定・選考状況を聞く | 不要 | 自分の Cloudflare |
+| katazuku MCP(任意) | Muse・Codex・Claude Codeから正本を読み、明示scopeで冪等入力と承認提案を行う。利用者のMuseアカウントが対象メールボックスに対応する場合は、毎回承認・action hash・Sent再照合付きのemail connector経路を使える。未対応のiCloudはprivate adapterへ分離する。フォーム提出と採用ポータル送信も、汎用workflow契約で本人承認・外部冪等キー・監査を必須にする。remote用OAuth gatewayもセルフホスト可能 | 不要 | 対応MCPクライアント・任意で自分のCloudflare |
 
 詳しい動きは [docs/WORKFLOWS.md](docs/WORKFLOWS.md)、AIの選び方は [docs/AI-PROVIDERS.md](docs/AI-PROVIDERS.md)。
+MCPは[MCPガイド](docs/MCP.md)、Museは[Muse接続ガイド](docs/MUSE.md)、安全なWindowsログインは[ローカル認証ブローカー](scripts/local-login/README-daily-login.md)、ブラウザ実行の共通境界は[ブラウザ操作計画](docs/BROWSER-PLAN.md)、運用を失敗から改善する仕組みは[ハーネス改善ループ](docs/HARNESS-IMPROVEMENT.md)を参照してください。private版との差と意図的な秘密境界は[追随台帳](docs/PRIVATE-PARITY.md)に固定しています。
 
 ## やらないこと(コードで止めている安全境界)
 
-- **第三者へのメール送信はしない。** 返信は常に下書きまで。送るのはあなた。
-- **ES・エントリー・フォームの送信、予約の確定、辞退はしない。** 提出物は「承認するだけ」の状態まで準備します。
+- **定常処理は第三者へ自動送信しない。** 通常は下書きまで。明示的に固定した宛先・本文を本人が承認した場合だけ、専用ExecutorまたはMuseの毎回承認付きemail connectorが同じaction hashを一度実行し、Sentを再照合する。
+- **定常処理や一般MCPはES・エントリー・フォームの送信、予約確定、辞退を実行しない。** 本人が固定内容を承認し、正本・action hash・外部冪等キー・直前再照合が一致した専用Executorだけが1回実行できます。
 - **Web適性検査・コーディングテストの代理受験はしない。**
 - AIにデータベースを直接書かせない。AIの出力は形と網羅性を検証してから、決まった規則で反映します。
 
@@ -84,6 +89,7 @@ flowchart LR
 ```
 
 - **正本は1つ**(ローカルの SQLite)。アプリ・カレンダーは「見る窓」です。
+- **戻せる。** バックアップはSQLite整合性と参照を検査して既存ファイルを上書きせず作り、復元も稼働中の正本を置換せず新しいパスへ作ります。
 - **書き手はエージェントだけ。** 状態は遷移規則(`transition()`)を必ず通して更新し、変化は台帳に残ります。
 - **AIは取り替えられる。** 未ログイン・利用枠切れなど「何もしていない失敗」のときだけ、次のAIへ切り替えます。
 
@@ -120,11 +126,28 @@ npm run workflow -- asa --dry-run        # 朝のまとめのプロンプトと�
 
 [docs/SETUP.md](docs/SETUP.md) の順に進めます。流れは次のとおりです。
 
-1. `katazuku.config.json` を作る(アカウント・署名・通知の設定。gitignore 済み)
+最初に `npm run init` を実行すると、リポジトリ外のOS利用者別領域へ空の正本DBを作成します。
+再実行しても既存データを消さず、必要なマイグレーションだけを適用します。保存先を変える場合は
+`KATAZUKU_DB`、または `npm run init -- /absolute/path/to/katazuku.db` を使います。
+
+1. `katazuku.config.json` を作り、`npm run init` で空の正本DBを一つ作る(設定・実データはgitignore 済み)
 2. Google につなぐ: 自分のGoogle CloudでデスクトップOAuthクライアントを作り、`npm run google:connect` で本人が読取りを許可。下書き・予定の書込みには別のGoogle MCP接続も必要
 3. AI を選ぶ: `npm run chatgpt -- signin`(ChatGPT プラン)、または Claude Code / Codex にログイン
 4. `--dry-run` で確認してから、毎日のワークフローを登録する
 5. `npm start` で8画面と朝・前夜のまとめを一つのローカルURLから開く
+
+採用サービスへの継続ログインが必要なWindows利用者は、セットアップ後に[ローカル認証ブローカー](scripts/local-login/README-daily-login.md)を任意で設定できます。資格情報は正本DBやMCPへ入らず、サービス・設定世代別のDPAPI暗号文として端末内だけに保存されます。schema v7は旧`company`平文資格情報列を廃止し、旧DBに値が残る場合はDPAPIへの明示移行が済むまで安全に停止します。
+
+Muse、Codex、Claude Codeなどから正本を使う場合は、既定で読取専用のMCPを起動できます。
+
+```sh
+KATAZUKU_MCP_DB=/absolute/path/to/katazuku.db KATAZUKU_MCP_SCOPES=read npm run mcp
+```
+
+全scopeは`read,write,sensitive,actions`です。全scopeでも、第三者送信・応募提出・予約確定は実行せず、
+固定した内容を本人承認済みExecutorへ渡すところで止まります。
+remote Muse用のOAuth・端末中継は[muse-gateway](muse-gateway/README.md)にあります。MetaはConnector Platformの
+提出・審査・Settings > Connectorsでの公開手順を案内しています。gateway実装、Meta提出、承認、利用者接続、実送信は区別します。
 
 実利用の前提は `npm run doctor -- --setup` で確認できます。設定・Google資格情報・選択したAIのローカル準備を調べ、秘密値は表示しません。
 通信やログインは行わないため、[Google接続ガイド](docs/GOOGLE-CONNECTION.md) の本人による読み取り確認も済ませてください。
@@ -183,6 +206,7 @@ macOS / Linux なら `npm run schedule:print` が出す cron / launchd / systemd
 - 初参加の手順(日英): [最初の貢献ガイド](docs/FIRST-CONTRIBUTION.md)
 - 募集中の初心者向け課題: [good first issue](https://github.com/kokotatan/katazuku-shukatsu/issues?q=is%3Aissue%20is%3Aopen%20label%3A%22good%20first%20issue%22)
 - 設計: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+- エージェントハーネス: [docs/HARNESS-IMPROVEMENT.md](docs/HARNESS-IMPROVEMENT.md)
 - AIアシスタントに聞くなら: [AGENTS.md](AGENTS.md) と [llms.txt](llms.txt) を読ませると、設計と作法をすぐ答えられます
 
 ```sh
@@ -215,6 +239,11 @@ import { openDb, transition, resolveCompany, applyDiff } from 'katazuku-shukatsu
 公開APIの入口は `src/index.ts` だけです(SemVer はこの面にかかります)。ランタイム依存はゼロで、標準の `node:sqlite` を使います。
 
 ---
+
+AIアシスタントに「クローン後の正本DBを構築して」と頼めます。AI向け手順の正本は
+[AGENTS.md](AGENTS.md) で、セットアップ・DB初期化・実データ投入・安全境界をまとめています。
+[llms.txt](llms.txt) は短い案内、Claude Code用の [CLAUDE.md](CLAUDE.md) は `AGENTS.md` を直接
+読み込む入口です。
 
 ## English
 

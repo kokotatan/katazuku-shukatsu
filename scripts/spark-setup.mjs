@@ -123,7 +123,7 @@ step(5, 'bridge(自分のPC ↔ gateway)')
 const { BRIDGE_TOKEN } = JSON.parse(readFileSync(secretsPath, 'utf8'))
 writeJson(bridgeConfigPath, { origin, token: BRIDGE_TOKEN }, true)
 const dbPath = process.env.KATAZUKU_DB ?? join(root, 'data', 'katazuku.db')
-if (!existsSync(dbPath)) console.log(`注意: 正本DB(${dbPath})がまだありません。試すだけなら npm run seed -- data/katazuku.db でデモDBを作れます`)
+if (!existsSync(dbPath)) console.log('正本DBは npm run init で準備してください。既存DBは KATAZUKU_DB で指定します。画面だけ試す場合は npm run demo を使います。')
 if (!register) {
   console.log('常駐登録は省きました。npm run spark:bridge で bridge を起動してください')
 } else if (process.platform === 'win32') {

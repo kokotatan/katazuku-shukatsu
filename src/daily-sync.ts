@@ -12,11 +12,12 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { DatabaseSync } from 'node:sqlite'
 import { validateJsonSchema } from './agent-runtime.js'
-import { applyDiff, MAX_APPLY_CHANGES, type DiffItem } from './db-apply.js'
+import { applyDiff, MAX_APPLY_CHANGES } from './db-apply.js'
 import { applyMail, type MailApplyItem } from './db-apply-mail.js'
 import { applySubmission, type SubmissionInput } from './db-apply-submission.js'
 import { inputDigest, splitMailInput, validateCoverage, validateMailInput, type ExtractionCoverage, type MailInput } from './daily-sync-input.js'
 import { applySubmissionRequirements, type SubmissionRequirementInput } from './submission-requirement.js'
+import { filterSelectionsByEvidence, type EvidenceSelection } from './selection-evidence.js'
 
 const here = dirname(fileURLToPath(import.meta.url))
 /** src/ からも dist/ からも同じ場所(リポジトリ直下の schemas/)を指す */
@@ -26,7 +27,7 @@ export interface DailySyncResult {
   schemaVersion: 1
   generatedAt?: string
   coverage?: ExtractionCoverage
-  selections: DiffItem[]
+  selections: EvidenceSelection[]
   mailItems: MailApplyItem[]
   submissions: SubmissionInput[]
   requirements?: SubmissionRequirementInput[]
@@ -161,7 +162,12 @@ export function mergeExtractionResults(
     const value = part.output
     validateDailySyncResult(value)
     validateCoverage(part.input, value.coverage)
-    merged.selections.push(...value.selections)
+    const evidence = filterSelectionsByEvidence(value.selections, part.input)
+    merged.selections.push(...evidence.accepted)
+    // 根拠が弱い更新を黙って消さず、Inboxと要確認の両方へ残す。
+    for (const rejected of evidence.rejected) {
+      merged.priorityMails!.push({ id: rejected.ref, subject: '選考の根拠を確認してください', reason: `${rejected.name}: ${rejected.reason}` })
+    }
     merged.mailItems.push(...value.mailItems)
     merged.submissions.push(...value.submissions)
     merged.requirements!.push(...(value.requirements ?? []))

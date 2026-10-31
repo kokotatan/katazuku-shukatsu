@@ -14,6 +14,7 @@ import { dirname, join, resolve } from 'node:path'
 import type { DatabaseSync } from 'node:sqlite'
 import { openDb, upsertCompany, insertSelection, transition, samePosition, resolveCompany, addPending, addEvent, addAppointment, listPending, outcomeOf, STATUS_FOR, type Stage } from './db.js'
 import { resolveDatabasePath } from './database-path.js'
+import { isCompanyExcluded } from './company-preference.js'
 
 export const MAX_APPLY_CHANGES = 15
 
@@ -26,7 +27,10 @@ export interface DiffItem {
   season?: string
   position?: string
   /** 面接・締切・説明会などの予定(日時はISO。時刻・終了時刻・URL・場所・相手まで取る) */
-  appointments?: { at: string; endAt?: string; kind?: string; title: string; url?: string; location?: string; person?: string }[]
+  appointments?: {
+    at: string; endAt?: string; kind?: string; title: string; url?: string; location?: string; person?: string
+    reimbursementStatus?: import('./db.js').ReimbursementStatus; receiptRequired?: boolean
+  }[]
   /** 根拠メールのID等(イベントのref) */
   ref?: string
 }
@@ -53,6 +57,7 @@ export function applyDiff(db: DatabaseSync, items: DiffItem[], by = 'daily-sync'
     try {
     const name = (it.name ?? '').trim()
     if (!name) continue
+    if (isCompanyExcluded(db, name)) { res.skipped.push(name); continue }
 
     // stage を実行時に検証する。未知のstage(タイポ・将来値・外部LLMの誤り)1件で
     // バッチ全体がロールバックしないよう、その1件だけ skip する。
@@ -106,7 +111,11 @@ export function applyDiff(db: DatabaseSync, items: DiffItem[], by = 'daily-sync'
       }, by)
       addEvent(db, sid, '新規', `${STATUS_FOR[it.stage]}として登録${it.position ? `(${it.position})` : ''}`, by, undefined, it.ref)
       for (const ap of it.appointments ?? []) {
-        addAppointment(db, { selectionId: sid, at: ap.at, endAt: ap.endAt, kind: ap.kind ?? 'その他', title: ap.title, url: ap.url, location: ap.location, person: ap.person })
+        addAppointment(db, {
+          selectionId: sid, at: ap.at, endAt: ap.endAt, kind: ap.kind ?? 'その他', title: ap.title,
+          url: ap.url, location: ap.location, person: ap.person,
+          reimbursementStatus: ap.reimbursementStatus, receiptRequired: ap.receiptRequired,
+        })
         addEvent(db, sid, '予定追加', `${ap.title} (${ap.at})`, by, undefined, it.ref)
       }
       res.added.push(name)
@@ -128,7 +137,11 @@ export function applyDiff(db: DatabaseSync, items: DiffItem[], by = 'daily-sync'
       changed = true
     }
     for (const ap of it.appointments ?? []) {
-      const added = addAppointment(db, { selectionId: target.id, at: ap.at, endAt: ap.endAt, kind: ap.kind ?? 'その他', title: ap.title, url: ap.url, location: ap.location, person: ap.person })
+      const added = addAppointment(db, {
+        selectionId: target.id, at: ap.at, endAt: ap.endAt, kind: ap.kind ?? 'その他', title: ap.title,
+        url: ap.url, location: ap.location, person: ap.person,
+        reimbursementStatus: ap.reimbursementStatus, receiptRequired: ap.receiptRequired,
+      })
       if (added.created) {
         addEvent(db, target.id, '予定追加', `${ap.title} (${ap.at})`, by, undefined, it.ref)
         changed = true

@@ -4,6 +4,7 @@ import { SparkQueue } from '../src/spark-queue.js'
 import { sparkRpc, type SparkReader } from '../src/spark-mcp.js'
 import { openDbReadOnly, quickRead } from '../src/quick-read.js'
 import { allowedSparkRemoteRequest, filterSparkRemoteResponse } from '../src/spark-remote-policy.js'
+import { resolveDatabasePath } from '../src/data-path.js'
 
 const root = new URL('../', import.meta.url)
 const configPath = process.env.KATAZUKU_SPARK_BRIDGE_CONFIG || fileURLToPath(new URL('logs/spark-bridge.local.json', root))
@@ -15,7 +16,7 @@ if (!/^[A-Za-z0-9_-]{43,128}$/.test(config.token)) throw new Error('bridge token
 const queue = new SparkQueue(config.queue || fileURLToPath(new URL('logs/spark-queue.local.db', root)))
 // 正本DBは要求ごとに読み取り専用で開いて閉じる(書き手の定常処理とロックを取り合わない)。
 // DBの場所やSQLの詳細はSparkへ返さない。
-const dbPath = process.env.KATAZUKU_DB || fileURLToPath(new URL('data/katazuku.db', root))
+const dbPath = resolveDatabasePath()
 const reader: SparkReader | undefined = existsSync(dbPath) ? (cmd, arg) => {
   let db: ReturnType<typeof openDbReadOnly> | undefined
   try { db = openDbReadOnly(dbPath); return quickRead(db, cmd, arg) }

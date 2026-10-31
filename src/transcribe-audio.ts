@@ -32,6 +32,7 @@ import {
   type TranscriptReceipt,
   type TranscriptSegment,
 } from './transcription.js'
+import { isDigitallySilentWav } from './wav-silence.js'
 
 export interface TranscribeAudioOptions {
   input: string
@@ -171,7 +172,9 @@ async function transcribeWithVoicebox(ffmpeg: string, input: string, workDir: st
   await client.initialize()
   const texts: string[] = []
   for (const [index, chunk] of chunks.entries()) {
-    const text = await client.transcribe(resolve(chunkDir, chunk))
+    const chunkPath = resolve(chunkDir, chunk)
+    // ffmpeg出力が確実なデジタル無音なら外部MCPを呼ばない。形式不明は通常処理へ倒す。
+    const text = isDigitallySilentWav(chunkPath) ? '' : await client.transcribe(chunkPath)
     texts.push(text)
     log(`${index + 1}/${chunks.length}: ${text ? `${text.length}文字` : '[無音]'}`)
   }

@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto'
 import type { DatabaseSync } from 'node:sqlite'
 import { resolveCompany, upsertCompany } from './db.js'
 import { resolveSelectionId, transaction } from './inputs.js'
+import { isCompanyExcluded } from './company-preference.js'
 
 export const REQUIREMENT_KINDS = [
   'pledge',
@@ -114,6 +115,7 @@ export function applySubmissionRequirements(
     for (const input of inputs) {
       if (!input.sourceRef || !input.company || !input.title) throw new Error('提出物は sourceRef/company/title が必須です')
       if (!['required', 'completed', 'waived'].includes(input.status)) throw new Error(`不正な提出物status: ${input.status}`)
+      if (input.status === 'required' && isCompanyExcluded(db, input.company)) continue
       const kind = normalizeRequirementKind(input.kind || input.title)
       const links = resolveLinks(db, input)
       const key = logicalKey([

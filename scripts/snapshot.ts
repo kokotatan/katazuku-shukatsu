@@ -11,17 +11,20 @@
  * 出さないもの: マイページのログインIDとパスワード、顔写真の実体、メール本文。
  * 実データから書き出した snapshot.json は .gitignore 済み。コミットしないこと。
  */
-import { writeFileSync, mkdirSync } from 'node:fs'
+import { writeFileSync, mkdirSync, existsSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
   openDb, upsertCompany, insertSelection, addAppointment, addEvent, addPending,
   listSelections, listAppointments, listCompanies, listEvents, listPending, outcomeOf,
 } from '../src/db.js'
+import { openDbReadOnly } from '../src/quick-read.js'
+import { resolveDatabasePath } from '../src/data-path.js'
 import { listPlatformSnapshot, saveBasicProfile, upsertCompanyDossier, upsertMailItem } from '../src/platform.js'
 import { upsertPerson } from '../src/inputs.js'
 import { applySubmissionRequirements } from '../src/submission-requirement.js'
 import { evaluateSubmissionReadiness } from '../src/submission-readiness.js'
+import { readConsistentSnapshot } from '../src/database-maintenance.js'
 import type { DatabaseSync } from 'node:sqlite'
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -30,15 +33,16 @@ const here = dirname(fileURLToPath(import.meta.url))
 const TARGETS = ['board', 'status', 'inbox', 'insight', 'profile', 'people', 'prep', 'impact']
 
 export function buildSnapshot(db: DatabaseSync, demo: boolean): Record<string, unknown> {
-  const selections = listSelections(db)
-  const companyOf = new Map(selections.map((s) => [s.id, s.company]))
-  const platform = listPlatformSnapshot(db)
+  return readConsistentSnapshot(db, () => {
+    const selections = listSelections(db)
+    const companyOf = new Map(selections.map((s) => [s.id, s.company]))
+    const platform = listPlatformSnapshot(db)
 
-  return {
-    generatedAt: new Date().toISOString(),
-    demo,
-    // ログインID・パスワードは意図的に出さない(見る窓に認証情報は要らない)
-    companies: listCompanies(db).map((c) => ({
+    return {
+      generatedAt: new Date().toISOString(),
+      demo,
+      // ログインID・パスワードは意図的に出さない(見る窓に認証情報は要らない)
+      companies: listCompanies(db).map((c) => ({
       name: c.name, shortName: c.shortName ?? '', industry: c.industry,
       mypageUrl: c.mypageUrl, memo: c.memo,
     })),
@@ -69,8 +73,9 @@ export function buildSnapshot(db: DatabaseSync, demo: boolean): Record<string, u
     })),
     dossiers: platform.dossiers,
     mailItems: platform.mailItems,
-    pending: listPending(db).map((p) => ({ name: p.name, context: p.context, createdAt: p.created_at })),
-  }
+      pending: listPending(db).map((p) => ({ name: p.name, context: p.context, createdAt: p.created_at })),
+    }
+  })
 }
 
 /** 架空データだけでアプリ群を一通り埋める。実在の企業・人物は登場しない */
@@ -231,8 +236,9 @@ function main(): void {
   const demo = process.argv.includes('--demo')
   const dbPath = demo
     ? ':memory:'
-    : (process.argv.slice(2).find((a) => !a.startsWith('--')) ?? process.env.KATAZUKU_DB ?? 'data/katazuku.db')
-  const db = demo ? undefined : openDb(dbPath)
+    : resolveDatabasePath(process.argv.slice(2).find((a) => !a.startsWith('--')))
+  if (!demo && !existsSync(dbPath)) throw new Error('正本DBが見つかりません。先に npm run init を実行してください。空のDBは作成しません。')
+  const db = demo ? undefined : openDbReadOnly(dbPath)
   const snapshot = demo ? buildDemoSnapshot() : buildSnapshot(db!, false)
   if (demo && process.argv.includes('--viewer')) {
     const out = join(here, '..', 'logs', 'viewer-demo.local.json')

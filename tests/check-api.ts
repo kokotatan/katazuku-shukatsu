@@ -21,8 +21,16 @@ const EXPECTED = [
   'MEETING_RUN_ORDER', 'decideMeetingRunTransition', 'ensureMeetingRun', 'isMeetingRunState', 'transitionMeetingRun',
   // db
   'openDb', 'SCHEMA_VERSION', 'transition', 'STATUS_FOR', 'outcomeOf',
+  'databaseVersion', 'assertSupportedDatabase', 'assertDatabaseIntegrity', 'verifyDatabaseBackup',
+  'createDatabaseBackup', 'restoreDatabaseBackup', 'migrateDatabase', 'readConsistentSnapshot', 'ensureCoreIndexes',
   'resolveCompany', 'sameCompany', 'samePosition', 'addAlias', 'addPending', 'listPending', 'setOfficialName',
-  'upsertCompany', 'insertSelection', 'listSelections', 'listCompanies', 'getCompanyCredential', 'addEvent', 'listEvents',
+  'COMPANY_EXCLUSION_MARKER', 'isCompanyExcluded', 'excludeCompany', 'applyPeopleResearch',
+  'applyCompanyResearch',
+  'emailIdentityFromProfile', 'professionalEmailIssues', 'hasScheduleCommitmentLanguage',
+  'buildWorkspaceSendCall', 'preflightThirdPartyEmail',
+  'executeApprovedThirdPartyEmail',
+  'ensureMuseEmailResultSchema', 'getMuseEmailResult', 'museEmailExpectedEvidence', 'recordMuseEmailResult',
+  'upsertCompany', 'insertSelection', 'listSelections', 'listCompanies', 'addEvent', 'listEvents',
   'addAppointment', 'listAppointments', 'sameAppointment', 'findAppointmentMatch',
   'normalizeAppointmentAt', 'normalizeAppointmentUrl',
   // inputs
@@ -43,6 +51,24 @@ const EXPECTED = [
   'parseProviderOrder', 'classifyFailure', 'mayFallback', 'parseQuotaResetAt', 'validateJsonSchema',
   'executeProcess', 'PROVIDER_IDS', 'DEFAULT_CODEX_WEB_SEARCH_ARGS',
   'DEFAULT_CAPABILITY_TOOLS', 'DEFAULT_ABORT_PATTERNS',
+  // 原子的判断
+  'DECISION_BACKENDS', 'DEFAULT_DECISION_POLICY', 'renderLlmDecisionPrompt', 'parseLlmDecisionResult',
+  'routeAtomicDecision', 'routeDecisionResult', 'resolveDecisionControlConfig',
+  'LlmAtomicDecisionEvaluator', 'TypeSafeJevDecisionEvaluator',
+  // 宣言的workflowと承認hash
+  'WORKFLOW_OWNERS', 'WORKFLOW_EFFECTS', 'canonicalJson', 'workflowHash', 'validateWorkflowContract',
+  'loadWorkflowContract', 'ensureWorkflowControlSchema', 'openWorkflowStore', 'startWorkflowRun',
+  'beginWorkflowStep', 'completeWorkflowStep', 'failWorkflowStep', 'requestWorkflowApproval',
+  'decideWorkflowApproval', 'getWorkflowRun',
+  // ブラウザ操作計画の安全境界
+  'BROWSER_STEP_TYPES', 'validateBrowserPlan', 'summarizeBrowserPlan', 'runBrowserPlan',
+  // capability-scoped katazuku MCP
+  'KATAZUKU_MCP_SCOPES', 'KATAZUKU_MCP_INSTRUCTIONS', 'KatazukuMcpServer',
+  'defaultWorkflowStorePath', 'katazukuRpc',
+  'KATAZUKU_REMOTE_SCOPES', 'KATAZUKU_REMOTE_TOOL_SCOPES', 'localScopes', 'allowedKatazukuRemoteRequest',
+  // 面接・面談ごとの準備ready判定
+  'validatePreparation', 'evaluateMeetingPreparation', 'saveMeetingPreparation', 'blockMeetingPreparation',
+  'meetingPreparationSnapshot', 'meetingPreparationContext', 'moveMeetingPreparation',
   // 会議URL
   'isMeetingUrl', 'MEETING_HOSTS', 'SHORTENER_HOSTS',
   'isAutomaticRecordingEligible',
@@ -58,6 +84,7 @@ const EXPECTED = [
   // 録音の文字起こしと議事録化
   'CHUNK_SECONDS', 'VOICEBOX_STARTUP_WAIT_MS', 'VoiceboxMcpClient', 'mergeSpeakerSegments', 'renderChunkTranscript',
   'renderSegmentTranscript', 'selectTranscriptionBackend', 'transcribeAudio',
+  'isDigitallySilentWav',
   'INTERVIEW_MINUTES_SCHEMA_PATH', 'buildMinutesPrompt', 'minutesRunId', 'parseMinutesOutput', 'toInterviewInput',
   // 面談スクショからの顔写真
   'attachPhotosToAppliedInterview', 'cropImage', 'decodePng', 'encodePng',

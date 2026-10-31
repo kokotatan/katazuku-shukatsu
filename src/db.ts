@@ -7,11 +7,19 @@
  * - だから「上書きしない」ではなく「遷移規則で堂々と更新する」(transition() に集約)
  */
 import { DatabaseSync } from 'node:sqlite'
-import { mkdirSync, rmSync } from 'node:fs'
+import { randomUUID } from 'node:crypto'
+import { existsSync, mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { ensurePlatformSchema } from './platform.js'
 import { ensureCareerSupportSchema } from './career-support-schema.js'
 import { ensureWorkflowSchema } from './workflow-schema.js'
+import {
+  assertDatabaseIntegrity,
+  assertSupportedDatabase,
+  createDatabaseBackup,
+  databaseVersion,
+  ensureCoreIndexes,
+} from './database-maintenance.js'
 
 export interface Selection {
   id?: number
@@ -35,18 +43,17 @@ export interface CompanyInfo {
   shortName?: string
   industry: string
   mypageUrl: string
-  loginId: string
-  password: string
   memo: string
-  /** listCompanies は資格情報の実値を返さない。設定の有無だけをこの真偽値で示す(実値は getCompanyCredential) */
-  hasLoginId?: boolean
-  hasPassword?: boolean
 }
 
 export function openDb(path: string): DatabaseSync {
+  const existed = path !== ':memory:' && existsSync(path)
   mkdirSync(dirname(path), { recursive: true })
   const db = new DatabaseSync(path)
-  db.exec(`
+  try {
+    // 将来版を古いコードで開いた場合は、journal_mode変更やCREATE TABLEより先に止める。
+    assertSupportedDatabase(db, SCHEMA_VERSION)
+    db.exec(`
     PRAGMA journal_mode = WAL;
     PRAGMA busy_timeout = 5000;
     PRAGMA foreign_keys = ON;
@@ -55,8 +62,6 @@ export function openDb(path: string): DatabaseSync {
       name TEXT NOT NULL UNIQUE,
       industry TEXT NOT NULL DEFAULT '',
       mypage_url TEXT NOT NULL DEFAULT '',
-      login_id TEXT NOT NULL DEFAULT '',
-      password TEXT NOT NULL DEFAULT '',
       memo TEXT NOT NULL DEFAULT '',
       updated_at TEXT NOT NULL
     );
@@ -120,11 +125,10 @@ export function openDb(path: string): DatabaseSync {
       status TEXT NOT NULL DEFAULT '予定',  -- 予定 / 完了 / 中止
       created_at TEXT NOT NULL
     );
-  `)
-  // マイグレーションに失敗したら開きっぱなしにしない。
-  // 呼び手は例外で気づくが、ハンドルが残るとファイルを掴んだままになる。
-  try {
-    migrate(db, path)
+    `)
+    migrate(db, path, existed)
+    ensureCoreIndexes(db)
+    assertDatabaseIntegrity(db)
   } catch (error) {
     db.close()
     throw error
@@ -133,7 +137,7 @@ export function openDb(path: string): DatabaseSync {
 }
 
 /** 現行スキーマの版。マイグレーションを足すたびに +1 し、`MIGRATIONS` に1本足す */
-export const SCHEMA_VERSION = 4
+export const SCHEMA_VERSION = 7
 
 /**
  * 版ゲート方式のマイグレーション(#10)。
@@ -150,6 +154,8 @@ interface Migration {
   description: string
   /** 列DROP・データ移送を含むか。含むなら適用前にバックアップを取る */
   destructive: boolean
+  /** バックアップや変更を始める前に満たす条件。秘密移行待ち等はここで止める。 */
+  preflight?: (db: DatabaseSync) => void
   up: (db: DatabaseSync) => void
 }
 
@@ -204,34 +210,82 @@ const MIGRATIONS: Migration[] = [
     destructive: false,
     up: (db) => ensureWorkflowSchema(db),
   },
+  {
+    version: 5,
+    description: '面接・面談ごとの準備成果物と根拠hashを追加',
+    destructive: false,
+    up: (db) => ensurePlatformSchema(db),
+  },
+  {
+    version: 6,
+    description: 'インターン交通費の精算状態と領収書提出タスクの由来を追加',
+    destructive: false,
+    up: (db) => ensureWorkflowSchema(db),
+  },
+  {
+    version: 7,
+    description: '企業テーブルから平文ログインID・パスワード列を削除し、OS資格情報ブローカーへ一本化',
+    destructive: true,
+    preflight: (db) => {
+      const columns = db.prepare('PRAGMA table_info(company)').all() as { name: string }[]
+      const names = new Set(columns.map((column) => column.name))
+      if (!names.has('login_id') && !names.has('password')) return
+      const legacy = db.prepare(`SELECT COUNT(*) AS count FROM company
+        WHERE ${names.has('login_id') ? "login_id <> ''" : '0'} OR ${names.has('password') ? "password <> ''" : '0'}`).get() as { count: number }
+      if (Number(legacy.count) > 0) {
+        throw new Error(
+          `旧companyテーブルに${legacy.count}件の平文資格情報があります。値は表示しません。` +
+          'Windowsでは local-login:migrate-db-credential でDPAPIへ1件ずつ移してから再実行してください。',
+        )
+      }
+    },
+    up: (db) => {
+      const columns = db.prepare('PRAGMA table_info(company)').all() as { name: string }[]
+      const names = new Set(columns.map((column) => column.name))
+      if (names.has('login_id')) db.exec('ALTER TABLE company DROP COLUMN login_id')
+      if (names.has('password')) db.exec('ALTER TABLE company DROP COLUMN password')
+    },
+  },
 ]
 
-/** 適用前のスナップショット。`VACUUM INTO` で WAL を畳んだ1ファイルを隣に置く */
-function snapshotBeforeMigration(db: DatabaseSync, path: string, version: number): string {
-  const target = `${path}.v${version}.bak`
-  rmSync(target, { force: true })
-  db.exec(`VACUUM INTO '${target.replace(/'/g, "''")}'`)
-  return target
-}
+function migrate(db: DatabaseSync, path: string, existed: boolean): void {
+  assertSupportedDatabase(db, SCHEMA_VERSION)
+  if (databaseVersion(db) === SCHEMA_VERSION) return
 
-function migrate(db: DatabaseSync, path: string): void {
-  const current = (db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version
-  for (const migration of MIGRATIONS) {
-    if (migration.version <= current) continue
-    // インメモリDBはバックアップの取りようが無い(消えて困るデータも無い)ので飛ばす
-    if (migration.destructive && path !== ':memory:') {
-      const target = snapshotBeforeMigration(db, path, migration.version)
-      console.warn(`スキーマ v${migration.version} を適用します。適用前のスナップショット: ${target}`)
+  db.exec('BEGIN IMMEDIATE')
+  try {
+    // ロック取得後に再判定する。他プロセスが先に移行を完了していても二重適用しない。
+    assertSupportedDatabase(db, SCHEMA_VERSION)
+    const current = databaseVersion(db)
+    const pending = MIGRATIONS.filter((migration) => migration.version > current)
+    for (const migration of pending) migration.preflight?.(db)
+    const destructive = pending.find((migration) => migration.destructive)
+
+    // 新規作成中の空DBには守るべき旧データがない。既存ファイルだけ一意名へ退避する。
+    if (destructive && existed && path !== ':memory:') {
+      const target = `${path}.before-v${destructive.version}-${Date.now()}-${randomUUID()}.db`
+      const reader = new DatabaseSync(path, { readOnly: true })
+      try {
+        createDatabaseBackup(reader, target)
+      } finally {
+        reader.close()
+      }
+      console.warn(`スキーマ v${destructive.version} を適用します。検証済みの適用前バックアップ: ${target}`)
     }
-    migration.up(db)
-    db.exec(`PRAGMA user_version = ${migration.version}`)
-  }
-  const after = (db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version
-  if (after > SCHEMA_VERSION) {
-    throw new Error(
-      `このDBはスキーマ v${after} です。コードが知っているのは v${SCHEMA_VERSION} まで。` +
-      '新しい版で書かれたDBを古いコードで開くとデータを壊すので、コードを更新してください。',
-    )
+
+    for (const migration of pending) {
+      migration.up(db)
+      db.exec(`PRAGMA user_version = ${migration.version}`)
+    }
+    assertDatabaseIntegrity(db)
+    db.exec('COMMIT')
+  } catch (error) {
+    try {
+      db.exec('ROLLBACK')
+    } catch {
+      // 元のエラーを返す。
+    }
+    throw error
   }
 }
 
@@ -482,6 +536,76 @@ export interface Appointment {
   location?: string
   person?: string
   status?: string
+  /** 企業が本人立替分を精算するか。企業による切符手配はarrangedで、領収書送付タスクを作らない。 */
+  reimbursementStatus?: ReimbursementStatus
+  /** 案内に領収書提出が明記されている場合。支給形態が未確定でも提出タスクを作る。 */
+  receiptRequired?: boolean
+  /** 自動生成タスクの元になった予定。通常の入力では指定しない。 */
+  parentAppointmentId?: number | null
+  /** 自動生成タスクの種類。通常の入力では指定しない。 */
+  taskType?: string
+  /** 固定予定と重なったら移動してよい本人タスク。空き判定では占有扱いにしない。 */
+  flexible?: boolean
+}
+
+export type ReimbursementStatus = 'unknown' | 'none' | 'full' | 'partial' | 'fixed' | 'arranged'
+
+const REIMBURSEMENT_STATUSES = new Set<ReimbursementStatus>([
+  'unknown', 'none', 'full', 'partial', 'fixed', 'arranged',
+])
+const RECEIPT_TASK_TYPE = 'transportation_receipt_submission'
+
+function isInternshipAppointment(a: Pick<Appointment, 'kind' | 'title'>): boolean {
+  return /インターン|internship|ハッカソン/i.test(`${a.kind} ${a.title}`)
+}
+
+/** インターン最終開催日の翌日09:00(JST)から15分間を返す。終日予定のendAtは終了日exclusiveを考慮する。 */
+function receiptTaskTimes(at: string, endAt: string): { at: string; endAt: string } {
+  const startMs = Date.parse(at)
+  let basisMs = Date.parse(endAt || at)
+  if (Number.isNaN(basisMs)) basisMs = startMs
+  if (!Number.isNaN(startMs) && basisMs > startMs) {
+    const jst = new Date(basisMs + 9 * 60 * 60 * 1000)
+    if (jst.getUTCHours() === 0 && jst.getUTCMinutes() === 0 && jst.getUTCSeconds() === 0) basisMs -= 1
+  }
+  const jst = new Date(basisMs + 9 * 60 * 60 * 1000)
+  const taskStart = Date.UTC(jst.getUTCFullYear(), jst.getUTCMonth(), jst.getUTCDate() + 1, 0, 0, 0)
+  return { at: new Date(taskStart).toISOString(), endAt: new Date(taskStart + 15 * 60 * 1000).toISOString() }
+}
+
+function ensureTransportationReceiptTask(
+  db: DatabaseSync,
+  source: {
+    id: number
+    selectionId: number
+    at: string
+    endAt: string
+    kind: string
+    title: string
+    reimbursementStatus: ReimbursementStatus
+    receiptRequired: boolean
+  },
+): void {
+  const participantReimbursement = ['full', 'partial', 'fixed'].includes(source.reimbursementStatus)
+  if (!isInternshipAppointment(source) || (!participantReimbursement && !source.receiptRequired)) return
+  const times = receiptTaskTimes(source.at, source.endAt)
+  const existing = db.prepare(
+    'SELECT id, external_id AS externalId FROM appointment WHERE parent_appointment_id = ? AND task_type = ?',
+  ).get(source.id, RECEIPT_TASK_TYPE) as { id: number; externalId: string } | undefined
+  if (existing) {
+    // 外部Calendar反映前だけ元日程の訂正へ追随する。反映済み予定は外部更新ExecutorなしにDBだけ動かさない。
+    if (!existing.externalId) {
+      db.prepare("UPDATE appointment SET at = ?, end_at = ?, status = '予定' WHERE id = ?")
+        .run(times.at, times.endAt, existing.id)
+    }
+    return
+  }
+  db.prepare(`
+    INSERT INTO appointment
+      (selection_id, at, end_at, kind, title, url, location, person, status, created_at,
+       parent_appointment_id, task_type, flexible)
+    VALUES (?, ?, ?, 'タスク', '交通費領収書を送る', '', '', '', '予定', ?, ?, ?, 1)
+  `).run(source.selectionId, times.at, times.endAt, new Date().toISOString(), source.id, RECEIPT_TASK_TYPE)
 }
 
 /**
@@ -598,16 +722,30 @@ export function addAppointment(db: DatabaseSync, a: Appointment): { id: number; 
   // 日時はISOで保存する。date-only/TZ無しは正規化で吸収し、解釈不能な文字列(「来週火曜」等)は
   // 黙って保存するとカレンダー送信待ち(outbox)の julianday 判定から静かに脱落するので、例外にして可視化する。
   const at = normalizeAppointmentAt(a.at)
+  const endAt = a.endAt ? normalizeAppointmentAt(a.endAt) : ''
   if (a.at && a.at.trim() && Number.isNaN(Date.parse(at))) {
     throw new Error(`予定の日時がISOとして解釈できません: ${a.at}`)
+  }
+  if (a.endAt && a.endAt.trim() && Number.isNaN(Date.parse(endAt))) {
+    throw new Error(`予定の終了日時がISOとして解釈できません: ${a.endAt}`)
+  }
+  const reimbursementStatus = a.reimbursementStatus || 'unknown'
+  if (!REIMBURSEMENT_STATUSES.has(reimbursementStatus)) {
+    throw new Error(`reimbursementStatus が不正です: ${reimbursementStatus}`)
   }
   const matchId = findAppointmentMatch(db, {
     selectionId: a.selectionId, at, title: a.title, url: a.url, kind: a.kind,
   })
   const dup = matchId === undefined
     ? undefined
-    : db.prepare('SELECT id, url, location, person FROM appointment WHERE id = ?')
-      .get(matchId) as { id: number; url: string; location: string; person: string } | undefined
+    : db.prepare(`
+        SELECT id, end_at AS endAt, url, location, person,
+               reimbursement_status AS reimbursementStatus, receipt_required AS receiptRequired, flexible
+        FROM appointment WHERE id = ?
+      `).get(matchId) as {
+        id: number; endAt: string; url: string; location: string; person: string
+        reimbursementStatus: ReimbursementStatus; receiptRequired: number; flexible: number
+      } | undefined
   if (dup) {
     const fill = (col: string, v?: string) => {
       if (v && !(dup as unknown as Record<string, string>)[col]) db.prepare(`UPDATE appointment SET ${col} = ? WHERE id = ?`).run(v, dup.id)
@@ -615,13 +753,38 @@ export function addAppointment(db: DatabaseSync, a: Appointment): { id: number; 
     fill('url', a.url)
     fill('location', a.location)
     fill('person', a.person)
-    if (a.endAt) db.prepare("UPDATE appointment SET end_at = ? WHERE id = ? AND end_at = ''").run(a.endAt, dup.id)
+    if (endAt) db.prepare("UPDATE appointment SET end_at = ? WHERE id = ? AND end_at = ''").run(endAt, dup.id)
+    if (a.reimbursementStatus && dup.reimbursementStatus === 'unknown') {
+      db.prepare('UPDATE appointment SET reimbursement_status = ? WHERE id = ?').run(reimbursementStatus, dup.id)
+      dup.reimbursementStatus = reimbursementStatus
+    }
+    if (a.receiptRequired && !dup.receiptRequired) {
+      db.prepare('UPDATE appointment SET receipt_required = 1 WHERE id = ?').run(dup.id)
+      dup.receiptRequired = 1
+    }
+    if (a.flexible && !dup.flexible) db.prepare('UPDATE appointment SET flexible = 1 WHERE id = ?').run(dup.id)
+    ensureTransportationReceiptTask(db, {
+      id: dup.id, selectionId: a.selectionId, at, endAt: endAt || dup.endAt, kind: a.kind, title: a.title,
+      reimbursementStatus: dup.reimbursementStatus, receiptRequired: Boolean(dup.receiptRequired),
+    })
     return { id: dup.id, created: false }
   }
   const r = db.prepare(
-    'INSERT INTO appointment (selection_id, at, end_at, kind, title, url, location, person, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-  ).run(a.selectionId, at, a.endAt ?? '', a.kind || 'その他', a.title, a.url ?? '', a.location ?? '', a.person ?? '', a.status ?? '予定', now)
-  return { id: Number(r.lastInsertRowid), created: true }
+    `INSERT INTO appointment
+      (selection_id, at, end_at, kind, title, url, location, person, status, created_at,
+       reimbursement_status, receipt_required, parent_appointment_id, task_type, flexible)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(
+    a.selectionId, at, endAt, a.kind || 'その他', a.title, a.url ?? '', a.location ?? '', a.person ?? '',
+    a.status ?? '予定', now, reimbursementStatus, a.receiptRequired ? 1 : 0,
+    a.parentAppointmentId ?? null, a.taskType ?? '', a.flexible ? 1 : 0,
+  )
+  const id = Number(r.lastInsertRowid)
+  ensureTransportationReceiptTask(db, {
+    id, selectionId: a.selectionId, at, endAt, kind: a.kind || 'その他', title: a.title,
+    reimbursementStatus, receiptRequired: Boolean(a.receiptRequired),
+  })
+  return { id, created: true }
 }
 
 export interface AppointmentRow extends Required<Appointment> {
@@ -631,6 +794,7 @@ export interface AppointmentRow extends Required<Appointment> {
 export function listAppointments(db: DatabaseSync): AppointmentRow[] {
   const rows = db.prepare(`
     SELECT a.id, a.selection_id, a.at, a.end_at, a.kind, a.title, a.url, a.location, a.person, a.status,
+           a.reimbursement_status, a.receipt_required, a.parent_appointment_id, a.task_type, a.flexible,
            CASE WHEN c.short_name <> '' THEN c.short_name ELSE c.name END AS company
     FROM appointment a
     JOIN selection s ON s.id = a.selection_id
@@ -648,6 +812,11 @@ export function listAppointments(db: DatabaseSync): AppointmentRow[] {
     location: r.location as string,
     person: r.person as string,
     status: r.status as string,
+    reimbursementStatus: r.reimbursement_status as ReimbursementStatus,
+    receiptRequired: (r.receipt_required as number) === 1,
+    parentAppointmentId: (r.parent_appointment_id as number | null) ?? null,
+    taskType: r.task_type as string,
+    flexible: (r.flexible as number) === 1,
     company: r.company as string,
   }))
 }
@@ -680,8 +849,6 @@ export function upsertCompany(db: DatabaseSync, info: Partial<CompanyInfo> & { n
     }
     fill('industry', info.industry)
     fill('mypage_url', info.mypageUrl)
-    fill('login_id', info.loginId)
-    fill('password', info.password)
     fill('memo', info.memo)
     return hit.id
   }
@@ -691,8 +858,8 @@ export function upsertCompany(db: DatabaseSync, info: Partial<CompanyInfo> & { n
     addPending(db, info.name, `既存「${reso.suggestName}」と紛らわしい。同一なら別名として学習、別会社ならこのままでよい`)
   }
   const r = db.prepare(
-    'INSERT INTO company (name, short_name, industry, mypage_url, login_id, password, memo, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-  ).run(info.name, info.shortName ?? info.name, info.industry ?? '', info.mypageUrl ?? '', info.loginId ?? '', info.password ?? '', info.memo ?? '', now)
+    'INSERT INTO company (name, short_name, industry, mypage_url, memo, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+  ).run(info.name, info.shortName ?? info.name, info.industry ?? '', info.mypageUrl ?? '', info.memo ?? '', now)
   return Number(r.lastInsertRowid)
 }
 
@@ -741,10 +908,6 @@ export function listSelections(db: DatabaseSync): SelectionRow[] {
   }))
 }
 
-/**
- * 企業一覧。**資格情報(login_id / password)の実値は返さない**(平文の広域露出を防ぐ)。
- * 設定済みかどうかだけを hasLoginId / hasPassword で示す。実値が要る場合は getCompanyCredential を使う。
- */
 export function listCompanies(db: DatabaseSync): CompanyInfo[] {
   const rows = db.prepare('SELECT * FROM company ORDER BY id').all() as Record<string, unknown>[]
   return rows.map((r) => ({
@@ -752,23 +915,8 @@ export function listCompanies(db: DatabaseSync): CompanyInfo[] {
     shortName: (r.short_name as string) ?? '',
     industry: r.industry as string,
     mypageUrl: r.mypage_url as string,
-    loginId: '',
-    password: '',
-    hasLoginId: !!(r.login_id as string),
-    hasPassword: !!(r.password as string),
     memo: r.memo as string,
   }))
-}
-
-/**
- * 企業のログイン資格情報の実値を1社ぶんだけ取り出す。ログイン自動化など、実値が本当に必要な
- * 呼び手だけがこれを使う(一覧に混ぜて広域に漏らさないための専用アクセサ)。
- */
-export function getCompanyCredential(db: DatabaseSync, companyId: number): { loginId: string; password: string } | undefined {
-  const r = db.prepare('SELECT login_id, password FROM company WHERE id = ?').get(companyId) as
-    | { login_id: string; password: string }
-    | undefined
-  return r ? { loginId: r.login_id, password: r.password } : undefined
 }
 
 /** 正式名称(株式会社/Inc.付き)へ昇格する。従来の名前は通称(short_name)として残る */

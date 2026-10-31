@@ -1,0 +1,15 @@
+{
+  "$schema": "../schemas/workflow-contract.schema.json",
+  "schemaVersion": 1,
+  "id": "third-party-portal-message",
+  "version": 1,
+  "title": "本人確認済みの採用ポータル連絡を事前検査して送信する",
+  "database": { "requiredRole": "canonical" },
+  "firstStep": "validate",
+  "steps": [
+    { "id": "validate", "title": "元メッセージ・正本DB・対象選考・送信履歴を照合する", "owner": "executor", "sideEffect": "none", "capabilities": [], "inputSchema": "../schemas/third-party-portal-message-action.schema.json", "approval": "none", "idempotency": "run-step", "next": "approve" },
+    { "id": "approve", "title": "送信先・本文・通知内容を本人が確認する", "owner": "user", "sideEffect": "none", "capabilities": [], "inputSchema": "../schemas/third-party-portal-message-action.schema.json", "approval": "user", "idempotency": "not-applicable", "next": "send" },
+    { "id": "send", "title": "承認内容と一致するポータルメッセージを送信する", "owner": "executor", "sideEffect": "third-party-commit", "capabilities": ["browser.message.send.confirmed"], "approval": "none", "requiresApprovalFrom": "approve", "idempotency": "external-key", "next": "audit" },
+    { "id": "audit", "title": "送信結果を外部IDと証拠参照で記録する", "owner": "executor", "sideEffect": "internal-sync", "capabilities": [], "approval": "none", "idempotency": "run-step", "next": null }
+  ]
+}

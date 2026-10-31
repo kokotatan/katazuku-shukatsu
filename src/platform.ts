@@ -3,6 +3,7 @@
  * 写真本体はDB/スナップショットへ入れず、person_photo.storage_keyだけを保持する。
  */
 import { DatabaseSync } from 'node:sqlite'
+import { meetingPreparationSnapshot } from './meeting-preparation.js'
 
 function addColumn(db: DatabaseSync, table: string, name: string, definition: string): void {
   const cols = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]
@@ -213,6 +214,17 @@ export function ensurePlatformSchema(db: DatabaseSync): void {
       source_ref TEXT NOT NULL DEFAULT ''
     );
 
+    CREATE TABLE IF NOT EXISTS appointment_preparation (
+      appointment_id INTEGER PRIMARY KEY REFERENCES appointment(id),
+      context_hash TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending'
+        CHECK (status IN ('pending', 'ready', 'blocked')),
+      data_json TEXT NOT NULL DEFAULT '{}',
+      prepared_at TEXT NOT NULL DEFAULT '',
+      source_ref TEXT NOT NULL DEFAULT '',
+      blocker TEXT NOT NULL DEFAULT ''
+    );
+
     CREATE TABLE IF NOT EXISTS mail_item (
       id TEXT PRIMARY KEY,
       selection_id INTEGER REFERENCES selection(id),
@@ -234,6 +246,7 @@ export function ensurePlatformSchema(db: DatabaseSync): void {
     CREATE INDEX IF NOT EXISTS idx_interview_selection ON interview_note(selection_id);
     CREATE INDEX IF NOT EXISTS idx_submission_selection ON submission(selection_id);
     CREATE INDEX IF NOT EXISTS idx_mail_received ON mail_item(received_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_appointment_preparation_status ON appointment_preparation(status);
     CREATE UNIQUE INDEX IF NOT EXISTS idx_place_provider_external
       ON place(provider, external_id) WHERE provider <> '' AND external_id <> '';
     CREATE INDEX IF NOT EXISTS idx_place_company ON place(company_id);
@@ -276,7 +289,9 @@ export interface PlatformSnapshot {
   personNotes: Record<string, unknown>[]
   interviews: Record<string, unknown>[]
   submissions: Record<string, unknown>[]
+  submissionRequirements: Record<string, unknown>[]
   dossiers: Record<string, unknown>[]
+  meetingPreparations: Record<string, unknown>[]
   meetingRuns: Record<string, unknown>[]
   mailItems: Record<string, unknown>[]
   enrichedEvents: Record<string, unknown>[]
@@ -330,6 +345,20 @@ export function listPlatformSnapshot(db: DatabaseSync): PlatformSnapshot {
     ORDER BY s.submitted_at DESC, s.id DESC
   `).all() as Record<string, unknown>[]
 
+  const submissionRequirements = db.prepare(`
+    SELECT r.id, r.selection_id AS selectionId, COALESCE(c.name, '') AS company,
+           COALESCE(se.position, '') AS position, r.kind, r.title, r.deadline,
+           r.action_url AS actionUrl, r.instructions, r.status,
+           r.preparation_status AS preparationStatus, r.preparation_ref AS preparationRef,
+           r.blocker, r.source_ref AS sourceRef, r.completion_ref AS completionRef,
+           r.first_seen_at AS firstSeenAt, r.updated_at AS updatedAt, r.completed_at AS completedAt
+    FROM submission_requirement r
+    LEFT JOIN selection se ON se.id = r.selection_id
+    LEFT JOIN company c ON c.id = r.company_id
+    ORDER BY CASE WHEN r.status = 'required' THEN 0 ELSE 1 END,
+             CASE WHEN r.deadline = '' THEN 1 ELSE 0 END, r.deadline, r.id
+  `).all() as Record<string, unknown>[]
+
   const dossiers = (db.prepare(`
     SELECT d.company_id AS companyId, c.name AS company, d.summary,
            d.facts_json AS factsJson, d.sources_json AS sourcesJson,
@@ -373,7 +402,9 @@ export function listPlatformSnapshot(db: DatabaseSync): PlatformSnapshot {
     personNotes,
     interviews,
     submissions,
+    submissionRequirements,
     dossiers,
+    meetingPreparations: meetingPreparationSnapshot(db),
     meetingRuns,
     mailItems,
     enrichedEvents,

@@ -31,7 +31,6 @@ export {
   insertSelection,
   listSelections,
   listCompanies,
-  getCompanyCredential,
   addEvent,
   listEvents,
   // 予定と冪等な突合
@@ -53,10 +52,44 @@ export type {
   AppointmentMatch,
   AppointmentRow,
   EventRow,
+  ReimbursementStatus,
 } from './db.js'
+export {
+  databaseVersion,
+  assertSupportedDatabase,
+  assertDatabaseIntegrity,
+  verifyDatabaseBackup,
+  createDatabaseBackup,
+  restoreDatabaseBackup,
+  migrateDatabase,
+  readConsistentSnapshot,
+  ensureCoreIndexes,
+} from './database-maintenance.js'
 
 // ---- 入力の共通処理 ----
 export { resolveSelectionId, upsertPerson, transaction } from './inputs.js'
+export { COMPANY_EXCLUSION_MARKER, isCompanyExcluded, excludeCompany } from './company-preference.js'
+export type { CompanyExclusionInput } from './company-preference.js'
+export { applyPeopleResearch } from './people-research.js'
+export type { PeopleResearchInput } from './people-research.js'
+export { applyCompanyResearch } from './company-research.js'
+export type { CompanyResearchInput, CompanyResearchSource, CompanyResearchResult } from './company-research.js'
+export {
+  emailIdentityFromProfile,
+  professionalEmailIssues,
+  hasScheduleCommitmentLanguage,
+  buildWorkspaceSendCall,
+  preflightThirdPartyEmail,
+  executeApprovedThirdPartyEmail,
+} from './third-party-email.js'
+export type {
+  ThirdPartyEmailAction,
+  EmailIdentity,
+  EmailPreflightResult,
+  EmailDeliveryState,
+  EmailDeliveryAdapter,
+  ExecuteApprovedEmailOptions,
+} from './third-party-email.js'
 
 // ---- 書き込み層(冪等な反映) ----
 export { applyDiff, MAX_APPLY_CHANGES } from './db-apply.js'
@@ -197,6 +230,97 @@ export type { SparkReader } from './spark-mcp.js'
 export { quickRead, openDbReadOnly } from './quick-read.js'
 export type { QuickCommand } from './quick-read.js'
 
+// ---- 原子的判断とconfidence gate（通常LLM / 任意Jev adapter） ----
+export {
+  DECISION_BACKENDS,
+  DEFAULT_DECISION_POLICY,
+  renderLlmDecisionPrompt,
+  parseLlmDecisionResult,
+  routeAtomicDecision,
+  routeDecisionResult,
+  resolveDecisionControlConfig,
+  LlmAtomicDecisionEvaluator,
+  TypeSafeJevDecisionEvaluator,
+} from './decision-control.js'
+
+// ---- 宣言的workflow・承認hash・正本identity固定 ----
+export {
+  WORKFLOW_OWNERS,
+  WORKFLOW_EFFECTS,
+  canonicalJson,
+  workflowHash,
+  validateWorkflowContract,
+  loadWorkflowContract,
+  ensureWorkflowControlSchema,
+  openWorkflowStore,
+  startWorkflowRun,
+  beginWorkflowStep,
+  completeWorkflowStep,
+  failWorkflowStep,
+  requestWorkflowApproval,
+  decideWorkflowApproval,
+  getWorkflowRun,
+} from './workflow-control.js'
+export type {
+  WorkflowOwner,
+  WorkflowEffect,
+  WorkflowRunStatus,
+  WorkflowStepStatus,
+  WorkflowStepContract,
+  WorkflowContract,
+  WorkflowRunRecord,
+  WorkflowStepRunRecord,
+} from './workflow-control.js'
+
+// ---- ブラウザ操作計画のdry-run・承認・冪等性・再照合境界 ----
+export { BROWSER_STEP_TYPES, runBrowserPlan, summarizeBrowserPlan, validateBrowserPlan } from './browser-plan.js'
+export type {
+  BrowserAssertStep,
+  BrowserCheckpointStep,
+  BrowserClickStep,
+  BrowserCommitStep,
+  BrowserDriver,
+  BrowserDriverContext,
+  BrowserDriverResult,
+  BrowserFillStep,
+  BrowserNavigateStep,
+  BrowserOperationPlan,
+  BrowserPlanRunRequest,
+  BrowserPlanRunResult,
+  BrowserPlanStep,
+  BrowserPlanSummary,
+  BrowserPlanSummaryStep,
+  BrowserStepType,
+  BrowserWaitStep,
+} from './browser-plan.js'
+
+// ---- Muse等のMCPクライアント向けのcapability-scoped入口 ----
+export {
+  KATAZUKU_MCP_SCOPES,
+  KATAZUKU_MCP_INSTRUCTIONS,
+  KatazukuMcpServer,
+  defaultWorkflowStorePath,
+  katazukuRpc,
+} from './katazuku-mcp.js'
+export type { KatazukuMcpScope, KatazukuMcpOptions } from './katazuku-mcp.js'
+export { KATAZUKU_REMOTE_SCOPES, KATAZUKU_REMOTE_TOOL_SCOPES, localScopes, allowedKatazukuRemoteRequest } from './katazuku-remote-policy.js'
+export type { KatazukuRemoteScope } from './katazuku-remote-policy.js'
+export { ensureMuseEmailResultSchema, getMuseEmailResult, museEmailExpectedEvidence, recordMuseEmailResult } from './muse-email.js'
+export type { MuseEmailResultState, MuseEmailConnectorResult, StoredMuseEmailResult } from './muse-email.js'
+export { validatePreparation, evaluateMeetingPreparation, saveMeetingPreparation, blockMeetingPreparation, meetingPreparationSnapshot, meetingPreparationContext, moveMeetingPreparation } from './meeting-preparation.js'
+export type { PreparationInput } from './meeting-preparation.js'
+export type {
+  DecisionBackend,
+  DecisionValue,
+  AtomicDecisionQuestion,
+  AtomicDecisionRequest,
+  AtomicDecisionAnswer,
+  AtomicDecisionResult,
+  AtomicDecisionEvaluator,
+  DecisionControlPolicy,
+  DecisionControlConfig,
+} from './decision-control.js'
+
 export { assertBundleMatchesInterview, isSafeBundlePath, sha256OfFile, validateBundleManifest, verifyExtractedBundle, type InterviewBundleManifest, type BundleFile, type BundleVerifyResult } from './interview-bundle.js'
 
 // ---- 会議実行(録音から議事録反映まで)の状態機械 ----
@@ -218,6 +342,7 @@ export type {
 } from './transcription.js'
 export { transcribeAudio } from './transcribe-audio.js'
 export type { TranscribeAudioOptions, TranscribeAudioResult } from './transcribe-audio.js'
+export { isDigitallySilentWav } from './wav-silence.js'
 export { INTERVIEW_MINUTES_SCHEMA_PATH, buildMinutesPrompt, minutesRunId, parseMinutesOutput, toInterviewInput } from './interview-minutes.js'
 export type { MinutesContext, MinutesInterview, MinutesOutput } from './interview-minutes.js'
 export { cropImage, decodePng, encodePng } from './png.js'

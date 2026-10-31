@@ -65,6 +65,7 @@ test('デモは実データと実ブリーフを読まず、ローカル生成�
 
 test('指定DBがなければ古いsnapshotやブリーフを表示せず、モードの取り違えを拒否する', async (t) => {
   const missing = await fixture(t, false, false)
+  assert.equal((await (await fetch(missing.url + '/api/viewer')).json()).dataAvailable, false)
   await writeFile(join(missing.root, 'board', 'public', 'snapshot.json'), JSON.stringify({ demo: false, companies: ['old-db'] }))
   await writeFile(join(missing.root, 'logs', 'briefs', 'asa-2099-01-01.local.md'), 'old-db-brief')
   assert.equal((await fetch(missing.url + '/board/snapshot.json')).status, 404)
