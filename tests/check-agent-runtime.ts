@@ -311,6 +311,12 @@ try {
       && arg.includes('google-workspace-bridge.mjs')), 'ホストの未保護接続へ送信を委ねています')
     assert(!invocation.args.some((arg) => arg.includes(syntheticEmail)), '本人アドレスをコマンド引数へ出しています')
     assert(invocation.stdin?.includes('接続済みMCP') && invocation.stdin.includes('shellからbridgeやMCPを再起動'), '制限shellからMCPの再起動へ逸れます')
+    assert(invocation.args.includes('mcp_servers.google-workspace.tools.send_gmail_message.approval_mode="approve"'), '本人が設定した自分宛通知が非対話の承認待ちで止まります')
+    const readOnlyInvocation = adapter.buildInvocation(request({ capabilities: ['gmail.read'],
+      workspacePolicy: { selfEmails: [syntheticEmail], allowedSenderEmails: [syntheticEmail] },
+    }), { finalOutputPath: join(workDir, 'read-only-final.txt') })
+    assert(!readOnlyInvocation.args.some((arg) => arg.includes('approval_mode=')), '読み取り工程へ送信許可を渡しています')
+    assert(!invocation.args.some((arg) => /default_tools_approval_mode|danger|yolo|ask-for-approval/.test(arg)), '全体の承認・sandbox境界を変更しています')
   })
 
   await check('ローカルOSS adapterはCodexのlocal provider境界を使う', () => {

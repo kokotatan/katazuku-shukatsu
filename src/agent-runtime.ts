@@ -915,6 +915,11 @@ export function createCodexAdapter(options: AdapterOptions, id: 'codex' | 'codex
         args.push('-c', `mcp_servers.google-workspace.env_vars=${JSON.stringify(googleMcpEnvNames())}`)
         args.push('-c', 'mcp_servers.google-workspace.required=true')
         args.push('-c', 'mcp_servers.google-workspace.startup_timeout_sec=120')
+        if (request.capabilities.includes('gmail.send.self')
+          && request.workspacePolicy?.selfEmails.length && request.workspacePolicy.allowedSenderEmails.length) {
+          // notify.selfEmailで本人が選んだ通知だけを許可する。全宛先/送信元は上の固定guardが検査する。
+          args.push('-c', 'mcp_servers.google-workspace.tools.send_gmail_message.approval_mode="approve"')
+        }
       }
       if (request.capabilities.includes('web.search')) args.push(...webSearchArgs)
       if (request.capabilities.includes('voice.transcribe') && options.voiceboxMcpUrl) {
