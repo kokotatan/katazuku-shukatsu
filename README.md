@@ -52,7 +52,7 @@ Googleとの通信や、選択したAIプロバイダへの情報送信は発生
 | 閲覧アプリ8本 | きょう / 選考 / 企業 / メール / 人 / 面接準備 / プロフィール / 効果 | 不要 | — |
 | 面談の録音(任意・Windows) | オンライン面談を相手の声つきで録る | 不要 | — |
 | Gemini Spark 連携(任意) | スマホから予定・選考状況を聞く | 不要 | 自分の Cloudflare |
-| katazuku MCP(任意) | Muse・Codex・Claude Codeから正本を読み、明示scopeで冪等入力と承認提案を行う | 不要 | 対応MCPクライアント |
+| katazuku MCP(任意) | Muse・Codex・Claude Codeから正本を読み、明示scopeで冪等入力と承認提案を行う。remote用OAuth gatewayもセルフホスト可能 | 不要 | 対応MCPクライアント・任意で自分のCloudflare |
 
 詳しい動きは [docs/WORKFLOWS.md](docs/WORKFLOWS.md)、AIの選び方は [docs/AI-PROVIDERS.md](docs/AI-PROVIDERS.md)。
 MCPは[MCPガイド](docs/MCP.md)、Museは[Muse接続ガイド](docs/MUSE.md)を参照してください。
@@ -140,6 +140,8 @@ KATAZUKU_MCP_DB=/absolute/path/to/katazuku.db KATAZUKU_MCP_SCOPES=read npm run m
 
 全scopeは`read,write,sensitive,actions`です。全scopeでも、第三者送信・応募提出・予約確定は実行せず、
 固定した内容を本人承認済みExecutorへ渡すところで止まります。
+remote Muse用のOAuth・端末中継は[muse-gateway](muse-gateway/README.md)にあります。Metaの公開資料で
+一般利用者向けcustom MCP登録画面までは確認できていないため、gateway実装とMuse実機接続済みは区別します。
 
 実利用の前提は `npm run doctor -- --setup` で確認できます。設定・Google資格情報・選択したAIのローカル準備を調べ、秘密値は表示しません。
 通信やログインは行わないため、[Google接続ガイド](docs/GOOGLE-CONNECTION.md) の本人による読み取り確認も済ませてください。

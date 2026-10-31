@@ -41,7 +41,7 @@ function throws(fn: () => unknown): boolean {
   const tables = (db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as { name: string }[]).map((row) => row.name)
   check('v4: 提出物台帳・予定投影・取得状態の表がある', ['submission_requirement', 'schedule_block', 'source_sync_state'].every((name) => tables.includes(name)))
   check('v4: appointment.flexible 列がある', (db.prepare('PRAGMA table_info(appointment)').all() as { name: string }[]).some((col) => col.name === 'flexible'))
-  check('SCHEMA_VERSION は 4', SCHEMA_VERSION === 4)
+  check('SCHEMA_VERSION は 5', SCHEMA_VERSION === 5)
 }
 
 // ---- 提出物台帳 ----

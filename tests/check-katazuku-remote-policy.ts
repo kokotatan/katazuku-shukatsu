@@ -1,0 +1,17 @@
+import { strict as assert } from 'node:assert'
+import { allowedKatazukuRemoteRequest, localScopes } from '../src/katazuku-remote-policy.js'
+
+const call = (name: string) => ({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: {} } })
+assert(allowedKatazukuRemoteRequest(call('katazuku_today'), ['katazuku:read']))
+assert(!allowedKatazukuRemoteRequest(call('katazuku_snapshot'), ['katazuku:read']))
+assert(allowedKatazukuRemoteRequest(call('katazuku_snapshot'), ['katazuku:sensitive']))
+assert(!allowedKatazukuRemoteRequest(call('katazuku_record_mail'), ['katazuku:actions']))
+assert(allowedKatazukuRemoteRequest(call('katazuku_prepare_action'), ['katazuku:actions']))
+assert(allowedKatazukuRemoteRequest(call('katazuku_meeting_preparations'), ['katazuku:read']))
+assert(!allowedKatazukuRemoteRequest(call('katazuku_meeting_preparation_context'), ['katazuku:read']))
+assert(allowedKatazukuRemoteRequest(call('katazuku_meeting_preparation_context'), ['katazuku:sensitive']))
+assert(allowedKatazukuRemoteRequest(call('katazuku_record_meeting_preparation'), ['katazuku:write']))
+assert(!allowedKatazukuRemoteRequest(call('shell'), ['katazuku:read', 'katazuku:write', 'katazuku:sensitive', 'katazuku:actions']))
+assert(allowedKatazukuRemoteRequest({ jsonrpc: '2.0', id: 1, method: 'tools/list' }, []))
+assert.deepEqual(localScopes(['katazuku:read', 'unknown', 'katazuku:read', 'katazuku:actions']), ['read', 'actions'])
+console.log('katazuku remote policy: OAuth scopeとtool境界を確認')

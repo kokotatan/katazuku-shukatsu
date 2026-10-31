@@ -8,6 +8,7 @@ import { applyCalendar } from './db-apply-calendar.js'
 import { applyMail } from './db-apply-mail.js'
 import { applySubmission } from './db-apply-submission.js'
 import { listActionableMail, listPlatformSnapshot } from './platform.js'
+import { meetingPreparationContext, meetingPreparationSnapshot, saveMeetingPreparation } from './meeting-preparation.js'
 import { openDbReadOnly, quickRead, type QuickCommand } from './quick-read.js'
 import { getDatabaseContext, getScheduleAvailability } from './schedule.js'
 import { listSubmissionRequirements } from './submission-requirement.js'
@@ -47,8 +48,10 @@ const allTools: Tool[] = [
     inputSchema: objectSchema({ startAt: text, endAt: text, excludeAppointmentId: { type: 'integer', minimum: 1 } }, ['startAt', 'endAt']) },
   { name: 'katazuku_submissions', scope: 'read', description: '提出物台帳を返す。openOnlyは未完了だけに絞る。', annotations: readAnnotations,
     inputSchema: objectSchema({ openOnly: { type: 'boolean' } }, []) },
+  { name: 'katazuku_meeting_preparations', scope: 'read', description: '今後の面接・面談ごとの準備ready/pending、理由、公開可能な準備内容を返す。', annotations: readAnnotations, inputSchema: objectSchema({}) },
   { name: 'katazuku_actionable_mail', scope: 'read', description: '正本DBにある要対応メールの要約を返す。メール本文は保存・返却しない。', annotations: readAnnotations, inputSchema: objectSchema({}) },
   { name: 'katazuku_snapshot', scope: 'sensitive', description: 'プロフィール、人脈、面談、企業研究、提出、メール要約を含む個人スナップショットを返す。画像本体は含めない。', annotations: readAnnotations, inputSchema: objectSchema({}) },
+  { name: 'katazuku_meeting_preparation_context', scope: 'sensitive', description: '面接準備の作成に必要な根拠hash、相手メモ、過去面談要約、企業研究を返す。文字起こしpathと内部JSONは返さない。', annotations: readAnnotations, inputSchema: objectSchema({}) },
   { name: 'katazuku_record_mail', scope: 'write', description: '取得済みメールの構造化要約を正本DBへ冪等反映する。第三者送信は行わない。', annotations: writeAnnotations,
     inputSchema: objectSchema({ items: { type: 'array', minItems: 1, maxItems: 200, items: objectSchema({
       id: text, receivedAt: text, sender: { type: 'string' }, subject: text, summary: { type: 'string' }, category: { type: 'string' }, needsAction: { type: 'boolean' }, deadline: { type: 'string' }, status: { type: 'string' }, company: { type: 'string' }, position: { type: 'string' }, sourceRef: { type: 'string' },
@@ -59,6 +62,15 @@ const allTools: Tool[] = [
     inputSchema: objectSchema({ events: { type: 'array', minItems: 1, maxItems: 500, items: objectSchema({
       externalId: text, calendarId: { type: 'string' }, title: text, startAt: text, endAt: { type: 'string' }, company: text, position: { type: 'string' }, kind: { type: 'string' }, url: { type: 'string' }, location: { type: 'string' }, status: { type: 'string' }, sourceHash: { type: 'string' },
     }, ['externalId', 'title', 'startAt', 'company']) } }) },
+  { name: 'katazuku_record_meeting_preparation', scope: 'write', description: '根拠hashと一次情報を検証し、面接・面談ごとの準備成果物を正本DBへ冪等保存する。企業研究なし・古い根拠・必須項目不足は拒否する。', annotations: writeAnnotations,
+    inputSchema: objectSchema({
+      appointmentId: { type: 'integer', minimum: 1 }, contextHash: { type: 'string', pattern: '^[a-f0-9]{64}$' }, preparedAt: text,
+      sourceRef: text, summary: text, counterpartResearch: text, priorContext: text,
+      questionsToAsk: { type: 'array', minItems: 3, items: text },
+      anticipatedQuestions: { type: 'array', minItems: 3, items: objectSchema({ question: text, answerOutline: text, evidenceRef: text }) },
+      sources: { type: 'array', minItems: 1, items: objectSchema({ title: text, url: text }) },
+      unknowns: { type: 'array', items: { type: 'string' } },
+    }) },
   { name: 'katazuku_prepare_action', scope: 'actions', description: '第三者への送信・予約等を実行せず、対象・内容・実行時点・通知内容を承認台帳へ固定する。専用Executorと本人承認が別途必要。', annotations: writeAnnotations,
     inputSchema: objectSchema({ runId: { ...text, maxLength: 160 }, sourceRef: { ...text, maxLength: 300 }, action: objectSchema({ actionType: text, target: { type: 'object', minProperties: 1 }, content: { type: 'object', minProperties: 1 }, effectiveAt: text, notification: text }) }) },
   { name: 'katazuku_action_status', scope: 'actions', description: '承認台帳の状態と固定済みaction hashを返す。実行や承認は行わない。', annotations: readAnnotations,
@@ -69,6 +81,7 @@ export const KATAZUKU_MCP_INSTRUCTIONS = [
   'katazuku-shukatsuは日本の新卒就職活動を管理するローカルファースト基盤です。終活ではありません。',
   '予定・選考・提出物はGmailやCalendarを再検索する前にkatazuku_*の正本DBから確認します。',
   'write scopeは取得済み事実の冪等な正本反映だけです。メール送信・応募提出・予約・受験・認証は行いません。',
+  '面接・面談を扱うときはkatazuku_meeting_preparationsを確認し、sensitive scopeがあれば根拠contextを取得して準備をreadyにします。',
   '第三者確定操作はkatazuku_prepare_actionで固定し、本人承認と専用Executorへ引き継ぎます。MCPのtool call自体を本人承認とみなしません。',
 ].join('\n')
 
@@ -124,11 +137,17 @@ export class KatazukuMcpServer {
       excludeAppointmentId: args.excludeAppointmentId as number | undefined, now: this.options.now?.(), databaseRole: 'canonical',
     }))
     if (name === 'katazuku_submissions') return this.read((db) => listSubmissionRequirements(db, { openOnly: Boolean(args.openOnly) }))
+    if (name === 'katazuku_meeting_preparations') return this.read((db) => meetingPreparationSnapshot(db, this.options.now?.()).map((preparation) => ({
+      appointmentId: preparation.appointmentId, companyId: preparation.companyId, company: preparation.company,
+      at: preparation.at, title: preparation.title, status: preparation.status, reasons: preparation.reasons, urgent: preparation.urgent,
+    })))
     if (name === 'katazuku_actionable_mail') return this.read((db) => listActionableMail(db))
     if (name === 'katazuku_snapshot') return this.read((db) => listPlatformSnapshot(db))
+    if (name === 'katazuku_meeting_preparation_context') return this.read((db) => meetingPreparationContext(db, this.options.now?.()))
     if (name === 'katazuku_record_mail') return this.write((db) => applyMail(db, args as unknown as Parameters<typeof applyMail>[1]))
     if (name === 'katazuku_record_submission') return this.write((db) => applySubmission(db, args as unknown as Parameters<typeof applySubmission>[1]))
     if (name === 'katazuku_record_calendar') return this.write((db) => applyCalendar(args as unknown as Parameters<typeof applyCalendar>[0], db))
+    if (name === 'katazuku_record_meeting_preparation') return this.write((db) => saveMeetingPreparation(db, args, this.options.now?.()))
     if (name === 'katazuku_prepare_action') {
       const contract = loadWorkflowContract(this.contractPath)
       const store = openWorkflowStore(this.options.workflowStorePath)

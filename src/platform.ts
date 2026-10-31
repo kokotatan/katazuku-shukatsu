@@ -213,6 +213,17 @@ export function ensurePlatformSchema(db: DatabaseSync): void {
       source_ref TEXT NOT NULL DEFAULT ''
     );
 
+    CREATE TABLE IF NOT EXISTS appointment_preparation (
+      appointment_id INTEGER PRIMARY KEY REFERENCES appointment(id),
+      context_hash TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending'
+        CHECK (status IN ('pending', 'ready', 'blocked')),
+      data_json TEXT NOT NULL DEFAULT '{}',
+      prepared_at TEXT NOT NULL DEFAULT '',
+      source_ref TEXT NOT NULL DEFAULT '',
+      blocker TEXT NOT NULL DEFAULT ''
+    );
+
     CREATE TABLE IF NOT EXISTS mail_item (
       id TEXT PRIMARY KEY,
       selection_id INTEGER REFERENCES selection(id),
@@ -234,6 +245,7 @@ export function ensurePlatformSchema(db: DatabaseSync): void {
     CREATE INDEX IF NOT EXISTS idx_interview_selection ON interview_note(selection_id);
     CREATE INDEX IF NOT EXISTS idx_submission_selection ON submission(selection_id);
     CREATE INDEX IF NOT EXISTS idx_mail_received ON mail_item(received_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_appointment_preparation_status ON appointment_preparation(status);
     CREATE UNIQUE INDEX IF NOT EXISTS idx_place_provider_external
       ON place(provider, external_id) WHERE provider <> '' AND external_id <> '';
     CREATE INDEX IF NOT EXISTS idx_place_company ON place(company_id);

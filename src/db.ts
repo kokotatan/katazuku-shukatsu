@@ -134,7 +134,7 @@ export function openDb(path: string): DatabaseSync {
 }
 
 /** 現行スキーマの版。マイグレーションを足すたびに +1 し、`MIGRATIONS` に1本足す */
-export const SCHEMA_VERSION = 4
+export const SCHEMA_VERSION = 5
 
 /**
  * 版ゲート方式のマイグレーション(#10)。
@@ -204,6 +204,12 @@ const MIGRATIONS: Migration[] = [
     description: '自動運転ワークフロー用: 提出物台帳・空き判定用の予定投影・外部取得の鮮度・可動タスク列',
     destructive: false,
     up: (db) => ensureWorkflowSchema(db),
+  },
+  {
+    version: 5,
+    description: '面接・面談ごとの準備成果物と根拠hashを追加',
+    destructive: false,
+    up: (db) => ensurePlatformSchema(db),
   },
 ]
 

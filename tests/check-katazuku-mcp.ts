@@ -28,6 +28,10 @@ try {
   const today = await rpc(reader, 'tools/call', { name: 'katazuku_today', arguments: {} })
   assert.equal(today.result.isError, false)
   assert(today.result.content[0].text.includes('一次面接'))
+  const preparationStatus = await rpc(reader, 'tools/call', { name: 'katazuku_meeting_preparations', arguments: {} })
+  const preparationStatusText = preparationStatus.result.content[0].text
+  assert(preparationStatusText.includes('Example株式会社'))
+  assert(!preparationStatusText.includes('contextHash'), 'read scopeへ準備用の根拠hashを出さない')
   const denied = await rpc(reader, 'tools/call', { name: 'katazuku_record_mail', arguments: { items: [] } })
   assert.equal(denied.result.isError, true)
 

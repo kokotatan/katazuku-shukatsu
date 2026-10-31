@@ -55,6 +55,10 @@ const EXPECTED = [
   // capability-scoped katazuku MCP
   'KATAZUKU_MCP_SCOPES', 'KATAZUKU_MCP_INSTRUCTIONS', 'KatazukuMcpServer',
   'defaultWorkflowStorePath', 'katazukuRpc',
+  'KATAZUKU_REMOTE_SCOPES', 'KATAZUKU_REMOTE_TOOL_SCOPES', 'localScopes', 'allowedKatazukuRemoteRequest',
+  // 面接・面談ごとの準備ready判定
+  'validatePreparation', 'evaluateMeetingPreparation', 'saveMeetingPreparation', 'blockMeetingPreparation',
+  'meetingPreparationSnapshot', 'meetingPreparationContext', 'moveMeetingPreparation',
   // 会議URL
   'isMeetingUrl', 'MEETING_HOSTS', 'SHORTENER_HOSTS',
   'isAutomaticRecordingEligible',

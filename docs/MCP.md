@@ -44,16 +44,18 @@ npm run mcp -- --http
 body上限を検査し、URL queryへのtokenは受け付けません。プロセスは常にloopbackへbindします。
 
 別端末やクラウドのエージェントから使う場合、このHTTPサーバーを直接インターネットへ公開しないでください。
-TLS、OAuth 2.1、短命token、利用者単位のscope、レート制限、監査を持つgatewayを前段に置き、
-gatewayから端末への経路も認証してください。DBやGoogleのrefresh tokenをgatewayへ複製しない構成を推奨します。
+TLS、OAuth 2.1、短命token、scope、レート制限、認証済み端末中継を持つ実装を`muse-gateway/`に用意しています。
+DBやGoogleのrefresh tokenをgatewayへ複製せず、端末停止時は503で閉じます。導入は
+[Muse gateway README](../muse-gateway/README.md)を参照してください。
 
 ## 公開tool
 
 - `katazuku_today` / `katazuku_next` / `katazuku_conflicts` / `katazuku_status`
 - `katazuku_availability`: 同期鮮度・正本role・移動を検査し、`unknown`を空きに丸めない
 - `katazuku_submissions` / `katazuku_actionable_mail`
-- `katazuku_snapshot` (`sensitive`)
-- `katazuku_record_mail` / `katazuku_record_calendar` / `katazuku_record_submission` (`write`)
+- `katazuku_meeting_preparations`: 面接・面談ごとのready/pendingと再確認理由
+- `katazuku_snapshot` / `katazuku_meeting_preparation_context` (`sensitive`)
+- `katazuku_record_mail` / `katazuku_record_calendar` / `katazuku_record_submission` / `katazuku_record_meeting_preparation` (`write`)
 - `katazuku_prepare_action` / `katazuku_action_status` (`actions`)
 
 tool一覧は起動時scopeに応じて削られます。許可されていないtoolは名前を知っていても呼べません。

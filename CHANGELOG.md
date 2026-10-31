@@ -7,6 +7,10 @@
 
 ### Added
 
+- Museなどのremote MCP client向けに、Cloudflare上へ正本や資格情報を置かないOAuth 2.1/PKCE gatewayと、端末から外向きに接続する認証済みbridgeを追加。`katazuku:read` / `write` / `sensitive` / `actions`をOAuth tokenと端末allowlistの両方で検査する。
+- 面接・面談準備のスキーマ v5。企業研究の出典、予定・相手・過去記録の根拠hash、30日鮮度、48時間以内の最終確認を全件再評価し、正本へ冪等保存する。MCPからもscope別に状態確認・根拠取得・保存ができる。
+- capability-scoped katazuku MCP。正本DBの読取り、取得済み事実の冪等反映、個人スナップショット、第三者操作の承認提案を`read` / `write` / `sensitive` / `actions`へ分離した。
+- 宣言的workflow controlと原子的判断API。正本DB identity、工程順、capability、第三者操作のaction hash、本人承認の一回消費を検査する。
 - 共通Google接続の初回同期。設定済みの標準接続では認証成功後に予定・メールの初回同期をローカルで開始する。`--no-sync` で接続だけ試せる。進捗と失敗は `logs/google-first-sync.local.json` に残す。
 - 正本DBから企業名や自由記述を含まない選考集計CSVをローカル出力できるようにした。架空データとDatabricksで試す手順を追加した。
 - 面談の録音を文字起こしする `npm run transcribe` と、文字起こしから議事録を作る `npm run interview:digest`。文字起こしはスクリプトが決定的に行い、ローカルの voicebox(MCP。30秒ごとに分割、止まっていれば起動して最大240秒待つ)か、任意導入の faster-whisper を使う。faster-whisper ではステレオ録音を左右別に文字起こしして `[相手]` / `[本人]` を付けられる。議事録化はツールなしの読み取り専用エージェントが厳格JSONを返し、Schema で検査してから議事録Markdownと DB反映用JSONを書き出す。`--apply` で同じ機械の正本DBへ冪等に反映する。[docs/TRANSCRIPTION.md](docs/TRANSCRIPTION.md)
