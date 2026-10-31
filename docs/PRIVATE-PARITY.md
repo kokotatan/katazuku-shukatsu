@@ -22,6 +22,7 @@
 | Museメール証跡契約 | 対象メールボックスに対応するMuse connectorが実在する場合だけ、Secure VM内認証、毎回承認、action hash、送信ID、Sent再照合を要求。iCloud対応自体は実機証拠待ち | `test:mcp`、`test:third-party-email` |
 | ローカルiCloudメール | credential brokerを別processで呼ぶIMAP/SMTP adapter。TLS固定、秘密値非出力、unknown再送禁止 | `test:icloud-mail` |
 | ローカル認証ブローカー | Windows DPAPI CurrentUser、隔離Chrome、origin＋テナントパス二重検査、欄type再検査、MFA/CAPTCHA/規約同意停止、設定世代分離。個人URL・暗号文・profileは端末内だけ | `test:local-login`（CLI、設定、DPAPI、合成Chrome） |
+| ブラウザ操作計画 | 許可origin/path、非機密JSON Pointer、無副作用dry-run、正本identity、承認hash、外部冪等キー、事前reconcile、最後のcommit 1回を型とExecutorで強制。任意JavaScript、秘密欄、成否不明の再試行を拒否 | `test:browser-plan`（36件の合成Driver検査） |
 | ハーネス改善 | 最小観測、合成回帰case、baseline/candidate eval、安全gate、人手承認、revision競合防止、直前版rollback | `test:harness-improvement` |
 | snapshotと閲覧面 | 機密を分離したsnapshot、ローカルviewer、Cloudflareへの明示push | `test:snapshot-viewer`、`cloudflare:check` |
 
@@ -44,7 +45,7 @@
 1. Muse Connector Platformへのproduction gateway deploy、提出、審査、利用者アカウントでの接続（preflight・secret-free live verifier・提出tool specは実装済み）
 2. 利用者のMuseアカウントにおけるiCloud対応可否。対応する場合は実ログイン、実メール読取、毎回承認、Sent再照合
 3. public privacy noticeのproduction deploy
-4. 各採用portalの規約確認と、許可されたadapterの実サイト回帰fixture
+4. 各採用portalの規約確認と、共通`BrowserDriver`契約を実装する許可済みadapterの実サイト回帰fixture
 5. macOS/Linuxの定期実行とOS keychainの実機確認
 
 ## 追随を壊さない基準

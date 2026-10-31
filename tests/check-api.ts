@@ -60,6 +60,8 @@ const EXPECTED = [
   'loadWorkflowContract', 'ensureWorkflowControlSchema', 'openWorkflowStore', 'startWorkflowRun',
   'beginWorkflowStep', 'completeWorkflowStep', 'failWorkflowStep', 'requestWorkflowApproval',
   'decideWorkflowApproval', 'getWorkflowRun',
+  // ブラウザ操作計画の安全境界
+  'BROWSER_STEP_TYPES', 'validateBrowserPlan', 'summarizeBrowserPlan', 'runBrowserPlan',
   // capability-scoped katazuku MCP
   'KATAZUKU_MCP_SCOPES', 'KATAZUKU_MCP_INSTRUCTIONS', 'KatazukuMcpServer',
   'defaultWorkflowStorePath', 'katazukuRpc',

@@ -13,6 +13,7 @@
 - `read/write/sensitive/actions`を分離したMCP、Muse向けOAuth/PKCE gateway、合成DBでの全scope E2E
 - 承認hash、正本identity、工程順、冪等性、再開点を強制する宣言的workflow契約
 - Windows DPAPI CurrentUser、隔離Chrome、origin/テナントパス再検査、MFA/CAPTCHA停止を備えたローカル認証ブローカー
+- 生値・任意JavaScriptを許さず、dry-run、承認hash、正本identity、外部冪等キー、reconcileを強制するブラウザ操作計画
 
 ## 次の大きな山
 
@@ -23,6 +24,7 @@
 3. **macOS/Linuxの資格情報ストア**(macOS Keychain / Linux Secret Service)。WindowsはDPAPI CurrentUserで実装済み。
 4. **production外部実証**。Muse Connectorの提出・審査・利用者接続、Google共通接続の権限審査、
    規約確認済みの採用portal adapter、macOS/Linuxの定期実行とkeychainを、合成データと実アカウントで段階的に検証する。
+   共通の操作計画と合成Driver試験は実装済みで、一般MCPから実ブラウザを直接操作させない。
 
 ## good first issue 候補
 

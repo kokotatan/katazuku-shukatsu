@@ -68,6 +68,13 @@ sequenceDiagram
   切り替えは「副作用を始める前の失敗」だけ。
 - **完了は完了行で判定する。** 終了コード0では成功とみなさず、失敗は `logs/alert-<name>.txt` に残して番犬と朝のまとめが拾う。
 
+### ブラウザ操作の境界
+
+サイト固有のブラウザ操作は、Agentの自由な命令ではなく`src/browser-plan.ts`の型付き計画を通す。
+dry-runはDriverを呼ばず、値と生selectorを除いたsummaryだけを返す。実行は正本identity、本人承認済みaction hash、
+外部冪等キー、直前の`not_done`再照合が一致した場合だけExecutorが行う。MFA/CAPTCHA/本人確認/規約同意はcheckpoint、
+成否不明は再試行せず再照合待ちにする。一般MCPへDriverを公開しない。詳細は[BROWSER-PLAN.md](BROWSER-PLAN.md)。
+
 詳しくは [WORKFLOWS.md](WORKFLOWS.md) と [AI-PROVIDERS.md](AI-PROVIDERS.md)。
 
 ## 主なテーブル
@@ -93,7 +100,8 @@ sequenceDiagram
 provider-neutralな外部操作契約、Muse向けOAuth MCP gatewayは実装済みです。
 
 Windowsのローカル認証はDPAPI CurrentUser、隔離Chrome、origin/テナントパス二重検査、MFA/CAPTCHA停止まで実装済みです。
-残る課題は、Muse Connectorのproduction提出・審査・利用者アカウント接続、実サイトごとの規約確認済みbrowser adapter、
+BrowserDriverの共通契約、無副作用dry-run、承認・冪等・再照合の合成試験も実装済みです。残る課題は、
+Muse Connectorのproduction提出・審査・利用者アカウント接続、実サイトごとの規約確認済みbrowser adapter、
 Google共通接続の権限審査、macOS Keychain/Linux Secret Service、macOS/Linuxでの定期実行の実機検証です。
 外部アカウントやproduction証拠が無い状態を実装済み・接続済み・審査済みとは扱いません。
 優先順と参加できる作業は[ROADMAP.md](../ROADMAP.md)を参照してください。

@@ -53,16 +53,17 @@ Googleとの通信や、選択したAIプロバイダへの情報送信は発生
 | 閲覧アプリ8本 | きょう / 選考 / 企業 / メール / 人 / 面接準備 / プロフィール / 効果 | 不要 | — |
 | 面談の録音(任意・Windows) | オンライン面談を相手の声つきで録る | 不要 | — |
 | 安全なローカルログイン(任意・Windows) | DPAPIで保護した資格情報を隔離Chromeへだけ入力。origin・テナントパスを再検査し、MFA/CAPTCHA/規約同意では停止 | 不要 | 本人が登録した採用サービス |
+| ブラウザ操作計画(開発者向け) | 生値・任意JavaScriptなしの型付き計画。dry-runは無操作、実行は正本・本人承認hash・外部冪等キー・再照合が一致した専用Executorだけ | 不要 | 規約確認済みのサイトadapter |
 | Gemini Spark 連携(任意) | スマホから予定・選考状況を聞く | 不要 | 自分の Cloudflare |
 | katazuku MCP(任意) | Muse・Codex・Claude Codeから正本を読み、明示scopeで冪等入力と承認提案を行う。利用者のMuseアカウントが対象メールボックスに対応する場合は、毎回承認・action hash・Sent再照合付きのemail connector経路を使える。未対応のiCloudはprivate adapterへ分離する。フォーム提出と採用ポータル送信も、汎用workflow契約で本人承認・外部冪等キー・監査を必須にする。remote用OAuth gatewayもセルフホスト可能 | 不要 | 対応MCPクライアント・任意で自分のCloudflare |
 
 詳しい動きは [docs/WORKFLOWS.md](docs/WORKFLOWS.md)、AIの選び方は [docs/AI-PROVIDERS.md](docs/AI-PROVIDERS.md)。
-MCPは[MCPガイド](docs/MCP.md)、Museは[Muse接続ガイド](docs/MUSE.md)、安全なWindowsログインは[ローカル認証ブローカー](scripts/local-login/README-daily-login.md)、運用を失敗から改善する仕組みは[ハーネス改善ループ](docs/HARNESS-IMPROVEMENT.md)を参照してください。private版との差と意図的な秘密境界は[追随台帳](docs/PRIVATE-PARITY.md)に固定しています。
+MCPは[MCPガイド](docs/MCP.md)、Museは[Muse接続ガイド](docs/MUSE.md)、安全なWindowsログインは[ローカル認証ブローカー](scripts/local-login/README-daily-login.md)、ブラウザ実行の共通境界は[ブラウザ操作計画](docs/BROWSER-PLAN.md)、運用を失敗から改善する仕組みは[ハーネス改善ループ](docs/HARNESS-IMPROVEMENT.md)を参照してください。private版との差と意図的な秘密境界は[追随台帳](docs/PRIVATE-PARITY.md)に固定しています。
 
 ## やらないこと(コードで止めている安全境界)
 
 - **定常処理は第三者へ自動送信しない。** 通常は下書きまで。明示的に固定した宛先・本文を本人が承認した場合だけ、専用ExecutorまたはMuseの毎回承認付きemail connectorが同じaction hashを一度実行し、Sentを再照合する。
-- **ES・エントリー・フォームの送信、予約の確定、辞退はしない。** 提出物は「承認するだけ」の状態まで準備します。
+- **定常処理や一般MCPはES・エントリー・フォームの送信、予約確定、辞退を実行しない。** 本人が固定内容を承認し、正本・action hash・外部冪等キー・直前再照合が一致した専用Executorだけが1回実行できます。
 - **Web適性検査・コーディングテストの代理受験はしない。**
 - AIにデータベースを直接書かせない。AIの出力は形と網羅性を検証してから、決まった規則で反映します。
 

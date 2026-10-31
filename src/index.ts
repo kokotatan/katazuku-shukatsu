@@ -272,6 +272,28 @@ export type {
   WorkflowStepRunRecord,
 } from './workflow-control.js'
 
+// ---- ブラウザ操作計画のdry-run・承認・冪等性・再照合境界 ----
+export { BROWSER_STEP_TYPES, runBrowserPlan, summarizeBrowserPlan, validateBrowserPlan } from './browser-plan.js'
+export type {
+  BrowserAssertStep,
+  BrowserCheckpointStep,
+  BrowserClickStep,
+  BrowserCommitStep,
+  BrowserDriver,
+  BrowserDriverContext,
+  BrowserDriverResult,
+  BrowserFillStep,
+  BrowserNavigateStep,
+  BrowserOperationPlan,
+  BrowserPlanRunRequest,
+  BrowserPlanRunResult,
+  BrowserPlanStep,
+  BrowserPlanSummary,
+  BrowserPlanSummaryStep,
+  BrowserStepType,
+  BrowserWaitStep,
+} from './browser-plan.js'
+
 // ---- Muse等のMCPクライアント向けのcapability-scoped入口 ----
 export {
   KATAZUKU_MCP_SCOPES,
