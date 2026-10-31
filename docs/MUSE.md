@@ -82,4 +82,3 @@ tool payloadと結果を必要最小限だけ中継し、tokenをURL・ログ・
 
 添付はMuse connectorの実際の証跡形式を確認するまでこの経路では受け付けません。ローカルiCloud adapterとMuse email connectorは
 同じ送信元を使えても別Executorであり、相互にactionを横流ししません。
-

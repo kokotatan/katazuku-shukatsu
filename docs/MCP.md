@@ -84,4 +84,3 @@ npm run test:workflow-control
 ```
 
 テストはscope分離、正本読取、冪等入力、承認actionの改変拒否、任意command拒否、HTTP認証とloopback境界を確認します。
-
