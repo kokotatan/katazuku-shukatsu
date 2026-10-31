@@ -1,4 +1,4 @@
-import { LlmAtomicDecisionEvaluator, TypeSafeJevDecisionEvaluator, renderLlmDecisionPrompt, resolveDecisionControlConfig, routeAtomicDecision, type AtomicDecisionRequest } from '../src/decision-control.js'
+import { LlmAtomicDecisionEvaluator, TypeSafeJevDecisionEvaluator, parseLlmDecisionResult, renderLlmDecisionPrompt, resolveDecisionControlConfig, routeAtomicDecision, validateAtomicDecisionRequest, type AtomicDecisionRequest } from '../src/decision-control.js'
 
 function assert(condition: unknown, message: string): asserts condition { if (!condition) throw new Error(message) }
 const request: AtomicDecisionRequest = {
@@ -22,6 +22,36 @@ assert(resolveDecisionControlConfig({}, {}).backend === 'llm', '既定はLLMで�
 let keyRejected = false
 try { resolveDecisionControlConfig({ agent: { decision_control: { backend: 'jev' } } }, {}) } catch { keyRejected = true }
 assert(keyRejected, 'APIキーなしのJevを許可しました')
+
+const mustReject = (label: string, run: () => unknown) => {
+  let rejected = false
+  try { run() } catch { rejected = true }
+  assert(rejected, label)
+}
+mustReject('requestの余分な命令を許可しました', () => validateAtomicDecisionRequest({ ...request, action: 'send' } as AtomicDecisionRequest))
+mustReject('質問の余分な命令を許可しました', () => validateAtomicDecisionRequest({
+  state: null,
+  questions: { unsafe: { type: 'boolean', instructions: '判定', action: 'send' } },
+} as unknown as AtomicDecisionRequest))
+mustReject('回答の余分な項目を許可しました', () => parseLlmDecisionResult(JSON.stringify({
+  schemaVersion: 1, backend: 'llm', model: 'fixture', execute: true,
+  answers: {
+    needs_action: { type: 'boolean', probability: 0.9 },
+    category: { type: 'choice', choice: 'scheduling', confidence: 0.9, probabilities: { scheduling: 0.9, information: 0.1 } },
+  },
+}), request))
+const scoreRequest: AtomicDecisionRequest = {
+  state: null,
+  questions: { priority: { type: 'score', instructions: '優先度', criteria: [null, null, null] } },
+}
+mustReject('小数のscoreを許可しました', () => parseLlmDecisionResult(JSON.stringify({
+  schemaVersion: 1, backend: 'llm', model: 'fixture',
+  answers: { priority: { type: 'score', score: 1.5, confidence: 0.9, probabilities: { 0: 0.1, 1: 0.8, 2: 0.1 } } },
+}), scoreRequest))
+mustReject('scoreの段階と異なる確率キーを許可しました', () => parseLlmDecisionResult(JSON.stringify({
+  schemaVersion: 1, backend: 'llm', model: 'fixture',
+  answers: { priority: { type: 'score', score: 1, confidence: 0.9, probabilities: { low: 0.1, medium: 0.8, high: 0.1 } } },
+}), scoreRequest))
 let capturedAuth = ''
 const jev = new TypeSafeJevDecisionEvaluator({ apiKey: 'fixture-key', fetch: (async (_url: string | URL | Request, init?: RequestInit) => {
   capturedAuth = new Headers(init?.headers).get('Authorization') ?? ''

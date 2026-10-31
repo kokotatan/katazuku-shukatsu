@@ -26,14 +26,38 @@ function asProbability(value: unknown, label: string): number {
   return value
 }
 
+function asRecord(value: unknown, label: string): Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${label}が不正です`)
+  return value as Record<string, unknown>
+}
+
+function exactKeys(value: Record<string, unknown>, allowed: string[], label: string): void {
+  const extras = Object.keys(value).filter((key) => !allowed.includes(key))
+  if (extras.length) throw new Error(`${label}に未知の項目があります: ${extras.join(', ')}`)
+}
+
 export function validateAtomicDecisionRequest(request: AtomicDecisionRequest): void {
-  const entries = Object.entries(request?.questions ?? {})
+  const root = asRecord(request, '判断request')
+  exactKeys(root, ['state', 'questions'], '判断request')
+  const questions = asRecord(root.questions, 'questions')
+  const entries = Object.entries(questions)
   if (!entries.length) throw new Error('原子的な質問を1件以上指定してください')
-  for (const [id, question] of entries) {
+  for (const [id, rawQuestion] of entries) {
     if (!/^[A-Za-z][A-Za-z0-9_-]{0,63}$/.test(id)) throw new Error(`質問IDが不正です: ${id}`)
-    if (!question.instructions.trim()) throw new Error(`${id}: instructionsは必須です`)
-    if (question.type === 'choice' && Object.keys(question.criteria).length < 2) throw new Error(`${id}: choiceには2候補以上必要です`)
-    if (question.type === 'score' && question.criteria.length < 2) throw new Error(`${id}: scoreには2段階以上必要です`)
+    const question = asRecord(rawQuestion, id)
+    if (!['boolean', 'choice', 'score'].includes(String(question.type))) throw new Error(`${id}: typeが不正です`)
+    if (typeof question.instructions !== 'string' || !question.instructions.trim()) throw new Error(`${id}: instructionsは必須です`)
+    if (question.type === 'boolean') {
+      exactKeys(question, ['type', 'instructions', 'criteria'], id)
+      if (question.criteria !== undefined) exactKeys(asRecord(question.criteria, `${id}.criteria`), ['true', 'false'], `${id}.criteria`)
+    } else if (question.type === 'choice') {
+      exactKeys(question, ['type', 'instructions', 'criteria'], id)
+      const criteria = asRecord(question.criteria, `${id}.criteria`)
+      if (Object.keys(criteria).length < 2) throw new Error(`${id}: choiceには2候補以上必要です`)
+    } else {
+      exactKeys(question, ['type', 'instructions', 'criteria'], id)
+      if (!Array.isArray(question.criteria) || question.criteria.length < 2) throw new Error(`${id}: scoreには2段階以上必要です`)
+    }
   }
 }
 
@@ -53,20 +77,26 @@ export function renderLlmDecisionPrompt(request: AtomicDecisionRequest): string 
 }
 
 function validateAnswer(id: string, question: AtomicDecisionQuestion, raw: unknown): AtomicDecisionAnswer {
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error(`${id}: 回答が不正です`)
-  const answer = raw as Record<string, unknown>
+  const answer = asRecord(raw, `${id}: 回答`)
   if (answer.type !== question.type) throw new Error(`${id}: 質問と回答の型が一致しません`)
-  if (question.type === 'boolean') return { type: 'boolean', probability: asProbability(answer.probability, `${id}.probability`) }
+  if (question.type === 'boolean') {
+    exactKeys(answer, ['type', 'probability'], id)
+    return { type: 'boolean', probability: asProbability(answer.probability, `${id}.probability`) }
+  }
   if (!answer.probabilities || typeof answer.probabilities !== 'object' || Array.isArray(answer.probabilities)) throw new Error(`${id}: probabilitiesが不正です`)
   const probabilities = Object.fromEntries(Object.entries(answer.probabilities as Record<string, unknown>).map(([key, value]) => [key, asProbability(value, `${id}.${key}`)]))
   if (question.type === 'choice') {
+    exactKeys(answer, ['type', 'choice', 'confidence', 'probabilities'], id)
     if (typeof answer.choice !== 'string' || !Object.hasOwn(question.criteria, answer.choice)) throw new Error(`${id}: choiceが候補外です`)
     const expected = Object.keys(question.criteria).sort()
     if (JSON.stringify(Object.keys(probabilities).sort()) !== JSON.stringify(expected)) throw new Error(`${id}: 確率キーが候補と一致しません`)
     return { type: 'choice', choice: answer.choice, confidence: asProbability(answer.confidence, `${id}.confidence`), probabilities }
   }
-  if (typeof answer.score !== 'number' || answer.score < 0 || answer.score > question.criteria.length - 1) throw new Error(`${id}: scoreが範囲外です`)
-  return { type: 'score', score: answer.score, confidence: asProbability(answer.confidence, `${id}.confidence`), probabilities }
+  exactKeys(answer, ['type', 'score', 'confidence', 'probabilities'], id)
+  if (!Number.isSafeInteger(answer.score) || (answer.score as number) < 0 || (answer.score as number) > question.criteria.length - 1) throw new Error(`${id}: scoreが範囲外の整数です`)
+  const expected = question.criteria.map((_, index) => String(index))
+  if (JSON.stringify(Object.keys(probabilities).sort()) !== JSON.stringify(expected.sort())) throw new Error(`${id}: 確率キーが段階と一致しません`)
+  return { type: 'score', score: answer.score as number, confidence: asProbability(answer.confidence, `${id}.confidence`), probabilities }
 }
 
 export function parseLlmDecisionResult(text: string, request: AtomicDecisionRequest): AtomicDecisionResult {
@@ -74,6 +104,7 @@ export function parseLlmDecisionResult(text: string, request: AtomicDecisionRequ
   const trimmed = text.trim()
   if (!trimmed.startsWith('{') || !trimmed.endsWith('}')) throw new Error('LLM判断はJSONオブジェクト1つだけで返してください')
   const value = JSON.parse(trimmed) as Record<string, unknown>
+  exactKeys(value, ['schemaVersion', 'backend', 'model', 'answers'], '判断結果')
   if (value.schemaVersion !== 1 || value.backend !== 'llm' || typeof value.model !== 'string' || !value.model) throw new Error('判断結果のヘッダーが不正です')
   if (!value.answers || typeof value.answers !== 'object' || Array.isArray(value.answers)) throw new Error('answersが不正です')
   const rawAnswers = value.answers as Record<string, unknown>
