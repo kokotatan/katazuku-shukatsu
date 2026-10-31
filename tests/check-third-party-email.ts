@@ -10,6 +10,9 @@ import { applyDiff } from '../src/db-apply.js'
 import { saveBasicProfile } from '../src/platform.js'
 import {
   buildWorkspaceSendCall,
+  emailStyleIssues,
+  emailTransportCapabilities,
+  emailTransportIdentity,
   emailIdentityFromProfile,
   hasScheduleCommitmentLanguage,
   preflightThirdPartyEmail,
@@ -79,6 +82,33 @@ try {
   assert.equal(call.arguments.to, 'recruit@example.com')
   assert.equal(call.arguments.thread_id, 'thread-example')
   assert.equal(call.arguments.include_signature, false)
+  assert.deepEqual(emailTransportIdentity(action), { provider: 'google-workspace', senderEmail: 'user@example.com' })
+  assert.deepEqual(emailTransportCapabilities(action), ['gmail.read', 'gmail.send.confirmed'])
+
+  const icloudAction: ThirdPartyEmailAction = {
+    ...action,
+    actionType: 'email.send',
+    target: {
+      provider: 'icloud-mail', senderEmail: 'contact@example.com',
+      to: action.target.to, companyName: action.target.companyName, selectionId: action.target.selectionId,
+    },
+  }
+  assert.equal(preflightThirdPartyEmail(db, icloudAction).ok, true)
+  assert.deepEqual(emailTransportIdentity(icloudAction), { provider: 'icloud-mail', senderEmail: 'contact@example.com' })
+  assert.deepEqual(emailTransportCapabilities(icloudAction), ['icloud-mail.read', 'icloud-mail.send.confirmed'])
+  assert.throws(() => buildWorkspaceSendCall(icloudAction), /Gmail transport/)
+  const businessAction: ThirdPartyEmailAction = {
+    ...icloudAction,
+    target: {
+      provider: 'icloud-mail', senderEmail: 'contact@example.com', context: 'business',
+      to: ['partner@example.com'], counterpartyName: 'Partner Marketplace',
+    },
+    content: { ...icloudAction.content, body: 'Hi,\n\nThank you for reaching out.\n\nKotaro Okuyama' },
+  }
+  assert.deepEqual(emailStyleIssues(businessAction.content.body, { name: 'Kotaro Okuyama', affiliation: '' }, 'business'), [])
+  assert.equal(preflightThirdPartyEmail(db, businessAction, {
+    identity: { name: 'Kotaro Okuyama', affiliation: '' },
+  }).ok, true)
 
   const commitment = {
     ...action,

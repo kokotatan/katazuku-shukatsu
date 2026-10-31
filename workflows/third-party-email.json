@@ -34,7 +34,7 @@
       "title": "承認内容と完全一致するメールを送信する",
       "owner": "executor",
       "sideEffect": "third-party-commit",
-      "capabilities": ["gmail.read", "gmail.send.confirmed"],
+      "capabilities": ["mail.read", "mail.send.confirmed"],
       "approval": "none",
       "requiresApprovalFrom": "approve",
       "idempotency": "external-key",

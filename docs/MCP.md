@@ -65,6 +65,11 @@ DBやGoogleのrefresh tokenをgatewayへ複製せず、端末停止時は503で�
 
 tool一覧は起動時scopeに応じて削られます。許可されていないtoolは名前を知っていても呼べません。
 
+メール送信はMCP toolへ直接公開しません。`prepare_action`でprovider・差出人・宛先・本文を固定した後、
+ローカルの第三者メールExecutorが本人承認、正本DB、元メール、予定、外部SENTを再照合します。
+Google WorkspaceとiCloud Mailは同じ契約を使い、資格情報をMuseやgatewayへ渡しません。
+端末固有の接続は[Private adapters](PRIVATE-ADAPTERS.md)を参照してください。
+
 ## 検証
 
 ```sh

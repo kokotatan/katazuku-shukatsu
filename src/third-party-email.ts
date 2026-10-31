@@ -13,13 +13,18 @@ import {
 } from './workflow-control.js'
 
 export interface ThirdPartyEmailAction {
-  actionType: 'gmail.send'
+  /** gmail.sendはv1互換。新規actionはproviderを固定したemail.sendを使う。 */
+  actionType: 'email.send' | 'gmail.send'
   target: {
-    userGoogleEmail: string
+    provider?: 'google-workspace' | 'icloud-mail'
+    senderEmail?: string
+    userGoogleEmail?: string
+    context?: 'recruiting' | 'business' | 'education' | 'personal'
     to: string[]
     cc?: string[]
     bcc?: string[]
-    companyName: string
+    companyName?: string
+    counterpartyName?: string
     selectionId?: number
   }
   content: {
@@ -65,6 +70,11 @@ export interface EmailDeliveryAdapter {
   reconcile(action: ThirdPartyEmailAction): Promise<EmailDeliveryState>
   /** 承認済みactionを一度だけ送る。呼出し後の成否不明は例外でよいが、再送してはならない。 */
   send(action: ThirdPartyEmailAction): Promise<void>
+}
+
+export interface EmailTransportIdentity {
+  provider: 'google-workspace' | 'icloud-mail'
+  senderEmail: string
 }
 
 export interface ExecuteApprovedEmailOptions {
@@ -137,6 +147,23 @@ export function professionalEmailIssues(body: string, identity: EmailIdentity): 
   return issues
 }
 
+export function emailStyleIssues(
+  body: string,
+  identity: EmailIdentity,
+  context: NonNullable<ThirdPartyEmailAction['target']['context']> = 'recruiting',
+): string[] {
+  if (context === 'recruiting') return professionalEmailIssues(body, identity)
+  const issues: string[] = []
+  const normalized = body.replace(/\r\n/g, '\n').trim()
+  if (!normalized) issues.push('メール本文がありません')
+  if (/\*\*|__/.test(body)) issues.push('メール本文へMarkdown装飾を入れないでください')
+  for (const item of DISCLOSURE_PATTERNS) if (item.pattern.test(body)) issues.push(`${item.label}を本文へ書かないでください`)
+  if (identity.name && !compactIdentity(normalized).includes(compactIdentity(identity.name))) {
+    issues.push('本文または署名に本人の氏名が必要です')
+  }
+  return issues
+}
+
 export function hasScheduleCommitmentLanguage(action: ThirdPartyEmailAction): boolean {
   const text = `${action.content.subject}\n${action.content.body}`
   const hasDateOrTime = /(?:20\d{2}[年/-])?\d{1,2}[月/-]\d{1,2}日?|\d{1,2}時(?:\d{1,2}分)?/.test(text)
@@ -148,8 +175,10 @@ export function hasScheduleCommitmentLanguage(action: ThirdPartyEmailAction): bo
 
 /** Google Workspace bridgeへ渡す送信call。承認済みaction以外から組み立ててはならない。 */
 export function buildWorkspaceSendCall(action: ThirdPartyEmailAction): { name: string; arguments: Record<string, unknown> } {
+  const transport = emailTransportIdentity(action)
+  if (transport.provider !== 'google-workspace') throw new Error('Google Workspace以外のactionをGmail transportへ渡せません')
   const args: Record<string, unknown> = {
-    user_google_email: action.target.userGoogleEmail,
+    user_google_email: transport.senderEmail,
     to: action.target.to.join(', '),
     subject: action.content.subject,
     body: action.content.body,
@@ -169,6 +198,26 @@ export function buildWorkspaceSendCall(action: ThirdPartyEmailAction): { name: s
   return { name: 'send_gmail_message', arguments: args }
 }
 
+export function emailTransportIdentity(action: ThirdPartyEmailAction): EmailTransportIdentity {
+  const provider = action.actionType === 'gmail.send'
+    ? 'google-workspace'
+    : action.target.provider
+  const senderEmail = (action.target.senderEmail ?? action.target.userGoogleEmail ?? '').trim().toLowerCase()
+  if (provider !== 'google-workspace' && provider !== 'icloud-mail') throw new Error('メールproviderが不正です')
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(senderEmail)) throw new Error('送信元メールアドレスが不正です')
+  if (action.actionType === 'gmail.send' && action.target.provider && action.target.provider !== 'google-workspace') {
+    throw new Error('gmail.sendのproviderはgoogle-workspaceだけです')
+  }
+  return { provider, senderEmail }
+}
+
+export function emailTransportCapabilities(action: ThirdPartyEmailAction): string[] {
+  const { provider } = emailTransportIdentity(action)
+  return provider === 'google-workspace'
+    ? ['gmail.read', 'gmail.send.confirmed']
+    : ['icloud-mail.read', 'icloud-mail.send.confirmed']
+}
+
 export function preflightThirdPartyEmail(
   db: DatabaseSync,
   action: ThirdPartyEmailAction,
@@ -176,15 +225,20 @@ export function preflightThirdPartyEmail(
 ): EmailPreflightResult {
   const database = getDatabaseContext(db)
   const identity = options.identity ?? emailIdentityFromProfile(getBasicProfile(db))
-  const issues = professionalEmailIssues(action.content.body, identity)
+  const context = action.target.context ?? 'recruiting'
+  const issues = emailStyleIssues(action.content.body, identity, context)
   const schedule: ScheduleAvailability[] = []
   if (database.role !== 'canonical') issues.push(`正本DBではありません(role=${database.role})`)
-  if (action.actionType !== 'gmail.send' || action.effectiveAt !== 'immediate') issues.push('対応していないメール操作です')
+  try { emailTransportIdentity(action) } catch (error) { issues.push(error instanceof Error ? error.message : 'メール送信元が不正です') }
+  if (!['email.send', 'gmail.send'].includes(action.actionType) || action.effectiveAt !== 'immediate') issues.push('対応していないメール操作です')
   if (!action.target.to.length) issues.push('送信先がありません')
 
-  const resolution = resolveCompany(db, action.target.companyName)
-  const companyId = resolution.kind === 'hit' ? resolution.companyId : undefined
-  if (!companyId) issues.push(`企業を正本DBで一意に確認できません: ${action.target.companyName}`)
+  const resolution = action.target.companyName ? resolveCompany(db, action.target.companyName) : undefined
+  const companyId = resolution?.kind === 'hit' ? resolution.companyId : undefined
+  if (context === 'recruiting' && !companyId) issues.push(`企業を正本DBで一意に確認できません: ${action.target.companyName ?? '未指定'}`)
+  if (context !== 'recruiting' && !action.target.counterpartyName?.trim() && !action.target.companyName?.trim()) {
+    issues.push('連絡相手の名称がありません')
+  }
 
   const mail = db.prepare(`
     SELECT id, company_id AS companyId, selection_id AS selectionId, source_ref AS sourceRef
@@ -195,6 +249,7 @@ export function preflightThirdPartyEmail(
   if (mail && companyId && mail.companyId && mail.companyId !== companyId) issues.push('元メールの企業と送信先企業が一致しません')
 
   if (action.target.selectionId) {
+    if (context !== 'recruiting') issues.push('採用以外のメールへselectionIdを指定できません')
     const selection = db.prepare('SELECT company_id AS companyId FROM selection WHERE id = ?')
       .get(action.target.selectionId) as { companyId: number } | undefined
     if (!selection) issues.push(`選考トラックが正本DBにありません: ${action.target.selectionId}`)
@@ -276,7 +331,7 @@ export async function executeApprovedThirdPartyEmail(
 
   beginWorkflowStep(workflowStore, contract, runId, 'send', 'executor', {
     input: action,
-    capabilities: ['gmail.read', 'gmail.send.confirmed'],
+    capabilities: ['mail.read', 'mail.send.confirmed'],
     action,
     targetDatabase: target,
     now,
