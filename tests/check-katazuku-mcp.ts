@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { openDb } from '../src/db.js'
 import { applyCalendar } from '../src/db-apply-calendar.js'
+import { applyApplicationEvent, startApplication } from '../src/application.js'
 import { katazukuRpc, KatazukuMcpServer } from '../src/katazuku-mcp.js'
 
 const root = mkdtempSync(join(tmpdir(), 'katazuku-mcp-'))
@@ -16,6 +17,18 @@ applyCalendar({ events: [{
   endAt: '2099-01-01T11:00:00+09:00', company: 'Example株式会社', position: '新卒採用', kind: '面接',
 }] }, db)
 const appointmentId = Number((db.prepare('SELECT id FROM appointment WHERE external_id = ?').get('calendar-example-1') as { id: number }).id)
+const application = startApplication(db, {
+  runId: 'application:example:1', company: 'Example株式会社', position: '新卒採用',
+  materialsRef: 'materials:example', sourceRef: 'source:example-application', startedAt: '2098-12-30T00:00:00Z',
+})
+applyApplicationEvent(db, {
+  eventId: 'event:example-assessment', runId: application.runId, type: 'assessment_detected',
+  at: '2098-12-31T00:00:00Z', sourceRef: 'source:example-assessment', summary: '適性検査を検知',
+  assessment: {
+    testType: 'SPI', provider: 'Example Test', url: 'https://example.com/assessment', deadline: '2099-01-03T00:00:00+09:00',
+    durationMinutes: 65, allowedItems: ['筆記用具'], environmentStatus: '未確認', status: 'pending', notes: '本人が受験する',
+  },
+})
 db.close()
 
 const rpc = async (server: KatazukuMcpServer, method: string, params?: unknown) => katazukuRpc(server, { jsonrpc: '2.0', id: 1, method, params }) as Promise<any>
@@ -24,7 +37,11 @@ try {
   const listed = await rpc(reader, 'tools/list')
   const names = listed.result.tools.map((tool: { name: string }) => tool.name)
   assert(names.includes('katazuku_today'))
+  assert(names.includes('katazuku_work_queue'))
+  assert(names.includes('katazuku_applications'))
+  assert(names.includes('katazuku_assessments'))
   assert(!names.includes('katazuku_snapshot'))
+  assert(!names.includes('katazuku_career_meetings'))
   assert(!names.includes('katazuku_record_mail'))
   const today = await rpc(reader, 'tools/call', { name: 'katazuku_today', arguments: {} })
   assert.equal(today.result.isError, false)
@@ -33,6 +50,18 @@ try {
   const preparationStatusText = preparationStatus.result.content[0].text
   assert(preparationStatusText.includes('Example株式会社'))
   assert(!preparationStatusText.includes('contextHash'), 'read scopeへ準備用の根拠hashを出さない')
+  const applications = await rpc(reader, 'tools/call', { name: 'katazuku_applications', arguments: {} })
+  const assessments = await rpc(reader, 'tools/call', { name: 'katazuku_assessments', arguments: {} })
+  const calendarOutbox = await rpc(reader, 'tools/call', { name: 'katazuku_calendar_outbox', arguments: {} })
+  assert.equal(applications.result.isError, false)
+  assert.equal(assessments.result.isError, false)
+  assert.equal(calendarOutbox.result.isError, false)
+  const applicationData = JSON.parse(applications.result.content[0].text)
+  const assessmentData = JSON.parse(assessments.result.content[0].text)
+  assert.equal(applicationData[0].id, 'application:example:1')
+  assert.equal(assessmentData[0].testType, 'SPI')
+  assert.deepEqual(assessmentData[0].allowedItems, ['筆記用具'])
+  assert(!JSON.stringify(assessmentData).match(/(?:question|answer|問題|解答)/i))
   const denied = await rpc(reader, 'tools/call', { name: 'katazuku_record_mail', arguments: { items: [] } })
   assert.equal(denied.result.isError, true)
 
@@ -42,6 +71,14 @@ try {
     summary: '日程確認が必要', needsAction: true, company: 'Example株式会社', sourceRef: 'gmail:message-example',
   }] } })
   assert.equal(mail.result.isError, false)
+  const workQueue = await rpc(full, 'tools/call', { name: 'katazuku_work_queue', arguments: {} })
+  const workQueueData = JSON.parse(workQueue.result.content[0].text)
+  assert.equal(workQueue.result.isError, false)
+  assert.equal(workQueueData.counts.mail, 1)
+  assert.equal(workQueueData.mail[0].id, 'message-example')
+  assert(!JSON.stringify(workQueueData).match(/(?:password|question|answer|問題|解答)/i))
+  const careerMeetings = await rpc(full, 'tools/call', { name: 'katazuku_career_meetings', arguments: {} })
+  assert.equal(careerMeetings.result.isError, false)
   const snapshot = await rpc(full, 'tools/call', { name: 'katazuku_snapshot', arguments: {} })
   assert(JSON.parse(snapshot.result.content[0].text).mailItems.some((item: { id: string }) => item.id === 'message-example'))
   const research = await rpc(full, 'tools/call', { name: 'katazuku_record_people_research', arguments: {

@@ -767,7 +767,8 @@ export function applyApplicationEvent(
 }
 
 export function listApplicationRuns(db: DatabaseSync): ApplicationRunRow[] {
-  ensureApplicationSchema(db)
+  const exists = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'application_run'").get()
+  if (!exists) return []
   return db.prepare(
     'SELECT ar.id, ar.selection_id AS selectionId, c.name AS company, s.position, ' +
     'ar.state, ar.previous_state AS previousState, ar.entry_url AS entryUrl, ' +
@@ -780,7 +781,8 @@ export function listApplicationRuns(db: DatabaseSync): ApplicationRunRow[] {
 }
 
 export function listWebAssessments(db: DatabaseSync): Record<string, unknown>[] {
-  ensureApplicationSchema(db)
+  const exists = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'web_assessment'").get()
+  if (!exists) return []
   return db.prepare(
     'SELECT wa.id, wa.run_id AS runId, wa.selection_id AS selectionId, ' +
     'c.name AS company, s.position, wa.test_type AS testType, ' +

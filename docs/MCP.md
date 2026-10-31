@@ -9,8 +9,8 @@ katazukuの正本SQLiteを、Muse・Codex・Claude CodeなどのMCPクライア�
 
 | scope | できること | できないこと |
 |---|---|---|
-| `read` | 予定、選考、空き、提出物、要対応メール要約 | 書込み、メール本文、外部操作 |
-| `sensitive` | プロフィール、人脈、面談記録、企業研究を含む個人スナップショット | 画像本体、資格情報 |
+| `read` | 予定、選考、空き、提出物、要対応メール要約、応募run、適性検査メタデータ、Calendar未反映 | 書込み、メール本文、適性検査の問題・解答、外部操作 |
+| `sensitive` | プロフィール、人脈、面談記録、企業研究、就活支援面談を含む個人スナップショット | 画像本体、資格情報 |
 | `write` | 取得済みメール要約、Calendarイベント、提出結果、企業・人物調査、面談議事録、本人の対象外指示の正本への冪等反映 | メール送信、Calendar作成、応募提出、受験、ローカルファイル参照 |
 | `actions` | 第三者確定操作を承認台帳へ提案し、内容hashを固定 | 承認、送信、予約、購入、取消 |
 
@@ -53,9 +53,12 @@ DBやGoogleのrefresh tokenをgatewayへ複製せず、端末停止時は503で�
 - `katazuku_today` / `katazuku_next` / `katazuku_conflicts` / `katazuku_status`
 - `katazuku_availability`: 同期鮮度・正本role・移動を検査し、`unknown`を空きに丸めない
 - `katazuku_submissions` / `katazuku_actionable_mail`
+- `katazuku_applications` / `katazuku_assessments` / `katazuku_calendar_outbox`
+- `katazuku_work_queue`: 要対応メール、未完了提出物、進行中の応募、適性検査、Calendar未反映をMuse向けに1回で返す
 - `katazuku_meeting_preparations`: 面接・面談ごとのready/pendingと再確認理由
 - `katazuku_snapshot`: プロフィール、人脈、面談、企業研究、提出結果と未完了要件、面談準備をまとめて返す (`sensitive`)
 - `katazuku_meeting_preparation_context`: 準備作成用の根拠hashと内部context (`sensitive`)
+- `katazuku_career_meetings`: 就活支援組織との面談を応募企業の選考から分離して返す (`sensitive`)
 - `katazuku_record_mail` / `katazuku_record_calendar` / `katazuku_record_submission` / `katazuku_record_meeting_preparation` (`write`)
 - `katazuku_record_people_research`: 出典・日時・confidence付きの人物調査を冪等反映 (`write`)
 - `katazuku_record_company_research`: 既存企業へ一次情報URL・調査日時・sourceRef付きで企業研究を反映。古い調査は新しい結果を巻き戻さない (`write`)

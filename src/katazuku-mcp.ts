@@ -13,6 +13,8 @@ import { applyCompanyResearch } from './company-research.js'
 import { meetingPreparationContext, meetingPreparationSnapshot, saveMeetingPreparation } from './meeting-preparation.js'
 import { excludeCompany } from './company-preference.js'
 import { applyPeopleResearch } from './people-research.js'
+import { listApplicationRuns, listCalendarOutbox, listWebAssessments } from './application.js'
+import { listCareerMeetings } from './career-support.js'
 import { openDbReadOnly, quickRead, type QuickCommand } from './quick-read.js'
 import { getDatabaseContext, getScheduleAvailability } from './schedule.js'
 import { listSubmissionRequirements } from './submission-requirement.js'
@@ -54,8 +56,13 @@ const allTools: Tool[] = [
     inputSchema: objectSchema({ openOnly: { type: 'boolean' } }, []) },
   { name: 'katazuku_meeting_preparations', scope: 'read', description: '今後の面接・面談ごとの準備ready/pending、理由、公開可能な準備内容を返す。', annotations: readAnnotations, inputSchema: objectSchema({}) },
   { name: 'katazuku_actionable_mail', scope: 'read', description: '正本DBにある要対応メールの要約を返す。メール本文は保存・返却しない。', annotations: readAnnotations, inputSchema: objectSchema({}) },
+  { name: 'katazuku_applications', scope: 'read', description: '応募自動運転runの進行状態、エラー、根拠参照を返す。ES本文は返さない。', annotations: readAnnotations, inputSchema: objectSchema({}) },
+  { name: 'katazuku_assessments', scope: 'read', description: 'Web適性検査の種類、期限、予約、環境準備、完了状態だけを返す。問題・解答は保存も返却もしない。', annotations: readAnnotations, inputSchema: objectSchema({}) },
+  { name: 'katazuku_calendar_outbox', scope: 'read', description: '正本DBで確定済みだが外部Calendarへ未反映の予定を返す。Calendarへの書込みは行わない。', annotations: readAnnotations, inputSchema: objectSchema({}) },
+  { name: 'katazuku_work_queue', scope: 'read', description: '要対応メール、未完了提出物、応募run、適性検査、Calendar未反映を1回で返すMuse向け運用キュー。', annotations: readAnnotations, inputSchema: objectSchema({}) },
   { name: 'katazuku_snapshot', scope: 'sensitive', description: 'プロフィール、人脈、面談、企業研究、提出、メール要約を含む個人スナップショットを返す。画像本体は含めない。', annotations: readAnnotations, inputSchema: objectSchema({}) },
   { name: 'katazuku_meeting_preparation_context', scope: 'sensitive', description: '面接準備の作成に必要な根拠hash、相手メモ、過去面談要約、企業研究を返す。文字起こしpathと内部JSONは返さない。', annotations: readAnnotations, inputSchema: objectSchema({}) },
+  { name: 'katazuku_career_meetings', scope: 'sensitive', description: '就活支援組織との面談予定、URL、場所、録音対象判定を返す。応募企業の選考とは分離する。', annotations: readAnnotations, inputSchema: objectSchema({}) },
   { name: 'katazuku_record_mail', scope: 'write', description: '取得済みメールの構造化要約を正本DBへ冪等反映する。第三者送信は行わない。', annotations: writeAnnotations,
     inputSchema: objectSchema({ items: { type: 'array', minItems: 1, maxItems: 200, items: objectSchema({
       id: text, receivedAt: text, sender: { type: 'string' }, subject: text, summary: { type: 'string' }, category: { type: 'string' }, needsAction: { type: 'boolean' }, deadline: { type: 'string' }, status: { type: 'string' }, company: { type: 'string' }, position: { type: 'string' }, sourceRef: { type: 'string' },
@@ -184,8 +191,29 @@ export class KatazukuMcpServer {
       at: preparation.at, title: preparation.title, status: preparation.status, reasons: preparation.reasons, urgent: preparation.urgent,
     })))
     if (name === 'katazuku_actionable_mail') return this.read((db) => listActionableMail(db))
+    if (name === 'katazuku_applications') return this.read((db) => listApplicationRuns(db))
+    if (name === 'katazuku_assessments') return this.read((db) => listWebAssessments(db).map((item) => {
+      const { allowedItemsJson, ...rest } = item
+      let allowedItems: unknown[] = []
+      try { allowedItems = JSON.parse(String(allowedItemsJson || '[]')) as unknown[] } catch { allowedItems = [] }
+      return { ...rest, allowedItems }
+    }))
+    if (name === 'katazuku_calendar_outbox') return this.read((db) => listCalendarOutbox(db, this.options.now?.()))
+    if (name === 'katazuku_work_queue') return this.read((db) => {
+      const applications = listApplicationRuns(db).filter((item) => item.state !== 'interview_scheduled').slice(0, 100)
+      const assessments = listWebAssessments(db).filter((item) => !['completed', 'waived'].includes(String(item.status))).slice(0, 100)
+      const submissions = listSubmissionRequirements(db, { openOnly: true }).slice(0, 100)
+      const mail = listActionableMail(db).slice(0, 100)
+      const calendarOutbox = listCalendarOutbox(db, this.options.now?.()).slice(0, 100)
+      return {
+        generatedAt: (this.options.now?.() ?? new Date()).toISOString(),
+        counts: { mail: mail.length, submissions: submissions.length, applications: applications.length, assessments: assessments.length, calendarOutbox: calendarOutbox.length },
+        mail, submissions, applications, assessments, calendarOutbox,
+      }
+    })
     if (name === 'katazuku_snapshot') return this.read((db) => listPlatformSnapshot(db))
     if (name === 'katazuku_meeting_preparation_context') return this.read((db) => meetingPreparationContext(db, this.options.now?.()))
+    if (name === 'katazuku_career_meetings') return this.read((db) => listCareerMeetings(db))
     if (name === 'katazuku_record_mail') return this.write((db) => applyMail(db, args as unknown as Parameters<typeof applyMail>[1]))
     if (name === 'katazuku_record_submission') return this.write((db) => applySubmission(db, args as unknown as Parameters<typeof applySubmission>[1]))
     if (name === 'katazuku_record_calendar') return this.write((db) => applyCalendar(args as unknown as Parameters<typeof applyCalendar>[0], db))
