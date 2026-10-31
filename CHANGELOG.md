@@ -52,6 +52,7 @@
 
 ### Security
 
+- Google Workspace MCPを直接登録せず同梱bridge経由に変更。実際の`tools/call`でworkflow capability、送信元、to/cc/bccを検査し、第三者宛は本人が確認したtool名・全argumentsとの完全一致を一度だけ許可する。改変・再送・未知toolはupstreamへ渡さない。
 - 閲覧サーバーを127.0.0.1に限定し、外部Origin/Host・書き込み・任意ファイル配信を拒否。実データがなくてもデモへ黙って切り替えない。
 - npmパスワードや長期トークンをリポジトリ／GitHub Secretsへ置かず、OIDCで公開できる手順を追加。
 - リポジトリ直下の `.npmrc` をgitignoreし、CLI認証情報の誤コミットを防止。

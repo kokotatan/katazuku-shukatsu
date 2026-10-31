@@ -46,6 +46,11 @@ export interface AgentRunRequest {
   outputSchemaPath?: string
   providerOrder?: ProviderId[]
   timeoutMs?: number
+  /** MCP bridgeがprovider/モデルに依存せず送信境界を検査するための、秘密を含まない実行時ポリシー。 */
+  workspacePolicy?: {
+    selfEmails: string[]
+    allowedSenderEmails: string[]
+  }
 }
 
 export interface ProcessInvocation {
@@ -915,7 +920,13 @@ export function createCodexAdapter(options: AdapterOptions, id: 'codex' | 'codex
       if (options.model) args.push('--model', options.model)
       if (id === 'codex-oss') args.push('--oss', '--local-provider', options.localProvider ?? 'ollama')
       args.push('-')
-      return { command: options.command, args, stdin: request.prompt, cwd: request.cwd }
+      return {
+        command: options.command,
+        args,
+        stdin: request.prompt,
+        cwd: request.cwd,
+        env: workspacePolicyEnv(request),
+      }
     },
     async readOutput(result, paths) {
       try {
@@ -961,6 +972,7 @@ export function createClaudeAdapter(options: AdapterOptions): AgentAdapter {
           ENABLE_CLAUDEAI_MCP_SERVERS: 'false',
           MCP_TIMEOUT: process.env.MCP_TIMEOUT ?? '180000',
           MCP_TOOL_TIMEOUT: process.env.MCP_TOOL_TIMEOUT ?? '180000',
+          ...workspacePolicyEnv(request),
         },
       }
     },
@@ -969,6 +981,23 @@ export function createClaudeAdapter(options: AdapterOptions): AgentAdapter {
     },
     detectPossibleSideEffect: claudePossibleSideEffect,
   }
+}
+
+function workspacePolicyEnv(request: AgentRunRequest): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = {
+    KATAZUKU_WORKSPACE_CAPABILITIES: JSON.stringify(request.capabilities),
+    KATAZUKU_WORKSPACE_SELF_EMAILS: JSON.stringify(request.workspacePolicy?.selfEmails ?? []),
+    KATAZUKU_WORKSPACE_ALLOWED_SENDERS: JSON.stringify(request.workspacePolicy?.allowedSenderEmails ?? []),
+  }
+  for (const key of [
+    'KATAZUKU_GOOGLE_MCP_COMMAND',
+    'KATAZUKU_GOOGLE_MCP_ARGS_JSON',
+    'KATAZUKU_GOOGLE_MCP_ENV_ALLOWLIST',
+    'KATAZUKU_GOOGLE_CREDENTIALS_DIR',
+  ]) {
+    if (process.env[key] !== undefined) env[key] = process.env[key]
+  }
+  return env
 }
 
 async function findOnPath(command: string, env: NodeJS.ProcessEnv): Promise<string | undefined> {

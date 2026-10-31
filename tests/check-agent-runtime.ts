@@ -289,6 +289,21 @@ try {
     assert(!preview.args.some((arg) => /danger|yolo/.test(arg)), '危険なflagがあります')
   })
 
+  await check('Google Workspaceのcapability・本人宛・送信元境界をprovider子プロセスへ渡す', () => {
+    const adapter = createCodexAdapter({ command: 'codex' })
+    const syntheticEmail = ['owner', 'example.test'].join('@')
+    const invocation = adapter.buildInvocation(request({
+      capabilities: ['gmail.read', 'gmail.send.self'],
+      workspacePolicy: {
+        selfEmails: [syntheticEmail],
+        allowedSenderEmails: [syntheticEmail],
+      },
+    }), { finalOutputPath: join(workDir, 'policy-final.txt') })
+    assert(invocation.env?.KATAZUKU_WORKSPACE_CAPABILITIES === '["gmail.read","gmail.send.self"]', 'capabilityがbridgeへ渡りません')
+    assert(invocation.env?.KATAZUKU_WORKSPACE_SELF_EMAILS === JSON.stringify([syntheticEmail]), '本人宛境界がbridgeへ渡りません')
+    assert(invocation.env?.KATAZUKU_WORKSPACE_ALLOWED_SENDERS === JSON.stringify([syntheticEmail]), '送信元境界がbridgeへ渡りません')
+  })
+
   await check('ローカルOSS adapterはCodexのlocal provider境界を使う', () => {
     const adapter = createCodexAdapter({ command: 'codex', localProvider: 'lmstudio' }, 'codex-oss')
     const preview = commandPreview(adapter, request(), join(workDir, 'oss-final.txt'))

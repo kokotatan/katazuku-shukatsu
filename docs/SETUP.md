@@ -69,7 +69,8 @@ AI接続前に試す場合は `--no-sync` を付けて接続だけ確認して�
 5. `npm run google:connect` で就活用アカウントの読み取りを許可し、本人確認・Gmail・Calendarの診断が成功することを確認する。
    既存のMCP資格情報がある場合は上書きせず、`npm run google:connect -- --check` で確認する。
 6. 下書き・予定の書込みを使う場合は [google-workspace MCP(workspace-mcp)](https://github.com/taylorwilsdon/google_workspace_mcp) を、
-   そのクライアントIDとシークレットで Claude Code / Codex に登録し、就活用アカウントで一度ログインする。
+   [送信境界を検査する同梱bridge](GOOGLE-CONNECTION.md#3-workspace-mcpをcliへ登録する)経由で Claude Code / Codex に登録し、
+   そのクライアントIDとシークレットを使って就活用アカウントで一度ログインする。workspace-mcpを直接登録しない。
    ログインすると `~/.google_workspace_mcp/credentials/<メールアドレス>.json` にトークンが保存され、
    katazuku の決定的な取得スクリプト(Gmail・カレンダーの読み取り)もそれを再利用します
    (置き場所を変えたら `google.credentialsDir` に書く)。

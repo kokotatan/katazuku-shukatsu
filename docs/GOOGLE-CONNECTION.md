@@ -69,10 +69,16 @@ katazukuのコアとは別に、Googleのツールを提供する [workspace-mcp
 次の例は [dotenv-cli](https://github.com/entropitor/dotenv-cli) を使って `.env` を読み込みます。
 値をコマンド引数やチャットに貼る必要はありません。リポジトリのルートで実行してください。
 
+katazukuの自動運転では、workspace-mcpをCLIへ直接登録しません。リポジトリ同梱の
+`scripts/google-workspace-bridge.mjs`を登録します。このbridgeは実際のMCP `tools/call` をupstreamへ渡す直前に、
+workflowのcapability、送信元、to/cc/bccを検査します。本人宛送信は設定済みの本人アドレスだけ、第三者宛送信は
+本人へ提示したtool名・送信元・全宛先・件名・本文・添付を含むargumentsとの完全一致を一度だけ許可します。
+プロンプトやCLIのtool許可だけに依存しません。
+
 ### Claude Code
 
 ```sh
-npx dotenv-cli --no-expand -e .env -- claude mcp add --scope local --transport stdio google-workspace -- uvx workspace-mcp --tools gmail calendar
+npx dotenv-cli --no-expand -e .env -- claude mcp add --scope local --transport stdio google-workspace -- node scripts/google-workspace-bridge.mjs
 npx dotenv-cli --no-expand -e .env -- claude
 ```
 
@@ -89,8 +95,8 @@ CLIのユーザー設定だけへ登録しても、katazukuのツール工程で
 
 ```toml
 [mcp_servers.google-workspace]
-command = "uvx"
-args = ["workspace-mcp", "--tools", "gmail", "calendar"]
+command = "node"
+args = ["scripts/google-workspace-bridge.mjs"]
 env_vars = ["GOOGLE_OAUTH_CLIENT_ID", "GOOGLE_OAUTH_CLIENT_SECRET"]
 ```
 
@@ -100,6 +106,14 @@ npx dotenv-cli --no-expand -e .env -- codex
 
 Codex内で `/mcp` を開き、サーバー接続を確認します。初回はプロジェクト設定の信頼確認が必要になる場合があります。
 詳細は [CodexのMCP設定](https://developers.openai.com/codex/mcp/) を参照してください。
+
+通常の `npm run workflow -- ...` は実行ごとのcapabilityと、`katazuku.config.json`で本人が設定したGoogleアドレスを
+CLIの子プロセスへ一時的に渡します。bridgeはそれ以外の宛先・送信元を拒否します。手動のCLIセッションでは
+安全側でGoogle toolをすべて拒否するため、まず読み取りだけを試す場合も、そのセッションに限って
+`KATAZUKU_WORKSPACE_CAPABILITIES=["gmail.read","calendar.read"]` を環境変数として渡してください。
+本人宛送信を試す場合は `gmail.send.self` と、本人アドレスのJSON配列を
+`KATAZUKU_WORKSPACE_SELF_EMAILS`、`KATAZUKU_WORKSPACE_ALLOWED_SENDERS` に指定します。
+第三者送信の承認値を手で作ったり、`.env`へ恒久保存したりしないでください。
 
 #### Windowsで `spawn EPERM` が出る場合
 
@@ -111,7 +125,7 @@ Codexの制限されたshell内で、Node.jsからさらにGoogle MCP用の子�
 `doctor --setup` の成功だけでは、MCPの接続成功を確認できません。
 
 既存の接続に送信先・承認の制限を持つブリッジを使っている場合は、そのブリッジを登録したまま修復します。
-制限を持たない別サーバーへ切り替えたり、sandboxや承認設定を無効化したりして回避しないでください。
+katazukuのbridgeを制限のないworkspace-mcp直接登録へ切り替えたり、sandboxや承認設定を無効化したりして回避しないでください。
 送信処理が途中で失敗した場合は、再実行前に送信済みメールを照合します。
 
 ## 4. MCPで本人がGoogleで許可し、読み取りだけを確認
