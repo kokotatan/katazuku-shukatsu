@@ -3,6 +3,7 @@
  * 写真本体はDB/スナップショットへ入れず、person_photo.storage_keyだけを保持する。
  */
 import { DatabaseSync } from 'node:sqlite'
+import { meetingPreparationSnapshot } from './meeting-preparation.js'
 
 function addColumn(db: DatabaseSync, table: string, name: string, definition: string): void {
   const cols = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]
@@ -288,7 +289,9 @@ export interface PlatformSnapshot {
   personNotes: Record<string, unknown>[]
   interviews: Record<string, unknown>[]
   submissions: Record<string, unknown>[]
+  submissionRequirements: Record<string, unknown>[]
   dossiers: Record<string, unknown>[]
+  meetingPreparations: Record<string, unknown>[]
   meetingRuns: Record<string, unknown>[]
   mailItems: Record<string, unknown>[]
   enrichedEvents: Record<string, unknown>[]
@@ -342,6 +345,20 @@ export function listPlatformSnapshot(db: DatabaseSync): PlatformSnapshot {
     ORDER BY s.submitted_at DESC, s.id DESC
   `).all() as Record<string, unknown>[]
 
+  const submissionRequirements = db.prepare(`
+    SELECT r.id, r.selection_id AS selectionId, COALESCE(c.name, '') AS company,
+           COALESCE(se.position, '') AS position, r.kind, r.title, r.deadline,
+           r.action_url AS actionUrl, r.instructions, r.status,
+           r.preparation_status AS preparationStatus, r.preparation_ref AS preparationRef,
+           r.blocker, r.source_ref AS sourceRef, r.completion_ref AS completionRef,
+           r.first_seen_at AS firstSeenAt, r.updated_at AS updatedAt, r.completed_at AS completedAt
+    FROM submission_requirement r
+    LEFT JOIN selection se ON se.id = r.selection_id
+    LEFT JOIN company c ON c.id = r.company_id
+    ORDER BY CASE WHEN r.status = 'required' THEN 0 ELSE 1 END,
+             CASE WHEN r.deadline = '' THEN 1 ELSE 0 END, r.deadline, r.id
+  `).all() as Record<string, unknown>[]
+
   const dossiers = (db.prepare(`
     SELECT d.company_id AS companyId, c.name AS company, d.summary,
            d.facts_json AS factsJson, d.sources_json AS sourcesJson,
@@ -385,7 +402,9 @@ export function listPlatformSnapshot(db: DatabaseSync): PlatformSnapshot {
     personNotes,
     interviews,
     submissions,
+    submissionRequirements,
     dossiers,
+    meetingPreparations: meetingPreparationSnapshot(db),
     meetingRuns,
     mailItems,
     enrichedEvents,

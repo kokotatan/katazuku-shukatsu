@@ -26,6 +26,20 @@ export function ensureWorkflowSchema(db: DatabaseSync): void {
   addColumn(db, 'appointment', 'parent_appointment_id', 'INTEGER REFERENCES appointment(id)')
   addColumn(db, 'appointment', 'task_type', "TEXT NOT NULL DEFAULT ''")
   db.exec(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_appointment_derived_task
+      ON appointment(parent_appointment_id, task_type)
+      WHERE parent_appointment_id IS NOT NULL AND task_type <> '';
+
+    -- 正本の論理ID。バックアップや移設後も同じデータ系列だと識別できるよう、
+    -- OS上のファイルパスと分離してDB自身へ保持する。canonical/replica/fixtureは実行時に決める。
+    CREATE TABLE IF NOT EXISTS database_identity (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      database_id TEXT NOT NULL UNIQUE,
+      created_at TEXT NOT NULL
+    );
+    INSERT OR IGNORE INTO database_identity (id, database_id, created_at)
+      VALUES (1, lower(hex(randomblob(16))), datetime('now'));
+
     CREATE TABLE IF NOT EXISTS submission_requirement (
       id INTEGER PRIMARY KEY,
       logical_key TEXT NOT NULL UNIQUE,

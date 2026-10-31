@@ -54,7 +54,8 @@ DBやGoogleのrefresh tokenをgatewayへ複製せず、端末停止時は503で�
 - `katazuku_availability`: 同期鮮度・正本role・移動を検査し、`unknown`を空きに丸めない
 - `katazuku_submissions` / `katazuku_actionable_mail`
 - `katazuku_meeting_preparations`: 面接・面談ごとのready/pendingと再確認理由
-- `katazuku_snapshot` / `katazuku_meeting_preparation_context` (`sensitive`)
+- `katazuku_snapshot`: プロフィール、人脈、面談、企業研究、提出結果と未完了要件、面談準備をまとめて返す (`sensitive`)
+- `katazuku_meeting_preparation_context`: 準備作成用の根拠hashと内部context (`sensitive`)
 - `katazuku_record_mail` / `katazuku_record_calendar` / `katazuku_record_submission` / `katazuku_record_meeting_preparation` (`write`)
 - `katazuku_record_people_research`: 出典・日時・confidence付きの人物調査を冪等反映 (`write`)
 - `katazuku_record_company_research`: 既存企業へ一次情報URL・調査日時・sourceRef付きで企業研究を反映。古い調査は新しい結果を巻き戻さない (`write`)

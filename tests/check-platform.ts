@@ -18,6 +18,9 @@ function check(label: string, cond: boolean, detail = '') {
 
 const db: DatabaseSync = openDb(':memory:')
 const companyA = upsertCompany(db, { name: '株式会社サンプルA' })
+const initialSnapshot = listPlatformSnapshot(db)
+check('スナップショットは提出要件と面談準備を独立配列で持つ',
+  Array.isArray(initialSnapshot.submissionRequirements) && Array.isArray(initialSnapshot.meetingPreparations))
 
 // --- profile_basic(設定GUIの保存先) ---
 saveBasicProfile(db, { graduationYear: 2028, preferredArea: '（地域）' }, 'test')

@@ -13,7 +13,7 @@ import { normalizeAppointmentAt } from './db.js'
 export type DatabaseRole = 'canonical' | 'replica' | 'fixture'
 
 export interface DatabaseContext {
-  /** workflow実行中のDB差し替えを検出する、パス由来の非秘密識別子 */
+  /** workflow実行中の別データ系列への差し替えを検出する、DB内部の非秘密識別子 */
   databaseId: string
   path: string
   role: DatabaseRole
@@ -33,7 +33,10 @@ export function getDatabaseContext(db: DatabaseSync, requestedRole?: DatabaseRol
     : main?.file ? 'canonical' : 'fixture'
   const schemaVersion = (db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version
   const path = main?.file || ':memory:'
-  const databaseId = createHash('sha256').update(path).digest('hex')
+  const identity = db.prepare('SELECT database_id AS databaseId FROM database_identity WHERE id = 1')
+    .get() as { databaseId: string } | undefined
+  if (!identity?.databaseId) throw new Error('正本DBの論理IDがありません。npm run initまたはマイグレーションを実行してください')
+  const databaseId = identity.databaseId
   return { databaseId, path, role, schemaVersion }
 }
 
