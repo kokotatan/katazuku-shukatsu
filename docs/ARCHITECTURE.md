@@ -89,7 +89,7 @@ dry-runはDriverを呼ばず、値と生selectorを除いたsummaryだけを返�
 
 ## 運用上の前提
 
-- **単一デバイス前提**。正本を複数デバイスで同時に書かない。移行・退避は `npm run backup`
+- **単一デバイス前提**。正本を複数デバイスで同時に書かない。移行・退避は `npm run backup`、検査は`npm run backup:verify`、復元は既存正本を上書きしない`npm run restore`
   (`VACUUM INTO` で WAL を畳んだ1ファイル)経由で行う。
 - 正本をクラウド同期フォルダ直下に置かない(WAL がネットワークFSで破損しうる)。
 - 時刻はゼロ時差入力を Asia/Tokyo として正規化する(`normalizeAppointmentAt`)。

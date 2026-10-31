@@ -25,6 +25,7 @@
 | ブラウザ操作計画 | 許可origin/path、非機密JSON Pointer、無副作用dry-run、正本identity、承認hash、外部冪等キー、事前reconcile、最後のcommit 1回を型とExecutorで強制。任意JavaScript、秘密欄、成否不明の再試行を拒否 | `test:browser-plan`（36件の合成Driver検査） |
 | ハーネス改善 | 最小観測、合成回帰case、baseline/candidate eval、安全gate、人手承認、revision競合防止、直前版rollback | `test:harness-improvement` |
 | snapshotと閲覧面 | 機密を分離したsnapshot、ローカルviewer、Cloudflareへの明示push | `test:snapshot-viewer`、`cloudflare:check` |
+| バックアップ・復元 | OS既定または明示正本をSQLiteで検証済み単一ファイルへ退避し、破損・参照切れ・未来版・既存先を拒否して新規パスへだけ復元。稼働中正本の自動切替なし | `test:database-maintenance`、`backup:verify` |
 
 `workflows/daily-sync.json`と`daily-sync-local.json`は、private版と同じ`prepare → extract → validate → apply → snapshot → audit`契約を公開する。取得先を特定のメールproviderへ固定せず、remote connectorは`mail.read`、取得済み入力は`workspace.read`に分離した。
 

@@ -60,6 +60,7 @@ export {
   assertDatabaseIntegrity,
   verifyDatabaseBackup,
   createDatabaseBackup,
+  restoreDatabaseBackup,
   migrateDatabase,
   readConsistentSnapshot,
   ensureCoreIndexes,

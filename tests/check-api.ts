@@ -22,7 +22,7 @@ const EXPECTED = [
   // db
   'openDb', 'SCHEMA_VERSION', 'transition', 'STATUS_FOR', 'outcomeOf',
   'databaseVersion', 'assertSupportedDatabase', 'assertDatabaseIntegrity', 'verifyDatabaseBackup',
-  'createDatabaseBackup', 'migrateDatabase', 'readConsistentSnapshot', 'ensureCoreIndexes',
+  'createDatabaseBackup', 'restoreDatabaseBackup', 'migrateDatabase', 'readConsistentSnapshot', 'ensureCoreIndexes',
   'resolveCompany', 'sameCompany', 'samePosition', 'addAlias', 'addPending', 'listPending', 'setOfficialName',
   'COMPANY_EXCLUSION_MARKER', 'isCompanyExcluded', 'excludeCompany', 'applyPeopleResearch',
   'applyCompanyResearch',

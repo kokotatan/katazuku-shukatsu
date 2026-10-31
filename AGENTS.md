@@ -16,7 +16,7 @@ AIコーディングエージェント(および使い方を尋ねられたAI)�
 - `npm run doctor` — 環境が動かせるか診断(OS・Node・node:sqlite)
 - `npm run init` — 個人データを入れず、OSの利用者別領域に空の正本DBを作成・更新
 - `npm run check` — 公開ゲート(個人情報スキャン + typecheck + テスト)。**変更はこれが通ってから**
-- `npm test` / `npm run seed`(スキーマの1例) / `npm run backup`(VACUUM INTO の単一ファイル退避)
+- `npm test` / `npm run seed`(スキーマの1例) / `npm run backup`(整合性検査・上書き拒否つきVACUUM INTO) / `npm run restore`(新規パスだけ)
 
 ## 利用者から「データベースを構築して」と頼まれたら
 

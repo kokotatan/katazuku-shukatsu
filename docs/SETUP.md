@@ -146,8 +146,17 @@ npm start
 ## 8. バックアップ
 
 ```sh
-npm run backup    # 正本DBを1ファイルに退避(クラウド同期フォルダ直下に正本を置かない)
+npm run backup    # 現在の正本DBを、整合性検査済みの1ファイルへ退避
+npm run backup:verify -- "C:\absolute\path\to\backup.db"
 ```
+
+復元は、稼働中の正本を上書きせず新しい絶対パスへ作ります。復元先を確認してから、設定の`KATAZUKU_DB`を自分で切り替えてください。
+
+```powershell
+npm run restore -- "C:\absolute\path\to\backup.db" "C:\absolute\new\katazuku-restored.db"
+```
+
+破損、参照切れ、未対応の未来版、既存の復元先、元と同じパスは拒否します。バックアップと復元はGoogle/Muse認可、資格情報、外部に保存した別バックアップを削除しません。
 
 ## やめるとき
 

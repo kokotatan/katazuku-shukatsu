@@ -68,6 +68,26 @@ export function createDatabaseBackup(db: DatabaseSync, destination: string): str
 }
 
 /**
+ * 検証済みのSQLite 1ファイルから、既存を上書きせず新しいDBを復元する。
+ * 元ファイルも現在利用中の正本も変更しない。利用先の切替は別の明示操作とする。
+ */
+export function restoreDatabaseBackup(source: string, destination: string, supportedVersion: number): string {
+  const from = resolve(source)
+  const target = resolve(destination)
+  if (from === target) throw new Error('復元元と復元先は別のパスを指定してください。')
+  const db = new DatabaseSync(from, { readOnly: true })
+  try {
+    assertDatabaseIntegrity(db)
+    assertSupportedDatabase(db, supportedVersion)
+    const restored = createDatabaseBackup(db, target)
+    verifyDatabaseBackup(restored)
+    return restored
+  } finally {
+    db.close()
+  }
+}
+
+/**
  * 版の判定・スキーマ変更・版の記録を一つのトランザクションにする。
  * 退避と更新の間に別プロセスが書けない状態でバックアップを作る。
  */

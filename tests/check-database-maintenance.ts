@@ -10,6 +10,7 @@ import {
   databaseVersion,
   migrateDatabase,
   readConsistentSnapshot,
+  restoreDatabaseBackup,
   verifyDatabaseBackup,
 } from '../src/database-maintenance.js'
 
@@ -73,6 +74,29 @@ try {
     }
   })())
 
+  const restoredPath = join(dir, 'restored.db')
+  check('検証済みバックアップを新規パスへ復元する', restoreDatabaseBackup(backupPath, restoredPath, 1) === restoredPath)
+  const restored = new DatabaseSync(restoredPath, { readOnly: true })
+  check('復元DBは版とWAL由来のデータを保持する', databaseVersion(restored) === 1
+    && (restored.prepare('SELECT value FROM parent').get() as { value: string }).value === '移行前データ')
+  restored.close()
+  check('復元先を上書きしない', (() => {
+    try {
+      restoreDatabaseBackup(backupPath, restoredPath, 1)
+      return false
+    } catch (error) {
+      return error instanceof Error && error.message.includes('既に存在')
+    }
+  })())
+  check('復元元と復元先の同一指定を拒否する', (() => {
+    try {
+      restoreDatabaseBackup(backupPath, backupPath, 1)
+      return false
+    } catch (error) {
+      return error instanceof Error && error.message.includes('別のパス')
+    }
+  })())
+
   const corruptPath = join(dir, 'corrupt.db')
   writeFileSync(corruptPath, 'not sqlite', 'utf8')
   check('壊れたバックアップを正常扱いしない', (() => {
@@ -81,6 +105,27 @@ try {
       return false
     } catch {
       return true
+    }
+  })())
+  check('壊れたファイルから復元しない', (() => {
+    try {
+      restoreDatabaseBackup(corruptPath, join(dir, 'from-corrupt.db'), 1)
+      return false
+    } catch {
+      return !existsSync(join(dir, 'from-corrupt.db'))
+    }
+  })())
+
+  const futurePath = join(dir, 'future.db')
+  const future = new DatabaseSync(futurePath)
+  future.exec('CREATE TABLE future_data (id INTEGER PRIMARY KEY); PRAGMA user_version = 99')
+  future.close()
+  check('未対応の未来版を復元しない', (() => {
+    try {
+      restoreDatabaseBackup(futurePath, join(dir, 'from-future.db'), 1)
+      return false
+    } catch {
+      return !existsSync(join(dir, 'from-future.db'))
     }
   })())
 
