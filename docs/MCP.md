@@ -12,7 +12,7 @@ katazukuの正本SQLiteを、Muse・Codex・Claude CodeなどのMCPクライア�
 | `read` | 予定、選考、空き、提出物、要対応メール要約、応募run、適性検査メタデータ、Calendar未反映 | 書込み、メール本文、適性検査の問題・解答、外部操作 |
 | `sensitive` | プロフィール、人脈、面談記録、企業研究、就活支援面談を含む個人スナップショット | 画像本体、資格情報 |
 | `write` | 取得済みメール要約、Calendarイベント、提出結果、企業・人物調査、面談議事録、本人の対象外指示の正本への冪等反映 | メール送信、Calendar作成、応募提出、受験、ローカルファイル参照 |
-| `actions` | 第三者確定操作を承認台帳へ提案し、内容hashを固定 | 承認、送信、予約、購入、取消 |
+| `actions` | 第三者確定操作を承認台帳へ提案し、内容hashを固定。Muse connectorの送信・Sent証跡を固定済みhashへ記録 | 無承認の送信、予約、購入、取消、資格情報取得 |
 
 `read,write,sensitive,actions`がkatazuku内の全scopeです。ただし「フルアクセス」は資格情報・任意SQL・任意シェルを
 渡す意味ではありません。第三者への確定操作は、本人が固定済み内容を確認し、専用Executorが同じhashだけを実行します。
@@ -65,12 +65,17 @@ DBやGoogleのrefresh tokenをgatewayへ複製せず、端末停止時は503で�
 - `katazuku_record_interview`: 面談議事録・人物メモ・プロフィール候補・予定完了をrunIdで原子的に反映。文字起こしpathと顔写真は受け付けない (`write`)
 - `katazuku_exclude_company`: 本人の対象外指示を記録し、ローカルの選考・予定を停止。外部予定は変更しない (`write`)
 - `katazuku_prepare_action` / `katazuku_action_status` (`actions`)
+- `katazuku_prepare_muse_email`: Muse email connectorへ渡す前に元メール・正本・日程・本文を検査してaction hashを固定 (`actions`)
+- `katazuku_record_muse_email_result`: Museの毎回承認後の送信IDとSent再照合IDを同じhashへ冪等記録。`unknown`では完了しない (`actions`)
+- `katazuku_muse_email_status`: Museメールrunの証跡と再照合要否を返す (`actions`)
 
 tool一覧は起動時scopeに応じて削られます。許可されていないtoolは名前を知っていても呼べません。
 
 メール送信はMCP toolへ直接公開しません。`prepare_action`でprovider・差出人・宛先・本文を固定した後、
 ローカルの第三者メールExecutorが本人承認、正本DB、元メール、予定、外部SENTを再照合します。
-Google WorkspaceとiCloud Mailは同じ契約を使い、資格情報をMuseやgatewayへ渡しません。
+Google Workspace、ローカルiCloud adapter、Muse Secure VMのemail connectorは同じaction hash原則を使い、資格情報を
+katazuku MCPやgatewayへ渡しません。Muse経路は内蔵connectorのsensitive-write承認とSent再照合を必須にし、ローカルExecutorへ
+誤って渡した場合は拒否します。
 端末固有の接続は[Private adapters](PRIVATE-ADAPTERS.md)を参照してください。
 
 ## 検証

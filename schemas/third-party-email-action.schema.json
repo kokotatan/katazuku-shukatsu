@@ -12,6 +12,7 @@
       "required": ["to"],
       "properties": {
         "provider": { "enum": ["google-workspace", "icloud-mail"] },
+        "executor": { "enum": ["private-adapter", "muse-email-connector"] },
         "senderEmail": { "type": "string", "format": "email" },
         "userGoogleEmail": { "type": "string", "format": "email" },
         "context": { "enum": ["recruiting", "business", "education", "personal"] },

@@ -82,7 +82,7 @@ try {
   assert.equal(call.arguments.to, 'recruit@example.com')
   assert.equal(call.arguments.thread_id, 'thread-example')
   assert.equal(call.arguments.include_signature, false)
-  assert.deepEqual(emailTransportIdentity(action), { provider: 'google-workspace', senderEmail: 'user@example.com' })
+  assert.deepEqual(emailTransportIdentity(action), { provider: 'google-workspace', senderEmail: 'user@example.com', executor: 'private-adapter' })
   assert.deepEqual(emailTransportCapabilities(action), ['gmail.read', 'gmail.send.confirmed'])
 
   const icloudAction: ThirdPartyEmailAction = {
@@ -94,7 +94,7 @@ try {
     },
   }
   assert.equal(preflightThirdPartyEmail(db, icloudAction).ok, true)
-  assert.deepEqual(emailTransportIdentity(icloudAction), { provider: 'icloud-mail', senderEmail: 'contact@example.com' })
+  assert.deepEqual(emailTransportIdentity(icloudAction), { provider: 'icloud-mail', senderEmail: 'contact@example.com', executor: 'private-adapter' })
   assert.deepEqual(emailTransportCapabilities(icloudAction), ['icloud-mail.read', 'icloud-mail.send.confirmed'])
   assert.throws(() => buildWorkspaceSendCall(icloudAction), /Gmail transport/)
   const businessAction: ThirdPartyEmailAction = {
@@ -109,6 +109,20 @@ try {
   assert.equal(preflightThirdPartyEmail(db, businessAction, {
     identity: { name: 'Kotaro Okuyama', affiliation: '' },
   }).ok, true)
+  const museBusinessAction: ThirdPartyEmailAction = {
+    ...businessAction,
+    target: { ...businessAction.target, executor: 'muse-email-connector' },
+  }
+  assert.equal(emailTransportIdentity(museBusinessAction).executor, 'muse-email-connector')
+  assert.throws(() => emailTransportCapabilities(museBusinessAction), /ローカルtransport/)
+  const museGuardStore = openWorkflowStore(':memory:')
+  try {
+    await assert.rejects(() => executeApprovedThirdPartyEmail({
+      canonicalDb: db, workflowStore: museGuardStore, contract: loadWorkflowContract(join(dirname(fileURLToPath(import.meta.url)), '..', 'workflows', 'third-party-email.json')),
+      runId: 'muse-local-guard', action: museBusinessAction,
+      adapter: { async reconcile() { return { state: 'not_sent' } }, async send() {} },
+    }), /ローカル送信Executor/)
+  } finally { museGuardStore.close() }
 
   const commitment = {
     ...action,

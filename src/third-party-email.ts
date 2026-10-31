@@ -17,6 +17,7 @@ export interface ThirdPartyEmailAction {
   actionType: 'email.send' | 'gmail.send'
   target: {
     provider?: 'google-workspace' | 'icloud-mail'
+    executor?: 'private-adapter' | 'muse-email-connector'
     senderEmail?: string
     userGoogleEmail?: string
     context?: 'recruiting' | 'business' | 'education' | 'personal'
@@ -75,6 +76,7 @@ export interface EmailDeliveryAdapter {
 export interface EmailTransportIdentity {
   provider: 'google-workspace' | 'icloud-mail'
   senderEmail: string
+  executor: 'private-adapter' | 'muse-email-connector'
 }
 
 export interface ExecuteApprovedEmailOptions {
@@ -203,16 +205,20 @@ export function emailTransportIdentity(action: ThirdPartyEmailAction): EmailTran
     ? 'google-workspace'
     : action.target.provider
   const senderEmail = (action.target.senderEmail ?? action.target.userGoogleEmail ?? '').trim().toLowerCase()
+  const executor = action.target.executor ?? 'private-adapter'
   if (provider !== 'google-workspace' && provider !== 'icloud-mail') throw new Error('メールproviderが不正です')
+  if (executor !== 'private-adapter' && executor !== 'muse-email-connector') throw new Error('メールExecutorが不正です')
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(senderEmail)) throw new Error('送信元メールアドレスが不正です')
   if (action.actionType === 'gmail.send' && action.target.provider && action.target.provider !== 'google-workspace') {
     throw new Error('gmail.sendのproviderはgoogle-workspaceだけです')
   }
-  return { provider, senderEmail }
+  if (action.actionType === 'gmail.send' && executor !== 'private-adapter') throw new Error('gmail.sendはprivate-adapterだけが実行できます')
+  return { provider, senderEmail, executor }
 }
 
 export function emailTransportCapabilities(action: ThirdPartyEmailAction): string[] {
-  const { provider } = emailTransportIdentity(action)
+  const { provider, executor } = emailTransportIdentity(action)
+  if (executor !== 'private-adapter') throw new Error('Muse email connector用actionへローカルtransport capabilityを付与できません')
   return provider === 'google-workspace'
     ? ['gmail.read', 'gmail.send.confirmed']
     : ['icloud-mail.read', 'icloud-mail.send.confirmed']
@@ -326,6 +332,9 @@ export async function executeApprovedThirdPartyEmail(
 ): Promise<{ reconciled: boolean; receiptRef: string; actionHash: string }> {
   const { canonicalDb, workflowStore, contract, runId, action, adapter, now, identity } = options
   const target = getDatabaseContext(canonicalDb)
+  if (emailTransportIdentity(action).executor !== 'private-adapter') {
+    throw new Error('Muse email connector用actionはローカル送信Executorで実行できません')
+  }
   const preflight = preflightThirdPartyEmail(canonicalDb, action, { now, identity })
   if (!preflight.ok) throw new Error(`メール送信前検査に失敗しました: ${preflight.issues.join(' / ')}`)
 

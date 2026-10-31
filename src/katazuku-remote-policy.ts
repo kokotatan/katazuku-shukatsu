@@ -33,6 +33,9 @@ export const KATAZUKU_REMOTE_TOOL_SCOPES = {
   katazuku_record_meeting_preparation: 'katazuku:write',
   katazuku_prepare_action: 'katazuku:actions',
   katazuku_action_status: 'katazuku:actions',
+  katazuku_prepare_muse_email: 'katazuku:actions',
+  katazuku_record_muse_email_result: 'katazuku:actions',
+  katazuku_muse_email_status: 'katazuku:actions',
 } as const satisfies Record<string, KatazukuRemoteScope>
 
 export function localScopes(scopes: readonly string[]): ('read' | 'write' | 'sensitive' | 'actions')[] {

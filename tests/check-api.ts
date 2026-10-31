@@ -29,6 +29,7 @@ const EXPECTED = [
   'emailIdentityFromProfile', 'professionalEmailIssues', 'hasScheduleCommitmentLanguage',
   'buildWorkspaceSendCall', 'preflightThirdPartyEmail',
   'executeApprovedThirdPartyEmail',
+  'ensureMuseEmailResultSchema', 'getMuseEmailResult', 'museEmailExpectedEvidence', 'recordMuseEmailResult',
   'upsertCompany', 'insertSelection', 'listSelections', 'listCompanies', 'getCompanyCredential', 'addEvent', 'listEvents',
   'addAppointment', 'listAppointments', 'sameAppointment', 'findAppointmentMatch',
   'normalizeAppointmentAt', 'normalizeAppointmentUrl',

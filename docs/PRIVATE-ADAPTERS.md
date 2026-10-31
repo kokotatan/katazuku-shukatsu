@@ -11,6 +11,7 @@ katazukuは、公開できる運用契約と、本人の端末・アカウント
 - action hash、本人承認、正本・予定・元メッセージの再照合
 - provider非依存のメールExecutorと、shellを使わない別プロセスadapter契約
 - iCloud Mail用の固定IMAP/SMTP adapter
+- Muse Secure VMの内蔵email connectorから、資格情報なしで送信証跡だけを受けるMCP契約
 - 合成fixture、秘密値を使わない回帰テスト、依存脆弱性検査
 
 ## Private層
@@ -38,6 +39,10 @@ Cloudflare gatewayへ出しません。MCPからprivate設定の変更、資格�
 この値もaction hashへ入り、承認後のprovider・差出人差し替えを防ぎます。Google Workspaceは
 `provider: google-workspace`を使い、旧`gmail.send`も互換入力として残します。どのproviderでも
 送信済み外部記録を照合できない場合は`unknown`で停止し、自動再送しません。
+
+Muse経由ではtargetへ`"executor": "muse-email-connector"`を追加します。このactionはローカルSMTP/Gmail Executorが
+拒否します。Museの毎回承認後、送信message IDとSent再照合message IDが一致した証跡だけを固定済みactionへ結び付けます。
+Muse Secure VM内の資格情報、OAuth token、Cookieはこのリポジトリへ来ません。
 
 iCloud実装は[adapter README](../adapters/icloud-mail/README.md)を参照してください。Apple公式の固定host、
 TLS、app-specific passwordの要件を実装へ固定し、受信時はHTML・添付本体・認証コードをAgentへ渡しません。

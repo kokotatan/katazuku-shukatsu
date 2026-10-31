@@ -283,6 +283,8 @@ export {
 export type { KatazukuMcpScope, KatazukuMcpOptions } from './katazuku-mcp.js'
 export { KATAZUKU_REMOTE_SCOPES, KATAZUKU_REMOTE_TOOL_SCOPES, localScopes, allowedKatazukuRemoteRequest } from './katazuku-remote-policy.js'
 export type { KatazukuRemoteScope } from './katazuku-remote-policy.js'
+export { ensureMuseEmailResultSchema, getMuseEmailResult, museEmailExpectedEvidence, recordMuseEmailResult } from './muse-email.js'
+export type { MuseEmailResultState, MuseEmailConnectorResult, StoredMuseEmailResult } from './muse-email.js'
 export { validatePreparation, evaluateMeetingPreparation, saveMeetingPreparation, blockMeetingPreparation, meetingPreparationSnapshot, meetingPreparationContext, moveMeetingPreparation } from './meeting-preparation.js'
 export type { PreparationInput } from './meeting-preparation.js'
 export type {

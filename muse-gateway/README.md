@@ -38,8 +38,10 @@ OAuth認可と一時中継だけです。正本SQLite、Google資格情報、too
 6. `npm run muse:bridge`を常駐端末で起動します。
 7. Museにcustom remote MCPの登録画面が提供されている場合だけ、`https://<host>/mcp`を登録し、owner keyで同意します。
 
-Metaが公開しているMCP対応はモデル能力の説明までで、Muse製品の一般利用者向け登録画面・redirect URI・審査手順は
-公開確認できていません。未公開の画面名やURLを推測せず、実機表示とOAuth discoveryを照合してください。
+MetaはConnector Platformで提出項目、tool権限分類、3段階審査、承認後のSettings > Connectorsでの発見方法を公開しています。
+このgatewayは未提出・未承認です。実装済み、提出済み、承認済み、利用者接続済みを区別し、
+[`docs/MUSE-CONNECTOR-SUBMISSION.md`](../docs/MUSE-CONNECTOR-SUBMISSION.md)の不足項目を解消してから提出してください。
+登録値やredirect URIは提出画面と実機のOAuth discoveryを照合し、推測で設定しません。
 
 ## 検証
 

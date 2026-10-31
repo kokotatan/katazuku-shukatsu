@@ -6,6 +6,7 @@ import { openDb } from '../src/db.js'
 import { applyCalendar } from '../src/db-apply-calendar.js'
 import { applyApplicationEvent, startApplication } from '../src/application.js'
 import { katazukuRpc, KatazukuMcpServer } from '../src/katazuku-mcp.js'
+import { workflowHash } from '../src/workflow-control.js'
 
 const root = mkdtempSync(join(tmpdir(), 'katazuku-mcp-'))
 const dbPath = join(root, 'katazuku.db')
@@ -145,6 +146,75 @@ try {
 
   const status = await rpc(full, 'tools/call', { name: 'katazuku_action_status', arguments: { runId: 'mcp:example:1' } })
   assert.equal(JSON.parse(status.result.content[0].text).approval.status, 'requested')
+
+  const museEmailAction = {
+    actionType: 'email.send',
+    target: {
+      provider: 'icloud-mail', executor: 'muse-email-connector', senderEmail: 'contact@example.com',
+      context: 'business', to: ['joeri@example.com'], counterpartyName: 'Agensi',
+    },
+    content: {
+      subject: 'Re: Agensi x katazuku-shukatsu',
+      body: 'Hi Joeri,\n\nThank you for reaching out.\n\nBest,\nKotaro Okuyama',
+      threadId: 'muse-thread-1', sourceMessageId: 'message-example', scheduleCommitments: [],
+    },
+    effectiveAt: 'immediate', notification: 'Museの承認後にiCloud Mailから返信する',
+  }
+  const musePrepared = await rpc(full, 'tools/call', { name: 'katazuku_prepare_muse_email', arguments: {
+    runId: 'muse-email-1', sourceRef: 'muse-email:INBOX:message-example', action: museEmailAction,
+  } })
+  assert.equal(musePrepared.result.isError, false)
+  const musePreparedData = JSON.parse(musePrepared.result.content[0].text)
+  assert.equal(musePreparedData.workflow.run.status, 'needs_user')
+  assert.equal(musePreparedData.dispatch.requiresSensitiveWriteApproval, true)
+  assert.equal(musePreparedData.dispatch.requiresSentReconciliation, true)
+  const museResult = {
+    state: 'sent', actionHash: workflowHash(museEmailAction), approvalId: 'muse-approval-1',
+    accountEmail: 'contact@example.com', to: ['joeri@example.com'],
+    subjectHash: workflowHash(museEmailAction.content.subject), bodyHash: workflowHash(museEmailAction.content.body),
+    threadId: 'muse-thread-1', sourceMessageId: 'message-example', sentMessageId: 'muse-sent-1',
+    reconciledMessageId: 'muse-sent-1', sentAt: now.toISOString(), evidenceRef: 'muse-email:sent:muse-sent-1', errorCode: '',
+  }
+  const museRecorded = await rpc(full, 'tools/call', { name: 'katazuku_record_muse_email_result', arguments: {
+    runId: 'muse-email-1', action: museEmailAction, result: museResult,
+  } })
+  assert.equal(museRecorded.result.isError, false)
+  assert.equal(JSON.parse(museRecorded.result.content[0].text).workflow.run.status, 'done')
+  const museStatus = await rpc(full, 'tools/call', { name: 'katazuku_muse_email_status', arguments: { runId: 'muse-email-1' } })
+  assert.equal(JSON.parse(museStatus.result.content[0].text).result.sentMessageId, 'muse-sent-1')
+  const museRepeated = await rpc(full, 'tools/call', { name: 'katazuku_record_muse_email_result', arguments: {
+    runId: 'muse-email-1', action: museEmailAction, result: museResult,
+  } })
+  assert.equal(JSON.parse(museRepeated.result.content[0].text).workflow.run.status, 'done')
+  const museMismatch = await rpc(full, 'tools/call', { name: 'katazuku_record_muse_email_result', arguments: {
+    runId: 'muse-email-1', action: museEmailAction, result: { ...museResult, bodyHash: '0'.repeat(64) },
+  } })
+  assert.equal(museMismatch.result.isError, true)
+
+  const unknownAction = { ...museEmailAction, content: { ...museEmailAction.content, threadId: 'muse-thread-2' } }
+  await rpc(full, 'tools/call', { name: 'katazuku_prepare_muse_email', arguments: {
+    runId: 'muse-email-unknown', sourceRef: 'muse-email:INBOX:message-example', action: unknownAction,
+  } })
+  const unknownResult = {
+    state: 'unknown', actionHash: workflowHash(unknownAction), approvalId: 'muse-approval-unknown', accountEmail: 'contact@example.com',
+    to: ['joeri@example.com'], subjectHash: workflowHash(unknownAction.content.subject), bodyHash: workflowHash(unknownAction.content.body),
+    threadId: 'muse-thread-2', sourceMessageId: 'message-example', sentMessageId: '', reconciledMessageId: '', sentAt: '',
+    evidenceRef: 'muse-email:unknown:timeout', errorCode: 'connector_timeout',
+  }
+  const unknownWithoutApproval = await rpc(full, 'tools/call', { name: 'katazuku_record_muse_email_result', arguments: {
+    runId: 'muse-email-unknown', action: unknownAction, result: { ...unknownResult, approvalId: '' },
+  } })
+  assert.equal(unknownWithoutApproval.result.isError, true)
+  const unknownRecorded = await rpc(full, 'tools/call', { name: 'katazuku_record_muse_email_result', arguments: {
+    runId: 'muse-email-unknown', action: unknownAction, result: unknownResult,
+  } })
+  const unknownData = JSON.parse(unknownRecorded.result.content[0].text)
+  assert.equal(unknownData.workflow.run.status, 'needs_user')
+  assert.equal(unknownData.reconciliationRequired, true)
+  const unknownRepeated = await rpc(full, 'tools/call', { name: 'katazuku_prepare_muse_email', arguments: {
+    runId: 'muse-email-unknown', sourceRef: 'muse-email:INBOX:message-example', action: unknownAction,
+  } })
+  assert.equal(JSON.parse(unknownRepeated.result.content[0].text).result.state, 'unknown')
   const shell = await rpc(full, 'tools/call', { name: 'shell', arguments: { command: 'echo test' } })
   assert.equal(shell.result.isError, true)
   console.log('katazuku MCP: scope分離・正本読取・冪等入力・個人情報scope・承認提案・任意コマンド拒否を確認')

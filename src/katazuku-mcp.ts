@@ -18,6 +18,13 @@ import { listCareerMeetings } from './career-support.js'
 import { openDbReadOnly, quickRead, type QuickCommand } from './quick-read.js'
 import { getDatabaseContext, getScheduleAvailability } from './schedule.js'
 import { listSubmissionRequirements } from './submission-requirement.js'
+import { preflightThirdPartyEmail, type ThirdPartyEmailAction } from './third-party-email.js'
+import {
+  getMuseEmailResult,
+  museEmailExpectedEvidence,
+  recordMuseEmailResult,
+  type MuseEmailConnectorResult,
+} from './muse-email.js'
 import {
   getWorkflowRun,
   loadWorkflowContract,
@@ -44,6 +51,38 @@ const objectSchema = (properties: Record<string, unknown>, required: string[] = 
 const text = { type: 'string', minLength: 1 }
 const readAnnotations = { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
 const writeAnnotations = { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false }
+const email = { type: 'string', format: 'email' }
+const sha256 = { type: 'string', pattern: '^[a-f0-9]{64}$' }
+const museEmailActionSchema = objectSchema({
+  actionType: { const: 'email.send' },
+  target: objectSchema({
+    provider: { enum: ['google-workspace', 'icloud-mail'] }, executor: { const: 'muse-email-connector' },
+    senderEmail: email, context: { enum: ['recruiting', 'business', 'education', 'personal'] },
+    to: { type: 'array', minItems: 1, maxItems: 20, uniqueItems: true, items: email },
+    cc: { type: 'array', maxItems: 20, uniqueItems: true, items: email },
+    bcc: { type: 'array', maxItems: 20, uniqueItems: true, items: email },
+    companyName: { type: 'string', minLength: 1, maxLength: 200 }, counterpartyName: { type: 'string', minLength: 1, maxLength: 200 },
+    selectionId: { type: 'integer', minimum: 1 },
+  }, ['provider', 'executor', 'senderEmail', 'context', 'to']),
+  content: objectSchema({
+    subject: { type: 'string', minLength: 1, maxLength: 1000 }, body: { type: 'string', minLength: 1, maxLength: 50000 },
+    threadId: { ...text, maxLength: 1000 }, sourceMessageId: { ...text, maxLength: 1000 },
+    inReplyTo: { type: 'string', maxLength: 1000 }, references: { type: 'string', maxLength: 4000 },
+    scheduleCommitments: { type: 'array', maxItems: 20, items: objectSchema({
+      appointmentId: { type: 'integer', minimum: 1 }, startAt: text, endAt: text,
+    }, ['startAt', 'endAt']) },
+  }, ['subject', 'body', 'threadId', 'sourceMessageId', 'scheduleCommitments']),
+  effectiveAt: { const: 'immediate' }, notification: { ...text, maxLength: 2000 },
+})
+const museEmailResultSchema = objectSchema({
+  state: { enum: ['sent', 'not_sent', 'unknown'] }, actionHash: sha256,
+  approvalId: { type: 'string', maxLength: 1000 }, accountEmail: email,
+  to: { type: 'array', minItems: 1, maxItems: 20, uniqueItems: true, items: email },
+  subjectHash: sha256, bodyHash: sha256, threadId: { ...text, maxLength: 1000 }, sourceMessageId: { ...text, maxLength: 1000 },
+  sentMessageId: { type: 'string', maxLength: 1000 }, reconciledMessageId: { type: 'string', maxLength: 1000 },
+  sentAt: { type: 'string', maxLength: 100 }, evidenceRef: { type: 'string', pattern: '^muse-email:', maxLength: 2000 },
+  errorCode: { type: 'string', maxLength: 200 },
+})
 
 const allTools: Tool[] = [
   { name: 'katazuku_today', scope: 'read', description: '今日の面接・面談・説明会・締切を正本DBから返す。', annotations: readAnnotations, inputSchema: objectSchema({}) },
@@ -124,6 +163,12 @@ const allTools: Tool[] = [
     inputSchema: objectSchema({ runId: { ...text, maxLength: 160 }, sourceRef: { ...text, maxLength: 300 }, action: objectSchema({ actionType: text, target: { type: 'object', minProperties: 1 }, content: { type: 'object', minProperties: 1 }, effectiveAt: text, notification: text }) }) },
   { name: 'katazuku_action_status', scope: 'actions', description: '承認台帳の状態と固定済みaction hashを返す。実行や承認は行わない。', annotations: readAnnotations,
     inputSchema: objectSchema({ runId: { ...text, maxLength: 160 } }) },
+  { name: 'katazuku_prepare_muse_email', scope: 'actions', description: 'Muse内蔵email connectorで返信する前に、元メール・正本DB・日程・本文を検査しaction hashを固定する。送信は行わない。', annotations: writeAnnotations,
+    inputSchema: objectSchema({ runId: { ...text, maxLength: 160 }, sourceRef: { ...text, maxLength: 300 }, action: museEmailActionSchema }) },
+  { name: 'katazuku_record_muse_email_result', scope: 'actions', description: 'Museの毎回承認後の送信IDとSent再照合IDを、提示済みaction hashへ冪等記録する。成否不明では完了せず再送を止める。', annotations: writeAnnotations,
+    inputSchema: objectSchema({ runId: { ...text, maxLength: 160 }, action: museEmailActionSchema, result: museEmailResultSchema }) },
+  { name: 'katazuku_muse_email_status', scope: 'actions', description: 'Muse email connector用runのaction、承認、送信証跡、再照合要否を返す。', annotations: readAnnotations,
+    inputSchema: objectSchema({ runId: { ...text, maxLength: 160 } }) },
 ]
 
 export const KATAZUKU_MCP_INSTRUCTIONS = [
@@ -131,6 +176,8 @@ export const KATAZUKU_MCP_INSTRUCTIONS = [
   '予定・選考・提出物はGmailやCalendarを再検索する前にkatazuku_*の正本DBから確認します。',
   'write scopeは取得済み事実の冪等な正本反映だけです。メール送信・応募提出・予約・受験・認証は行いません。',
   '面接・面談を扱うときはkatazuku_meeting_preparationsを確認し、sensitive scopeがあれば根拠contextを取得して準備をreadyにします。',
+  'Google/iCloud認証はprivate adapterまたはMuse Secure VMの内蔵email connectorに残し、MCPへ資格情報を渡しません。',
+  'Museからメールを送る場合はkatazuku_prepare_muse_emailで固定し、Museのsensitive write承認後に送信IDとSent再照合IDをkatazuku_record_muse_email_resultへ返します。unknownでは再送しません。',
   '第三者確定操作はkatazuku_prepare_actionで固定し、本人承認と専用Executorへ引き継ぎます。MCPのtool call自体を本人承認とみなしません。',
 ].join('\n')
 
@@ -244,6 +291,43 @@ export class KatazukuMcpServer {
     if (name === 'katazuku_action_status') {
       const store = openWorkflowStore(this.options.workflowStorePath)
       try { return getWorkflowRun(store, String(args.runId)) } finally { store.close() }
+    }
+    if (name === 'katazuku_prepare_muse_email') {
+      const action = args.action as ThirdPartyEmailAction
+      const preflight = this.read((db) => preflightThirdPartyEmail(db, action, { now: this.options.now?.() }))
+      if (!preflight.ok) throw new Error(`Museメール事前検査に失敗しました: ${preflight.issues.join(' / ')}`)
+      const contract = loadWorkflowContract(this.contractPath)
+      const store = openWorkflowStore(this.options.workflowStorePath)
+      try {
+        const target = this.read((db) => getDatabaseContext(db, 'canonical'))
+        startWorkflowRun(store, contract, { sourceRef: args.sourceRef }, target, String(args.runId), this.options.now?.())
+        const existingResult = getMuseEmailResult(store, String(args.runId))
+        const state = getWorkflowRun(store, String(args.runId))
+        if (state.approval) {
+          if (state.approval.actionHash !== workflowHash(action)) throw new Error('同じrunIdへ異なるMuseメールを提示できません')
+          return { preflight, workflow: state, result: existingResult, dispatch: { connector: 'muse-email', requiresSensitiveWriteApproval: true, requiresSentReconciliation: true, expected: museEmailExpectedEvidence(action) } }
+        }
+        requestWorkflowApproval(store, contract, String(args.runId), 'approve', action, target, this.options.now?.())
+        return { preflight, workflow: getWorkflowRun(store, String(args.runId)), result: existingResult, dispatch: { connector: 'muse-email', requiresSensitiveWriteApproval: true, requiresSentReconciliation: true, expected: museEmailExpectedEvidence(action) } }
+      } finally { store.close() }
+    }
+    if (name === 'katazuku_record_muse_email_result') {
+      const action = args.action as ThirdPartyEmailAction
+      const result = args.result as MuseEmailConnectorResult
+      const contract = loadWorkflowContract(this.contractPath)
+      const store = openWorkflowStore(this.options.workflowStorePath)
+      try {
+        const target = this.read((db) => getDatabaseContext(db, 'canonical'))
+        return recordMuseEmailResult(store, contract, target, String(args.runId), action, result, this.options.now?.())
+      } finally { store.close() }
+    }
+    if (name === 'katazuku_muse_email_status') {
+      const store = openWorkflowStore(this.options.workflowStorePath)
+      try {
+        const workflow = getWorkflowRun(store, String(args.runId))
+        const result = getMuseEmailResult(store, String(args.runId))
+        return { workflow, result, reconciliationRequired: result?.state === 'unknown' }
+      } finally { store.close() }
     }
     throw new Error('ツール実装がありません')
   }
