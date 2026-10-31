@@ -358,7 +358,9 @@ check('面接予定を登録してカレンダーoutboxへ載せる', () => {
   interviewAppointmentId = result.appointmentId || 0
   assert(result.state === 'interview_scheduled' && interviewAppointmentId > 0, '面接予定が作成されていません')
   const outbox = listCalendarOutbox(db, new Date('2026-07-28T12:00:00+09:00'))
-  assert(outbox.some((item) => item.appointmentId === interviewAppointmentId), '面接予定がoutboxにありません')
+  const item = outbox.find((candidate) => candidate.appointmentId === interviewAppointmentId)
+  assert(item, '面接予定がoutboxにありません')
+  assert(typeof item.flexible === 'boolean', 'outboxのflexibleは真偽値で返します')
 })
 
 check('外部カレンダーIDを戻すとoutboxから外れる', () => {

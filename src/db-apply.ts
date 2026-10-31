@@ -14,6 +14,7 @@ import { dirname, join, resolve } from 'node:path'
 import type { DatabaseSync } from 'node:sqlite'
 import { openDb, upsertCompany, insertSelection, transition, samePosition, resolveCompany, addPending, addEvent, addAppointment, listPending, outcomeOf, STATUS_FOR, type Stage } from './db.js'
 import { resolveDatabasePath } from './database-path.js'
+import { isCompanyExcluded } from './company-preference.js'
 
 export const MAX_APPLY_CHANGES = 15
 
@@ -53,6 +54,7 @@ export function applyDiff(db: DatabaseSync, items: DiffItem[], by = 'daily-sync'
     try {
     const name = (it.name ?? '').trim()
     if (!name) continue
+    if (isCompanyExcluded(db, name)) { res.skipped.push(name); continue }
 
     // stage を実行時に検証する。未知のstage(タイポ・将来値・外部LLMの誤り)1件で
     // バッチ全体がロールバックしないよう、その1件だけ skip する。

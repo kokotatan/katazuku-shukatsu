@@ -24,6 +24,10 @@ const EXPECTED = [
   'databaseVersion', 'assertSupportedDatabase', 'assertDatabaseIntegrity', 'verifyDatabaseBackup',
   'createDatabaseBackup', 'migrateDatabase', 'readConsistentSnapshot', 'ensureCoreIndexes',
   'resolveCompany', 'sameCompany', 'samePosition', 'addAlias', 'addPending', 'listPending', 'setOfficialName',
+  'COMPANY_EXCLUSION_MARKER', 'isCompanyExcluded', 'excludeCompany', 'applyPeopleResearch',
+  'emailIdentityFromProfile', 'professionalEmailIssues', 'hasScheduleCommitmentLanguage',
+  'buildWorkspaceSendCall', 'preflightThirdPartyEmail',
+  'executeApprovedThirdPartyEmail',
   'upsertCompany', 'insertSelection', 'listSelections', 'listCompanies', 'getCompanyCredential', 'addEvent', 'listEvents',
   'addAppointment', 'listAppointments', 'sameAppointment', 'findAppointmentMatch',
   'normalizeAppointmentAt', 'normalizeAppointmentUrl',
@@ -76,6 +80,7 @@ const EXPECTED = [
   // 録音の文字起こしと議事録化
   'CHUNK_SECONDS', 'VOICEBOX_STARTUP_WAIT_MS', 'VoiceboxMcpClient', 'mergeSpeakerSegments', 'renderChunkTranscript',
   'renderSegmentTranscript', 'selectTranscriptionBackend', 'transcribeAudio',
+  'isDigitallySilentWav',
   'INTERVIEW_MINUTES_SCHEMA_PATH', 'buildMinutesPrompt', 'minutesRunId', 'parseMinutesOutput', 'toInterviewInput',
   // 面談スクショからの顔写真
   'attachPhotosToAppliedInterview', 'cropImage', 'decodePng', 'encodePng',

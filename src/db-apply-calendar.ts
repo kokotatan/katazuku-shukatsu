@@ -11,6 +11,7 @@ import { isAutomaticRecordingEligible, type AutomaticRecordingCandidate } from '
 import { addEvent, findAppointmentMatch, openDb } from './db.js'
 import { resolveDatabasePath } from './database-path.js'
 import { resolveSelectionId, transaction, upsertPerson } from './inputs.js'
+import { isCompanyExcluded } from './company-preference.js'
 import {
   applyScheduleProjection,
   type ScheduleBlockInput,
@@ -65,6 +66,7 @@ export function applyCalendar(
   return transaction(db, () => {
     const result = { created: 0, updated: 0, unchanged: 0, promoted: 0 }
     for (const event of input.events) {
+      if (isCompanyExcluded(db, event.company)) continue
       const { selectionId, companyId } = resolveSelectionId(db, event.company, event.position)
       const sourceHash = event.sourceHash || createHash('sha256').update(JSON.stringify({
         title: event.title, startAt: event.startAt, endAt: event.endAt || '',

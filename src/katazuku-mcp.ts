@@ -9,6 +9,8 @@ import { applyMail } from './db-apply-mail.js'
 import { applySubmission } from './db-apply-submission.js'
 import { listActionableMail, listPlatformSnapshot } from './platform.js'
 import { meetingPreparationContext, meetingPreparationSnapshot, saveMeetingPreparation } from './meeting-preparation.js'
+import { excludeCompany } from './company-preference.js'
+import { applyPeopleResearch } from './people-research.js'
 import { openDbReadOnly, quickRead, type QuickCommand } from './quick-read.js'
 import { getDatabaseContext, getScheduleAvailability } from './schedule.js'
 import { listSubmissionRequirements } from './submission-requirement.js'
@@ -62,6 +64,17 @@ const allTools: Tool[] = [
     inputSchema: objectSchema({ events: { type: 'array', minItems: 1, maxItems: 500, items: objectSchema({
       externalId: text, calendarId: { type: 'string' }, title: text, startAt: text, endAt: { type: 'string' }, company: text, position: { type: 'string' }, kind: { type: 'string' }, url: { type: 'string' }, location: { type: 'string' }, status: { type: 'string' }, sourceHash: { type: 'string' },
     }, ['externalId', 'title', 'startAt', 'company']) } }) },
+  { name: 'katazuku_record_people_research', scope: 'write', description: '公開情報等から得た人物調査を出典・日時・confidence付きで人物台帳へ冪等反映する。学生・同級生の大学名は企業マスタにしない。', annotations: writeAnnotations,
+    inputSchema: objectSchema({
+      sourceRef: { ...text, maxLength: 500 }, researchedAt: text,
+      people: { type: 'array', minItems: 1, maxItems: 200, items: objectSchema({
+        name: { ...text, maxLength: 200 }, company: { type: 'string', maxLength: 200 }, role: { type: 'string', maxLength: 300 },
+        category: { type: 'string', maxLength: 100 }, notes: { type: 'array', maxItems: 100, items: { type: 'string', maxLength: 4000 } },
+        confidence: { type: 'number', minimum: 0, maximum: 1 },
+      }, ['name', 'notes']) },
+    }) },
+  { name: 'katazuku_exclude_company', scope: 'write', description: '本人が既に対象外と決めた企業を正本へ記録し、既存トラックとローカル予定を停止する。外部カレンダーや第三者には変更・通知しない。', annotations: writeAnnotations,
+    inputSchema: objectSchema({ name: { ...text, maxLength: 200 }, reason: { ...text, maxLength: 1000 }, ref: { ...text, maxLength: 500 } }) },
   { name: 'katazuku_record_meeting_preparation', scope: 'write', description: '根拠hashと一次情報を検証し、面接・面談ごとの準備成果物を正本DBへ冪等保存する。企業研究なし・古い根拠・必須項目不足は拒否する。', annotations: writeAnnotations,
     inputSchema: objectSchema({
       appointmentId: { type: 'integer', minimum: 1 }, contextHash: { type: 'string', pattern: '^[a-f0-9]{64}$' }, preparedAt: text,
@@ -147,6 +160,8 @@ export class KatazukuMcpServer {
     if (name === 'katazuku_record_mail') return this.write((db) => applyMail(db, args as unknown as Parameters<typeof applyMail>[1]))
     if (name === 'katazuku_record_submission') return this.write((db) => applySubmission(db, args as unknown as Parameters<typeof applySubmission>[1]))
     if (name === 'katazuku_record_calendar') return this.write((db) => applyCalendar(args as unknown as Parameters<typeof applyCalendar>[0], db))
+    if (name === 'katazuku_record_people_research') return this.write((db) => applyPeopleResearch(db, args as unknown as Parameters<typeof applyPeopleResearch>[1]))
+    if (name === 'katazuku_exclude_company') return this.write((db) => excludeCompany(db, args as unknown as Parameters<typeof excludeCompany>[1], this.options.now?.()))
     if (name === 'katazuku_record_meeting_preparation') return this.write((db) => saveMeetingPreparation(db, args, this.options.now?.()))
     if (name === 'katazuku_prepare_action') {
       const contract = loadWorkflowContract(this.contractPath)

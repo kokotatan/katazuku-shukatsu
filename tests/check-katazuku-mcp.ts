@@ -43,6 +43,16 @@ try {
   assert.equal(mail.result.isError, false)
   const snapshot = await rpc(full, 'tools/call', { name: 'katazuku_snapshot', arguments: {} })
   assert(JSON.parse(snapshot.result.content[0].text).mailItems.some((item: { id: string }) => item.id === 'message-example'))
+  const research = await rpc(full, 'tools/call', { name: 'katazuku_record_people_research', arguments: {
+    sourceRef: 'official:example-team', researchedAt: '2098-12-31T12:00:00Z',
+    people: [{ name: '採用担当A', company: 'Example株式会社', role: '採用担当', category: '採用担当', notes: ['公式チームページに掲載'], confidence: 0.9 }],
+  } })
+  assert.equal(research.result.isError, false)
+  const excluded = await rpc(full, 'tools/call', { name: 'katazuku_exclude_company', arguments: {
+    name: 'Example株式会社', reason: '本人が今後の管理対象外と決定', ref: 'conversation:example-exclusion',
+  } })
+  assert.equal(excluded.result.isError, false)
+  assert.equal(JSON.parse(excluded.result.content[0].text).selections, 1)
 
   const action = {
     actionType: 'email.send', target: { to: ['recipient@example.com'] },

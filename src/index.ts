@@ -67,6 +67,26 @@ export {
 
 // ---- 入力の共通処理 ----
 export { resolveSelectionId, upsertPerson, transaction } from './inputs.js'
+export { COMPANY_EXCLUSION_MARKER, isCompanyExcluded, excludeCompany } from './company-preference.js'
+export type { CompanyExclusionInput } from './company-preference.js'
+export { applyPeopleResearch } from './people-research.js'
+export type { PeopleResearchInput } from './people-research.js'
+export {
+  emailIdentityFromProfile,
+  professionalEmailIssues,
+  hasScheduleCommitmentLanguage,
+  buildWorkspaceSendCall,
+  preflightThirdPartyEmail,
+  executeApprovedThirdPartyEmail,
+} from './third-party-email.js'
+export type {
+  ThirdPartyEmailAction,
+  EmailIdentity,
+  EmailPreflightResult,
+  EmailDeliveryState,
+  EmailDeliveryAdapter,
+  ExecuteApprovedEmailOptions,
+} from './third-party-email.js'
 
 // ---- 書き込み層(冪等な反映) ----
 export { applyDiff, MAX_APPLY_CHANGES } from './db-apply.js'
@@ -295,6 +315,7 @@ export type {
 } from './transcription.js'
 export { transcribeAudio } from './transcribe-audio.js'
 export type { TranscribeAudioOptions, TranscribeAudioResult } from './transcribe-audio.js'
+export { isDigitallySilentWav } from './wav-silence.js'
 export { INTERVIEW_MINUTES_SCHEMA_PATH, buildMinutesPrompt, minutesRunId, parseMinutesOutput, toInterviewInput } from './interview-minutes.js'
 export type { MinutesContext, MinutesInterview, MinutesOutput } from './interview-minutes.js'
 export { cropImage, decodePng, encodePng } from './png.js'

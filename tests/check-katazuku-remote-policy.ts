@@ -11,6 +11,8 @@ assert(allowedKatazukuRemoteRequest(call('katazuku_meeting_preparations'), ['kat
 assert(!allowedKatazukuRemoteRequest(call('katazuku_meeting_preparation_context'), ['katazuku:read']))
 assert(allowedKatazukuRemoteRequest(call('katazuku_meeting_preparation_context'), ['katazuku:sensitive']))
 assert(allowedKatazukuRemoteRequest(call('katazuku_record_meeting_preparation'), ['katazuku:write']))
+assert(allowedKatazukuRemoteRequest(call('katazuku_record_people_research'), ['katazuku:write']))
+assert(allowedKatazukuRemoteRequest(call('katazuku_exclude_company'), ['katazuku:write']))
 assert(!allowedKatazukuRemoteRequest(call('shell'), ['katazuku:read', 'katazuku:write', 'katazuku:sensitive', 'katazuku:actions']))
 assert(allowedKatazukuRemoteRequest({ jsonrpc: '2.0', id: 1, method: 'tools/list' }, []))
 assert.deepEqual(localScopes(['katazuku:read', 'unknown', 'katazuku:read', 'katazuku:actions']), ['read', 'actions'])

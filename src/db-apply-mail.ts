@@ -5,6 +5,7 @@
 import type { DatabaseSync } from 'node:sqlite'
 import { resolveCompany } from './db.js'
 import { resolveSelectionId, transaction } from './inputs.js'
+import { isCompanyExcluded } from './company-preference.js'
 
 export interface MailApplyItem {
   id: string
@@ -30,7 +31,7 @@ export function applyMail(db: DatabaseSync, input: { items: MailApplyItem[] }): 
     for (const item of input.items) {
       let selectionId: number | null = null
       let companyId: number | null = null
-      if (item.company) {
+      if (item.company && !isCompanyExcluded(db, item.company)) {
         const resolution = resolveCompany(db, item.company)
         if (resolution.kind === 'hit') {
           // selection_id は一意に特定できた時だけ付ける。複数トラックで position が無い等で
