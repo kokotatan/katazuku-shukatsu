@@ -21,7 +21,7 @@ const parsed = parseJsonc(valid)
 const result = validateMuseProductionConfig(parsed)
 assert.equal(result.ok, true)
 assert.equal(result.manifest?.endpoints.mcp, 'https://katazuku-muse.example.workers.dev/mcp')
-assert.equal(result.manifest?.endpoints.revocation, 'https://katazuku-muse.example.workers.dev/oauth/revoke')
+assert.equal(result.manifest?.endpoints.revocation, 'https://katazuku-muse.example.workers.dev/oauth/token')
 assert.equal(result.manifest?.secrets.valuesRecorded, false)
 
 const invalid = (mutate: (config: Record<string, any>) => void, expected: string) => {

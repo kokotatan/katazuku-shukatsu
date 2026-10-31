@@ -143,7 +143,7 @@ export function validateMuseProductionConfig(value: unknown): MuseProductionVali
         authorize: `${origin.origin}/authorize`,
         token: `${origin.origin}/oauth/token`,
         registration: `${origin.origin}/oauth/register`,
-        revocation: `${origin.origin}/oauth/revoke`,
+        revocation: `${origin.origin}/oauth/token`,
         metadata: `${origin.origin}/.well-known/oauth-authorization-server`,
       },
       compatibilityDate,

@@ -48,6 +48,15 @@ npm run muse:production-preflight -- --config=muse-gateway/wrangler.jsonc > muse
 この証跡はlive deploymentやMeta承認を意味しません。外部から`/health`、OAuth discovery、token失効、MCP、
 bridge切断時のfail-closedを確認してから、production確認済みとして扱います。
 
+deploy後は、秘密やOAuth grantを作らない公開面の検査を実行します。health、MCP/bridgeの認証必須、異なるOriginの拒否、
+OAuth discoveryのendpointとscopeを実環境から照合します。
+
+```sh
+npm run muse:live-verify -- --origin=https://production-origin > muse-live-evidence.json
+```
+
+この検査はowner keyを使うOAuth E2E、bridge接続、token失効、Muse審査アカウントでの接続を代替しません。
+
 MetaはConnector Platformで提出項目、tool権限分類、3段階審査、承認後のSettings > Connectorsでの発見方法を公開しています。
 このgatewayは未提出・未承認です。実装済み、提出済み、承認済み、利用者接続済みを区別し、
 [`docs/MUSE-CONNECTOR-SUBMISSION.md`](../docs/MUSE-CONNECTOR-SUBMISSION.md)の不足項目を解消してから提出してください。

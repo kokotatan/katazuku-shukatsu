@@ -111,6 +111,7 @@ npm run --silent muse:submission-spec > muse-connector-tool-spec.json
 - [ ] 事業者情報、ブランド素材、利用規約、保守担当者を提出画面の内容と一致させる。
 - [ ] production gateway origin、OAuth client情報、redirect URIを実環境で固定する。
 - [x] production設定のHTTPS origin、placeholder、KV/DO、秘密の平文混入、ログ無効化をdeploy前に拒否し、秘密を読まずendpointとsource hashを証跡JSONへ出すpreflightを実装する。
+- [x] deploy後のTLS、health、MCP/bridge認証、異なるOrigin拒否、OAuth discoveryを、秘密とOAuth grantなしで外部検証するlive verifierを実装する。
 - [ ] 個人データを含まない審査専用アカウント、合成DB、bridge、接続手順を用意する。
 - [x] RFC 7009でrefresh tokenを失効すると既存access tokenとrefreshが直ちに拒否され、gatewayにMCP payloadが残らないことをローカルE2Eで確認する。
 - [ ] production環境の接続解除と、正本・workflow証跡そのものを利用者が明示的に削除する運用手順を審査アカウントで確認する。
