@@ -30,6 +30,7 @@ try {
   assert.equal((await post('/mcp', {}, { Origin: 'https://attacker.example' })).status, 403)
   const discovery = await (await request('/.well-known/oauth-authorization-server')).json()
   assert.equal(discovery.authorization_endpoint, origin + '/authorize')
+  assert.equal(discovery.revocation_endpoint, origin + '/oauth/token')
   assert.deepEqual(discovery.scopes_supported, ['katazuku:read', 'katazuku:write', 'katazuku:sensitive', 'katazuku:actions'])
 
   const registration = await post('/oauth/register', {
@@ -83,7 +84,18 @@ try {
   const response = await (await post('/mcp', { jsonrpc: '2.0', id: 3, method: 'ping' }, authorization)).json()
   assert.equal(response.result.synthetic, true)
   assert.equal((await request('/oauth/token', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(tokenBody) })).status, 400)
-  console.log('Muse gateway: OAuth discovery・PKCE・CSRF・scope・中継・code再利用拒否を確認')
+  assert.equal(typeof token.refresh_token, 'string')
+  const revoked = await request('/oauth/token', {
+    method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ token: token.refresh_token, token_type_hint: 'refresh_token', client_id: client.client_id }),
+  })
+  assert.equal(revoked.status, 200)
+  assert.equal((await post('/mcp', { jsonrpc: '2.0', id: 4, method: 'ping' }, authorization)).status, 401)
+  assert.equal((await request('/oauth/token', {
+    method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: token.refresh_token, client_id: client.client_id, resource: origin + '/mcp' }),
+  })).status, 400)
+  console.log('Muse gateway: OAuth discovery・PKCE・CSRF・scope・中継・code再利用拒否・RFC7009失効を確認')
 } finally {
   socket?.close()
   if (child) {

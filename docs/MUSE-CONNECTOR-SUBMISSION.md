@@ -26,6 +26,11 @@ Muse -> HTTPS/OAuth 2.1 gateway -> 15秒期限のrelay -> 所有者端末のloop
 - Google、iCloud、Muse email connectorの資格情報はkatazuku MCP、gateway、正本DBへ渡しません。
 - Muse email connectorでの送信はMeta側のsensitive writeです。katazuku Connector自身はメールを送信せず、actionの検査・hash固定・Sent証跡の記録だけを担当します。
 
+Muse側で接続を解除したときはOAuth RFC 7009のrefresh token失効を受け付け、そのgrantのaccess tokenも直ちに無効化します。
+gatewayには削除対象のMCP payloadが残りません。利用者所有の正本DBはConnector用コピーではなく元サービスのデータなので、
+Connector解除だけを理由に削除せず、失効tokenからアクセス不能にします。正本自体の削除要求は、誤消去を避けて利用者が管理する
+ローカル製品の明示的な削除手順として分離します。
+
 ## Tool注釈
 
 Metaの分類では、状態を変えないtoolはRead、正本またはworkflow storeを変えるtoolはWriteです。katazuku Connector内に外部メール送信、購入、予約確定などのSensitive write toolはありません。
@@ -106,7 +111,8 @@ npm run --silent muse:submission-spec > muse-connector-tool-spec.json
 - [ ] 事業者情報、ブランド素材、利用規約、保守担当者を提出画面の内容と一致させる。
 - [ ] production gateway origin、OAuth client情報、redirect URIを実環境で固定する。
 - [ ] 個人データを含まない審査専用アカウント、合成DB、bridge、接続手順を用意する。
-- [ ] access revokeと削除要求に対する、OAuth認可情報・ローカルDB・workflow証跡の削除手順を実機確認する。
+- [x] RFC 7009でrefresh tokenを失効すると既存access tokenとrefreshが直ちに拒否され、gatewayにMCP payloadが残らないことをローカルE2Eで確認する。
+- [ ] production環境の接続解除と、正本・workflow証跡そのものを利用者が明示的に削除する運用手順を審査アカウントで確認する。
 - [x] 全toolの入力、副作用、共通エラー、gateway上限を実装から提出用JSONへ書き出す（出力JSON Schemaは未宣言であることも明記）。
 - [ ] `npm run check`と上記E2Eをproduction候補revisionで通し、revisionと結果を保存する。
 - [ ] Muse Connector Termsとデータ処理条件を本人が確認し、提出対象・公開範囲を最終承認する。
