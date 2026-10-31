@@ -53,10 +53,10 @@ Googleとの通信や、選択したAIプロバイダへの情報送信は発生
 | 閲覧アプリ8本 | きょう / 選考 / 企業 / メール / 人 / 面接準備 / プロフィール / 効果 | 不要 | — |
 | 面談の録音(任意・Windows) | オンライン面談を相手の声つきで録る | 不要 | — |
 | Gemini Spark 連携(任意) | スマホから予定・選考状況を聞く | 不要 | 自分の Cloudflare |
-| katazuku MCP(任意) | Muse・Codex・Claude Codeから正本を読み、明示scopeで冪等入力と承認提案を行う。Muse内蔵email connectorでは、毎回承認・action hash・Sent再照合付きでiCloud等へ返信できる。remote用OAuth gatewayもセルフホスト可能 | 不要 | 対応MCPクライアント・任意で自分のCloudflare |
+| katazuku MCP(任意) | Muse・Codex・Claude Codeから正本を読み、明示scopeで冪等入力と承認提案を行う。Muse内蔵email connectorでは、毎回承認・action hash・Sent再照合付きでiCloud等へ返信できる。フォーム提出と採用ポータル送信も、汎用workflow契約で本人承認・外部冪等キー・監査を必須にする。remote用OAuth gatewayもセルフホスト可能 | 不要 | 対応MCPクライアント・任意で自分のCloudflare |
 
 詳しい動きは [docs/WORKFLOWS.md](docs/WORKFLOWS.md)、AIの選び方は [docs/AI-PROVIDERS.md](docs/AI-PROVIDERS.md)。
-MCPは[MCPガイド](docs/MCP.md)、Museは[Muse接続ガイド](docs/MUSE.md)、運用を失敗から改善する仕組みは[ハーネス改善ループ](docs/HARNESS-IMPROVEMENT.md)を参照してください。
+MCPは[MCPガイド](docs/MCP.md)、Museは[Muse接続ガイド](docs/MUSE.md)、運用を失敗から改善する仕組みは[ハーネス改善ループ](docs/HARNESS-IMPROVEMENT.md)を参照してください。private版との差と意図的な秘密境界は[追随台帳](docs/PRIVATE-PARITY.md)に固定しています。
 
 ## やらないこと(コードで止めている安全境界)
 

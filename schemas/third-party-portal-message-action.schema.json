@@ -1,0 +1,23 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "本人確認済みの採用ポータルメッセージ",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["actionType", "companyName", "selectionId", "sourceMessageId", "portalHost", "subject", "body", "notification"],
+  "properties": {
+    "actionType": { "const": "portal.message.send" },
+    "companyName": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "selectionId": { "type": "integer", "minimum": 1 },
+    "sourceMessageId": { "type": "string", "minLength": 1, "maxLength": 500 },
+    "priorMessageId": { "type": "string", "minLength": 1, "maxLength": 500 },
+    "portalHost": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 253,
+      "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9.-]{0,251}[A-Za-z0-9])?$"
+    },
+    "subject": { "type": "string", "minLength": 1, "maxLength": 500 },
+    "body": { "type": "string", "minLength": 1, "maxLength": 20000 },
+    "notification": { "type": "string", "minLength": 1, "maxLength": 1000 }
+  }
+}

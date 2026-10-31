@@ -4,9 +4,11 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { AgentRunResult } from '../src/agent-runtime.js'
 import {
-  approveCandidate, ensureRegressionForObservation, evaluateHarnessCandidate,
+  activateApprovedCandidate, approveCandidate, ensureRegressionForObservation, evaluateHarnessCandidate,
+  getHarnessRelease,
   harnessImprovementSummary, ingestAgentRunArtifacts, observationFromRun, openHarnessImprovementStore,
   recordCandidateEvaluation, recordHarnessObservation, recordImprovementProposal,
+  registerHarnessBaseline, rollbackHarnessRelease,
 } from '../src/harness-improvement.js'
 
 const root = mkdtempSync(join(tmpdir(), 'katazuku-harness-improvement-'))
@@ -56,6 +58,19 @@ try {
     assert.throws(() => approveCandidate(db, 'candidate:mail-reconcile:1', '', '1234567'), /approvedBy/)
     approveCandidate(db, 'candidate:mail-reconcile:1', '本人確認', '1234567')
     assert.equal((db.prepare('SELECT status FROM harness_candidate').get() as { status: string }).status, 'approved')
+    assert.equal(registerHarnessBaseline(db, 'abcdef1', '運用責任者', new Date('2026-10-31T02:00:00Z')).currentRevision, 'abcdef1')
+    assert.throws(() => registerHarnessBaseline(db, 'abcdef1', '運用責任者'), /登録済み/)
+    assert.throws(() => activateApprovedCandidate(db, 'candidate:mail-reconcile:1', '運用責任者', 'fffffff'), /一致しません/)
+    const activated = activateApprovedCandidate(db, 'candidate:mail-reconcile:1', '運用責任者', 'abcdef1', new Date('2026-10-31T02:10:00Z'))
+    assert.equal(activated.currentRevision, '1234567')
+    assert.equal(activated.previousRevision, 'abcdef1')
+    assert.throws(() => rollbackHarnessRelease(db, 'fffffff', '運用責任者', '退行を検知'), /一致しません/)
+    const rolledBack = rollbackHarnessRelease(db, '1234567', '運用責任者', 'safety caseの退行を検知', new Date('2026-10-31T02:20:00Z'))
+    assert.equal(rolledBack.currentRevision, 'abcdef1')
+    assert.equal(rolledBack.previousRevision, '')
+    assert.equal(getHarnessRelease(db)?.candidateId, '')
+    assert.equal((db.prepare('SELECT status FROM harness_candidate').get() as { status: string }).status, 'rolled_back')
+    assert.deepEqual((db.prepare('SELECT kind FROM harness_release_event ORDER BY id').all() as { kind: string }[]).map((row) => row.kind), ['baseline', 'activated', 'rolled_back'])
 
     const rejected = evaluateHarnessCandidate([
       { ...passingCases[0], candidatePassed: false, candidateScore: 0 }, passingCases[1], passingCases[2],
@@ -68,6 +83,7 @@ try {
       { outcome: 'needs_resume', count: 1 },
     ])
     assert(!JSON.stringify(summary).includes('SENT照合を先行'), '運用summaryへ候補本文を出さない')
-    console.log('harness改善ループ: 観測最小化・回帰fixture化・baseline比較・safety gate・人手昇格を確認')
+    assert.equal((summary.release as { currentRevision: string }).currentRevision, 'abcdef1')
+    console.log('harness改善ループ: 観測最小化・回帰fixture化・baseline比較・safety gate・人手昇格・競合防止・rollbackを確認')
   } finally { db.close() }
 } finally { rmSync(root, { recursive: true, force: true }) }

@@ -1,0 +1,15 @@
+{
+  "$schema": "../schemas/workflow-contract.schema.json",
+  "schemaVersion": 1,
+  "id": "third-party-form",
+  "version": 1,
+  "title": "本人確認済みの日程候補をフォームで提出する",
+  "database": { "requiredRole": "canonical" },
+  "firstStep": "validate",
+  "steps": [
+    { "id": "validate", "title": "元メッセージと正本カレンダーの空きを検査する", "owner": "executor", "sideEffect": "none", "capabilities": [], "inputSchema": "../schemas/third-party-form-action.schema.json", "approval": "none", "idempotency": "run-step", "next": "approve" },
+    { "id": "approve", "title": "候補日時と提出先を本人が確認する", "owner": "user", "sideEffect": "none", "capabilities": [], "inputSchema": "../schemas/third-party-form-action.schema.json", "approval": "user", "idempotency": "not-applicable", "next": "submit" },
+    { "id": "submit", "title": "承認内容と同じ候補をフォームで提出する", "owner": "executor", "sideEffect": "third-party-commit", "capabilities": ["browser.form.submit.confirmed"], "approval": "none", "requiresApprovalFrom": "approve", "idempotency": "external-key", "next": "audit" },
+    { "id": "audit", "title": "提出結果を外部IDと証拠参照で記録する", "owner": "executor", "sideEffect": "internal-sync", "capabilities": [], "approval": "none", "idempotency": "run-step", "next": null }
+  ]
+}

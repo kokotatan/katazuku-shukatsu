@@ -50,7 +50,7 @@ run台帳 → 最小観測 → 失敗cluster → 合成回帰case → 改善候�
 - 平均品質scoreを下げない。
 - 25%を超える遅延増加は、明確な品質向上がなければ拒否する。
 
-合格しても状態は`evaluated`であり、自動deployしない。人が候補内容と実際のGit revisionを確認した場合だけ`approved`へ進める。外部送信、予約、応募提出、資格情報、承認境界に関する候補は常に高リスクとして扱う。
+合格しても状態は`evaluated`であり、自動deployしない。人が候補内容と実際のGit revisionを確認した場合だけ`approved`へ進める。さらに安定版baselineとcandidateのbase revisionが一致し、呼出側が現在revisionを明示した場合だけ`activate`できる。外部送信、予約、応募提出、資格情報、承認境界に関する候補は常に高リスクとして扱う。
 
 ## 運用コマンド
 
@@ -73,12 +73,30 @@ npm run harness:improve -- approve <candidate-id> <git-revision> --approved-by <
 
 `approve`は評価合格済み候補だけを対象にし、確認者と実Git revisionの両方を要求する。定期処理がこのcommandを呼んではならない。
 
+最初に既知の安定版を1回だけ登録し、承認済みrevisionを明示的に昇格する。
+
+```powershell
+npm run harness:improve -- baseline <stable-revision> --registered-by <確認者>
+npm run harness:improve -- activate <candidate-id> --expected-revision <stable-revision> --activated-by <確認者>
+npm run harness:improve -- release
+```
+
+`activate`はcandidate作成時のbase revision、現在の安定版、`--expected-revision`の三者が一致しないと停止する。これは並行する改善候補が古いbaselineを上書きするのを防ぐ楽観ロックである。実際のGit checkoutやproduction deployは別のCI/CDが、この台帳と同じrevisionを照合して行う。
+
+退行時は任意のrevisionへ飛ばさず、直前の安定版へだけ戻す。
+
+```powershell
+npm run harness:improve -- rollback --expected-revision <current-revision> --rolled-back-by <確認者> --reason <理由>
+```
+
+baseline、昇格、rollbackは追記専用イベントにも残る。自動判定は候補を`evaluated`まで進められるが、`approve`、`activate`、`rollback`は運用責任者の明示操作である。
+
 ## 今後の接続
 
 `run.local.json`の冪等取り込みと、失敗signatureからの合成回帰case生成までは実装済みである。次に接続する範囲は以下とする。
 
 1. CIでbaseline revisionとcandidate revisionを同じfixture群へ実行する。
 2. eval結果と費用・時間を候補へ記録する。
-3. 承認済みrevisionを次の既定harness versionとして登録し、旧revisionへ即時rollbackできるようにする。
+3. deployment側でrelease台帳のrevisionと実行artifactの署名を照合し、段階的なcanary観測を行う。
 
 改善DBやeval結果だけを根拠に、正本DB、外部サービス、production prompt、workflow契約を自動変更してはならない。

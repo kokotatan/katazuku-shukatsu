@@ -52,6 +52,14 @@ export interface CandidateEvaluation {
   candidateLatencyMs: number
 }
 
+export interface HarnessReleaseRecord {
+  currentRevision: string
+  previousRevision: string
+  candidateId: string
+  activatedBy: string
+  activatedAt: string
+}
+
 const FAILURE_CODES = new Set<FailureCode>([
   'command_missing', 'auth_unavailable', 'quota_exhausted', 'rate_limited', 'connection_failed',
   'capability_missing', 'invalid_output', 'timeout', 'partial_side_effect', 'user_action_required', 'runtime_error',
@@ -102,6 +110,17 @@ export function openHarnessImprovementStore(path: string): DatabaseSync {
     CREATE TABLE IF NOT EXISTS harness_candidate_event (
       id INTEGER PRIMARY KEY AUTOINCREMENT, candidate_id TEXT NOT NULL REFERENCES harness_candidate(id),
       at TEXT NOT NULL, kind TEXT NOT NULL, detail_json TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS harness_release (
+      id TEXT PRIMARY KEY CHECK(id = 'default'), current_revision TEXT NOT NULL,
+      previous_revision TEXT NOT NULL DEFAULT '', candidate_id TEXT NOT NULL DEFAULT '',
+      activated_by TEXT NOT NULL, activated_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS harness_release_event (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, at TEXT NOT NULL,
+      kind TEXT NOT NULL CHECK(kind IN ('baseline','activated','rolled_back')),
+      from_revision TEXT NOT NULL, to_revision TEXT NOT NULL,
+      candidate_id TEXT NOT NULL DEFAULT '', actor TEXT NOT NULL, reason TEXT NOT NULL DEFAULT ''
     );
   `)
   return db
@@ -254,12 +273,113 @@ export function approveCandidate(db: DatabaseSync, candidateId: string, approved
   } catch (error) { db.exec('ROLLBACK'); throw error }
 }
 
+function revision(value: unknown, name: string): string {
+  const text = nonEmpty(value, name, 80)
+  if (!/^[0-9a-f]{7,64}$/i.test(text)) throw new Error(`${name}が不正です`)
+  return text.toLowerCase()
+}
+
+export function getHarnessRelease(db: DatabaseSync): HarnessReleaseRecord | undefined {
+  const row = db.prepare(`SELECT current_revision AS currentRevision,previous_revision AS previousRevision,
+    candidate_id AS candidateId,activated_by AS activatedBy,activated_at AS activatedAt
+    FROM harness_release WHERE id='default'`).get() as HarnessReleaseRecord | undefined
+  return row ? { ...row } : undefined
+}
+
+/** 最初の安定版だけを登録する。既存releaseの上書きや自動bootstrapは行わない。 */
+export function registerHarnessBaseline(
+  db: DatabaseSync, baselineRevision: string, registeredBy: string, at = new Date(),
+): HarnessReleaseRecord {
+  const target = revision(baselineRevision, 'baselineRevision')
+  const actor = nonEmpty(registeredBy, 'registeredBy', 200)
+  if (getHarnessRelease(db)) throw new Error('baselineは登録済みです')
+  const timestamp = at.toISOString()
+  db.exec('BEGIN IMMEDIATE')
+  try {
+    db.prepare(`INSERT INTO harness_release
+      (id,current_revision,previous_revision,candidate_id,activated_by,activated_at)
+      VALUES('default',?,'','',?,?)`).run(target, actor, timestamp)
+    db.prepare(`INSERT INTO harness_release_event
+      (at,kind,from_revision,to_revision,candidate_id,actor,reason) VALUES(?,'baseline','',?,'',?,'')`)
+      .run(timestamp, target, actor)
+    db.exec('COMMIT')
+  } catch (error) { db.exec('ROLLBACK'); throw error }
+  return getHarnessRelease(db)!
+}
+
+/** 承認済み候補だけを、候補作成時のbase revisionと現在値が一致する場合に昇格する。 */
+export function activateApprovedCandidate(
+  db: DatabaseSync, candidateId: string, activatedBy: string, expectedCurrentRevision: string, at = new Date(),
+): HarnessReleaseRecord {
+  const id = nonEmpty(candidateId, 'candidateId', 160)
+  const actor = nonEmpty(activatedBy, 'activatedBy', 200)
+  const expected = revision(expectedCurrentRevision, 'expectedCurrentRevision')
+  const candidate = db.prepare(`SELECT status,base_revision AS baseRevision,approved_revision AS approvedRevision
+    FROM harness_candidate WHERE id=?`).get(id) as {
+      status: ImprovementCandidateStatus; baseRevision: string; approvedRevision: string
+    } | undefined
+  if (!candidate || candidate.status !== 'approved') throw new Error('承認済みcandidateだけ昇格できます')
+  const approvedRevision = revision(candidate.approvedRevision, 'approvedRevision')
+  const baselineRevision = revision(candidate.baseRevision, 'baseRevision')
+  const current = getHarnessRelease(db)
+  if (!current) throw new Error('baselineが未登録です')
+  if (current.currentRevision !== expected) throw new Error('現在revisionがexpectedCurrentRevisionと一致しません')
+  if (baselineRevision !== current.currentRevision) throw new Error('candidateのbase revisionが現在revisionと一致しません')
+  if (approvedRevision === current.currentRevision) throw new Error('同じrevisionは昇格できません')
+  const timestamp = at.toISOString()
+  db.exec('BEGIN IMMEDIATE')
+  try {
+    const changed = db.prepare(`UPDATE harness_release SET current_revision=?,previous_revision=?,candidate_id=?,
+      activated_by=?,activated_at=? WHERE id='default' AND current_revision=?`)
+      .run(approvedRevision, current.currentRevision, id, actor, timestamp, expected)
+    if (Number(changed.changes) !== 1) throw new Error('releaseが競合しました')
+    db.prepare(`INSERT INTO harness_release_event
+      (at,kind,from_revision,to_revision,candidate_id,actor,reason) VALUES(?,'activated',?,?,?,?, '')`)
+      .run(timestamp, current.currentRevision, approvedRevision, id, actor)
+    db.exec('COMMIT')
+  } catch (error) { db.exec('ROLLBACK'); throw error }
+  return getHarnessRelease(db)!
+}
+
+/** 直前の安定版へだけ戻す。任意revisionへの切替や、自動rollbackは許可しない。 */
+export function rollbackHarnessRelease(
+  db: DatabaseSync, expectedCurrentRevision: string, rolledBackBy: string, reasonText: string, at = new Date(),
+): HarnessReleaseRecord {
+  const expected = revision(expectedCurrentRevision, 'expectedCurrentRevision')
+  const actor = nonEmpty(rolledBackBy, 'rolledBackBy', 200)
+  const reason = nonEmpty(reasonText, 'reason', 1000)
+  const current = getHarnessRelease(db)
+  if (!current) throw new Error('baselineが未登録です')
+  if (current.currentRevision !== expected) throw new Error('現在revisionがexpectedCurrentRevisionと一致しません')
+  const target = revision(current.previousRevision, 'previousRevision')
+  const timestamp = at.toISOString()
+  db.exec('BEGIN IMMEDIATE')
+  try {
+    const changed = db.prepare(`UPDATE harness_release SET current_revision=?,previous_revision='',candidate_id='',
+      activated_by=?,activated_at=? WHERE id='default' AND current_revision=?`)
+      .run(target, actor, timestamp, expected)
+    if (Number(changed.changes) !== 1) throw new Error('releaseが競合しました')
+    if (current.candidateId) {
+      db.prepare("UPDATE harness_candidate SET status='rolled_back',updated_at=? WHERE id=? AND status='approved'")
+        .run(timestamp, current.candidateId)
+      db.prepare('INSERT INTO harness_candidate_event(candidate_id,at,kind,detail_json) VALUES(?,?,?,?)')
+        .run(current.candidateId, timestamp, 'rolled_back', JSON.stringify({ fromRevision: expected, toRevision: target, actor, reason }))
+    }
+    db.prepare(`INSERT INTO harness_release_event
+      (at,kind,from_revision,to_revision,candidate_id,actor,reason) VALUES(?,'rolled_back',?,?,?,?,?)`)
+      .run(timestamp, expected, target, current.candidateId, actor, reason)
+    db.exec('COMMIT')
+  } catch (error) { db.exec('ROLLBACK'); throw error }
+  return getHarnessRelease(db)!
+}
+
 export function harnessImprovementSummary(db: DatabaseSync): Record<string, unknown> {
   return {
     observations: db.prepare('SELECT outcome,COUNT(*) AS count FROM harness_observation GROUP BY outcome ORDER BY outcome').all(),
     failures: db.prepare("SELECT workflow_id AS workflowId,failure,side_effect_state AS sideEffectState,COUNT(*) AS count FROM harness_observation WHERE outcome <> 'succeeded' GROUP BY workflow_id,failure,side_effect_state ORDER BY count DESC,workflow_id").all(),
     regressions: db.prepare("SELECT kind,COUNT(*) AS count FROM harness_regression WHERE status='active' GROUP BY kind ORDER BY kind").all(),
     candidates: db.prepare('SELECT status,COUNT(*) AS count FROM harness_candidate GROUP BY status ORDER BY status').all(),
+    release: getHarnessRelease(db),
   }
 }
 

@@ -9,6 +9,7 @@ katazukuは、公開できる運用契約と、本人の端末・アカウント
 - 正本SQLite、予定、選考、提出、面談準備、企業・人物調査の型付きMCP
 - OAuth scope別のMuse gatewayと端末へのprivate relay
 - action hash、本人承認、正本・予定・元メッセージの再照合
+- 日程フォームと採用ポータル連絡の汎用workflow契約。企業別hostは設定値として分離
 - provider非依存のメールExecutorと、shellを使わない別プロセスadapter契約
 - iCloud Mail用の固定IMAP/SMTP adapter
 - Muse Secure VMの内蔵email connectorから、資格情報なしで送信証跡だけを受けるMCP契約
@@ -46,3 +47,5 @@ Muse Secure VM内の資格情報、OAuth token、Cookieはこのリポジトリ�
 
 iCloud実装は[adapter README](../adapters/icloud-mail/README.md)を参照してください。Apple公式の固定host、
 TLS、app-specific passwordの要件を実装へ固定し、受信時はHTML・添付本体・認証コードをAgentへ渡しません。
+
+公開機能とprivate境界の確認結果は[private版との追随台帳](PRIVATE-PARITY.md)を参照してください。

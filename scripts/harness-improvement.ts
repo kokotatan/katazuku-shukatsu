@@ -2,7 +2,8 @@ import { existsSync, mkdirSync, readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
-  approveCandidate, harnessImprovementSummary, ingestAgentRunArtifacts, openHarnessImprovementStore,
+  activateApprovedCandidate, approveCandidate, getHarnessRelease, harnessImprovementSummary,
+  ingestAgentRunArtifacts, openHarnessImprovementStore, registerHarnessBaseline, rollbackHarnessRelease,
   recordCandidateEvaluation, recordImprovementProposal, type HarnessEvalCase, type ImprovementProposal,
 } from '../src/harness-improvement.js'
 
@@ -46,5 +47,24 @@ try {
     if (!candidateId || !revision || !approvedBy) throw new Error('approveにはcandidateId、revision、--approved-byが必要です')
     approveCandidate(db, candidateId, approvedBy, revision)
     console.log(JSON.stringify({ approved: true, candidateId, revision }))
+  } else if (command === 'baseline') {
+    const revision = args[1]
+    const registeredBy = valueAfter('--registered-by')
+    if (!revision || !registeredBy) throw new Error('baselineにはrevisionと--registered-byが必要です')
+    console.log(JSON.stringify(registerHarnessBaseline(db, revision, registeredBy), null, 2))
+  } else if (command === 'activate') {
+    const candidateId = args[1]
+    const expectedRevision = valueAfter('--expected-revision')
+    const activatedBy = valueAfter('--activated-by')
+    if (!candidateId || !expectedRevision || !activatedBy) throw new Error('activateにはcandidateId、--expected-revision、--activated-byが必要です')
+    console.log(JSON.stringify(activateApprovedCandidate(db, candidateId, activatedBy, expectedRevision), null, 2))
+  } else if (command === 'rollback') {
+    const expectedRevision = valueAfter('--expected-revision')
+    const rolledBackBy = valueAfter('--rolled-back-by')
+    const reason = valueAfter('--reason')
+    if (!expectedRevision || !rolledBackBy || !reason) throw new Error('rollbackには--expected-revision、--rolled-back-by、--reasonが必要です')
+    console.log(JSON.stringify(rollbackHarnessRelease(db, expectedRevision, rolledBackBy, reason), null, 2))
+  } else if (command === 'release') {
+    console.log(JSON.stringify(getHarnessRelease(db) || null, null, 2))
   } else throw new Error(`未知のcommandです: ${command}`)
 } finally { db.close() }
