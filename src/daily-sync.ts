@@ -18,6 +18,8 @@ import { applySubmission, type SubmissionInput } from './db-apply-submission.js'
 import { inputDigest, splitMailInput, validateCoverage, validateMailInput, type ExtractionCoverage, type MailInput } from './daily-sync-input.js'
 import { applySubmissionRequirements, type SubmissionRequirementInput } from './submission-requirement.js'
 import { filterSelectionsByEvidence, type EvidenceSelection } from './selection-evidence.js'
+import { resolveSelectionId } from './inputs.js'
+import { resolveCompany } from './db.js'
 
 const here = dirname(fileURLToPath(import.meta.url))
 /** src/ からも dist/ からも同じ場所(リポジトリ直下の schemas/)を指す */
@@ -51,7 +53,7 @@ export function validateDailySyncResult(
 export interface DailySyncApplySummary {
   selections: { updated: string[]; added: string[]; skipped: string[]; pending: string[]; errors: string[] }
   mail: { created: number; updated: number }
-  submissions: { created: number; duplicate: number; errors: string[] }
+  submissions: { created: number; duplicate: number; skipped: number; errors: string[] }
   requirements: { created: number; updated: number; completed: number; errors: string[] }
   priorityMails: { subject: string; reason: string }[]
   notes?: string
@@ -86,14 +88,22 @@ export function applyDailySyncResult(
       requirements.errors.push(`${requirement.company}/${requirement.title}: ${(error as Error).message}`)
     }
   }
-  const submissions = { created: 0, duplicate: 0, errors: [] as string[] }
+  const submissions = { created: 0, duplicate: 0, skipped: 0, errors: [] as string[] }
   for (const entry of result.submissions) {
     try {
+      // 提出結果だけから応募先を新設しない。応募は根拠を検証したselectionが先に作る。
+      if (resolveCompany(db, entry.company).kind !== 'hit') {
+        submissions.skipped += 1
+        continue
+      }
+      resolveSelectionId(db, entry.company, entry.position, false)
       const res = applySubmission(db, entry)
       if (res.created) submissions.created += 1
       else submissions.duplicate += 1
     } catch (error) {
-      submissions.errors.push(`${entry.company}/${entry.kind}: ${(error as Error).message}`)
+      const message = (error as Error).message
+      if (/選考トラックが見つかりません|企業名の確認が必要/.test(message)) submissions.skipped += 1
+      else submissions.errors.push(`${entry.company}/${entry.kind}: ${message}`)
     }
   }
   return {
@@ -176,6 +186,14 @@ export function mergeExtractionResults(
     if (value.notes) notes.push(value.notes)
   }
   if (notes.length) merged.notes = notes.join('\n')
+  // 自分が送った要約を再取得しても、新たな提出義務や優先メールを自己増殖させない。
+  // 元の要約はmailItemsに残すため、本人は確認できる。
+  const internalSummaryIds = new Set(input.messages.filter((message) =>
+    /(前夜ブリーフ|朝のまとめ|日次同期|daily[- ]?sync|就活ダッシュボード)/i.test(String(message.subject ?? '')),
+  ).map((message) => message.id))
+  merged.requirements = merged.requirements!.filter((requirement) => !internalSummaryIds.has(requirement.sourceRef))
+  merged.submissions = merged.submissions.filter((submission) => !internalSummaryIds.has(submission.sourceRef))
+  merged.priorityMails = merged.priorityMails!.filter((priority) => !priority.id || !internalSummaryIds.has(priority.id))
   validateDailySyncResult(merged)
   validateCoverage(input, merged.coverage)
   return merged

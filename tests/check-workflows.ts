@@ -159,6 +159,22 @@ function throws(fn: () => unknown): boolean {
   const summary = applyDailySyncResult(db, merged)
   check('反映: 選考と予定とメールが正本へ入る', summary.selections.added.length === 1 && summary.mail.created === 1
     && (db.prepare('SELECT COUNT(*) AS n FROM appointment').get() as { n: number }).n === 1)
+  const submission = { sourceRef: 'x2', company: '支援テスト団体', kind: 'アンケート', submittedAt: '2030-01-01T00:00:00Z' }
+  const nonEmployment = applyDailySyncResult(db, { ...merged, selections: [], submissions: [submission] })
+  check('反映: 非雇用の提出だけでは応募トラックを新設しない', nonEmployment.submissions.skipped === 1
+    && (db.prepare('SELECT COUNT(*) AS n FROM selection').get() as { n: number }).n === 1
+    && (db.prepare("SELECT COUNT(*) AS n FROM company WHERE name = '支援テスト団体'").get() as { n: number }).n === 0)
+  const employment = applyDailySyncResult(db, { ...merged, selections: [], submissions: [{ ...submission, company: 'C社', position: '本選考' }] })
+  check('反映: 既存の応募トラックへの提出は記録する', employment.submissions.created === 1)
+  const internalInput: MailInput = { ...input, messages: [{ ...input.messages[1], subject: '朝のまとめ — 合成データ' }] }
+  const internal = mergeExtractionResults(internalInput, [{ input: internalInput, output: {
+    ...output, selections: [], coverage: { status: 'completed', inputDigest: inputDigest(internalInput), reviewedMessageIds: ['x2'] },
+    mailItems: [{ ...output.mailItems[0], id: 'x2' }], submissions: [submission],
+    requirements: [{ sourceRef: 'x2', company: 'C社', kind: 'pledge', title: '誓約書', status: 'required' }],
+    priorityMails: [{ id: 'x2', subject: '朝のまとめ', reason: '要確認' }],
+  } }])
+  check('抽出: 内部要約から提出・義務・優先メールを自己生成せず、メール記録は残す', internal.requirements!.length === 0
+    && internal.submissions.length === 0 && internal.priorityMails!.length === 0 && internal.mailItems.length === 1)
   check('反映: 暴走ブレーキ(上限超えは --force なしで中止)', throws(() => applyDailySyncResult(openDb(':memory:'), { ...merged, selections: Array.from({ length: 16 }, (_, i) => ({ name: `D社${i}`, stage: 'entried' as const })) })))
   check('出力: コードフェンス付きでもJSONを取り出す', (parseModelJson('```json\n{"a":1}\n```') as { a: number }).a === 1)
 }
