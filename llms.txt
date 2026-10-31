@@ -6,9 +6,14 @@
 > Runtime dependency-free (uses Node's built-in node:sqlite); code in TypeScript.
 
 ## Getting started
-- [README](README.md): overview, requirements (Node 22.5+, recommended 24), quickstart, multi-device/backup
-- Run: `npm install`, then `npm run doctor`, `npm test`, `npm run seed`
+- [README](README.md): overview, requirements (Node 22.13+ in the 22.x line or Node 24+), quickstart, multi-device/backup
+- Verify: `npm install`, then `npm run doctor`, `npm test`, `npm run seed`
+- Create or migrate the real empty database: `npm run init`. It is idempotent, keeps existing data,
+  and defaults to the OS user-data directory outside the checkout.
+- Real data defaults to the OS user-data directory outside the Git checkout; override the database path with `KATAZUKU_DB`.
 - [AGENTS.md](AGENTS.md): guide for AI agents and "how do I use this" answers
+- [CLAUDE.md](CLAUDE.md): Claude Code entry point; imports AGENTS.md as the canonical instructions
+- [Setup](docs/SETUP.md): per-user configuration, Google connection, AI provider, and scheduled workflows
 
 ## Architecture and design
 - [ARCHITECTURE](docs/ARCHITECTURE.md): single-writer, SQLite source of truth, semantic layer, idempotency, audit events

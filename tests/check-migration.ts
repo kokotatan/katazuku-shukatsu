@@ -39,6 +39,7 @@ check('v3: 議事録と人物が支援組織を参照できる', (() => {
 // --- ファイルDB: 破壊的な版の前にスナップショットが残る ---
 const dir = mkdtempSync(join(tmpdir(), 'katazuku-migration-'))
 const path = join(dir, 'katazuku.db')
+new DatabaseSync(path).close()
 const first = openDb(path)
 upsertCompany(first, { name: '株式会社サンプルA' })
 first.close()

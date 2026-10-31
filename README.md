@@ -120,6 +120,10 @@ npm run workflow -- asa --dry-run        # 朝のまとめのプロンプトと�
 
 [docs/SETUP.md](docs/SETUP.md) の順に進めます。流れは次のとおりです。
 
+最初に `npm run init` を実行すると、リポジトリ外のOS利用者別領域へ空の正本DBを作成します。
+再実行しても既存データを消さず、必要なマイグレーションだけを適用します。保存先を変える場合は
+`KATAZUKU_DB`、または `npm run init -- /absolute/path/to/katazuku.db` を使います。
+
 1. `katazuku.config.json` を作る(アカウント・署名・通知の設定。gitignore 済み)
 2. Google につなぐ: 自分のGoogle CloudでデスクトップOAuthクライアントを作り、`npm run google:connect` で本人が読取りを許可。下書き・予定の書込みには別のGoogle MCP接続も必要
 3. AI を選ぶ: `npm run chatgpt -- signin`(ChatGPT プラン)、または Claude Code / Codex にログイン
@@ -215,6 +219,11 @@ import { openDb, transition, resolveCompany, applyDiff } from 'katazuku-shukatsu
 公開APIの入口は `src/index.ts` だけです(SemVer はこの面にかかります)。ランタイム依存はゼロで、標準の `node:sqlite` を使います。
 
 ---
+
+AIアシスタントに「クローン後の正本DBを構築して」と頼めます。AI向け手順の正本は
+[AGENTS.md](AGENTS.md) で、セットアップ・DB初期化・実データ投入・安全境界をまとめています。
+[llms.txt](llms.txt) は短い案内、Claude Code用の [CLAUDE.md](CLAUDE.md) は `AGENTS.md` を直接
+読み込む入口です。
 
 ## English
 

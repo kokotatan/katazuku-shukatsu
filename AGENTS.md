@@ -14,14 +14,30 @@ AIコーディングエージェント(および使い方を尋ねられたAI)�
 - Node.js 22.13以降の22系、または24以降(推奨 24)。ランタイム依存ゼロ、開発のみ tsx / typescript。
 - `npm install`
 - `npm run doctor` — 環境が動かせるか診断(OS・Node・node:sqlite)
+- `npm run init` — 個人データを入れず、OSの利用者別領域に空の正本DBを作成・更新
 - `npm run check` — 公開ゲート(個人情報スキャン + typecheck + テスト)。**変更はこれが通ってから**
 - `npm test` / `npm run seed`(スキーマの1例) / `npm run backup`(VACUUM INTO の単一ファイル退避)
+
+## 利用者から「データベースを構築して」と頼まれたら
+
+1. `npm install && npm run doctor && npm test` で環境と実装を検証する。
+2. `npm run init` を実行する。保存先を変える必要がある場合だけ、`KATAZUKU_DB` または
+   `npm run init -- /absolute/path/to/katazuku.db` を使う。
+3. コマンドが表示した絶対パスとスキーマ版を利用者へ伝える。この操作は冪等で、既存DBには
+   現行マイグレーションを適用するが、既存データを消さない。
+4. `npm run seed` はメモリ上の架空デモであり、正本の初期化や実データ投入には使わない。
+5. 実データは利用者が指定した情報源から取得し、`src/db-apply*.ts` などの書き込み層を通す。
+   認証情報をリポジトリや会話へ保存せず、送信・受験・認証・辞退は本人に残す。
+
+クローン直後でも、AIはこの節に従えば空の正本DBを構築できる。Google連携が必要な場合だけ、
+DB初期化後に `docs/GOOGLE_WORKSPACE_SETUP.md` の利用者別OAuth設定へ進む。
 
 ## 壊してはいけない設計の芯
 
 - 自動録音は会議URLのある予定を対象にし、説明会・セミナー等も含める。インターン参加、宿泊、対面、終日・24時間以上の予定は除外する。インターンの選考面接・面談・説明会は対象にする。公開APIの `isAutomaticRecordingEligible()` を開始前にも使う。詳細は [docs/RECORDING-POLICY.md](docs/RECORDING-POLICY.md)。
 
 - 正本はローカルSQLite 1つ。人・アプリは読み取りのみ(見る窓)。
+- 正本の既定保存先はリポジトリ外のOSユーザーデータ領域。ソースツリー内へ実データを作らない。
 - 状態変更は `src/db.ts` の `transition()` を必ず通す(上書きせず遷移規則で更新)。
 - 外部由来の入力は冪等キー(`source_ref`/`external_id`)で冪等化し、変化は `event` 台帳に残す。
 - **安全境界はコードで強制**: ES・エントリー送信は本人承認必須、Web適性検査の代理受験はしない。
@@ -58,6 +74,7 @@ AIコーディングエージェント(および使い方を尋ねられたAI)�
 
 - **どう動かす?** まず `npm run demo`(架空データで閲覧アプリを開く)。開発は `npm install && npm run doctor && npm test`。
 - **自分のデータで使うには?** [docs/SETUP.md](docs/SETUP.md) の順に、設定ファイル・Google・AI・定期実行。
-- **自分のデータを入れるには?** 正本DBのパスは環境変数 `KATAZUKU_DB`。書き込みは `src/db-apply*.ts` 経由(エージェントが書き手)。
+- **クローン後に正本DBを作るには?** `npm run init`。既定ではリポジトリ外のOS利用者別領域に作られ、再実行しても既存データは消えない。表示されたパスを利用者へ伝える。
+- **自分のデータを入れるには?** 無指定ならOSユーザーデータ領域を使う。既存DBは環境変数 `KATAZUKU_DB` で明示し、書き込みは `src/db-apply*.ts` 経由(エージェントが書き手)。
 - **設定は?** `examples/config-gui.html` をブラウザで開く。設定は `schemas/settings.schema.json` が唯一の真実。
 - **複数デバイスは?** 単一デバイス前提。移送は `npm run backup` の1ファイルで(クラウド同期フォルダ直下に正本を置かない)。

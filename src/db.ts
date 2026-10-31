@@ -7,7 +7,7 @@
  * - だから「上書きしない」ではなく「遷移規則で堂々と更新する」(transition() に集約)
  */
 import { DatabaseSync } from 'node:sqlite'
-import { mkdirSync, rmSync } from 'node:fs'
+import { existsSync, mkdirSync, rmSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { ensurePlatformSchema } from './platform.js'
 import { ensureCareerSupportSchema } from './career-support-schema.js'
@@ -44,6 +44,7 @@ export interface CompanyInfo {
 }
 
 export function openDb(path: string): DatabaseSync {
+  const existed = path !== ':memory:' && existsSync(path)
   mkdirSync(dirname(path), { recursive: true })
   const db = new DatabaseSync(path)
   db.exec(`
@@ -124,7 +125,7 @@ export function openDb(path: string): DatabaseSync {
   // マイグレーションに失敗したら開きっぱなしにしない。
   // 呼び手は例外で気づくが、ハンドルが残るとファイルを掴んだままになる。
   try {
-    migrate(db, path)
+    migrate(db, path, existed)
   } catch (error) {
     db.close()
     throw error
@@ -214,12 +215,13 @@ function snapshotBeforeMigration(db: DatabaseSync, path: string, version: number
   return target
 }
 
-function migrate(db: DatabaseSync, path: string): void {
+function migrate(db: DatabaseSync, path: string, existed: boolean): void {
   const current = (db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version
   for (const migration of MIGRATIONS) {
     if (migration.version <= current) continue
     // インメモリDBはバックアップの取りようが無い(消えて困るデータも無い)ので飛ばす
-    if (migration.destructive && path !== ':memory:') {
+    // 新規作成中の空DBには守るべき旧データがない。既存ファイルだけ退避する。
+    if (migration.destructive && existed) {
       const target = snapshotBeforeMigration(db, path, migration.version)
       console.warn(`スキーマ v${migration.version} を適用します。適用前のスナップショット: ${target}`)
     }
