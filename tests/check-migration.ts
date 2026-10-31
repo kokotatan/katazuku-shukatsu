@@ -42,6 +42,10 @@ check('v6: 交通費精算と領収書タスク由来の列が版管理下にあ
     .every((name) => columns.some((column) => column.name === name))
 })())
 check('v6: 正本の論理IDをDB内部に持つ', /^[a-f0-9]{32}$/.test(getDatabaseContext(fresh).databaseId))
+check('v7: companyから平文資格情報列を削除した', (() => {
+  const columns = fresh.prepare('PRAGMA table_info(company)').all() as { name: string }[]
+  return !columns.some((column) => ['login_id', 'password'].includes(column.name))
+})())
 
 // --- ファイルDB: 破壊的な版の前にスナップショットが残る ---
 const dir = mkdtempSync(join(tmpdir(), 'katazuku-migration-'))

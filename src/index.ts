@@ -31,7 +31,6 @@ export {
   insertSelection,
   listSelections,
   listCompanies,
-  getCompanyCredential,
   addEvent,
   listEvents,
   // 予定と冪等な突合

@@ -43,7 +43,7 @@ function throws(fn: () => unknown): boolean {
   check('v4: appointment.flexible 列がある', (db.prepare('PRAGMA table_info(appointment)').all() as { name: string }[]).some((col) => col.name === 'flexible'))
   const appointmentColumns = (db.prepare('PRAGMA table_info(appointment)').all() as { name: string }[]).map((col) => col.name)
   check('v6: 交通費精算と自動タスク由来の列がある', ['reimbursement_status', 'receipt_required', 'parent_appointment_id', 'task_type'].every((name) => appointmentColumns.includes(name)))
-  check('SCHEMA_VERSION は 6', SCHEMA_VERSION === 6)
+  check('SCHEMA_VERSION は 7', SCHEMA_VERSION === 7)
 }
 
 // ---- インターン交通費: 抽出結果を捨てず、領収書提出を可動タスク化 ----

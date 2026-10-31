@@ -135,7 +135,7 @@ npm run workflow -- asa --dry-run        # 朝のまとめのプロンプトと�
 4. `--dry-run` で確認してから、毎日のワークフローを登録する
 5. `npm start` で8画面と朝・前夜のまとめを一つのローカルURLから開く
 
-採用サービスへの継続ログインが必要なWindows利用者は、セットアップ後に[ローカル認証ブローカー](scripts/local-login/README-daily-login.md)を任意で設定できます。資格情報は正本DBやMCPへ入らず、サービス・設定世代別のDPAPI暗号文として端末内だけに保存されます。
+採用サービスへの継続ログインが必要なWindows利用者は、セットアップ後に[ローカル認証ブローカー](scripts/local-login/README-daily-login.md)を任意で設定できます。資格情報は正本DBやMCPへ入らず、サービス・設定世代別のDPAPI暗号文として端末内だけに保存されます。schema v7は旧`company`平文資格情報列を廃止し、旧DBに値が残る場合はDPAPIへの明示移行が済むまで安全に停止します。
 
 Muse、Codex、Claude Codeなどから正本を使う場合は、既定で読取専用のMCPを起動できます。
 

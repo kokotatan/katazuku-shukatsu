@@ -31,6 +31,20 @@ npm run local-login:credential -- --portal example-portal
 Windowsのプロンプトへ本人が入力します。秘密値はコマンド引数、環境変数、Node.js、標準出力へ渡りません。
 通常のApple/Google等のアカウントパスワードを別用途へ転用せず、サービスが発行する専用資格情報を使います。
 
+### v6以前のDBから移す場合
+
+旧版の`company`テーブルにログインID・パスワードが残るDBは、v7 migrationが値を表示せず停止します。
+先に対象サービスを上の手順で端末設定へ登録し、会社IDと正本DBの絶対パスを明示して1件ずつ移します。
+
+```powershell
+npm run local-login:migrate-db-credential -- --database "C:\absolute\path\to\katazuku.db" --company-id 123 --portal example-portal
+```
+
+このコマンドは秘密値を引数、環境変数、標準出力へ出さず、DPAPI recordの新規作成に成功した場合だけ
+同じ旧DB行を空にします。既存recordは上書きしません。全件を移した後に`npm run init`を再実行すると、
+検証済みの適用前バックアップを作って平文列自体を削除します。バックアップにも旧列があるため、
+DPAPIでのログイン確認後に本人が保管・廃棄方針を決めるまで、第三者へ共有しないでください。
+
 ## 3. 合成試験と手動確認
 
 ```powershell

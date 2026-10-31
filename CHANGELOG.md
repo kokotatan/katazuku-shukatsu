@@ -7,6 +7,7 @@
 
 ### Added
 
+- schema v7で`company.login_id/password`と実値取得APIを廃止。旧DBに平文が残る場合はバックアップや変更の前に値を表示せず停止し、Windows専用移行コマンドが新規DPAPI recordを検証できた行だけを原子的に空にしてから列を削除する。既存record、broker失敗、同時変更では旧DBを保持する。
 - Driverへ渡す前のブラウザ操作計画契約を追加。任意JavaScript、生値、秘密欄、別origin/pathを拒否し、dry-runは無操作、実行は正本identity・本人承認hash・外部冪等キー・事前reconcileが一致した場合だけ許可する。commitは最後の1回に限定し、MFA/CAPTCHA等は本人checkpoint、成否不明は自動再試行せず再照合待ちにする。
 - 第三者メールExecutorをGmail専用actionからprovider固定の`email.send`へ拡張。既存`gmail.send`との互換性を維持しつつ、iCloud Mailを同じ本人承認hash・正本照合・SENT照合・不明時再送禁止の境界へ接続できるようにした。資格情報や直接送信toolはMCPへ公開しない。
 - 第三者メールの文面検査を採用担当専用から`recruiting`、`business`、`education`、`personal`へ分離。採用時の正本企業・選考・所属・署名検査を弱めず、事業連絡や教員連絡へ不適切に強制しない。

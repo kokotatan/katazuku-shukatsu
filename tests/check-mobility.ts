@@ -53,8 +53,6 @@ const companyId = upsertCompany(db, {
   shortName: '移動テスト',
   industry: 'IT',
   mypageUrl: '',
-  loginId: '',
-  password: '',
   memo: '',
 })
 const selectionId = insertSelection(db, companyId, {

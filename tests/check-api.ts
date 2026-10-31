@@ -30,7 +30,7 @@ const EXPECTED = [
   'buildWorkspaceSendCall', 'preflightThirdPartyEmail',
   'executeApprovedThirdPartyEmail',
   'ensureMuseEmailResultSchema', 'getMuseEmailResult', 'museEmailExpectedEvidence', 'recordMuseEmailResult',
-  'upsertCompany', 'insertSelection', 'listSelections', 'listCompanies', 'getCompanyCredential', 'addEvent', 'listEvents',
+  'upsertCompany', 'insertSelection', 'listSelections', 'listCompanies', 'addEvent', 'listEvents',
   'addAppointment', 'listAppointments', 'sameAppointment', 'findAppointmentMatch',
   'normalizeAppointmentAt', 'normalizeAppointmentUrl',
   // inputs

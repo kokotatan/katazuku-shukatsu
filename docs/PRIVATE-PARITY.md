@@ -21,7 +21,7 @@
 | Muse remote接続 | OAuth 2.1 gateway、端末relay、scopeとtool allowlist、秘密値・payload非永続化。全4 scopeを実bridgeと合成DBへ往復し、失効、production設定、公開endpoint、incident復旧を別gate化 | `test:muse-gateway`、`test:mcp`、`muse:production-preflight`、`muse:live-verify` |
 | Museメール証跡契約 | 対象メールボックスに対応するMuse connectorが実在する場合だけ、Secure VM内認証、毎回承認、action hash、送信ID、Sent再照合を要求。iCloud対応自体は実機証拠待ち | `test:mcp`、`test:third-party-email` |
 | ローカルiCloudメール | credential brokerを別processで呼ぶIMAP/SMTP adapter。TLS固定、秘密値非出力、unknown再送禁止 | `test:icloud-mail` |
-| ローカル認証ブローカー | Windows DPAPI CurrentUser、隔離Chrome、origin＋テナントパス二重検査、欄type再検査、MFA/CAPTCHA/規約同意停止、設定世代分離。個人URL・暗号文・profileは端末内だけ | `test:local-login`（CLI、設定、DPAPI、合成Chrome） |
+| ローカル認証ブローカー | Windows DPAPI CurrentUser、隔離Chrome、origin＋テナントパス二重検査、欄type再検査、MFA/CAPTCHA/規約同意停止、設定世代分離。schema v7で正本の平文資格情報列を廃止し、旧値はDPAPI保存成功後だけ消去。個人URL・暗号文・profileは端末内だけ | `test:local-login`（CLI、設定、DPAPI、合成Chrome、旧DB移行） |
 | ブラウザ操作計画 | 許可origin/path、非機密JSON Pointer、無副作用dry-run、正本identity、承認hash、外部冪等キー、事前reconcile、最後のcommit 1回を型とExecutorで強制。任意JavaScript、秘密欄、成否不明の再試行を拒否 | `test:browser-plan`（36件の合成Driver検査） |
 | ハーネス改善 | 最小観測、合成回帰case、baseline/candidate eval、安全gate、人手承認、revision競合防止、直前版rollback | `test:harness-improvement` |
 | snapshotと閲覧面 | 機密を分離したsnapshot、ローカルviewer、Cloudflareへの明示push | `test:snapshot-viewer`、`cloudflare:check` |

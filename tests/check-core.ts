@@ -5,7 +5,7 @@
  */
 import { DatabaseSync } from 'node:sqlite'
 import {
-  openDb, upsertCompany, insertSelection, listSelections, listCompanies, getCompanyCredential,
+  openDb, upsertCompany, insertSelection, listSelections, listCompanies,
   transition, sameCompany, samePosition, resolveCompany, addAlias, listPending,
   setOfficialName, normalizeAppointmentAt, sameAppointment, addAppointment,
 } from '../src/db.js'
@@ -29,12 +29,11 @@ check('進行中の手書きに合格の根拠→確定に進める', transition
 check('空欄→出願済を書く', transition('', 'entried') === '出願済')
 check('「辞退予定」は本人意思なので内定通知でも上書きしない', transition('合格→本人辞退予定', 'offer') === null)
 check('不合格メールは「辞退」でなく「不合格」と書く', transition('選考中', 'rejected') === '不合格')
-// #24: 資格情報(login/password)の平文を一覧で広域露出しない
-const credCo = upsertCompany(db, { name: '資格テスト社', loginId: 'user1', password: 'pw-secret' })
-const credRow = listCompanies(db).find((c) => c.name === '資格テスト社')!
-check('#24: listCompanies はパスワード/ID実値を返さない', credRow.password === '' && credRow.loginId === '')
-check('#24: 設定の有無は hasPassword/hasLoginId で分かる', credRow.hasPassword === true && credRow.hasLoginId === true)
-check('#24: 実値は専用アクセサ getCompanyCredential でのみ取れる', getCompanyCredential(db, credCo)?.password === 'pw-secret')
+// #24: 企業正本へ資格情報の平文を保存する列・APIを持たない
+upsertCompany(db, { name: '資格分離テスト社' })
+const companyColumns = db.prepare('PRAGMA table_info(company)').all() as { name: string }[]
+check('#24: companyにログインID・パスワード列を持たない', !companyColumns.some((column) => ['login_id', 'password'].includes(column.name)))
+check('#24: listCompaniesにも資格情報の形を出さない', !Object.keys(listCompanies(db).find((c) => c.name === '資格分離テスト社')!).some((key) => /login|password/i.test(key)))
 
 check('#5: 内定は不合格で自動的に潰さない(誤割当保護)', transition('内定', 'rejected') === null)
 check('#5: 内定辞退(closed)は本人意思なので確定できる', transition('内定', 'closed') === '辞退')

@@ -43,12 +43,7 @@ export interface CompanyInfo {
   shortName?: string
   industry: string
   mypageUrl: string
-  loginId: string
-  password: string
   memo: string
-  /** listCompanies は資格情報の実値を返さない。設定の有無だけをこの真偽値で示す(実値は getCompanyCredential) */
-  hasLoginId?: boolean
-  hasPassword?: boolean
 }
 
 export function openDb(path: string): DatabaseSync {
@@ -67,8 +62,6 @@ export function openDb(path: string): DatabaseSync {
       name TEXT NOT NULL UNIQUE,
       industry TEXT NOT NULL DEFAULT '',
       mypage_url TEXT NOT NULL DEFAULT '',
-      login_id TEXT NOT NULL DEFAULT '',
-      password TEXT NOT NULL DEFAULT '',
       memo TEXT NOT NULL DEFAULT '',
       updated_at TEXT NOT NULL
     );
@@ -144,7 +137,7 @@ export function openDb(path: string): DatabaseSync {
 }
 
 /** 現行スキーマの版。マイグレーションを足すたびに +1 し、`MIGRATIONS` に1本足す */
-export const SCHEMA_VERSION = 6
+export const SCHEMA_VERSION = 7
 
 /**
  * 版ゲート方式のマイグレーション(#10)。
@@ -161,6 +154,8 @@ interface Migration {
   description: string
   /** 列DROP・データ移送を含むか。含むなら適用前にバックアップを取る */
   destructive: boolean
+  /** バックアップや変更を始める前に満たす条件。秘密移行待ち等はここで止める。 */
+  preflight?: (db: DatabaseSync) => void
   up: (db: DatabaseSync) => void
 }
 
@@ -227,6 +222,30 @@ const MIGRATIONS: Migration[] = [
     destructive: false,
     up: (db) => ensureWorkflowSchema(db),
   },
+  {
+    version: 7,
+    description: '企業テーブルから平文ログインID・パスワード列を削除し、OS資格情報ブローカーへ一本化',
+    destructive: true,
+    preflight: (db) => {
+      const columns = db.prepare('PRAGMA table_info(company)').all() as { name: string }[]
+      const names = new Set(columns.map((column) => column.name))
+      if (!names.has('login_id') && !names.has('password')) return
+      const legacy = db.prepare(`SELECT COUNT(*) AS count FROM company
+        WHERE ${names.has('login_id') ? "login_id <> ''" : '0'} OR ${names.has('password') ? "password <> ''" : '0'}`).get() as { count: number }
+      if (Number(legacy.count) > 0) {
+        throw new Error(
+          `旧companyテーブルに${legacy.count}件の平文資格情報があります。値は表示しません。` +
+          'Windowsでは local-login:migrate-db-credential でDPAPIへ1件ずつ移してから再実行してください。',
+        )
+      }
+    },
+    up: (db) => {
+      const columns = db.prepare('PRAGMA table_info(company)').all() as { name: string }[]
+      const names = new Set(columns.map((column) => column.name))
+      if (names.has('login_id')) db.exec('ALTER TABLE company DROP COLUMN login_id')
+      if (names.has('password')) db.exec('ALTER TABLE company DROP COLUMN password')
+    },
+  },
 ]
 
 function migrate(db: DatabaseSync, path: string, existed: boolean): void {
@@ -239,6 +258,7 @@ function migrate(db: DatabaseSync, path: string, existed: boolean): void {
     assertSupportedDatabase(db, SCHEMA_VERSION)
     const current = databaseVersion(db)
     const pending = MIGRATIONS.filter((migration) => migration.version > current)
+    for (const migration of pending) migration.preflight?.(db)
     const destructive = pending.find((migration) => migration.destructive)
 
     // 新規作成中の空DBには守るべき旧データがない。既存ファイルだけ一意名へ退避する。
@@ -829,8 +849,6 @@ export function upsertCompany(db: DatabaseSync, info: Partial<CompanyInfo> & { n
     }
     fill('industry', info.industry)
     fill('mypage_url', info.mypageUrl)
-    fill('login_id', info.loginId)
-    fill('password', info.password)
     fill('memo', info.memo)
     return hit.id
   }
@@ -840,8 +858,8 @@ export function upsertCompany(db: DatabaseSync, info: Partial<CompanyInfo> & { n
     addPending(db, info.name, `既存「${reso.suggestName}」と紛らわしい。同一なら別名として学習、別会社ならこのままでよい`)
   }
   const r = db.prepare(
-    'INSERT INTO company (name, short_name, industry, mypage_url, login_id, password, memo, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-  ).run(info.name, info.shortName ?? info.name, info.industry ?? '', info.mypageUrl ?? '', info.loginId ?? '', info.password ?? '', info.memo ?? '', now)
+    'INSERT INTO company (name, short_name, industry, mypage_url, memo, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+  ).run(info.name, info.shortName ?? info.name, info.industry ?? '', info.mypageUrl ?? '', info.memo ?? '', now)
   return Number(r.lastInsertRowid)
 }
 
@@ -890,10 +908,6 @@ export function listSelections(db: DatabaseSync): SelectionRow[] {
   }))
 }
 
-/**
- * 企業一覧。**資格情報(login_id / password)の実値は返さない**(平文の広域露出を防ぐ)。
- * 設定済みかどうかだけを hasLoginId / hasPassword で示す。実値が要る場合は getCompanyCredential を使う。
- */
 export function listCompanies(db: DatabaseSync): CompanyInfo[] {
   const rows = db.prepare('SELECT * FROM company ORDER BY id').all() as Record<string, unknown>[]
   return rows.map((r) => ({
@@ -901,23 +915,8 @@ export function listCompanies(db: DatabaseSync): CompanyInfo[] {
     shortName: (r.short_name as string) ?? '',
     industry: r.industry as string,
     mypageUrl: r.mypage_url as string,
-    loginId: '',
-    password: '',
-    hasLoginId: !!(r.login_id as string),
-    hasPassword: !!(r.password as string),
     memo: r.memo as string,
   }))
-}
-
-/**
- * 企業のログイン資格情報の実値を1社ぶんだけ取り出す。ログイン自動化など、実値が本当に必要な
- * 呼び手だけがこれを使う(一覧に混ぜて広域に漏らさないための専用アクセサ)。
- */
-export function getCompanyCredential(db: DatabaseSync, companyId: number): { loginId: string; password: string } | undefined {
-  const r = db.prepare('SELECT login_id, password FROM company WHERE id = ?').get(companyId) as
-    | { login_id: string; password: string }
-    | undefined
-  return r ? { loginId: r.login_id, password: r.password } : undefined
 }
 
 /** 正式名称(株式会社/Inc.付き)へ昇格する。従来の名前は通称(short_name)として残る */
