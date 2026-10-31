@@ -49,13 +49,14 @@ Googleとの通信や、選択したAIプロバイダへの情報送信は発生
 | カレンダー同期(30分) | カレンダー → 正本DB。空き判定は「空き / 重複 / 不明」で、情報不足を空きと扱わない | 不要(判断が要る予定だけAI) | カレンダー |
 | 提出物台帳 | 誓約書・証明書・ES などを成果物1件ずつ追跡し、完了するまで毎日再評価 | 不要 | — |
 | 番犬(4時間) | 自動処理が止まっていないか・AIの利用枠が全滅していないかを見張る | 不要 | — |
+| ハーネス改善ループ | run台帳を匿名化した最小観測へ変え、失敗を合成回帰caseにしてbaseline比較する。合格候補も人がrevisionを確認するまで反映しない | 不要 | — |
 | 閲覧アプリ8本 | きょう / 選考 / 企業 / メール / 人 / 面接準備 / プロフィール / 効果 | 不要 | — |
 | 面談の録音(任意・Windows) | オンライン面談を相手の声つきで録る | 不要 | — |
 | Gemini Spark 連携(任意) | スマホから予定・選考状況を聞く | 不要 | 自分の Cloudflare |
 | katazuku MCP(任意) | Muse・Codex・Claude Codeから正本を読み、明示scopeで冪等入力と承認提案を行う。remote用OAuth gatewayもセルフホスト可能 | 不要 | 対応MCPクライアント・任意で自分のCloudflare |
 
 詳しい動きは [docs/WORKFLOWS.md](docs/WORKFLOWS.md)、AIの選び方は [docs/AI-PROVIDERS.md](docs/AI-PROVIDERS.md)。
-MCPは[MCPガイド](docs/MCP.md)、Museは[Muse接続ガイド](docs/MUSE.md)を参照してください。
+MCPは[MCPガイド](docs/MCP.md)、Museは[Muse接続ガイド](docs/MUSE.md)、運用を失敗から改善する仕組みは[ハーネス改善ループ](docs/HARNESS-IMPROVEMENT.md)を参照してください。
 
 ## やらないこと(コードで止めている安全境界)
 
@@ -200,6 +201,7 @@ macOS / Linux なら `npm run schedule:print` が出す cron / launchd / systemd
 - 初参加の手順(日英): [最初の貢献ガイド](docs/FIRST-CONTRIBUTION.md)
 - 募集中の初心者向け課題: [good first issue](https://github.com/kokotatan/katazuku-shukatsu/issues?q=is%3Aissue%20is%3Aopen%20label%3A%22good%20first%20issue%22)
 - 設計: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+- エージェントハーネス: [docs/HARNESS-IMPROVEMENT.md](docs/HARNESS-IMPROVEMENT.md)
 - AIアシスタントに聞くなら: [AGENTS.md](AGENTS.md) と [llms.txt](llms.txt) を読ませると、設計と作法をすぐ答えられます
 
 ```sh
