@@ -197,6 +197,69 @@ export type { SparkReader } from './spark-mcp.js'
 export { quickRead, openDbReadOnly } from './quick-read.js'
 export type { QuickCommand } from './quick-read.js'
 
+// ---- 原子的判断とconfidence gate（通常LLM / 任意Jev adapter） ----
+export {
+  DECISION_BACKENDS,
+  DEFAULT_DECISION_POLICY,
+  renderLlmDecisionPrompt,
+  parseLlmDecisionResult,
+  routeAtomicDecision,
+  routeDecisionResult,
+  resolveDecisionControlConfig,
+  LlmAtomicDecisionEvaluator,
+  TypeSafeJevDecisionEvaluator,
+} from './decision-control.js'
+
+// ---- 宣言的workflow・承認hash・正本identity固定 ----
+export {
+  WORKFLOW_OWNERS,
+  WORKFLOW_EFFECTS,
+  canonicalJson,
+  workflowHash,
+  validateWorkflowContract,
+  loadWorkflowContract,
+  ensureWorkflowControlSchema,
+  openWorkflowStore,
+  startWorkflowRun,
+  beginWorkflowStep,
+  completeWorkflowStep,
+  failWorkflowStep,
+  requestWorkflowApproval,
+  decideWorkflowApproval,
+  getWorkflowRun,
+} from './workflow-control.js'
+export type {
+  WorkflowOwner,
+  WorkflowEffect,
+  WorkflowRunStatus,
+  WorkflowStepStatus,
+  WorkflowStepContract,
+  WorkflowContract,
+  WorkflowRunRecord,
+  WorkflowStepRunRecord,
+} from './workflow-control.js'
+
+// ---- Muse等のMCPクライアント向けのcapability-scoped入口 ----
+export {
+  KATAZUKU_MCP_SCOPES,
+  KATAZUKU_MCP_INSTRUCTIONS,
+  KatazukuMcpServer,
+  defaultWorkflowStorePath,
+  katazukuRpc,
+} from './katazuku-mcp.js'
+export type { KatazukuMcpScope, KatazukuMcpOptions } from './katazuku-mcp.js'
+export type {
+  DecisionBackend,
+  DecisionValue,
+  AtomicDecisionQuestion,
+  AtomicDecisionRequest,
+  AtomicDecisionAnswer,
+  AtomicDecisionResult,
+  AtomicDecisionEvaluator,
+  DecisionControlPolicy,
+  DecisionControlConfig,
+} from './decision-control.js'
+
 export { assertBundleMatchesInterview, isSafeBundlePath, sha256OfFile, validateBundleManifest, verifyExtractedBundle, type InterviewBundleManifest, type BundleFile, type BundleVerifyResult } from './interview-bundle.js'
 
 // ---- 会議実行(録音から議事録反映まで)の状態機械 ----

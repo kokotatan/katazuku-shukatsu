@@ -13,6 +13,8 @@ import { normalizeAppointmentAt } from './db.js'
 export type DatabaseRole = 'canonical' | 'replica' | 'fixture'
 
 export interface DatabaseContext {
+  /** workflow実行中のDB差し替えを検出する、パス由来の非秘密識別子 */
+  databaseId: string
   path: string
   role: DatabaseRole
   schemaVersion: number
@@ -30,7 +32,9 @@ export function getDatabaseContext(db: DatabaseSync, requestedRole?: DatabaseRol
     ? configured
     : main?.file ? 'canonical' : 'fixture'
   const schemaVersion = (db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version
-  return { path: main?.file || ':memory:', role, schemaVersion }
+  const path = main?.file || ':memory:'
+  const databaseId = createHash('sha256').update(path).digest('hex')
+  return { databaseId, path, role, schemaVersion }
 }
 
 export interface ScheduleBlockInput {

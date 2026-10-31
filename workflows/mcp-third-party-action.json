@@ -1,0 +1,43 @@
+{
+  "$schema": "../schemas/workflow-contract.schema.json",
+  "schemaVersion": 1,
+  "id": "mcp-third-party-action",
+  "version": 1,
+  "title": "MCPから第三者確定操作を提案し、本人承認済みExecutorへ引き継ぐ",
+  "database": { "requiredRole": "canonical" },
+  "firstStep": "approve",
+  "steps": [
+    {
+      "id": "approve",
+      "title": "対象・内容・実行時点・通知内容を本人が確認する",
+      "owner": "user",
+      "sideEffect": "none",
+      "capabilities": [],
+      "inputSchema": "../schemas/third-party-action.schema.json",
+      "approval": "user",
+      "idempotency": "not-applicable",
+      "next": "execute"
+    },
+    {
+      "id": "execute",
+      "title": "承認内容と完全一致する操作を専用Executorが実行する",
+      "owner": "executor",
+      "sideEffect": "third-party-commit",
+      "capabilities": ["external.commit.confirmed"],
+      "approval": "none",
+      "requiresApprovalFrom": "approve",
+      "idempotency": "external-key",
+      "next": "audit"
+    },
+    {
+      "id": "audit",
+      "title": "実行結果を監査台帳へ記録する",
+      "owner": "executor",
+      "sideEffect": "internal-sync",
+      "capabilities": [],
+      "approval": "none",
+      "idempotency": "run-step",
+      "next": null
+    }
+  ]
+}

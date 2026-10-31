@@ -1,0 +1,54 @@
+{
+  "$schema": "../schemas/workflow-contract.schema.json",
+  "schemaVersion": 1,
+  "id": "third-party-email",
+  "version": 1,
+  "title": "本人確認済みの第三者宛メールを事前検査して送信する",
+  "database": { "requiredRole": "canonical" },
+  "firstStep": "validate",
+  "steps": [
+    {
+      "id": "validate",
+      "title": "元メール・正本DB・予定・文面・重複を検査する",
+      "owner": "executor",
+      "sideEffect": "none",
+      "capabilities": [],
+      "inputSchema": "../schemas/third-party-email-action.schema.json",
+      "approval": "none",
+      "idempotency": "run-step",
+      "next": "approve"
+    },
+    {
+      "id": "approve",
+      "title": "宛先・本文・日時・通知内容を本人が確認する",
+      "owner": "user",
+      "sideEffect": "none",
+      "capabilities": [],
+      "inputSchema": "../schemas/third-party-email-action.schema.json",
+      "approval": "user",
+      "idempotency": "not-applicable",
+      "next": "send"
+    },
+    {
+      "id": "send",
+      "title": "承認内容と完全一致するメールを送信する",
+      "owner": "executor",
+      "sideEffect": "third-party-commit",
+      "capabilities": ["gmail.read", "gmail.send.confirmed"],
+      "approval": "none",
+      "requiresApprovalFrom": "approve",
+      "idempotency": "external-key",
+      "next": "audit"
+    },
+    {
+      "id": "audit",
+      "title": "送信結果を活動ログへ記録する",
+      "owner": "executor",
+      "sideEffect": "internal-sync",
+      "capabilities": [],
+      "approval": "none",
+      "idempotency": "run-step",
+      "next": null
+    }
+  ]
+}

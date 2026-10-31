@@ -60,6 +60,8 @@ DB初期化後に `docs/GOOGLE_WORKSPACE_SETUP.md` の利用者別OAuth設定へ
 | `src/db-apply*.ts` | メール/面接/カレンダー由来の入力を冪等にDBへ反映する書き込み層 |
 | `src/application.ts` | 応募の状態機械(承認ゲート・カレンダー送信待ち・再開点) |
 | `src/agent-runtime.ts` | provider非依存の実行契約(Claude/Codex/ローカル) |
+| `src/katazuku-mcp.ts` + `scripts/katazuku-mcp.ts` | Muse等へ正本の読取・冪等入力・承認提案をscope別に公開するMCP。外部確定操作は実行しない。 |
+| `src/workflow-control.ts` + `workflows/` | owner・capability・副作用・承認hash・正本identityをコードで強制する宣言的workflow。 |
 | `src/mobility.ts` | 移動可能性の判定 |
 | `scripts/workflow.ts` + `scripts/*-prompt.md` | 自動運転ワークフロー(mail-watch / daily-sync / asa / evening-brief / calendar-sync / watchdog)。無人工程は第三者へ送信しない。[docs/WORKFLOWS.md](docs/WORKFLOWS.md) |
 | `schemas/` | 応募イベント / 設定 の JSON Schema(`settings.schema.json` が設定UIを生成) |
