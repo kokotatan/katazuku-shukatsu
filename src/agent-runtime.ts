@@ -1,7 +1,8 @@
 import { spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { access, mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises'
+import { access, mkdir, readFile, readdir, realpath, stat, writeFile } from 'node:fs/promises'
 import { delimiter, dirname, join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { createAnthropicApiAdapter } from './providers/anthropic-api.js'
 import { createChatGptPlanAdapter } from './providers/chatgpt-siwc.js'
 import { createOpenAiApiAdapter } from './providers/openai-api.js'
@@ -46,6 +47,11 @@ export interface AgentRunRequest {
   outputSchemaPath?: string
   providerOrder?: ProviderId[]
   timeoutMs?: number
+  /** MCP bridgeがprovider/モデルに依存せず送信境界を検査するための、秘密を含まない実行時ポリシー。 */
+  workspacePolicy?: {
+    selfEmails: string[]
+    allowedSenderEmails: string[]
+  }
 }
 
 export interface ProcessInvocation {
@@ -900,6 +906,16 @@ export function createCodexAdapter(options: AdapterOptions, id: 'codex' | 'codex
       // 明示する作業領域であり、Gitの有無で正規の実行を止めない。sandboxは別途維持する。
       const args = ['exec', '-C', request.cwd, '--skip-git-repo-check', '--color', 'never', '--json', '--output-last-message', paths.finalOutputPath]
       args.push('--sandbox', request.risk === 'read-only' ? 'read-only' : 'workspace-write')
+      if (request.capabilities.some((capability) => /^(gmail|calendar|drive|sheets|google)\./.test(capability))) {
+        // ホストに以前の直接接続が登録されていても、この実行は公開guardを必ず通す。
+        args.push('-c', `mcp_servers.google-workspace.command=${JSON.stringify(process.execPath)}`)
+        args.push('-c', `mcp_servers.google-workspace.args=${JSON.stringify([fileURLToPath(new URL('../scripts/google-workspace-bridge.mjs', import.meta.url))])}`)
+        args.push('-c', `mcp_servers.google-workspace.cwd=${JSON.stringify(request.cwd)}`)
+        // CLIへのenv指定だけではSTDIO MCPへ届かない。値を引数へ出さず、必要な名前だけ転送する。
+        args.push('-c', `mcp_servers.google-workspace.env_vars=${JSON.stringify(googleMcpEnvNames())}`)
+        args.push('-c', 'mcp_servers.google-workspace.required=true')
+        args.push('-c', 'mcp_servers.google-workspace.startup_timeout_sec=120')
+      }
       if (request.capabilities.includes('web.search')) args.push(...webSearchArgs)
       if (request.capabilities.includes('voice.transcribe') && options.voiceboxMcpUrl) {
         args.push('-c', `mcp_servers.voicebox.url=${JSON.stringify(options.voiceboxMcpUrl)}`)
@@ -915,7 +931,15 @@ export function createCodexAdapter(options: AdapterOptions, id: 'codex' | 'codex
       if (options.model) args.push('--model', options.model)
       if (id === 'codex-oss') args.push('--oss', '--local-provider', options.localProvider ?? 'ollama')
       args.push('-')
-      return { command: options.command, args, stdin: request.prompt, cwd: request.cwd }
+      return {
+        command: options.command,
+        args,
+        stdin: request.capabilities.some((capability) => /^(gmail|calendar|drive|sheets|google)\./.test(capability))
+          ? 'Google Workspace操作は、接続済みMCPのツールを直接使ってください。利用できるツールの名前・説明から発見し、ALL_TOOLSがあれば必要な項目だけ検索します。shellからbridgeやMCPを再起動・インストールせず、sandboxを変更しません。接続済みツールが見つからなければ「MCPが使えないため中止」と明示し、送信や処理を済ませたと報告しません。\n\n' + request.prompt
+          : request.prompt,
+        cwd: request.cwd,
+        env: workspacePolicyEnv(request),
+      }
     },
     async readOutput(result, paths) {
       try {
@@ -961,6 +985,7 @@ export function createClaudeAdapter(options: AdapterOptions): AgentAdapter {
           ENABLE_CLAUDEAI_MCP_SERVERS: 'false',
           MCP_TIMEOUT: process.env.MCP_TIMEOUT ?? '180000',
           MCP_TOOL_TIMEOUT: process.env.MCP_TOOL_TIMEOUT ?? '180000',
+          ...workspacePolicyEnv(request),
         },
       }
     },
@@ -969,6 +994,34 @@ export function createClaudeAdapter(options: AdapterOptions): AgentAdapter {
     },
     detectPossibleSideEffect: claudePossibleSideEffect,
   }
+}
+
+function googleMcpEnvNames(): string[] {
+  const raw = process.env.KATAZUKU_GOOGLE_MCP_ENV_ALLOWLIST ?? ''
+  const extra: unknown = raw.trim().startsWith('[') ? JSON.parse(raw) : raw.split(',').map((name) => name.trim()).filter(Boolean)
+  if (!Array.isArray(extra) || extra.some((name) => typeof name !== 'string' || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(name))) {
+    throw new Error('KATAZUKU_GOOGLE_MCP_ENV_ALLOWLISTは環境変数名の配列で指定してください')
+  }
+  return [...new Set([
+    'GOOGLE_OAUTH_CLIENT_ID', 'GOOGLE_OAUTH_CLIENT_SECRET', 'USER_GOOGLE_EMAIL',
+    'KATAZUKU_WORKSPACE_CAPABILITIES', 'KATAZUKU_WORKSPACE_SELF_EMAILS', 'KATAZUKU_WORKSPACE_ALLOWED_SENDERS',
+    'KATAZUKU_GOOGLE_MCP_COMMAND', 'KATAZUKU_GOOGLE_MCP_ARGS_JSON', 'KATAZUKU_GOOGLE_MCP_ENV_ALLOWLIST',
+    'KATAZUKU_GOOGLE_CREDENTIALS_DIR',
+    ...extra,
+  ])]
+}
+
+function workspacePolicyEnv(request: AgentRunRequest): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = {
+    KATAZUKU_WORKSPACE_CAPABILITIES: JSON.stringify(request.capabilities),
+    KATAZUKU_WORKSPACE_SELF_EMAILS: JSON.stringify(request.workspacePolicy?.selfEmails ?? []),
+    KATAZUKU_WORKSPACE_ALLOWED_SENDERS: JSON.stringify(request.workspacePolicy?.allowedSenderEmails ?? []),
+  }
+  for (const key of googleMcpEnvNames()) {
+    if (key.startsWith('KATAZUKU_WORKSPACE_')) continue // 実行要求の境界をホストenvで上書きさせない。
+    if (process.env[key] !== undefined) env[key] = process.env[key]
+  }
+  return env
 }
 
 async function findOnPath(command: string, env: NodeJS.ProcessEnv): Promise<string | undefined> {
@@ -1127,7 +1180,14 @@ export async function runAgent(request: AgentRunRequest, options: RunAgentOption
     const ledger = await readFile(join(runDir, 'run.local.json'), 'utf8')
       .then((text) => JSON.parse(text) as AgentRunResult)
       .catch(() => null)
-    if (ledger && ledger.status) return ledger
+    if (ledger && ledger.status) {
+      if (ledger.status === 'succeeded' && ledger.outputRef) {
+        const outputPath = await realpath(resolve(ledger.outputRef))
+        if (dirname(outputPath) !== await realpath(runDir)) throw new Error('保存済みの出力が実行領域外を指しています。再実行せず停止しました。')
+        return { ...ledger, output: await readFile(outputPath, 'utf8') }
+      }
+      return ledger
+    }
     throw new Error(`runId ${request.runId} は既に実行中です。二重起動を防止しました(冪等キーの衝突)。`)
   }
   const attempts: AgentAttempt[] = []

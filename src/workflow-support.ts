@@ -194,6 +194,10 @@ export async function runAgentStep(options: AgentStepOptions): Promise<AgentRunR
     outputSchemaPath: options.outputSchemaPath,
     providerOrder: order,
     timeoutMs: options.timeoutMs,
+    workspacePolicy: {
+      selfEmails: options.config.google.accounts.map((account) => account.email),
+      allowedSenderEmails: options.config.google.accounts.map((account) => account.email),
+    },
   }, {
     adapters,
     artifactDir,

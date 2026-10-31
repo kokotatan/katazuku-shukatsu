@@ -69,7 +69,8 @@ AI接続前に試す場合は `--no-sync` を付けて接続だけ確認して�
 5. `npm run google:connect` で就活用アカウントの読み取りを許可し、本人確認・Gmail・Calendarの診断が成功することを確認する。
    既存のMCP資格情報がある場合は上書きせず、`npm run google:connect -- --check` で確認する。
 6. 下書き・予定の書込みを使う場合は [google-workspace MCP(workspace-mcp)](https://github.com/taylorwilsdon/google_workspace_mcp) を、
-   そのクライアントIDとシークレットで Claude Code / Codex に登録し、就活用アカウントで一度ログインする。
+   [送信境界を検査する同梱bridge](GOOGLE-CONNECTION.md#3-workspace-mcpをcliへ登録する)経由で Claude Code / Codex に登録し、
+   そのクライアントIDとシークレットを使って就活用アカウントで一度ログインする。workspace-mcpを直接登録しない。
    ログインすると `~/.google_workspace_mcp/credentials/<メールアドレス>.json` にトークンが保存され、
    katazuku の決定的な取得スクリプト(Gmail・カレンダーの読み取り)もそれを再利用します
    (置き場所を変えたら `google.credentialsDir` に書く)。
@@ -119,6 +120,20 @@ npm run workflow -- asa --dry-run
 
 使うAIの順番・渡す能力・プロンプトが表示されます。ここで、アカウント一覧や署名が自分の値になっているかを確認します。
 `--dry-run` は接続の成功を確認する機能ではありません。定期登録前に `npm run doctor -- --setup` と [Googleの読み取り確認](GOOGLE-CONNECTION.md) も済ませてください。
+
+### 初回の朝まとめを本人宛に試験配信する
+
+本人のprimary Googleアカウントを設定し、`notify.selfEmail`を`true`にしてから実行します。
+
+```sh
+npm run workflow -- asa --delivery-test first-setup --agent codex
+```
+
+「OSS初回導入・朝まとめ配信確認」と試験IDを件名に付け、本人宛に一通だけ送ります。
+予定登録・下書き・既読化は行いません。同じ試験IDでの再実行は保存結果を使い、再送しません。
+受信箱で件名と試験IDを確認してから定期登録へ進みます。途中失敗や成否不明のときは
+Sentを照合し、新しいIDを発行してむやみに再送しないでください。
+Googleの初回認証・自分のアカウント設定は本人が行う必要があります。
 
 ## 6. 毎日のワークフローを登録する
 
