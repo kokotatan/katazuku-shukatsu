@@ -30,7 +30,7 @@ AIコーディングエージェント(および使い方を尋ねられたAI)�
    認証情報をリポジトリや会話へ保存せず、送信・受験・認証・辞退は本人に残す。
 
 クローン直後でも、AIはこの節に従えば空の正本DBを構築できる。Google連携が必要な場合だけ、
-DB初期化後に `docs/GOOGLE_WORKSPACE_SETUP.md` の利用者別OAuth設定へ進む。
+DB初期化後に `docs/GOOGLE-CONNECTION.md` の利用者別OAuth設定へ進む。
 
 ## 壊してはいけない設計の芯
 
