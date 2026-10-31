@@ -73,9 +73,7 @@ tool一覧は起動時scopeに応じて削られます。許可されていな�
 
 メール送信はMCP toolへ直接公開しません。`prepare_action`でprovider・差出人・宛先・本文を固定した後、
 ローカルの第三者メールExecutorが本人承認、正本DB、元メール、予定、外部SENTを再照合します。
-Google Workspace、ローカルiCloud adapter、Muse Secure VMのemail connectorは同じaction hash原則を使い、資格情報を
-katazuku MCPやgatewayへ渡しません。Muse経路は内蔵connectorのsensitive-write承認とSent再照合を必須にし、ローカルExecutorへ
-誤って渡した場合は拒否します。
+Google Workspace、ローカルiCloud adapter、利用者アカウントで対応を確認できたMuse Secure VMのemail connectorは同じaction hash原則を使い、資格情報をkatazuku MCPやgatewayへ渡しません。Muse経路は互換connectorのsensitive-write承認とSent再照合を必須にし、ローカルExecutorへ誤って渡した場合は拒否します。一般的なMuseメール機能をiCloud対応の証拠にはしません。
 端末固有の接続は[Private adapters](PRIVATE-ADAPTERS.md)を参照してください。
 
 ## 検証

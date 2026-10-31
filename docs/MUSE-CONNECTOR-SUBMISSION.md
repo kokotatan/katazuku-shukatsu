@@ -66,11 +66,11 @@ Metaの分類では、状態を変えないtoolはRead、正本またはworkflow
 - `katazuku_prepare_muse_email`
 - `katazuku_record_muse_email_result`
 
-これらは利用者所有のローカル台帳を更新します。`katazuku_prepare_action`と`katazuku_prepare_muse_email`は外部操作を実行せず、完全な内容をhash固定して`needs_user`で止めます。`katazuku_record_muse_email_result`は、Muse built-in email connectorが返した承認IDとSent再照合証跡を記録するだけです。
+これらは利用者所有のローカル台帳を更新します。`katazuku_prepare_action`と`katazuku_prepare_muse_email`は外部操作を実行せず、完全な内容をhash固定して`needs_user`で止めます。`katazuku_record_muse_email_result`は、利用者アカウントで対応を確認できたMuse email connectorが返した承認IDとSent再照合証跡を記録するだけです。
 
 ### 別Connector上のSensitive write
 
-Muse built-in email connectorのsend toolは、宛先・件名・本文を表示して毎回`Allow once`を要求します。katazukuの承認hashはMuseのHITLを代替せず、アカウント接続や過去の許可も送信許可として再利用しません。
+対応済みMuse email connectorのsend toolは、宛先・件名・本文を表示して毎回`Allow once`を要求します。katazukuの承認hashはMuseのHITLを代替せず、アカウント接続や過去の許可も送信許可として再利用しません。対象メールボックスがMuseで未対応ならこの経路を申告・実行しません。
 
 ## 審査用E2Eシナリオ
 

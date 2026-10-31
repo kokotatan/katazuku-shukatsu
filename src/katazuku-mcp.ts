@@ -163,7 +163,7 @@ const allTools: Tool[] = [
     inputSchema: objectSchema({ runId: { ...text, maxLength: 160 }, sourceRef: { ...text, maxLength: 300 }, action: objectSchema({ actionType: text, target: { type: 'object', minProperties: 1 }, content: { type: 'object', minProperties: 1 }, effectiveAt: text, notification: text }) }) },
   { name: 'katazuku_action_status', scope: 'actions', description: '承認台帳の状態と固定済みaction hashを返す。実行や承認は行わない。', annotations: readAnnotations,
     inputSchema: objectSchema({ runId: { ...text, maxLength: 160 } }) },
-  { name: 'katazuku_prepare_muse_email', scope: 'actions', description: 'Muse内蔵email connectorで返信する前に、元メール・正本DB・日程・本文を検査しaction hashを固定する。送信は行わない。', annotations: writeAnnotations,
+  { name: 'katazuku_prepare_muse_email', scope: 'actions', description: '利用者アカウントで対応を確認できたMuse email connectorへ渡す前に、元メール・正本DB・日程・本文を検査しaction hashを固定する。送信は行わない。', annotations: writeAnnotations,
     inputSchema: objectSchema({ runId: { ...text, maxLength: 160 }, sourceRef: { ...text, maxLength: 300 }, action: museEmailActionSchema }) },
   { name: 'katazuku_record_muse_email_result', scope: 'actions', description: 'Museの毎回承認後の送信IDとSent再照合IDを、提示済みaction hashへ冪等記録する。成否不明では完了せず再送を止める。', annotations: writeAnnotations,
     inputSchema: objectSchema({ runId: { ...text, maxLength: 160 }, action: museEmailActionSchema, result: museEmailResultSchema }) },
@@ -176,7 +176,7 @@ export const KATAZUKU_MCP_INSTRUCTIONS = [
   '予定・選考・提出物はGmailやCalendarを再検索する前にkatazuku_*の正本DBから確認します。',
   'write scopeは取得済み事実の冪等な正本反映だけです。メール送信・応募提出・予約・受験・認証は行いません。',
   '面接・面談を扱うときはkatazuku_meeting_preparationsを確認し、sensitive scopeがあれば根拠contextを取得して準備をreadyにします。',
-  'Google/iCloud認証はprivate adapterまたはMuse Secure VMの内蔵email connectorに残し、MCPへ資格情報を渡しません。',
+  'Google/iCloud認証はprivate adapter、または対象メールボックスへの対応を実機確認できたMuse Secure VMのemail connectorに残し、MCPへ資格情報を渡しません。',
   'Museからメールを送る場合はkatazuku_prepare_muse_emailで固定し、Museのsensitive write承認後に送信IDとSent再照合IDをkatazuku_record_muse_email_resultへ返します。unknownでは再送しません。',
   '第三者確定操作はkatazuku_prepare_actionで固定し、本人承認と専用Executorへ引き継ぎます。MCPのtool call自体を本人承認とみなしません。',
 ].join('\n')

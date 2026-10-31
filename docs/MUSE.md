@@ -66,11 +66,11 @@ Muse
 SQLite、Google資格情報、本人情報をクラウドgatewayへ置かず、端末側でtoolを実行します。remote gatewayは
 tool payloadと結果を必要最小限だけ中継し、tokenをURL・ログ・Skill本文へ書きません。
 
-## Museのemail connectorでiCloudを使う
+## Museのemail connectorでメールを使う
 
-Museは接続資格情報を利用者ごとのSecure VM内に保管し、agent自身へ秘密値を見せずにemail connectorを使います。
-Apple Account password、app-specific password、session cookieはkatazuku MCPへ渡しません。MuseがiCloudを読む場合も、
-本文やOTPを正本へ複製せず、message ID、送信者、件名、要約、`muse-email:` sourceRefだけを`katazuku_record_mail`へ記録します。
+この経路は、利用者の実際のMuseアカウントに対象メールボックスへ接続できる互換email connectorが表示され、読取試験に成功した場合だけ使います。Metaの現在の日本向け案内はGmailを明記していますが、iCloudは明記していません。一般的なメール機能だけを根拠にiCloud対応と扱わず、未対応なら送信元を変えずにprivate iCloud adapterを使います。
+
+互換connectorがある場合、Museは接続資格情報を利用者ごとのSecure VM内に保管し、agent自身へ秘密値を見せずに使います。Apple Account password、app-specific password、session cookieはkatazuku MCPへ渡しません。本文やOTPを正本へ複製せず、message ID、送信者、件名、要約、`muse-email:` sourceRefだけを`katazuku_record_mail`へ記録します。
 
 返信は次の順で行います。
 
