@@ -47,6 +47,7 @@ try {
   const today = await rpc(reader, 'tools/call', { name: 'katazuku_today', arguments: {} })
   assert.equal(today.result.isError, false)
   assert(today.result.content[0].text.includes('一次面接'))
+  assert(today.result.content[0].text.includes('10:00-11:00'), 'OSのタイムゾーンによらず日本時間で返す')
   const preparationStatus = await rpc(reader, 'tools/call', { name: 'katazuku_meeting_preparations', arguments: {} })
   const preparationStatusText = preparationStatus.result.content[0].text
   assert(preparationStatusText.includes('Example株式会社'))

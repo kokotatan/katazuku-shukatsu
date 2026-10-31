@@ -10,16 +10,17 @@
   <script src="/viewer-home.js" defer></script>
 </head>
 <body><main>
-  <header><p class="muted">katazuku</p><h1>就活の状況を、一か所で確認する。</h1><p id="mode" class="mode">読み込み中</p><p id="mode-description"></p><p class="muted">この画面を開いただけでは、メール取得・AI実行・定期処理は始まりません。</p></header>
-  <section><h2>見る画面を選ぶ</h2><nav class="apps" aria-label="katazuku アプリ">
+  <header><p class="muted">katazuku</p><h1>就活の状況を、一か所で確認する。</h1><p id="mode" class="mode">読み込み中</p><p id="mode-description"></p><p id="data-status" role="status"></p><p class="muted">この画面を開いただけでは、メール取得・AI実行・定期処理は始まりません。</p></header>
+  <section id="app-section"><h2>見る画面を選ぶ</h2><nav class="apps" aria-label="katazuku アプリ">
     <a href="/insight/">今日やること</a><a href="/board/">ボード</a><a href="/status/">選考管理</a><a href="/inbox/">メール</a><a href="/prep/">面接準備</a><a href="/people/">人</a><a href="/profile/">個人マスタ</a><a href="/impact/">効果</a>
   </nav></section>
   <section><h2>朝のまとめ・前夜の準備</h2><p class="muted">作成日を確認してください。過去のまとめは、今日の予定を保証しません。</p><button id="reload" type="button">まとめを再読込</button><div id="briefs" aria-live="polite"><p>読み込み中</p></div></section>
   <section><h2>自分のデータで使うために</h2><ol>
     <li>リポジトリの <code>katazuku.config.example.json</code> をコピーし、アカウント・呼び名・使うAIを設定します。</li>
+    <li><code>npm run init</code> で空の正本DBを一つ作ります。既存のDBは <code>KATAZUKU_DB</code> で指定します。</li>
     <li><a href="https://github.com/kokotatan/katazuku-shukatsu/blob/main/docs/SETUP.md" target="_blank" rel="noreferrer">セットアップ手順</a>に沿ってGoogleとAIを接続します。</li>
     <li><code>npm run doctor -- --setup</code> で前提を確認します。ログインとMCPの実接続は別途確認が必要です。</li>
-    <li><code>npm run workflow -- daily-sync --dry-run</code> で確認してから日次同期を実行し、正本DBを作ります。</li>
+    <li><code>npm run workflow -- daily-sync --dry-run</code> で確認してから日次同期を実行します。</li>
     <li><code>npm start</code> で自分のデータを開きます。定期処理はセットアップ手順で登録します。</li>
   </ol><p class="muted">Google Cloudの設定とターミナル操作が必要な開発版です。メールの送信・フォーム提出・適性検査は本人が行います。デスクトップ版は準備中です。</p></section>
 </main></body></html>

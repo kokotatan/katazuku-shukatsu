@@ -59,7 +59,7 @@ export function createViewerServer({ root, demo = false, dataAvailable = true, b
         send(200, await readFile(join(root, 'tools', 'viewer-home.html')), TYPES['.html'])
         return
       }
-      if (path === '/api/viewer') { json(200, { mode: demo ? 'demo' : 'local', automaticExecution: false }); return }
+      if (path === '/api/viewer') { json(200, { mode: demo ? 'demo' : 'local', dataAvailable, automaticExecution: false }); return }
       if (path === '/api/briefs') { json(200, briefsAvailable ? await readBriefs(root, demo) : []); return }
       if (path === '/viewer-home.js') { send(200, await readFile(join(root, 'tools', 'viewer-home.js')), TYPES['.js']); return }
       const match = path.match(/^\/([a-z]+)\/(.*)$/)

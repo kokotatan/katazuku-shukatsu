@@ -11,13 +11,15 @@
  * 出さないもの: マイページのログインIDとパスワード、顔写真の実体、メール本文。
  * 実データから書き出した snapshot.json は .gitignore 済み。コミットしないこと。
  */
-import { writeFileSync, mkdirSync } from 'node:fs'
+import { writeFileSync, mkdirSync, existsSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
   openDb, upsertCompany, insertSelection, addAppointment, addEvent, addPending,
   listSelections, listAppointments, listCompanies, listEvents, listPending, outcomeOf,
 } from '../src/db.js'
+import { openDbReadOnly } from '../src/quick-read.js'
+import { resolveDatabasePath } from '../src/data-path.js'
 import { listPlatformSnapshot, saveBasicProfile, upsertCompanyDossier, upsertMailItem } from '../src/platform.js'
 import { upsertPerson } from '../src/inputs.js'
 import { applySubmissionRequirements } from '../src/submission-requirement.js'
@@ -234,8 +236,9 @@ function main(): void {
   const demo = process.argv.includes('--demo')
   const dbPath = demo
     ? ':memory:'
-    : (process.argv.slice(2).find((a) => !a.startsWith('--')) ?? process.env.KATAZUKU_DB ?? 'data/katazuku.db')
-  const db = demo ? undefined : openDb(dbPath)
+    : resolveDatabasePath(process.argv.slice(2).find((a) => !a.startsWith('--')))
+  if (!demo && !existsSync(dbPath)) throw new Error('正本DBが見つかりません。先に npm run init を実行してください。空のDBは作成しません。')
+  const db = demo ? undefined : openDbReadOnly(dbPath)
   const snapshot = demo ? buildDemoSnapshot() : buildSnapshot(db!, false)
   if (demo && process.argv.includes('--viewer')) {
     const out = join(here, '..', 'logs', 'viewer-demo.local.json')

@@ -10,6 +10,8 @@ import { listAppointments, sameAppointment, type AppointmentRow } from './db.js'
 
 const WD = ['日', '月', '火', '水', '木', '金', '土']
 const H = 3600_000
+const JST = 9 * H
+const jstDate = (time: number) => new Date(time + JST)
 
 export type Slot = { start: number; end: number; row: AppointmentRow }
 export type QuickCommand = 'today' | 'next' | 'conflicts' | 'status'
@@ -22,13 +24,13 @@ export function parseSlot(a: AppointmentRow): Slot | null {
 }
 
 export function fmtDay(t: number): string {
-  const d = new Date(t)
-  return `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}(${WD[d.getDay()]})`
+  const d = jstDate(t)
+  return `${String(d.getUTCMonth() + 1).padStart(2, '0')}/${String(d.getUTCDate()).padStart(2, '0')}(${WD[d.getUTCDay()]})`
 }
 
 export function fmtTime(t: number): string {
-  const d = new Date(t)
-  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+  const d = jstDate(t)
+  return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`
 }
 
 export function overlaps(a: Slot, b: Slot): boolean {
@@ -37,8 +39,8 @@ export function overlaps(a: Slot, b: Slot): boolean {
 
 /** 終日(日付だけの)予定か。00:00始まりで23時間以上の幅を終日とみなす */
 export function isAllDay(s: Slot): boolean {
-  const d = new Date(s.start)
-  return d.getHours() === 0 && d.getMinutes() === 0 && s.end - s.start >= 23 * H
+  const d = jstDate(s.start)
+  return d.getUTCHours() === 0 && d.getUTCMinutes() === 0 && s.end - s.start >= 23 * H
 }
 
 /** 読み取り専用で正本DBを開く。スキーマ作成・WAL切替をしないので、書き手と競合しない */
@@ -100,8 +102,7 @@ export function quickRead(db: DatabaseSync, cmd: QuickCommand, arg?: string | nu
   const out: string[] = []
 
   if (cmd === 'today') {
-    const d = new Date(now)
-    const dayStart = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
+    const dayStart = Math.floor((now + JST) / (24 * H)) * 24 * H - JST
     const dayEnd = dayStart + 24 * H
     const items = foldExactDupes(activeSlots(db).filter((s) => s.start < dayEnd && s.end > dayStart))
     out.push(`今日 ${fmtDay(now)} の予定 ${items.length}件`)

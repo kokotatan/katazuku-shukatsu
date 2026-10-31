@@ -6,9 +6,10 @@
  *   npm run quick -- conflicts [日数]  # 重なり検出(既定14日先まで)
  *   npm run quick -- status [語]      # 選考ステータス
  *
- * DBは data/katazuku.db(または $KATAZUKU_DB)。
+ * DBは npm run init と共通の保存先(または $KATAZUKU_DB)。
  */
 import { openDbReadOnly, quickRead, type QuickCommand } from '../src/quick-read.js'
+import { resolveDatabasePath } from '../src/data-path.js'
 
 const COMMANDS: QuickCommand[] = ['today', 'next', 'conflicts', 'status']
 const cmd = (process.argv[2] ?? 'today') as QuickCommand
@@ -16,7 +17,7 @@ if (!COMMANDS.includes(cmd)) {
   console.log('使い方: npm run quick -- today | next [N] | conflicts [日数] | status [語]')
   process.exit(1)
 }
-const db = openDbReadOnly(process.env.KATAZUKU_DB ?? 'data/katazuku.db')
+const db = openDbReadOnly(resolveDatabasePath())
 try {
   for (const l of quickRead(db, cmd, process.argv[3])) console.log(l)
 } finally {

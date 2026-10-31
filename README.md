@@ -130,7 +130,7 @@ npm run workflow -- asa --dry-run        # 朝のまとめのプロンプトと�
 再実行しても既存データを消さず、必要なマイグレーションだけを適用します。保存先を変える場合は
 `KATAZUKU_DB`、または `npm run init -- /absolute/path/to/katazuku.db` を使います。
 
-1. `katazuku.config.json` を作る(アカウント・署名・通知の設定。gitignore 済み)
+1. `katazuku.config.json` を作り、`npm run init` で空の正本DBを一つ作る(設定・実データはgitignore 済み)
 2. Google につなぐ: 自分のGoogle CloudでデスクトップOAuthクライアントを作り、`npm run google:connect` で本人が読取りを許可。下書き・予定の書込みには別のGoogle MCP接続も必要
 3. AI を選ぶ: `npm run chatgpt -- signin`(ChatGPT プラン)、または Claude Code / Codex にログイン
 4. `--dry-run` で確認してから、毎日のワークフローを登録する

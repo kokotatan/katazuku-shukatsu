@@ -44,7 +44,12 @@ if (demo) {
     run('架空データを準備しています', process.execPath, [tsx, 'scripts/snapshot.ts', '--demo', '--viewer'])
   }
 } else {
-  const db = dbArg || process.env.KATAZUKU_DB || process.env.KATAZUKU_DB_PATH || join(root, 'data', 'katazuku.db')
+  let db = dbArg || process.env.KATAZUKU_DB?.trim() || process.env.KATAZUKU_DB_PATH?.trim()
+  if (!db) {
+    const location = spawnSync(process.execPath, [tsx, 'scripts/resolve-data-path.ts'], { cwd: root, encoding: 'utf8', windowsHide: true })
+    if (location.status !== 0 || !location.stdout.trim()) throw new Error('正本DBの保存先を確認できません。KATAZUKU_DBを指定して再起動してください。')
+    db = location.stdout.trim()
+  }
   if (existsSync(db)) run('正本DBから閲覧データを更新しています', process.execPath, [tsx, 'scripts/snapshot.ts', db])
   else {
     dataAvailable = false

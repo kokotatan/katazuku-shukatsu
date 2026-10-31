@@ -35,13 +35,25 @@ cp katazuku.config.example.json katazuku.config.json      # Windows(PowerShell)�
 
 秘密値(API キーなど)は設定ファイルに書かず、`.env` に書きます(`.env.example` をコピー)。
 
-## 2. Google につなぐ(自分の OAuth クライアント)
+## 2. 正本DBを作る
+
+GoogleやAIを接続する前に、空の正本DBを一つだけ作ります。
+
+```sh
+npm run init
+```
+
+表示された絶対パスが、同期・MCP・閲覧・バックアップで共通の保存先です。
+Windowsは利用者のLocalAppData、macOSはApplication Support、LinuxはXDGデータ領域に保存し、ソースツリーには置きません。
+すでに正本がある場合は `KATAZUKU_DB` にその絶対パスを指定してから実行してください。既存データを初期化し直しません。
+`npm run seed` は架空データの試験であり、この初期化の代わりにはなりません。
+
+## 3. Google につなぐ(自分の OAuth クライアント)
 
 共通接続を試す開発者向けに、Google Cloudプロジェクトを自分で作らない経路もあります。
 `npm run google:workspace:connect -- --account 自分のメールアドレス` を使い、
 [共通Google接続ガイド](GOOGLE-WORKSPACE.md)に従って本人が許可してください。
-設定済みの標準接続では認証後に初回同期を始めるため、先に手順4のAI接続を済ませてください。
-接続だけ先に済ませる場合は `--no-sync` を付けます。
+AI接続前に試す場合は `--no-sync` を付けて接続だけ確認してください。認証を完了するだけで初回同期が始まる経路もあるため、通常は手順4のAI接続を先に済ませます。
 共通接続はGoogleの権限審査が未完了で、一般利用向けの完成版ではありません。
 既存接続を自動で置き換えません。個別OAuthを使う場合は以下の手順を続けてください。
 
@@ -79,11 +91,6 @@ npm run doctor -- --setup
 ```sh
 npx tsx scripts/gmail-fetch.ts logs/check-mail.local.json --days 1     # 取得できた件数が出れば成功(読み取りのみ)
 ```
-
-## 3. 正本DBを作る
-
-最初の日次同期が自動で作ります。すでに手元の選考情報がある場合は、会話でエージェントに頼んで
-`src/db-apply.ts` 経由で入れてもらうのが安全です(遷移規則と名寄せを通るため)。
 
 ## 4. AIを選ぶ
 
@@ -168,7 +175,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\register-tasks.ps1 -
 npm run chatgpt -- signout       # ChatGPT のセッションを失効させる
 ```
 
-閲覧サーバーも Ctrl+C で停止します。データは `data/`・`logs/` と各画面の `public/snapshot.json` にあります。
+閲覧サーバーも Ctrl+C で停止します。正本DBは `npm run init` が表示した利用者別領域（または自分で指定した保存先）、作業ログは `logs/`、閲覧データは各画面の `public/snapshot.json` にあります。
 利用を終える場合は、これらと個人設定・`.env`、接続時に作成された認証情報を自分で削除します。
 バックアップを別の場所に保存した場合は、その場所も確認してください。
 Google 側の許可は <https://myaccount.google.com/permissions> から取り消せます。

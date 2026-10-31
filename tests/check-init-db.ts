@@ -5,6 +5,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { initializeDatabase } from '../scripts/init-db.js'
 import { SCHEMA_VERSION } from '../src/db.js'
 import { resolveDatabasePath } from '../src/data-path.js'
+import { resolveDatabasePath as workflowDatabasePath } from '../src/database-path.js'
 
 const root = mkdtempSync(join(tmpdir(), 'katazuku-init-db-'))
 const path = join(root, 'nested', 'katazuku.db')
@@ -16,6 +17,10 @@ function check(name: string, ok: boolean): void {
 }
 
 try {
+  check('初期化・同期・閲覧が同じ既定の正本DBを選ぶ',
+    resolveDatabasePath(undefined, {}) === workflowDatabasePath(undefined, {}))
+  check('旧環境変数も全入口で同じ正本を選ぶ',
+    workflowDatabasePath(undefined, { KATAZUKU_DB_PATH: path }) === path)
   check('Windowsの既定保存先はソースツリー外の利用者別領域',
     resolveDatabasePath(undefined, { LOCALAPPDATA: join(root, 'local') }, 'win32') === join(root, 'local', 'katazuku', 'data', 'katazuku.db'))
   check('明示した保存先を最優先する', resolveDatabasePath(path, { KATAZUKU_DB: join(root, 'other.db') }, 'win32') === path)
