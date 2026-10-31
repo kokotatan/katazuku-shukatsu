@@ -126,15 +126,17 @@ function throws(fn: () => unknown): boolean {
   const input: MailInput = {
     accounts: [{ status: 'success' }],
     messages: [
-      { id: 'x1', receivedAt: '2030-01-01T00:00:00Z', subject: '一次面接のご案内', body: '...' },
-      { id: 'x2', receivedAt: '2030-01-01T01:00:00Z', subject: 'ニュースレター', body: '...' },
+      { id: 'x1', receivedAt: '2030-01-01T00:00:00Z', subject: '一次面接のご案内', body: '一次面接の日程は1月5日10時です。' },
+      { id: 'x2', receivedAt: '2030-01-01T01:00:00Z', subject: 'ニュースレター', body: '限定スカウトが届きました。' },
     ],
   }
   const batches = buildExtractionBatches(input, '抽出してください', '{}')
   check('抽出: 本文をプロンプトへ埋め込み、入力ダイジェストを指示する', batches.length === 1 && batches[0].prompt.includes(inputDigest(input)) && batches[0].prompt.includes('MAIL_DATA'))
   const output = {
     schemaVersion: 1,
-    selections: [{ name: 'C社', stage: 'interview', position: '本選考', appointments: [{ at: '2030-01-05T10:00:00+09:00', kind: '面接', title: '一次面接' }] }],
+    selections: [{ name: 'C社', stage: 'interview', position: '本選考', ref: 'x1',
+      evidence: { messageId: 'x1', kind: 'interview_scheduled', quote: '一次面接の日程は1月5日10時です。' },
+      appointments: [{ at: '2030-01-05T10:00:00+09:00', kind: '面接', title: '一次面接' }] }],
     mailItems: [{ id: 'x1', receivedAt: '2030-01-01T00:00:00Z', subject: '一次面接のご案内', company: 'C社', needsAction: true }],
     submissions: [],
     requirements: [],
@@ -144,6 +146,15 @@ function throws(fn: () => unknown): boolean {
   check('抽出: 未知の項目があれば全体を拒否', throws(() => validateDailySyncResult({ ...output, extra: 1 })))
   check('抽出: 読んでいないメールがあれば網羅性で拒否', throws(() => validateCoverage(input, { ...output.coverage, status: 'completed', reviewedMessageIds: ['x1'] })))
   const merged = mergeExtractionResults(input, [{ input: batches[0].input, output }])
+  for (const [label, selection] of [
+    ['未承諾スカウト', { ...output.selections[0], stage: 'scouted', ref: 'x2', evidence: { messageId: 'x2', kind: 'direct_scout_accepted', quote: '限定スカウトが届きました。' } }],
+    ['別メールの根拠', { ...output.selections[0], evidence: { ...output.selections[0].evidence, messageId: 'x2' } }],
+    ['実在しない引用', { ...output.selections[0], evidence: { ...output.selections[0].evidence, quote: '二次面接の日程が確定しました。' } }],
+    ['段階に合わない根拠', { ...output.selections[0], stage: 'offer' }],
+  ] as const) {
+    const held = mergeExtractionResults(input, [{ input: batches[0].input, output: { ...output, selections: [selection] } }])
+    check(`抽出: ${label}は選考へ反映せずメールと要確認に残す`, held.selections.length === 0 && held.mailItems.length === 1 && held.priorityMails!.length === 1)
+  }
   const db = openDb(':memory:')
   const summary = applyDailySyncResult(db, merged)
   check('反映: 選考と予定とメールが正本へ入る', summary.selections.added.length === 1 && summary.mail.created === 1

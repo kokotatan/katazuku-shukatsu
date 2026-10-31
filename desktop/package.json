@@ -12,7 +12,7 @@
     "package:windows": "node tools/package-portable.mjs"
   },
   "devDependencies": {
-    "electron": "44.5.0"
+    "electron": "44.10.1"
   },
   "dependencies": {
     "tsx": "4.20.6"

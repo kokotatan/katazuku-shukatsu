@@ -43,7 +43,7 @@
     "selection": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["name", "stage"],
+      "required": ["name", "stage", "ref", "evidence"],
       "properties": {
         "name": { "type": "string", "minLength": 1 },
         "stage": {
@@ -54,7 +54,39 @@
         "industry": { "type": "string" },
         "season": { "type": "string" },
         "position": { "type": "string" },
-        "ref": { "type": "string" },
+        "ref": { "type": "string", "minLength": 1 },
+        "evidence": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "messageId",
+            "kind",
+            "quote"
+          ],
+          "properties": {
+            "messageId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "kind": {
+              "enum": [
+                "direct_scout_accepted",
+                "application_submitted",
+                "selection_action_required",
+                "interview_scheduled",
+                "participation_confirmed",
+                "offer_received",
+                "rejected",
+                "withdrawn"
+              ]
+            },
+            "quote": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 240
+            }
+          }
+        },
         "appointments": {
           "type": "array",
           "items": { "$ref": "#/$defs/appointment" }

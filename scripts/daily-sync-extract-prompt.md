@@ -12,6 +12,9 @@ DBへの反映は後段の決定論的なスクリプトが検証してから行
 ## 抽出すること
 
 1. 企業ごとの選考の動き(`selections`)
+   - 未承諾スカウト、応募前の募集、一般向け説明会だけでは選考へ昇格させず、mailItems に残す。「内定直結」等の広告は内定通知ではない。
+   - 各項目に ref と evidence を必須とする。evidence.messageId は ref と同じ元メールID、quote は元メールの件名・本文にある8〜240文字の逐語引用とし、推測・言い換えをしない。
+   - evidence.kind は stage ごとに固定する: scouted=direct_scout_accepted（本人の承諾済み）、entried=application_submitted、task=selection_action_required、interview=interview_scheduled、intern=participation_confirmed、offer=offer_received、rejected=rejected、closed=withdrawn。証拠が弱ければ mailItems / priorityMails に残す。
    - 就活エージェント・キャリア支援組織・イベント運営者・大学の一般案内は応募企業ではない。応募先としての採用・選考が
      明記されない限り selections に入れず、必要なら mailItems / priorityMails にだけ入れる。
    - stage: 出願予定=scouted / 出願済=entried / ES・テスト中=task / 面接中=interview / インターン合格=intern /

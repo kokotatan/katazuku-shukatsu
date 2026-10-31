@@ -23,6 +23,7 @@ jobs:
         with:
           node-version: '24'
       - run: npm ci
+      - run: npm audit --audit-level=high
       # 個人情報・秘密情報の混入検査(形ベース)。固有名詞の遮断は private 側の SCAN_BLOCKLIST で行う。
       - run: npm run scan
       - run: npm run typecheck
@@ -32,6 +33,8 @@ jobs:
       - run: npm pack --dry-run
       - run: node tools/check-npm-release.mjs
       - run: npm test
+      - run: npm --prefix spark-gateway audit --audit-level=high
+      - run: npm --prefix muse-gateway audit --audit-level=high
       - run: npm run google-auth:check
 
   apps:
@@ -51,6 +54,7 @@ jobs:
         with:
           node-version: '24'
       - run: npm ci
+      - run: npm audit --audit-level=high
       - run: npm run build
 
   compat-node22:
@@ -83,5 +87,6 @@ jobs:
       - name: Verify the packaged application
         shell: pwsh
         run: node desktop/tools/check-portable.mjs "$env:RUNNER_TEMP/katazuku-windows-x64"
+      - run: npm --prefix desktop audit --audit-level=high
       - name: Run the complete public gate
         run: npm run check
