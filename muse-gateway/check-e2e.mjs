@@ -2,13 +2,13 @@ import assert from 'node:assert/strict'
 import { createHash, randomBytes } from 'node:crypto'
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { spawn, spawnSync } from 'node:child_process'
 import { setTimeout as delay } from 'node:timers/promises'
 
 const here = dirname(fileURLToPath(import.meta.url))
-const repository = join(here, '..')
+const repository = resolve(process.env.KATAZUKU_MUSE_E2E_REPOSITORY || join(here, '..'))
 const origin = 'http://127.0.0.1:18803'
 const ownerKey = randomBytes(32).toString('base64url')
 const bridgeToken = randomBytes(32).toString('base64url')
@@ -21,8 +21,12 @@ const workflowStorePath = join(root, 'workflow.db')
 // Wrangler resolves the entrypoint relative to the config file, so the test config belongs beside worker.ts.
 const gatewayConfigPath = join(here, 'test-e2e.local.json')
 const bridgeConfigPath = join(root, 'bridge.local.json')
-const tsxCli = join(repository, 'node_modules', 'tsx', 'dist', 'cli.mjs')
-const bridgeScript = join(repository, 'scripts', 'muse-bridge.ts')
+const tsxCli = resolve(process.env.KATAZUKU_MUSE_E2E_TSX_CLI || join(repository, 'node_modules', 'tsx', 'dist', 'cli.mjs'))
+const bridgeScript = resolve(process.env.KATAZUKU_MUSE_E2E_BRIDGE_SCRIPT || join(repository, 'scripts', 'muse-bridge.ts'))
+const seedScript = resolve(process.env.KATAZUKU_MUSE_E2E_SEED_SCRIPT || join(repository, 'examples', 'seed.ts'))
+const expectedCompany = process.env.KATAZUKU_MUSE_E2E_EXPECTED_COMPANY || 'Example Inc.'
+const expectedServerName = process.env.KATAZUKU_MUSE_E2E_EXPECTED_SERVER_NAME || 'katazuku-shukatsu'
+const resultLabel = process.env.KATAZUKU_MUSE_E2E_LABEL || 'Muse E2E'
 let gateway
 let bridge
 
@@ -37,7 +41,7 @@ async function stop(child) {
 }
 
 try {
-  const seeded = spawnSync(process.execPath, [tsxCli, join(repository, 'examples', 'seed.ts'), dbPath], {
+  const seeded = spawnSync(process.execPath, [tsxCli, seedScript, dbPath], {
     cwd: repository, encoding: 'utf8', windowsHide: true,
   })
   assert.equal(seeded.status, 0, '合成DBを作成できませんでした')
@@ -133,15 +137,15 @@ try {
   assert(connected, '実bridgeがgatewayへ接続しませんでした')
 
   const initialized = await rpc(2, 'initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'muse-e2e', version: '1' } })
-  assert.equal(initialized.result.serverInfo.name, 'katazuku-shukatsu')
+  assert.equal(initialized.result.serverInfo.name, expectedServerName)
   const listed = await rpc(3, 'tools/list', {})
   const names = listed.result.tools.map((tool) => tool.name)
   for (const name of ['katazuku_today', 'katazuku_snapshot', 'katazuku_record_mail', 'katazuku_prepare_action']) assert(names.includes(name))
   assert(!names.includes('shell'))
 
-  const status = await rpc(4, 'tools/call', { name: 'katazuku_status', arguments: { company: 'Example Inc.' } })
+  const status = await rpc(4, 'tools/call', { name: 'katazuku_status', arguments: { company: expectedCompany } })
   assert.equal(status.result.isError, false)
-  assert(status.result.content[0].text.includes('Example Inc.'))
+  assert(status.result.content[0].text.includes(expectedCompany))
   const snapshot = await rpc(5, 'tools/call', { name: 'katazuku_snapshot', arguments: {} })
   assert.equal(snapshot.result.isError, false)
   const snapshotData = JSON.parse(snapshot.result.content[0].text)
@@ -149,7 +153,7 @@ try {
 
   const recorded = await rpc(6, 'tools/call', { name: 'katazuku_record_mail', arguments: { items: [{
     id: 'muse-e2e-message', receivedAt: '2099-01-01T00:00:00Z', subject: 'Synthetic appointment request',
-    summary: 'Synthetic E2E only', needsAction: true, company: 'Example Inc.', sourceRef: 'muse-email:synthetic:muse-e2e-message',
+    summary: 'Synthetic E2E only', needsAction: true, company: expectedCompany, sourceRef: 'muse-email:synthetic:muse-e2e-message',
   }] } })
   assert.equal(recorded.result.isError, false)
   const queue = await rpc(7, 'tools/call', { name: 'katazuku_work_queue', arguments: {} })
@@ -170,7 +174,7 @@ try {
 
   const forbidden = await post('/mcp', { jsonrpc: '2.0', id: 9, method: 'tools/call', params: { name: 'shell', arguments: {} } }, authorization)
   assert.equal((await forbidden.json()).error.code, -32601)
-  console.log('Muse E2E: OAuth全4scope → gateway → 実bridge → 合成DBのread/sensitive/write/actions往復を確認')
+  console.log(`${resultLabel}: OAuth全4scope → gateway → 実bridge → 合成DBのread/sensitive/write/actions往復を確認`)
 } finally {
   await stop(bridge)
   await stop(gateway)
