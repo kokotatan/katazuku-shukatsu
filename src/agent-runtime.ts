@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { access, mkdir, readFile, readdir, realpath, stat, writeFile } from 'node:fs/promises'
 import { delimiter, dirname, join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { createAnthropicApiAdapter } from './providers/anthropic-api.js'
 import { createChatGptPlanAdapter } from './providers/chatgpt-siwc.js'
 import { createOpenAiApiAdapter } from './providers/openai-api.js'
@@ -906,6 +907,10 @@ export function createCodexAdapter(options: AdapterOptions, id: 'codex' | 'codex
       const args = ['exec', '-C', request.cwd, '--skip-git-repo-check', '--color', 'never', '--json', '--output-last-message', paths.finalOutputPath]
       args.push('--sandbox', request.risk === 'read-only' ? 'read-only' : 'workspace-write')
       if (request.capabilities.some((capability) => /^(gmail|calendar|drive|sheets|google)\./.test(capability))) {
+        // ホストに以前の直接接続が登録されていても、この実行は公開guardを必ず通す。
+        args.push('-c', `mcp_servers.google-workspace.command=${JSON.stringify(process.execPath)}`)
+        args.push('-c', `mcp_servers.google-workspace.args=${JSON.stringify([fileURLToPath(new URL('../scripts/google-workspace-bridge.mjs', import.meta.url))])}`)
+        args.push('-c', `mcp_servers.google-workspace.cwd=${JSON.stringify(request.cwd)}`)
         // CLIへのenv指定だけではSTDIO MCPへ届かない。値を引数へ出さず、必要な名前だけ転送する。
         args.push('-c', `mcp_servers.google-workspace.env_vars=${JSON.stringify(googleMcpEnvNames())}`)
         args.push('-c', 'mcp_servers.google-workspace.required=true')

@@ -307,6 +307,8 @@ try {
       && envConfig.includes('KATAZUKU_WORKSPACE_ALLOWED_SENDERS')
       && envConfig.includes('GOOGLE_OAUTH_CLIENT_SECRET')), 'STDIO MCPへenv名を転送していません')
     assert(invocation.args.includes('mcp_servers.google-workspace.required=true'), 'Google接続を待たずに実行を開始します')
+    assert(invocation.args.some((arg) => arg.startsWith('mcp_servers.google-workspace.args=')
+      && arg.includes('google-workspace-bridge.mjs')), 'ホストの未保護接続へ送信を委ねています')
     assert(!invocation.args.some((arg) => arg.includes(syntheticEmail)), '本人アドレスをコマンド引数へ出しています')
     assert(invocation.stdin?.includes('接続済みMCP') && invocation.stdin.includes('shellからbridgeやMCPを再起動'), '制限shellからMCPの再起動へ逸れます')
   })
