@@ -45,6 +45,8 @@ export interface AgentRunRequest {
   risk: AgentRisk
   sideEffectMode: SideEffectMode
   outputSchemaPath?: string
+  /** 完了確認行。未確認の外部操作を成功台帳へ保存しない。 */
+  completionMarker?: string
   providerOrder?: ProviderId[]
   timeoutMs?: number
   /** MCP bridgeがprovider/モデルに依存せず送信境界を検査するための、秘密を含まない実行時ポリシー。 */
@@ -722,8 +724,9 @@ export function validateJsonSchema(value: unknown, schema: unknown): string[] {
   return errors
 }
 
-async function validateOutput(output: string, schemaPath?: string): Promise<FailureCode | undefined> {
+async function validateOutput(output: string, schemaPath?: string, completionMarker?: string): Promise<FailureCode | undefined> {
   if (!output.trim()) return 'invalid_output'
+  if (completionMarker && !output.split(/\r?\n/).some((line) => line.trim() === completionMarker)) return 'invalid_output'
   if (!schemaPath) return undefined
   try {
     const value = JSON.parse(output)
@@ -1186,10 +1189,18 @@ export async function runAgent(request: AgentRunRequest, options: RunAgentOption
       .then((text) => JSON.parse(text) as AgentRunResult)
       .catch(() => null)
     if (ledger && ledger.status) {
+      if (ledger.status === 'succeeded' && request.completionMarker && !ledger.outputRef) {
+        return { ...ledger, status: 'needs_resume', sideEffectState: 'unknown', failure: 'invalid_output', safeToFallback: false }
+      }
       if (ledger.status === 'succeeded' && ledger.outputRef) {
         const outputPath = await realpath(resolve(ledger.outputRef))
         if (dirname(outputPath) !== await realpath(runDir)) throw new Error('保存済みの出力が実行領域外を指しています。再実行せず停止しました。')
-        return { ...ledger, output: await readFile(outputPath, 'utf8') }
+        const output = await readFile(outputPath, 'utf8')
+        if (await validateOutput(output, request.outputSchemaPath, request.completionMarker)) {
+          // 過去版の未確認成功も再送せず、照合待ちとして返す。
+          return { ...ledger, status: 'needs_resume', sideEffectState: 'unknown', failure: 'invalid_output', safeToFallback: false, output }
+        }
+        return { ...ledger, output }
       }
       return ledger
     }
@@ -1336,11 +1347,12 @@ export async function runAgent(request: AgentRunRequest, options: RunAgentOption
     }
 
     const output = await adapter.readOutput(processResult, { finalOutputPath })
-    const validationFailure = await validateOutput(output, request.outputSchemaPath)
+    const validationFailure = await validateOutput(output, request.outputSchemaPath, request.completionMarker)
     const refs = await writeAttemptArtifacts(runDir, attemptId, processResult, output)
     if (validationFailure) {
       const possibleSideEffect = adapter.detectPossibleSideEffect(processResult)
-      const safeToFallback = mayFallback({
+      const unconfirmedCommit = Boolean(request.completionMarker) && (request.sideEffectMode === 'direct' || request.sideEffectMode === 'reconcile')
+      const safeToFallback = !unconfirmedCommit && mayFallback({
         failure: validationFailure,
         phase: 'validating',
         sideEffectMode: request.sideEffectMode,

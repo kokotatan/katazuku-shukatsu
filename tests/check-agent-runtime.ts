@@ -452,8 +452,8 @@ try {
 
   await check('#23: 同じrunIdの再試行は二重起動せず、既存結果を冪等に返す', async () => {
     const calls: { command: string; args: string[]; stdin?: string }[] = []
-    const execute = queuedExecutor([processResult({ stdout: 'one' }), processResult({ stdout: 'two' })], calls)
-    const req = () => request({ runId: 'idempotent-run', risk: 'db-write', sideEffectMode: 'reconcile', providerOrder: ['claude'] })
+    const execute = queuedExecutor([processResult({ stdout: 'one\n=== asa DONE ===' }), processResult({ stdout: 'two' })], calls)
+    const req = () => request({ runId: 'idempotent-run', completionMarker: '=== asa DONE ===', risk: 'db-write', sideEffectMode: 'reconcile', providerOrder: ['claude'] })
     const opts = { adapters: [fakeAdapter('claude')], artifactDir: workDir, execute }
     const first = await runAgent(req(), opts)
     const callsAfterFirst = calls.length
@@ -461,6 +461,29 @@ try {
     assert(second.runId === first.runId && second.status === first.status, '再試行が既存結果を返していません')
     assert(second.output === first.output, '再試行で保存済みの完了出力が失われます')
     assert(calls.length === callsAfterFirst, '再試行で provider を二重起動しています')
+  })
+
+  await check('配信完了行のないexit0を成功保存せず、再試行でも二重送信しない', async () => {
+    const calls: { command: string; args: string[]; stdin?: string }[] = []
+    const execute = queuedExecutor([processResult({ stdout: 'Delivery result unavailable.' })], calls)
+    const req = request({ runId: 'unconfirmed-delivery', completionMarker: '=== asa DONE ===',
+      risk: 'external-commit', sideEffectMode: 'reconcile', providerOrder: ['codex'] })
+    const opts = { adapters: [fakeAdapter('codex', { possibleSideEffect: true })], artifactDir: workDir, execute }
+    const first = await runAgent(req, opts)
+    const second = await runAgent(req, opts)
+    assert(first.status === 'needs_resume' && first.sideEffectState === 'unknown', JSON.stringify(first))
+    assert(second.status === 'needs_resume' && calls.length === 1, '未確認配信を自動再試行しました')
+  })
+
+  await check('旧成功台帳に完了行がなければ照合待ちを返し、新規providerは起動しない', async () => {
+    const calls: { command: string; args: string[]; stdin?: string }[] = []
+    const execute = queuedExecutor([processResult({ stdout: 'incomplete' })], calls)
+    const req = request({ runId: 'legacy-incomplete-delivery', risk: 'external-commit',
+      sideEffectMode: 'reconcile', providerOrder: ['codex'] })
+    const opts = { adapters: [fakeAdapter('codex')], artifactDir: workDir, execute }
+    await runAgent(req, opts)
+    const recovered = await runAgent({ ...req, completionMarker: '=== asa DONE ===' }, opts)
+    assert(recovered.status === 'needs_resume' && calls.length === 1, '旧未確認成功を受け入れました')
   })
 
   await check('#23: 実行中(終端台帳なし)の同runIdは拒否して二重起動を防ぐ', async () => {

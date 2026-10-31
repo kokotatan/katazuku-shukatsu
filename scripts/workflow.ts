@@ -387,6 +387,7 @@ async function asaDeliveryTest(ctx: Context, id: string): Promise<boolean> {
   if (ctx.dryRun) { dryRunReport(ctx, 'asa', prompt, capabilities); return true }
   const result = await runAgentStep({
     config: ctx.config, workflow: 'asa', runId: `asa-delivery-test:${id}`, prompt, capabilities,
+    completionMarker: sentinelFor('asa'),
     risk: 'external-commit', sideEffectMode: 'reconcile', timeoutMs: 15 * MINUTE, agent: ctx.agent,
   })
   if (result.status !== 'succeeded') throw new Error('配信試験に失敗: ' + describeFailure(result))
