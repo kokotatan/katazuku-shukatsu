@@ -107,7 +107,7 @@ npm run --silent muse:submission-spec > muse-connector-tool-spec.json
 ## 提出前の未完了項目
 
 - [ ] Connector専用の公開プライバシー通知を`https://www.katazuku-shukatsu.kotalabo.com/muse/privacy/`へデプロイし、外部から本文・更新日・問い合わせ先を確認する（サイト実装と`MUSE-CONNECTOR-PRIVACY-DRAFT.md`は準備済み、まだ未公開）。
-- [ ] support/security連絡先と、48時間以内のMeta incident通知責任者を固定する。
+- [x] support/privacy/security窓口をproductionの公開privacy noticeへ固定し、48時間以内のMeta incident通知責任者、封じ込め、rotation、復旧gateを`MUSE-INCIDENT-RESPONSE.md`へ定義する（具体的な連絡先は公開OSSへ複製しない）。
 - [ ] 事業者情報、ブランド素材、利用規約、保守担当者を提出画面の内容と一致させる。
 - [ ] production gateway origin、OAuth client情報、redirect URIを実環境で固定する。
 - [x] production設定のHTTPS origin、placeholder、KV/DO、秘密の平文混入、ログ無効化をdeploy前に拒否し、秘密を読まずendpointとsource hashを証跡JSONへ出すpreflightを実装する。

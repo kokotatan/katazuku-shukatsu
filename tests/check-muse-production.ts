@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { parseJsonc, sha256, validateMuseProductionConfig } from '../src/muse-production.js'
 
 const valid = `{
@@ -40,4 +41,8 @@ invalid((config) => { config.workers_dev = false }, 'production route')
 invalid((config) => { config.vars.PUBLIC_ORIGIN = 'https://connector.example.net/' }, 'originだけ')
 
 assert.equal(Buffer.from(sha256('katazuku'), 'hex').toString('base64'), 'HL0xnm2fLliMtNvrX8A63FJuPfcE4nx7O430P1vdlrI=')
+const incident = readFileSync(new URL('../docs/MUSE-INCIDENT-RESPONSE.md', import.meta.url), 'utf8')
+for (const required of ['operator security contact', '48時間以内', 'credential broker', 'OAuth grantを失効', 'npm run check', '非送信の読取']) {
+  assert.ok(incident.includes(required), `incident responseに必須手順がありません: ${required}`)
+}
 console.log('Muse production preflight: JSONC、HTTPS origin、秘密境界、KV/DO、ログ無効化、endpoint、hashを確認')

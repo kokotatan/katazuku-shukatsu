@@ -52,6 +52,8 @@ MetaはConnector Platformで提出項目、tool権限分類、3段階審査、�
 このgatewayは未提出・未承認です。実装済み、提出済み、承認済み、利用者接続済みを区別し、
 [`docs/MUSE-CONNECTOR-SUBMISSION.md`](../docs/MUSE-CONNECTOR-SUBMISSION.md)の不足項目を解消してから提出してください。
 登録値やredirect URIは提出画面と実機のOAuth discoveryを照合し、推測で設定しません。
+security incidentでは[`docs/MUSE-INCIDENT-RESPONSE.md`](../docs/MUSE-INCIDENT-RESPONSE.md)に従い、
+bridge停止、grant失効、鍵rotation、最小証跡保全、48時間以内のMeta通知を行います。
 
 ## 検証
 
