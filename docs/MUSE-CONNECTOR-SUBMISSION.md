@@ -89,7 +89,7 @@ Muse built-in email connectorのsend toolは、宛先・件名・本文を表示
 
 ## 提出前の未完了項目
 
-- [ ] Connector専用の公開プライバシー通知を、実運用URLへ掲載する（草案は`MUSE-CONNECTOR-PRIVACY-DRAFT.md`）。
+- [ ] Connector専用の公開プライバシー通知を`https://www.katazuku-shukatsu.kotalabo.com/muse/privacy/`へデプロイし、外部から本文・更新日・問い合わせ先を確認する（サイト実装と`MUSE-CONNECTOR-PRIVACY-DRAFT.md`は準備済み、まだ未公開）。
 - [ ] support/security連絡先と、48時間以内のMeta incident通知責任者を固定する。
 - [ ] 事業者情報、ブランド素材、利用規約、保守担当者を提出画面の内容と一致させる。
 - [ ] production gateway origin、OAuth client情報、redirect URIを実環境で固定する。
